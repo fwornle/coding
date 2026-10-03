@@ -112,7 +112,6 @@ FROM node-deps AS builder
 COPY integrations/ ./integrations/
 COPY src/ ./src/
 COPY lib/ ./lib/
-COPY knowledge-management/insights/ ./knowledge-management/insights/
 COPY scripts/ ./scripts/
 COPY config/ ./config/
 COPY tsconfig.json ./
@@ -210,7 +209,9 @@ COPY --from=builder /coding/src ./src
 COPY --from=builder /coding/lib ./lib
 COPY --from=builder /coding/scripts ./scripts
 COPY --from=builder /coding/config ./config
-COPY --from=builder /coding/knowledge-management ./knowledge-management
+# knowledge-management/ is bind-mounted (docker-compose.yml); its insights/ is
+# a symlink into the tools repo's learning checkout (per-repo tenancy T7), so
+# nothing of it belongs in the image.
 # Pre-warmed fastembed model cache (see "Pre-warm Node fastembed cache" in builder)
 COPY --from=builder /coding/local_cache ./local_cache
 

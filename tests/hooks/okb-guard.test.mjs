@@ -94,6 +94,9 @@ describe('in the tools repo (lib/paths present)', () => {
     for (const rel of [
       '.data/knowledge-graph/exports/coding.json',
       '.data/observation-export/observations.json',
+      // T7: the UKB insight documents left too (a symlink into .coding/kb/).
+      'knowledge-management/insights/SomePattern.md',
+      'knowledge-management/insights/images/some-pattern.png',
     ]) {
       const cwd = makeRepo(`tools-${rel.split('/')[1]}`, true);
       write(cwd, rel, '{}\n');
@@ -113,6 +116,13 @@ describe('in the tools repo (lib/paths present)', () => {
 
     git(cwd, 'rm', '-q', '--cached', '.data/knowledge-export/coding.json');
     assert.equal(runHook(cwd).code, 0, 'untracking KB content must not be blocked');
+
+    // The T7 move: 2,353 insight documents untracked in one commit.
+    write(cwd, 'knowledge-management/insights/A.md', 'a\n');
+    git(cwd, 'add', '-f', 'knowledge-management/insights/A.md');
+    git(cwd, 'commit', '-q', '-m', 'insight', '--no-verify');
+    git(cwd, 'rm', '-q', '--cached', 'knowledge-management/insights/A.md');
+    assert.equal(runHook(cwd).code, 0, 'untracking insight documents must not be blocked');
   });
 
   test('an ordinary code commit passes', () => {

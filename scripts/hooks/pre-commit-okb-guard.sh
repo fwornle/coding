@@ -11,7 +11,10 @@
 #      the old "commit them separately" advice is wrong: separately is still in
 #      the wrong repository. A hit means a .gitignore re-include crept back, or
 #      someone used `git add -f`, and 119 MB of one developer's knowledge base
-#      is about to re-enter every clone.
+#      is about to re-enter every clone. `knowledge-management/insights/` (UKB
+#      insight documents, 43 MB) followed in per-repo tenancy T7: it is a
+#      symlink into the tools repo's own learning checkout,
+#      `.coding/kb/insights/`, and gitignored here.
 #
 #   2. An OKB submodule inside a consumer repo. There `.data/exports/*.json` IS
 #      the live baseline, tracked on purpose, and the original semantics still
@@ -41,7 +44,7 @@ repo_root=$(git rev-parse --show-toplevel 2>/dev/null || echo '')
 # name keeps this working for a checkout under any name.
 if [ -n "$repo_root" ] && [ -f "$repo_root/lib/paths/data-home.cjs" ]; then
     # ── 1. tools repo: these trees are not allowed back ──────────────────────
-    MOVED_PATTERN='^\.data/(knowledge-export|knowledge-graph|observation-export)/'
+    MOVED_PATTERN='^(\.data/(knowledge-export|knowledge-graph|observation-export)|knowledge-management/insights)/'
     staged_moved=$(echo "$staged_all" | grep -E "$MOVED_PATTERN" || true)
 
     # Deletions are how the content LEAVES, so they must stay allowed — the
@@ -58,19 +61,20 @@ if [ -n "$repo_root" ] && [ -f "$repo_root/lib/paths/data-home.cjs" ]; then
     echo "║  KNOWLEDGE BASE CONTENT IN THE TOOLS REPO                    ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo ""
-    echo "These trees moved to the data root and are gitignored here:"
+    echo "These trees moved out of the tools repo and are gitignored here:"
     echo ""
     echo "$staged_moved" | while read -r f; do echo "  - $f"; done
     echo ""
-    echo "They belong under \$(bin/coding-data-home)/kb/ — a per-machine,"
-    echo "per-scope location, so a colleague's clone does not start as a copy"
-    echo "of this machine's knowledge base."
+    echo ".data/knowledge-*, .data/observation-export belong under"
+    echo "\$(bin/coding-data-home)/kb/; knowledge-management/insights is a symlink"
+    echo "into .coding/kb/insights/ — this repo's own learning checkout. Either"
+    echo "way a colleague's clone does not start as a copy of this machine's"
+    echo "knowledge base."
     echo ""
     echo "If these are staged, either a .gitignore re-include came back or they"
-    echo "were added with 'git add -f'. Check .gitignore around the"
-    echo "'.data/knowledge-*' block before unstaging:"
+    echo "were added with 'git add -f'. Check .gitignore before unstaging:"
     echo ""
-    echo "  git reset HEAD .data/knowledge-export .data/knowledge-graph .data/observation-export"
+    echo "  git reset HEAD .data/knowledge-export .data/knowledge-graph .data/observation-export knowledge-management/insights"
     echo ""
     echo "Escape hatch: git commit --no-verify"
     echo ""

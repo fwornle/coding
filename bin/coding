@@ -344,11 +344,13 @@ export CODING_TOOLS_PATH="$SCRIPT_DIR/.."
 export CODING_REPO="$SCRIPT_DIR/.."
 export CODING_PROJECT_DIR="$PROJECT_DIR"
 
-# Ensure private session-history dirs exist. These trees (history/, logs/,
-# archive/) are .gitignore'd in 'coding' and live in a separate private
-# repo configured via install.sh. LSL services that write to them crash
-# if the dirs don't exist on a fresh public checkout.
-if [ -x "$SCRIPT_DIR/init-history.sh" ]; then
+# Set up the tools repo's own learning checkout (<coding>/.coding/, the
+# coding-history repo) and its .specstory/history + knowledge-management/
+# insights symlinks. LSL services that write there crash if the dirs don't
+# exist on a fresh public checkout. Not on --dry-run: it MOVES data (a nested
+# history checkout, the insight documents), and a dry run must change nothing —
+# the profile-matrix test runs this launcher against the real checkout.
+if [ "$DRY_RUN" != true ] && [ -x "$SCRIPT_DIR/init-history.sh" ]; then
   "$SCRIPT_DIR/init-history.sh" 2>/dev/null || true
 fi
 

@@ -169,12 +169,14 @@ diff -q "$OUT/sentinel.before" "$OUT/sentinel.after" >/dev/null \
 [ ! -e "$DATA/default" ] && pass "nothing was filed under the placeholder scope" \
   || fail "a data home exists for the placeholder: $DATA/default"
 
-# History: the tools repo's own slot is a symlink into this scope's data home.
+# History: the tools repo is an ordinary linked repo (T7) — its own slot is a
+# symlink into its learning checkout, <tools>/.coding/history.
 link="$TOOLS/.specstory/history"
-if [ -L "$link" ] && [ "$(readlink "$link")" = "$DH/history" ]; then
-  pass ".specstory/history → $DH/history"
+TH="$TOOLS/.coding/history"
+if [ -L "$link" ] && [ "$(readlink "$link")" = "../.coding/history" ]; then
+  pass ".specstory/history → ../.coding/history"
 else
-  fail ".specstory/history is not a symlink into $DH/history ($(ls -ld "$link" 2>&1))"
+  fail ".specstory/history is not a symlink into ../.coding/history ($(ls -ld "$link" 2>&1))"
 fi
 
 # Session logs: each landed with its own project, and only there.
@@ -182,12 +184,15 @@ has_probe() { grep -rlF "$1" "$2" 2>/dev/null | grep -v '/logs/' | head -1; }
 f="$(has_probe 'cleanroom-outside' "$PROJECT/.specstory/history")"
 [ -n "$f" ] && pass "the outside project's session landed in the outside project ($f)" \
   || fail "the outside project's session is not in $PROJECT/.specstory/history (see lsl-outside.log)"
-[ -z "$(has_probe 'cleanroom-outside' "$DH/history")" ] \
+[ -z "$(has_probe 'cleanroom-outside' "$TH")" ] \
   && pass "the outside project's session was NOT redirected into the tools history" \
-  || fail "the outside project's session was redirected into $DH/history"
-f="$(has_probe 'cleanroom-tools' "$DH/history")"
-[ -n "$f" ] && pass "the tools repo's session landed in this scope's data home ($f)" \
-  || fail "the tools repo's session is not in $DH/history (see lsl-tools.log)"
+  || fail "the outside project's session was redirected into $TH"
+f="$(has_probe 'cleanroom-tools' "$TH")"
+[ -n "$f" ] && pass "the tools repo's session landed in its own learning checkout ($f)" \
+  || fail "the tools repo's session is not in $TH (see lsl-tools.log)"
+[ -z "$(git -C "$TOOLS" status --porcelain -- .specstory .coding knowledge-management)" ] \
+  && pass "the tools checkout's git status shows none of it" \
+  || fail "learned data shows in the tools checkout: $(git -C "$TOOLS" status --porcelain -- .specstory .coding knowledge-management | head -3)"
 
 # Knowledge: the entity is in this scope's data home and nowhere else.
 f="$(grep -rlF 'CleanroomProbeEntity' "$DH" 2>/dev/null | head -1)"

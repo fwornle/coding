@@ -163,7 +163,8 @@ export -f ensure_coding_runtime_ignored
 # Ensure <project>/.coding/ — the project's private <project>-history checkout
 # (history/ + kb/), with .specstory/history a symlink into it. The whole flow
 # lives in lib/history/repo-link.mjs (one implementation, also used by
-# bin/init-history.sh); this is only its launcher entry point.
+# bin/init-history.sh); this is only its launcher entry point. The tools repo is
+# no exception: its coding-history checkout is <coding>/.coding/ too.
 #
 # First launch in a repo asks for the remote (Enter = the derived default, a
 # URL — an existing teammate repo is cloned and shared — or 'skip'). The answer
@@ -173,13 +174,6 @@ export -f ensure_coding_runtime_ignored
 # $LSL_HISTORY_AUTO (yes|no) and $LSL_HISTORY_REMOTE_TEMPLATE.
 ensure_private_history_repo() {
   local project_dir="$1"
-
-  # The tools repo's own history is not this function's. install.sh and
-  # bin/init-history.sh put it in the per-scope data home (a symlink here),
-  # and its .coding/ is the per-launch runtime dir.
-  if [ -n "${CODING_REPO:-}" ] && [ "$(cd "$project_dir" 2>/dev/null && pwd -P)" = "$(cd "$CODING_REPO" 2>/dev/null && pwd -P)" ]; then
-    return 0
-  fi
 
   local coding_repo="${CODING_REPO:-$(cd "$_AGENT_COMMON_DIR/.." && pwd)}"
   # Never fails the launch: the module reports and exits 0 on its own errors.

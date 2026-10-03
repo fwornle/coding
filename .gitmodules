@@ -1,18 +1,18 @@
 [submodule "integrations/constraint-monitor"]
 	path = integrations/constraint-monitor
-	url = git@github.com:fwornle/constraint-monitor.git
+	url = https://github.com/fwornle/constraint-monitor.git
 [submodule "integrations/memory-visualizer"]
 	path = integrations/memory-visualizer
-	url = git@github.com:fwornle/memory-visualizer.git
+	url = https://github.com/fwornle/memory-visualizer.git
 [submodule "integrations/semantic-analysis"]
 	path = integrations/semantic-analysis
-	url = git@github.com:fwornle/semantic-analysis.git
+	url = https://github.com/fwornle/semantic-analysis.git
 [submodule "integrations/serena"]
 	path = integrations/serena
 	url = https://github.com/oraios/serena.git
 [submodule "lib/km-core"]
 	path = lib/km-core
-	url = git@github.com:fwornle/km-core.git
+	url = https://github.com/fwornle/km-core.git
 [submodule "integrations/graphify"]
 	path = integrations/graphify
 	url = https://github.com/fwornle/graphify.git

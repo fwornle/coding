@@ -47,7 +47,7 @@ test('owner mode: repos that ignore .coding/ get their file; others stay local',
     assert.equal(l.fileFor('linked'), join(f.root, 'linked', '.coding', 'kb', 'knowledge-graph', 'linked.json'));
     assert.equal(l.fileFor('skipped'), join(f.root, 'skipped', '.coding', 'kb', 'knowledge-graph', 'skipped.json'));
     assert.equal(l.fileFor('never-launched'), join(local, 'never-launched.json'), 'would show up in the user\'s repo');
-    assert.equal(l.fileFor('tools'), join(local, 'tools.json'), 'the tools repo waits for T7');
+    assert.equal(l.fileFor('tools'), join(f.root, 'tools', '.coding', 'kb', 'knowledge-graph', 'tools.json'), 'the tools repo is an ordinary linked repo (T7)');
     assert.equal(l.fileFor('teammate'), join(local, 'teammate.json'), 'a shared clone is never written');
     const d = l.describe();
     assert.equal(d.linked.kind, 'linked');

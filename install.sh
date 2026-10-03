@@ -1063,13 +1063,12 @@ install_memory_visualizer() {
         fi
     else
         info "Initializing memory-visualizer submodule..."
-        # The submodule remote is SSH (git@github.com:…), so this needs a key.
-        # A public CI runner has none, and neither does the Docker install
-        # harness — the clone fails on authentication, which is missing infra
-        # rather than an installer defect. --ci promises to downgrade exactly
-        # that class of gate, so honour the promise here too: before this, a
-        # --ci run aborted at this line and never reached the remaining steps,
-        # which is why CI could not verify a complete install even in principle.
+        # The submodule remote is public HTTPS (D4), so no key is needed — but
+        # a clone can still fail (no network, or the Docker install harness,
+        # which builds from a tar of tracked files and has no .git at all).
+        # That is missing infra rather than an installer defect, and --ci
+        # promises to downgrade exactly that class of gate: before this, a --ci
+        # run aborted at this line and never reached the remaining steps.
         if ! git submodule update --init --recursive integrations/memory-visualizer; then
             if [[ "$CI_LITE" == "true" ]]; then
                 warning "Could not clone memory-visualizer (no credentials for the private remote) — skipping (CI-lite portability run)"
@@ -1138,10 +1137,10 @@ install_semantic_analysis() {
         # user without the semantic-analysis server has no working MCP layer and
         # should be told so immediately rather than discovering it later.
         #
-        # Two distinct causes both land here, which is why the message does not
-        # name one: a CI runner has the git checkout but no SSH key for
-        # git@github.com, while the Docker install harness builds from a tar of
-        # tracked files and so has no .git at all ("not a git repository").
+        # More than one cause lands here, which is why the message does not
+        # name one: no network to github.com, or the Docker install harness,
+        # which builds from a tar of tracked files and so has no .git at all
+        # ("not a git repository").
         if ! git submodule update --init --recursive integrations/semantic-analysis; then
             if [[ "$CI_LITE" == "true" ]]; then
                 warning "Could not initialize the semantic-analysis submodule"
@@ -3839,27 +3838,12 @@ git_url_slug() {
     return 0
 }
 
-# The directory that is — or should become — this installation's history
-# checkout. Prints nothing when there is none to offer.
-#
-#   $CODING_REPO/.specstory/history   a pre-data-home install: a REAL directory
-#                                     with content (the developer's own machine
-#                                     until it migrates). Never moved from here.
-#   <data home>/history               an older transcripts-only repo cloned into
-#                                     the data home by bin/init-history.sh
-#   <data home>                       otherwise: the user-data repo, history/ and
-#                                     kb/ tracked, var/ ignored
-#
-# Nothing when the scope is the placeholder: a history repo named after no one,
-# filed under a data home that moves the moment the user names their scope.
+# The tools repo's own learning checkout: `<coding>/.coding/` (the
+# coding-history repo — history/ + kb/), exactly like every other repo coding
+# runs in (per-repo tenancy T7; lib/history/repo-link.mjs). It no longer depends
+# on the install scope: the scope only names this machine's runtime home (D7).
 history_home() {
-    local legacy="$CODING_REPO/.specstory/history" dh
-    if [[ -d "$legacy" && ! -L "$legacy" && -n "$(ls -A "$legacy" 2>/dev/null || true)" ]]; then
-        printf '%s' "$legacy"; return 0
-    fi
-    "$CODING_REPO/bin/coding-data-home" --require-scope >/dev/null 2>&1 || return 0
-    dh="$("$CODING_REPO/bin/coding-data-home" --ensure 2>/dev/null)" || return 0
-    if [[ -e "$dh/history/.git" ]]; then printf '%s' "$dh/history"; else printf '%s' "$dh"; fi
+    printf '%s' "$CODING_REPO/.coding"
     return 0
 }
 
@@ -3942,113 +3926,37 @@ history_repo_state() {
 # Print the manual recipe. Used whenever we cannot (or must not) automate, so
 # that a user on a host gh cannot reach is never left without a path forward.
 history_manual_recipe() {
-    local url="$1" slug home
+    local url="$1" slug
     slug="$(git_url_slug "$url")"
-    home="$(history_home)"
     cat <<EOF
 
   To do this yourself:
     1. Create a NEW PRIVATE, EMPTY repository named "${slug:-<owner>/<name>}"
        (no README, no license, no .gitignore)
-    2. Then seed it from the snapshot already on this machine:
+    2. Put its URL in .env as CODING_HISTORY_REPO=$url and run
 
-         cd ${home:-<your data home: bin/coding-data-home>}
-         git init -b main && git add . && git commit -m "initial snapshot"
-         git remote add origin $url
-         git push -u origin main
+         bin/init-history.sh
+
+       It links $(history_home) to it and pushes the empty layout; existing
+       transcripts are committed locally — publish them with: coding sync --push
 
 EOF
     return 0
 }
 
-# Initialise .specstory/history/ as a checkout of the private repo and push the
-# snapshot that is already on disk.
+# Configure the private session-history side-repo of the tools repo itself.
 #
-# WHY THIS EXISTS: bin/init-history.sh only ever CLONES. A repo the installer
-# just created is empty, so cloning it yields an empty tree and the transcripts
-# already on disk are never published — they sit there untracked, looking for
-# all the world like they are backed up.
+# What coding learns while working on coding — verbatim session transcripts
+# (full prompts, full responses, file paths, occasionally secrets that slipped
+# past redaction) and the knowledge it extracted — lives in <coding>/.coding/,
+# gitignored here, backed by a SEPARATE PRIVATE repo so it can't leak via a
+# public clone. The same layout every repo gets (lib/history/repo-link.mjs).
 #
-# Pushing publishes verbatim session transcripts to a remote, so it is
-# confirmed explicitly every time and never happens on an unattended run unless
-# CODING_HISTORY_PUSH=1 says so.
-history_repo_seed() {
-    local url="$1" hist_dir reply=""
-    local n_files
-    hist_dir="$(history_home)"
-    if [[ -z "$hist_dir" ]]; then
-        info "No scope configured — nothing to seed"
-        return 0
-    fi
-    # Every file it would publish: transcripts are .jsonl now as well as .md,
-    # and a data home also carries kb/. var/ is ignored by the .gitignore
-    # ensureDataHome() wrote, so it is not counted.
-    n_files="$(find "$hist_dir" \( -name .git -o -path "$hist_dir/var" \) -prune -o -type f -print 2>/dev/null | wc -l | tr -d ' ')"
-
-    if [[ -d "$hist_dir/.git" ]]; then
-        info "History dir is already a git checkout — nothing to seed"
-        return 0
-    fi
-
-    echo ""
-    echo "  Ready to publish $hist_dir to:"
-    echo "      $url"
-    echo "  That would push ${n_files} file(s) — session transcripts (verbatim"
-    echo "  prompts and responses) and your knowledge base — to that remote."
-    echo "  Make sure it is PRIVATE."
-    echo ""
-
-    if [[ "$NON_INTERACTIVE" == "true" ]]; then
-        if [[ "${CODING_HISTORY_PUSH:-0}" != "1" ]]; then
-            info "Unattended run: not pushing history (set CODING_HISTORY_PUSH=1 to allow)"
-            history_manual_recipe "$url"
-            return 0
-        fi
-        reply="y"
-    else
-        read_or_default reply "n" "  Initialise and push now? [y/N]: "
-    fi
-    if [[ ! "${reply:-n}" =~ ^[Yy]$ ]]; then
-        info "Skipped — history stays local-only"
-        history_manual_recipe "$url"
-        return 0
-    fi
-
-    (
-        set -e
-        cd "$hist_dir"
-        git init -q
-        git symbolic-ref HEAD refs/heads/main
-        git add -A
-        # An empty history dir is legitimate on a fresh machine; --allow-empty
-        # keeps the remote's default branch created either way.
-        git commit -q --allow-empty -m "initial snapshot"
-        git remote add origin "$url"
-        git push -q -u origin main
-    ) >>"$INSTALL_LOG" 2>&1 \
-        && success "Pushed session history to $url" \
-        || {
-            warning "Push failed — see $INSTALL_LOG. History stays local-only."
-            INSTALLATION_WARNINGS+=("History: initial push to $url failed")
-            history_manual_recipe "$url"
-        }
-    return 0
-}
-
-# Configure the private session-history side-repo.
-#
-# The .specstory/history/ tree contains verbatim Claude session transcripts
-# (organized as YYYY/MM/<file>.md, with classification + operational logs
-# tracked under .specstory/history/logs/)
-# (full prompts, full responses, file paths, occasionally secrets that
-# slipped past redaction). They are .gitignore'd in this public repo and
-# live in a SEPARATE PRIVATE repo so conversation content can't leak via
-# a public clone.
-#
-# This step asks the user for the URL of that private repo, stores it in
-# .env as CODING_HISTORY_REPO, then delegates to bin/init-history.sh
-# which clones into .specstory/history/ (or just creates the empty dirs
-# if the user skipped or has no access).
+# This step asks for that repo's URL, stores it in .env as CODING_HISTORY_REPO,
+# and delegates to bin/init-history.sh → repo-link, which refuses a public
+# repo, creates a missing one (gh, private), clones a populated one (a
+# teammate's history is shared), and seeds an empty one with the layout only.
+# Transcripts are never pushed from here (D3): `coding sync --push`.
 setup_history_repo() {
     skip_unless_feature lsl "session-history repository" || return 0
     info "Configuring private session-history repository"
@@ -4056,15 +3964,6 @@ setup_history_repo() {
     local env_file="$CODING_REPO/.env"
     local hist_dir existing=""
     hist_dir="$(history_home)"
-    if [[ -z "$hist_dir" ]]; then
-        # No scope: a repo named after nobody, filed under a data home that
-        # moves when the scope is named. Local-only until then.
-        warning "No install scope set — session history stays local-only."
-        echo "      Name one (re-run ./install.sh, or write ~/.coding/scope), then re-run."
-        INSTALLATION_WARNINGS+=("History: no scope set (local-only)")
-        "$CODING_REPO/bin/init-history.sh" || true
-        return 0
-    fi
 
     if [[ -f "$env_file" ]] && grep -q '^CODING_HISTORY_REPO=' "$env_file"; then
         # grep -m1 rather than `| head -1`: head closing the pipe SIGPIPEs grep
@@ -4084,18 +3983,19 @@ setup_history_repo() {
   ──────────────────────────────────────────────────────────────────
   PRIVATE SESSION-HISTORY REPO
 
-  Your session transcripts and knowledge base live in your data home,
-  OUTSIDE this checkout:
+  What coding learns while you work on coding itself lives in this
+  checkout's own learning repo, ignored by this repo:
     $hist_dir
       history/YYYY/MM/<file>     verbatim session transcripts
       history/logs/              classification + operational logs
-      kb/                        knowledge base exports and insights
-  (.specstory/history in this repo is a symlink to history/.)
+      kb/                        knowledge exports and insight documents
+  (.specstory/history and knowledge-management/insights are symlinks
+  into it.) Every other repo you run coding in gets the same layout.
 
-  This is the ONLY place your data is tracked. Back it with a SEPARATE
-  PRIVATE repo so conversation content (including occasional unredacted
-  secrets, internal paths, stakeholder names) can't leak, and so a clone
-  of these tools never carries anyone else's history.
+  Back it with a SEPARATE PRIVATE repo so conversation content
+  (including occasional unredacted secrets, internal paths, stakeholder
+  names) can't leak, and so a clone of these tools never carries anyone
+  else's history.
 
   Any host your team can reach works — GitHub, GitHub Enterprise,
   GitLab, Gitea. The suggested URL below is derived from this machine
@@ -4106,9 +4006,8 @@ EOF
 
     # The .env value and the actual checkout can disagree — and when they do,
     # .env is the one that is wrong, because the checkout is what has been
-    # pushed to. Left unreported this is silent: init-history.sh only clones
-    # when the dir is EMPTY, so a bogus .env URL is never exercised on the
-    # machine that has content, and only breaks on the next fresh clone.
+    # pushed to. .env is only read where there is no checkout yet, so a bogus
+    # value is never exercised on this machine and breaks only on a fresh clone.
     if [[ -n "$existing" && -n "$live" && "${existing%.git}" != "${live%.git}" ]]; then
         warning "CODING_HISTORY_REPO in .env does not match the live checkout"
         echo "      .env       : $existing"
@@ -4118,7 +4017,7 @@ EOF
         INSTALLATION_WARNINGS+=("History: .env URL != checkout remote (offered correction)")
     fi
 
-    local repo_url="" reply=""
+    local repo_url="" reply="" state=""
     if [[ -n "$existing" || -n "$live" ]]; then
         echo "  Currently configured: ${existing:-(none)}"
         if [[ -n "$live" ]]; then echo "  Live checkout       : $live"; fi
@@ -4135,11 +4034,28 @@ EOF
         repo_url="$reply"
     fi
 
+    # Resolve the far end only while there is no checkout to link yet.
+    if [[ -n "$repo_url" && ! -d "$hist_dir/.git" && "$repo_url" != *YOUR-ACCOUNT* ]]; then
+        state="$(history_repo_state "$repo_url")"
+        log "History repo state for $repo_url: $state"
+    fi
+
     if [[ -z "$repo_url" ]]; then
-        warning "No private history repo configured — using local-only dirs."
+        warning "No private history repo configured — using a local-only checkout."
         INSTALLATION_WARNINGS+=("History: no private repo configured (local-only)")
     elif [[ "$repo_url" == *YOUR-ACCOUNT* ]]; then
         warning "Could not derive your account name — history left local-only."
+        history_manual_recipe "$repo_url"
+        repo_url=""
+    elif [[ "$state" == "public" ]]; then
+        warning "$repo_url is PUBLIC — refusing to keep transcripts there."
+        echo "      Make it private, or choose a different repo, then re-run."
+        INSTALLATION_WARNINGS+=("History: configured repo is public — not used")
+        repo_url=""
+    elif [[ "$state" == "absent" && "$NON_INTERACTIVE" == "true" ]]; then
+        # Creating a remote repository is a decision, not a side effect of an
+        # unattended run.
+        info "Unattended run: $repo_url does not exist — not creating it"
         history_manual_recipe "$repo_url"
         repo_url=""
     else
@@ -4147,97 +4063,22 @@ EOF
         success "Saved CODING_HISTORY_REPO to .env"
     fi
 
-    # Resolve the far end BEFORE deciding what to do locally. The three cases
-    # need opposite actions and the old code only ever handled one of them:
-    # it called init-history.sh (clone-only) and then printed a recipe.
-    local state="unknown"
-    if [[ -n "$repo_url" && ! -d "$hist_dir/.git" ]]; then
-        state="$(history_repo_state "$repo_url")"
-        log "History repo state for $repo_url: $state"
-
-        case "$state" in
-            public)
-                warning "$repo_url is PUBLIC — refusing to publish transcripts there."
-                echo "      Make it private, or choose a different repo, then re-run."
-                INSTALLATION_WARNINGS+=("History: configured repo is public — not used")
-                repo_url=""
-                ;;
-            absent)
-                echo ""
-                echo "  No repository at $repo_url yet."
-                local host slug create=""
-                host="$(git_url_host "$repo_url")"
-                slug="$(git_url_slug "$repo_url")"
-                if [[ "$NON_INTERACTIVE" == "true" ]]; then
-                    info "Unattended run: not creating a remote repository"
-                    history_manual_recipe "$repo_url"
-                else
-                    read_or_default create "Y" "  Create it as a PRIVATE repo on $host via gh? [Y/n]: "
-                    if [[ -z "${create:-}" || "${create}" =~ ^[Yy]$ ]]; then
-                        if GH_HOST="$host" gh repo create "$slug" --private >>"$INSTALL_LOG" 2>&1; then
-                            success "Created private repo $slug on $host"
-                            history_repo_seed "$repo_url"
-                        else
-                            warning "gh repo create failed — see $INSTALL_LOG"
-                            history_manual_recipe "$repo_url"
-                        fi
-                    else
-                        history_manual_recipe "$repo_url"
-                    fi
-                fi
-                ;;
-            empty)
-                # The case bin/init-history.sh cannot handle: cloning an empty
-                # repo yields an empty tree and silently abandons whatever is
-                # already on disk.
-                info "$repo_url exists but has no commits yet"
-                history_repo_seed "$repo_url"
-                ;;
-            populated)
-                info "$repo_url has content — bin/init-history.sh will clone it"
-                ;;
-            unknown)
-                # No gh, or gh cannot reach that host. Cloning may still work
-                # (ssh keys, credential helper), so let init-history.sh try.
-                log "Cannot inspect $repo_url via gh — deferring to clone"
-                ;;
-        esac
-    fi
-
-    # Always ensure the dirs exist so LSL services don't crash. init-history.sh
-    # also clones the private repo when it's configured AND the local dir is
-    # empty — which after the block above is exactly the "populated" case.
+    # The checkout itself: one implementation for every repo. It also lays out
+    # .coding/ and both symlinks when no repo was chosen, so the LSL services
+    # have somewhere to write.
     if [[ -x "$CODING_REPO/bin/init-history.sh" ]]; then
         "$CODING_REPO/bin/init-history.sh" || warning "init-history.sh exited non-zero"
     else
         # First-run before init-history.sh has been chmod'd or in a partial
         # checkout — make sure the dirs exist so we don't break later steps.
-        mkdir -p "$hist_dir" "$hist_dir/logs/classification"
+        mkdir -p "$hist_dir/history/logs/classification"
     fi
 
-    # Local content, a configured repo, and still no checkout.
-    if [[ -n "$repo_url" ]] \
-        && [[ -d "$hist_dir" ]] \
-        && [[ -n "$(ls -A "$hist_dir" 2>/dev/null || true)" ]] \
-        && [[ ! -d "$hist_dir/.git" ]]; then
-        echo ""
-        echo -e "  ${YELLOW}NOTE${NC}: $hist_dir/ has content but is not a git checkout."
-        if [[ "$state" == "populated" ]]; then
-            # Both sides have content and they are unrelated histories. Seeding
-            # here would build a fresh root commit and try to push it over the
-            # remote's own — git rejects that as a non-fast-forward, so it is
-            # not destructive, but offering it is still the wrong advice.
-            echo "  The remote already has its own content, so these are two unrelated"
-            echo "  histories — pushing would be rejected. Resolve it deliberately:"
-            echo ""
-            echo "      mv $hist_dir $hist_dir.local-$(date +%Y%m%d)"
-            echo "      bin/init-history.sh          # clones the remote"
-            echo "      # then copy anything you still want from the .local-* dir"
-            echo ""
-            INSTALLATION_WARNINGS+=("History: local content and remote content diverge — see install output")
-        else
-            history_repo_seed "$repo_url"
-        fi
+    if [[ -n "$repo_url" && -d "$hist_dir/.git" ]]; then
+        success "Session history: $hist_dir → $(git -C "$hist_dir" remote get-url origin 2>/dev/null || echo "$repo_url")"
+    elif [[ -n "$repo_url" ]]; then
+        warning "Session history is not linked to $repo_url yet — see the [history] lines above"
+        INSTALLATION_WARNINGS+=("History: $repo_url not linked (local-only for now)")
     fi
     return 0
 }
@@ -4289,10 +4130,6 @@ ENVIRONMENT:
   CODING_HISTORY_HOST=<host>       Git host to suggest for the private
                                    session-history repo. Default is derived from
                                    this machine, not hardcoded.
-  CODING_HISTORY_PUSH=1            Allow an UNATTENDED run to push session
-                                   transcripts to the history repo. Off by
-                                   default: pushing publishes verbatim prompts
-                                   and responses, so it is normally confirmed.
   CODING_OKB_CONSUMER_REPOS=a:b    Extra repos to receive the OKB pre-commit hook.
                                    Empty by default.
 

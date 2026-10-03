@@ -1,49 +1,32 @@
 #!/usr/bin/env bash
-# bin/init-history.sh — put the tools repo's session history in the data home.
+# bin/init-history.sh — set up the tools repo's own learning checkout.
 #
 # Called by bin/coding on every launch and by install.sh during setup.
 #
-# WHERE HISTORY LIVES. Session transcripts are user data, so they live in the
-# per-scope data home (lib/paths/data-home.cjs), not in this public checkout:
+# The tools repo is an ordinary linked repo (per-repo tenancy T7): what coding
+# learns about itself lives in its `coding-history` checkout, like any repo's:
 #
-#   ~/.coding/data/<scope>/            the user-data repo (when one is configured)
-#   ├── history/                       LSL transcripts, YYYY/MM/<file> + logs/
-#   ├── kb/                            knowledge worth keeping
-#   └── var/                           machine-local churn, git-ignored
+#   <coding>/.coding/                 the coding-history repo (or untracked, on skip)
+#   ├── history/                      LSL transcripts, YYYY/MM/<file> + logs/
+#   └── kb/                           knowledge exports, insight documents
+#       └── insights/                 UKB insight documents + their images
 #
-#   $CODING_REPO/.specstory/history  →  ~/.coding/data/<scope>/history   (symlink)
+#   <coding>/.specstory/history            →  ../.coding/history     (symlink)
+#   <coding>/knowledge-management/insights →  ../.coding/kb/insights (symlink)
 #
-# The symlink keeps every writer that addresses `.specstory/history` working
-# unchanged, and makes the history of whoever installed this checkout THEIRS:
-# a colleague's clone of `coding` no longer carries a slot that their own
-# installer might fill from the tools author's history repo.
+# Both symlinks keep every writer that addresses the old path working
+# unchanged (the ETM, semantic-analysis, obs-api, the viewer). Both paths are
+# gitignored in this repo, so a UKB run leaves `git status` clean here.
 #
-# Behaviour:
-#   - A REAL, non-empty .specstory/history directory is a pre-data-home install
-#     (including the developer's own machine). It is left exactly as it is; the
-#     move is deliberate (scripts/migrate-data-home.mjs), never a side effect of
-#     launching an agent.
-#   - No resolvable scope (the placeholder): stay in the repo, as before. A
-#     history written under the placeholder's data home would be stranded the
-#     moment the user names their scope.
-#   - Otherwise, when CODING_HISTORY_REPO is configured and the data home has no
-#     checkout yet and holds no history or knowledge: clone it. A data-home
-#     repo (it has a top-level history/) becomes the data home itself; an older
-#     transcripts-only repo (YYYY/ at its root, like the original
-#     `coding-history`) is cloned INTO history/, so it keeps working unchanged.
-#   - Then the symlink, when .specstory/history is absent or an empty dir.
-#
-# DELIBERATELY CLONE-ONLY. This runs on every `bin/coding` launch, so it must
-# never push: publishing verbatim transcripts is a decision, not a side effect
-# of starting an agent. Creating the remote and seeding it from a local snapshot
-# is install.sh's job (`history_repo_seed`), where it is confirmed explicitly and
-# gated behind CODING_HISTORY_PUSH=1 for unattended runs.
+# The checkout itself is lib/history/repo-link.mjs's job — the same code every
+# other repo goes through. CODING_HISTORY_REPO (written to .env by install.sh)
+# answers its question; without it nothing is asked from here (this runs on
+# every launch, non-interactively), and the launcher asks when an agent starts
+# in this repo. Never pushes: publishing transcripts is `coding sync --push`.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
-
-LINK=".specstory/history"
 
 # Source CODING_HISTORY_REPO from .env without polluting the parent shell.
 history_repo=""
@@ -53,56 +36,40 @@ if [ -f .env ]; then
   history_repo="${history_repo#\"}"
 fi
 
-# Only fills in a missing tree; never touches one that already has content.
-ensure_legacy_dirs() {
-  mkdir -p "$LINK" "$LINK/logs/classification"
-}
+args=(ensure "$REPO_ROOT" --no-ask)
+[ -n "$history_repo" ] && args+=(--remote "$history_repo")
+node "$REPO_ROOT/lib/history/repo-link.mjs" "${args[@]}" </dev/null >/dev/null \
+  || echo "[init-history] learning checkout setup did not complete" >&2
 
-is_empty_dir() {
-  [ -d "$1" ] && [ -z "$(ls -A "$1" 2>/dev/null)" ]
-}
-
-# 1. A pre-data-home install: a real directory with content. Leave it alone.
-if [ -d "$LINK" ] && [ ! -L "$LINK" ] && ! is_empty_dir "$LINK"; then
-  ensure_legacy_dirs
-  exit 0
-fi
-
-# 2. No scope to file the history under — keep the old in-repo layout.
-if ! scope="$("$REPO_ROOT/bin/coding-data-home" --require-scope 2>/dev/null)"; then
-  ensure_legacy_dirs
-  exit 0
-fi
-data_home="$("$REPO_ROOT/bin/coding-data-home" --ensure)"
-hist_dir="$data_home/history"
-
-# 3. Clone the configured repo into a data home that has nothing of its own.
-if [ -n "$history_repo" ] && [ ! -e "$data_home/.git" ] && [ ! -e "$hist_dir/.git" ] \
-  && is_empty_dir "$hist_dir" && is_empty_dir "$data_home/kb"; then
-  # One clone implementation for every learning repo (lib/history/repo-link.mjs).
-  # --nest keeps this data home's historical handling of a transcripts-only repo
-  # (YYYY/ at its root, like the original `coding-history`): it is cloned INTO
-  # history/ and keeps working unchanged. A data-home repo (top-level history/)
-  # becomes the data home itself; local untracked files such as var/ are kept.
-  if ! node "$REPO_ROOT/lib/history/repo-link.mjs" clone "$data_home" "$history_repo" --nest 2>&1 \
-      | sed 's/^\[history\]/[init-history]/'; then
-    echo "[init-history] clone of $history_repo failed (auth/network?) — using empty local dir"
+# The insight documents. A real directory here is either the pre-T7 tracked
+# tree (still tracked: leave it — that checkout has not got the move yet) or
+# what is left of it after the move (untracked leftovers: fold them in).
+INSIGHTS="knowledge-management/insights"
+target=".coding/kb/insights"
+mkdir -p "$target"
+if [ -d "$INSIGHTS" ] && [ ! -L "$INSIGHTS" ]; then
+  if [ -z "$(git ls-files -- "$INSIGHTS" | head -1)" ]; then
+    for entry in "$INSIGHTS"/* "$INSIGHTS"/.[!.]*; do
+      [ -e "$entry" ] || continue
+      name="$(basename "$entry")"
+      if [ -e "$target/$name" ]; then
+        # Same name on both sides: merge a directory, keep the existing file.
+        if [ -d "$entry" ] && [ -d "$target/$name" ]; then
+          mv -n "$entry"/* "$target/$name"/ 2>/dev/null || true
+          rmdir "$entry" 2>/dev/null || true
+        fi
+      else
+        mv "$entry" "$target/$name"
+      fi
+    done
+    if rmdir "$INSIGHTS" 2>/dev/null; then
+      echo "[init-history] moved $INSIGHTS → $target"
+    else
+      echo "[init-history] $INSIGHTS: entries already in $target left in place" >&2
+    fi
   fi
 fi
-
-mkdir -p "$hist_dir/logs/classification"
-
-# 4. Point the repo's .specstory/history at it.
-if [ -L "$LINK" ]; then
-  current="$(readlink "$LINK")"
-  if [ "$current" != "$hist_dir" ]; then
-    # Somebody pointed it elsewhere on purpose (or at another scope's data
-    # home). Say so rather than silently re-pointing it.
-    echo "[init-history] $LINK → $current, not this scope's $hist_dir — left as is" >&2
-  fi
-elif [ ! -e "$LINK" ] || is_empty_dir "$LINK"; then
-  [ -d "$LINK" ] && rmdir "$LINK"
-  mkdir -p "$(dirname "$LINK")"
-  ln -s "$hist_dir" "$LINK"
-  echo "[init-history] $LINK → $hist_dir (scope: $scope)"
+if [ ! -e "$INSIGHTS" ] && [ ! -L "$INSIGHTS" ]; then
+  mkdir -p "$(dirname "$INSIGHTS")"
+  ln -s ../.coding/kb/insights "$INSIGHTS"
 fi

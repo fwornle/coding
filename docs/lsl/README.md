@@ -218,8 +218,14 @@ Older layouts — a nested `.specstory/history` checkout, a plain
 are migrated on the next launch. The ETM stages new transcripts only when the
 nearest repo is the learning repo, never the outer project.
 
-Implementation: `lib/history/repo-link.mjs` (also clones the tools repo's data
-home for `bin/init-history.sh`); tests: `tests/history/repo-link.test.mjs`.
+The tools repo is no exception: its own `coding-history` checkout is
+`coding/.coding/`, set up on every launch by `bin/init-history.sh` (with
+`CODING_HISTORY_REPO` from `.env` as the answer), and
+`knowledge-management/insights` — the UKB insight documents — is a second
+symlink, into `.coding/kb/insights/`.
+
+Implementation: `lib/history/repo-link.mjs`; tests:
+`tests/history/repo-link.test.mjs`, `tests/scripts/init-history.test.mjs`.
 
 ### Security Redaction
 

@@ -246,14 +246,44 @@ describe('migration from the older layouts', () => {
   });
 });
 
-describe('stands down', () => {
-  test('for the tools repo', async () => {
-    const { project, opts } = fixture();
+describe('the tools repo (T7) is an ordinary linked repo', () => {
+  test('its nested coding-history checkout migrates; the runtime in .coding/ stays local', async () => {
+    const { base, project, opts } = fixture();
+    const remote = seededRemote(base, 'coding-history', { 'README.md': '# c\n', '2026/01/t.md': 't\n', 'chain-map.json': '{}\n' });
+    sh(project, 'clone', '-q', remote, join(project, '.specstory', 'history'));
+    // What a launch of the tools repo keeps in .coding/ before the move.
+    mkdirSync(join(project, '.coding', 'runtime'), { recursive: true });
+    writeFileSync(join(project, '.coding', 'runtime', 'features.json'), '{}\n');
+    mkdirSync(join(project, '.coding', 'claude-plugin', 'commands'), { recursive: true });
+    writeFileSync(join(project, '.coding', 'claude-plugin', 'commands', 'x.md'), 'x\n');
+    writeFileSync(join(project, '.coding', 'session-state.json'), '{}\n');
     const r = await link.ensure(project, { ...opts, toolsRepo: project, ask: neverAsk });
-    assert.equal(r.action, 'tools-repo');
-    assert.ok(!existsSync(join(project, '.coding')));
+    assert.equal(r.action, 'migrated');
+    assertLayout(project);
+    const c = join(project, '.coding');
+    assert.ok(existsSync(join(c, 'history', '2026', '01', 't.md')));
+    assert.ok(existsSync(join(c, 'history', 'chain-map.json')));
+    // Runtime left where the launcher and the container expect it, never committed.
+    assert.ok(existsSync(join(c, 'runtime', 'features.json')));
+    assert.ok(existsSync(join(c, 'claude-plugin', 'commands', 'x.md')));
+    const tracked = sh(c, 'ls-files');
+    assert.doesNotMatch(tracked, /runtime\/|claude-plugin\/|session-state\.json/);
+    assert.equal(sh(c, 'status', '--porcelain'), '');
+    assert.deepEqual(link.lookup(project, opts), { remote });
   });
 
+  test('a remote chosen at install time answers the question without asking', async () => {
+    const { base, project, opts } = fixture();
+    const remote = seededRemote(base, 'preset', { 'README.md': '# p\n', 'history/2026/02/a.md': 'a\n' });
+    const r = await link.ensure(project, { ...opts, toolsRepo: project, remote, ask: neverAsk });
+    assert.equal(r.action, 'cloned');
+    assertLayout(project);
+    assert.ok(existsSync(join(project, '.coding', 'history', '2026', '02', 'a.md')));
+    assert.deepEqual(link.lookup(project, opts), { remote });
+  });
+});
+
+describe('stands down', () => {
   test('when the outer repo already tracks transcripts', async () => {
     const { project, opts } = fixture();
     mkdirSync(join(project, '.specstory', 'history'), { recursive: true });

@@ -11,7 +11,7 @@
 #      DESTRUCTIVE: rewrites shared history. Anyone with a clone must re-clone.
 #      The on-host backup is kept at <project>/../<project>.pre-purge-<ts>.bundle.
 #   C. Bootstrap a private nested git repo at .specstory/history/, set the
-#      remote (defaults to bmw.ghe.com:Frank-Woernle/<name>-history.git),
+#      remote (defaults to what the launcher offers: <gh user>/<name>-history),
 #      attempt to create the private repo via gh if missing, push initial commit.
 #
 # Safety:
@@ -89,11 +89,15 @@ echo "  Outer branch: $OUTER_BRANCH"
 TRACKED_COUNT="$(git -C "$PROJECT_DIR" ls-files .specstory/history 2>/dev/null | wc -l | tr -d ' ')"
 echo "  Tracked history files: $TRACKED_COUNT"
 
-# Default remote URL (HTTPS — gh credential helper supplies the token;
-# SSH to bmw.ghe.com is not configured by default)
-DEFAULT_PRIVATE="https://bmw.ghe.com/Frank-Woernle/${NAME}-history.git"
+# Default remote URL: the same derivation the launcher offers
+# (lib/history/repo-link.mjs defaultRemote — LSL_HISTORY_REMOTE_TEMPLATE, else
+# the gh user for bmw.ghe.com, else next to the outer repo's own remote).
 if [ -z "$REMOTE_URL" ]; then
-  REMOTE_URL="$DEFAULT_PRIVATE"
+  REMOTE_URL="$(node "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/history/repo-link.mjs" default-remote "$PROJECT_DIR" 2>/dev/null || true)"
+fi
+if [ -z "$REMOTE_URL" ]; then
+  echo "❌ No default remote could be derived for $NAME — pass one: $(basename "$0") $PROJECT_DIR --remote <url>" >&2
+  exit 1
 fi
 echo "  Private history remote: $REMOTE_URL"
 

@@ -149,7 +149,7 @@ extract_patterns {
 **Storage Architecture:**
 - All entities stored to GraphDB: `.data/knowledge-graph/` (Graphology + LevelDB)
 - Auto-export to `shared-memory-coding.json` every 30 seconds
-- Insight `.md` files written to `knowledge-management/insights/`
+- Insight `.md` files written to `knowledge-management/insights/` — in the tools repo a symlink into its learning checkout, `.coding/kb/insights/` (not tracked by `coding`)
 
 ### Quality-Based Feedback Loops
 
