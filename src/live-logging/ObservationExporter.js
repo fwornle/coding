@@ -210,7 +210,7 @@ export class ObservationExporter {
    * the graph has long since resolved. Measured 2026-09-23: exactly 2 rows
    * entered that state the moment the backfill ran.
    */
-  _mergeWithExisting(dbObs, dbDigests, dbInsights) {
+  _mergeWithExisting(dbObs, dbDigests, dbInsights, { dir = this.exportDir, union = false } = {}) {
     const result = { observations: dbObs, digests: dbDigests, insights: dbInsights };
 
     // Content-key extractor — defines a "same record" identity stronger
@@ -230,9 +230,11 @@ export class ObservationExporter {
     const mergeArrays = (dbRecords, filename) => {
       if (!dbRecords) return null;
       try {
-        const existing = JSON.parse(fs.readFileSync(path.join(this.exportDir, filename), 'utf-8'));
+        const existing = JSON.parse(fs.readFileSync(path.join(dir, filename), 'utf-8'));
         if (!Array.isArray(existing)) return dbRecords;
-        if (existing.length <= dbRecords.length) return dbRecords;
+        // `union`: a shared file other machines write too — having as many rows
+        // as it does is no evidence this store holds THEIR rows.
+        if (!union && existing.length <= dbRecords.length) return dbRecords;
 
         // Build tombstone set from canonicals' metadata.absorbed lists.
         // Any existing record whose id appears here was intentionally
@@ -253,8 +255,9 @@ export class ObservationExporter {
         );
         const resurrected = existing.filter((r) => !dbIds.has(r.id) && tombstoned.has(r.id));
         const merged = [...preserved, ...dbRecords];
+        if (union && preserved.length === 0) return dbRecords;
         process.stderr.write(
-          `[ObservationExporter] Safety merge for ${filename}: kept ${preserved.length} historic + ${dbRecords.length} current = ${merged.length} total` +
+          `[ObservationExporter] Safety merge for ${path.relative(this.exportDir, dir) || '.'}/${filename}: kept ${preserved.length} historic + ${dbRecords.length} current = ${merged.length} total` +
             (resurrected.length > 0 ? ` (skipped ${resurrected.length} tombstoned)` : '') +
             `\n`
         );
@@ -586,6 +589,12 @@ export class ObservationExporter {
    * One slice per project that has a learning checkout: the rows whose
    * `project` is that project, in `<kbDir>/observation-export/`. No metadata
    * file — its `exportedAt` would change the repo on every export.
+   *
+   * The slice is shared through git, so it is merged with what is already
+   * there, never replaced: a teammate's rows are in the file but not in this
+   * store (hydrate reads only the graph exports), and this machine's own
+   * history beyond retention lives only in its data-home export. Replacing
+   * it shrank a clone's 6910 observations to the 180 its store held.
    */
   _writeProjectSlices(merged) {
     if (!this.projectKbDirs) return;
@@ -596,8 +605,10 @@ export class ObservationExporter {
       const dir = path.join(kbDir, 'observation-export');
       try {
         fs.mkdirSync(dir, { recursive: true });
+        const mine = (kind) => merged[kind].filter((r) => r && r.project === project);
+        const slice = this._mergeWithExisting(mine('observations'), mine('digests'), mine('insights'), { dir, union: true });
         for (const kind of ['observations', 'digests', 'insights']) {
-          this._writeJSON(`${kind}.json`, merged[kind].filter((r) => r && r.project === project), dir);
+          this._writeJSON(`${kind}.json`, slice[kind], dir);
         }
       } catch (err) {
         process.stderr.write(`[ObservationExporter] slice for ${project} failed: ${err.message}\n`);
