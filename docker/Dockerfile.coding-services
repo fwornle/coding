@@ -52,7 +52,7 @@ FROM base AS node-deps
 COPY package.json package-lock.json ./
 
 # Install root dependencies first. (The proxy is NOT one of them: it runs on the host from the
-# sibling rapid-llm-proxy checkout. semantic-analysis still pins its own v1 copy, patched below.)
+# sibling rapid-llm-proxy checkout, and the integrations reach it over HTTP at LLM_CLI_PROXY_URL.)
 RUN npm ci --ignore-scripts || npm install --ignore-scripts
 
 # Install platform-specific native binaries for fastembed tokenizers
@@ -164,24 +164,6 @@ RUN cd integrations/constraint-monitor/dashboard && npm install 2>/dev/null || t
 # lockfile is regenerated host-side; in-container we install without verifying
 # integrity against the stale pinned hash.
 RUN cd integrations/semantic-analysis && npm install --ignore-scripts --legacy-peer-deps --no-package-lock
-
-# Patch broken JSDoc comment in @rapid/llm-proxy network-detect.js
-# The comment contains "utun*/" which prematurely closes the /* block, breaking ESM parsing
-# Fix: replace everything before the first import statement with a clean comment
-RUN for f in $(find integrations/*/node_modules/@rapid/llm-proxy/dist -name "network-detect.js" 2>/dev/null); do \
-      sed -i '1,/^import/{ /^import/!d }' "$f" && \
-      sed -i '1i // Network Detection Module (patched: broken JSDoc removed)' "$f"; \
-    done 2>/dev/null || true
-
-# Align @rapid/llm-proxy's copilot model ids with what Copilot actually serves.
-# The SDK pins retired ids (claude-sonnet-4.6 / claude-opus-4.6); Copilot answers
-# those with a hard 400, and since `standard` is the tier semantic_analysis uses,
-# every Wave 3 call fell through to `[llm] All providers failed` and wrote a
-# shallow stub entity instead. Run EXPLICITLY here because the installs above
-# use --ignore-scripts, so the package.json `postinstall` never fires in-image.
-# No `|| true`: a silent miss costs a whole wave of degraded knowledge, which
-# only shows up hours later as unexplained ~600-char entity descriptions.
-RUN cd integrations/semantic-analysis && node scripts/align-copilot-model-ids.mjs
 
 # Rebuild native bindings for the container's architecture
 RUN npm rebuild better-sqlite3 classic-level 2>/dev/null || true

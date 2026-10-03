@@ -17,41 +17,5 @@
       "reason": "Pre-existing host-side Grok/Groq semantic engine; hard-requires GROQ_API_KEY and is inert in the keyless container (T2). Ratcheted here until refactored onto the proxy."
     }
   ],
-  "llmService": [
-    {
-      "file": "integrations/semantic-analysis/src/agents/semantic-analyzer.ts",
-      "maxCount": 1,
-      "reason": "Legacy in-process LLMService site predating T2; keyless container makes key-based providers unavailable so SDK routes via LLM_CLI_PROXY_URL CLI providers."
-    },
-    {
-      "file": "integrations/semantic-analysis/src/agents/git-staleness-detector.ts",
-      "maxCount": 1,
-      "reason": "Legacy in-process LLMService site predating T2; keyless container routes via LLM_CLI_PROXY_URL CLI providers."
-    },
-    {
-      "file": "integrations/semantic-analysis/src/agents/semantic-analysis-agent.ts",
-      "maxCount": 1,
-      "reason": "Legacy in-process LLMService site predating T2; keyless container routes via LLM_CLI_PROXY_URL CLI providers."
-    },
-    {
-      "file": "integrations/semantic-analysis/src/agents/wave1-project-agent.ts",
-      "maxCount": 1,
-      "reason": "Legacy in-process LLMService site predating T2; keyless container routes via LLM_CLI_PROXY_URL CLI providers."
-    },
-    {
-      "file": "integrations/semantic-analysis/src/agents/wave2-component-agent.ts",
-      "maxCount": 1,
-      "reason": "Legacy in-process LLMService site predating T2; keyless container routes via LLM_CLI_PROXY_URL CLI providers."
-    },
-    {
-      "file": "integrations/semantic-analysis/src/agents/wave3-detail-agent.ts",
-      "maxCount": 1,
-      "reason": "Legacy in-process LLMService site predating T2; keyless container routes via LLM_CLI_PROXY_URL CLI providers."
-    },
-    {
-      "file": "integrations/constraint-monitor/src/engines/semantic-validator.js",
-      "maxCount": 1,
-      "reason": "Legacy in-process LLMService site in constraint monitor; host-side, ratcheted until refactored onto the proxy."
-    }
-  ]
+  "llmService": []
 }
