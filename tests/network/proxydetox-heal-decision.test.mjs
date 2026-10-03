@@ -204,3 +204,42 @@ describe('the 2026-08-30 incident, replayed', () => {
     assert.equal(d.cause, CAUSES.DAEMON);
   });
 });
+
+describe('2026-10-03, leaving VPN: the heal debounce raced the location hysteresis', () => {
+  // .logs/health-coordinator.log, 08:12:46-08:12:56Z. The socket stayed bound,
+  // the host had internet directly, the corporate host was unreachable through
+  // the proxy -- the VPN-transition shape -- while the location probe had said
+  // `open` twice and the hysteresis held `vpn` (2/3). The third failure healed:
+  // proxydetox kickstarted, :3128 gone for ~30s.
+  const leaving = {
+    portListening: true,
+    proxiedExternalOk: false,
+    directExternalOk: true,
+    proxiedInternalOk: false,
+    location: 'vpn',
+    consecutiveFailures: 3,
+  };
+
+  it('healed the network change as a daemon fault, as it was', () => {
+    const d = decideProxydetoxHeal(leaving);
+    assert.equal(d.heal, true);
+    assert.equal(d.cause, CAUSES.DAEMON);
+  });
+
+  it('does not heal while the network is known to be changing', () => {
+    const d = decideProxydetoxHeal({ ...leaving, networkChanging: true, consecutiveFailures: 8 });
+    assert.equal(d.heal, false);
+    assert.equal(d.cause, CAUSES.NETWORK_CHANGE);
+  });
+
+  it('a dead daemon mid-change still heals: the change is no excuse for an unbound socket', () => {
+    const d = decideProxydetoxHeal({ ...leaving, networkChanging: true, portListening: false });
+    assert.equal(d.heal, true);
+    assert.equal(d.cause, CAUSES.DAEMON);
+  });
+
+  it('a proxy that works mid-change is healthy, not a network change', () => {
+    const d = decideProxydetoxHeal({ ...leaving, networkChanging: true, proxiedExternalOk: true });
+    assert.equal(d.cause, CAUSES.HEALTHY);
+  });
+});

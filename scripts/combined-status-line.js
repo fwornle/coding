@@ -23,6 +23,7 @@ import { visibleCellWidth } from '../lib/statusline/visible-cell-width.cjs';
 import { markClickable, buildProjectTag, decorate as decorateClickable } from '../lib/statusline/clickable.cjs';
 import { loadFeatures } from '../lib/features/index.mjs';
 import { isToolsRepo } from '../lib/scope/index.mjs';
+import { restartingServices } from '../lib/health/deliberate-restart.mjs';
 
 const { statusLeftReserveCells } = paneCacheKey;
 
@@ -1207,9 +1208,14 @@ class CombinedStatusLine {
     }
 
     const services = state.services || [];
-    const downServices = services.filter(s =>
+    // A service the coordinator is restarting on purpose is a transition, not
+    // an outage (lib/health/deliberate-restart.mjs) — it shows as a warning.
+    const restarting = restartingServices(state);
+    const notRunning = services.filter(s =>
       s && s.status && s.status !== 'running' && s.status !== 'unknown'
     );
+    const downServices = notRunning.filter(s => !restarting.has(s.name));
+    const restartingCount = notRunning.length - downServices.length;
     const dbStatus = state.databases?.status;
     const containerOk = !state.container?.healthcheck
       || state.container.healthcheck === 'healthy';
@@ -1224,7 +1230,8 @@ class CombinedStatusLine {
       overallStatus,
       criticalCount,
       violationCount: 0,
-      autoHealingActive: false,
+      autoHealingActive: restartingCount > 0,
+      restartingCount,
       lastUpdate: state.generated_at
     };
   }
@@ -2335,6 +2342,9 @@ class CombinedStatusLine {
         overallColor = 'red';
       } else if (!gcmHealthy) {
         parts.push(`[🏥${STATE_DOTS.WARN}]`); // GCM unhealthy (independent of verifier)
+        if (overallColor === 'green') overallColor = 'yellow';
+      } else if (healthVerifier.restartingCount > 0) {
+        parts.push(`[🏥${STATE_DOTS.WARN}]`); // The coordinator is restarting a service
         if (overallColor === 'green') overallColor = 'yellow';
       } else if (verifierHealthy || violationCount === 0) {
         parts.push(`[🏥${STATE_DOTS.OK}]`); // All healthy (GCM + services)
