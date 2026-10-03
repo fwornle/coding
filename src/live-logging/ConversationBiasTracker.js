@@ -11,6 +11,8 @@
  * - Provides bias strength/confidence scores
  */
 
+import { isWithinPath, samePath } from '../../lib/scope/index.mjs';
+
 class ConversationBiasTracker {
   constructor(config = {}) {
     // Configuration
@@ -107,9 +109,11 @@ class ConversationBiasTracker {
     });
 
     // Add working directory signal (weak)
-    if (this.codingRepo && this.currentWorkingDir.includes(this.codingRepo)) {
+    // Containment, not `includes`: a substring test called ~/Agentic/coding-history
+    // (and any path merely mentioning the repo path) a cwd inside the tools repo.
+    if (this.codingRepo && isWithinPath(this.currentWorkingDir, this.codingRepo)) {
       weights.CODING_INFRASTRUCTURE += this.workingDirWeight;
-    } else if (this.currentWorkingDir !== this.codingRepo) {
+    } else if (!samePath(this.currentWorkingDir, this.codingRepo)) {
       weights.LOCAL += this.workingDirWeight;
     }
 

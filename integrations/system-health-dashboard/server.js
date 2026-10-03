@@ -10,7 +10,7 @@ import express from 'express';
 import { createServer, get as httpGet } from 'http';
 import { WebSocketServer } from 'ws';
 import { readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync, watch, statSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
+import { join, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 import cors from 'cors';
 import { spawn, execSync } from 'child_process';
@@ -2617,12 +2617,14 @@ class SystemHealthAPIServer {
      */
     getKnownProjectPaths() {
         const agenticRoot = join(codingRoot, '..');
-        const projectPaths = [codingRoot]; // Always include coding
+        const projectPaths = [codingRoot]; // Always include the tools checkout
 
         try {
             const entries = readdirSync(agenticRoot, { withFileTypes: true });
             for (const entry of entries) {
-                if (entry.isDirectory() && entry.name !== 'coding') {
+                // Skip the checkout by its own name — it is already listed, and it is
+                // not necessarily called 'coding' on a colleague's machine.
+                if (entry.isDirectory() && entry.name !== basename(codingRoot)) {
                     const projectPath = join(agenticRoot, entry.name);
                     const reportsDir = join(projectPath, '.data', 'workflow-reports');
                     if (existsSync(reportsDir)) {
