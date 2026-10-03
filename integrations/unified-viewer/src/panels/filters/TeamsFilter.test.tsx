@@ -21,6 +21,7 @@ const REGISTRY: TeamRegistry = {
   viewGroups: [
     { id: 'kgbench', label: 'Kgbench', match: '^kgbench(-tree-.*)?$', description: '' },
   ],
+  scope: 'coding',
 }
 
 function ent(id: string, team?: string): Entity {
@@ -41,7 +42,7 @@ const renderFilter = (props: Partial<React.ComponentProps<typeof TeamsFilter>> =
 
 describe('TeamsFilter', () => {
   beforeEach(() => {
-    useViewerStore.setState({ selectedTeams: new Set<string>() })
+    useViewerStore.setState({ selectedTeams: new Set<string>(), teamScope: null })
     cleanup()
   })
 
@@ -159,5 +160,21 @@ describe('TeamsFilter', () => {
     render(<TeamsFilter entities={ENTITIES} apiClient={{ listTeams } as unknown as ApiClient} />)
     await waitFor(() => expect(screen.getByTestId('filter-team-group-views')).toBeInTheDocument())
     expect(screen.queryByTestId('filter-team-group-projects')).not.toBeInTheDocument()
+  })
+
+  test('an untagged entity is counted under the registry scope, and the scope is published', async () => {
+    const untagged = [...ENTITIES, ent('g'), ent('h')]
+    render(<TeamsFilter entities={untagged} registry={{ ...REGISTRY, scope: 'ui' }} />)
+    // ui: one tagged + two untagged. The canvases read the same scope from the
+    // store, so a click on the row selects exactly what the row counts.
+    expect(screen.getByTestId('filter-team-ui')).toHaveTextContent('3')
+    await waitFor(() => expect(useViewerStore.getState().teamScope).toBe('ui'))
+  })
+
+  test('with no scope, untagged entities get their own row instead of a guessed team', () => {
+    render(<TeamsFilter entities={[...ENTITIES, ent('g')]} registry={{ ...REGISTRY, scope: null }} />)
+    fireEvent.click(screen.getByTestId('filter-team-group-toggle-views'))
+    expect(screen.getByTestId('filter-team-untagged')).toHaveTextContent('1')
+    expect(screen.getByTestId('filter-team-coding')).toHaveTextContent('2')
   })
 })

@@ -25,6 +25,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Logger } from '@/lib/logging'
 import type { ApiClient, Entity, TeamRegistry } from '@/api/ApiClient'
 import { EMPTY_TEAM_REGISTRY } from '@/api/ApiClient'
+import { teamOf } from '@/graph/team-of'
 import {
   buildTeamGroups,
   allTeamIds,
@@ -42,17 +43,6 @@ interface TeamsFilterProps {
   apiClient?: ApiClient
   /** Test seam — bypasses the fetch when provided. */
   registry?: TeamRegistry
-}
-
-/**
- * Entities with no `metadata.team` are counted as 'coding'.
- *
- * Carried over from the original filter verbatim. It is a guess, but it is the
- * guess the graph already makes elsewhere, and changing it here would silently
- * move ~850 entities between rows for reasons unrelated to this rail.
- */
-function teamOf(e: Entity): string {
-  return ((e.metadata as { team?: string } | undefined)?.team) || 'coding'
 }
 
 export function TeamsFilter({ entities, apiClient, registry: registryProp }: TeamsFilterProps) {
@@ -76,14 +66,22 @@ export function TeamsFilter({ entities, apiClient, registry: registryProp }: Tea
     }
   }, [apiClient, registryProp])
 
+  // The canvases filter with the same teamOf() rule, so they need the same
+  // scope; publishing it is what keeps a row's count equal to what a click on
+  // it shows.
+  const scope = registry.scope
+  useEffect(() => {
+    set({ teamScope: scope })
+  }, [scope, set])
+
   const counts = useMemo(() => {
     const map = new Map<string, number>()
     for (const e of entities) {
-      const t = teamOf(e)
+      const t = teamOf(e, scope)
       map.set(t, (map.get(t) ?? 0) + 1)
     }
     return map
-  }, [entities])
+  }, [entities, scope])
 
   const groups = useMemo(() => buildTeamGroups(counts, registry), [counts, registry])
 

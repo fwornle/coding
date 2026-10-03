@@ -214,6 +214,12 @@ export interface ViewerState {
   // don't match get filter-hidden.
   learningSource: 'batch' | 'online' | 'combined'
   selectedTeams: ReadonlySet<string>
+  /**
+   * The installation's tenant, from `/api/teams .scope` — the team an entity
+   * with no team and no project is counted and filtered under (graph/team-of).
+   * Written by TeamsFilter when the registry arrives; null until then.
+   */
+  teamScope: string | null
 
   // Filters
   searchQuery: string
@@ -692,6 +698,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   // VKB-style filters (2026-06-11). Default Combined + all teams visible.
   learningSource: 'combined',
   selectedTeams: new Set<string>(),
+  teamScope: null,
   theme: readPersistedThemeForStore(),
   // Default to the D3 renderer — that's the VKB-parity engine. The
   // UnifiedViewer route can override to 'sigma' for systems that

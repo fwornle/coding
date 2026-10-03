@@ -89,6 +89,7 @@ import {
 import {
   graphDbDir, graphExportsDir, observationExportDir, ensureDataHome,
 } from '../lib/paths/index.mjs';
+import { resolveScope, isPlaceholderScope } from '../lib/scope/index.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..');
@@ -1495,10 +1496,27 @@ app.get('/api/projects', async (_req, res) => {
  *
  * No cache: these are five small files, and re-reading them means an edit shows
  * up on the next page load rather than after a daemon restart.
+ *
+ * `scope` is this installation's tenant: the team the viewer files an entity
+ * under when it carries neither `team` nor `project` (its graph/team-of.ts).
+ * null when the install has none — the viewer then shows such entities as
+ * untagged rather than guessing a tenant.
  */
+function installationScope() {
+  // Fail open: this is a display hint, and a malformed ~/.coding/scope must
+  // not take the whole registry down with it.
+  try {
+    const scope = resolveScope();
+    return isPlaceholderScope(scope) ? null : scope;
+  } catch (err) {
+    process.stderr.write(`[obs-api] /teams scope unresolved: ${err.message}\n`);
+    return null;
+  }
+}
+
 app.get('/api/teams', (_req, res) => {
   try {
-    res.json(loadRegistry(REPO_ROOT));
+    res.json({ ...loadRegistry(REPO_ROOT), scope: installationScope() });
   } catch (err) {
     // loadRegistry is fail-open by construction, so this is belt-and-braces.
     process.stderr.write(`[obs-api] /teams error: ${err.message}\n`);
