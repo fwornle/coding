@@ -16,6 +16,7 @@ import {
 } from './color-fallback'
 import type { Entity, NodeState, OntologyClass, Relation } from './types'
 import type { Level, ViewerState } from '@/store/viewer-store'
+import { teamOf } from './team-of'
 
 /**
  * Backend entities (Phase 44 /api/v1/entities) ship `entityType` but not
@@ -357,6 +358,7 @@ export function computeNodeState(
     pathToSelected?: ReadonlySet<string>
     learningSource?: 'batch' | 'online' | 'combined'
     selectedTeams?: ReadonlySet<string>
+    teamScope?: string | null
   },
   hoveredNodeId: string | null = null,
 ): NodeState {
@@ -408,12 +410,8 @@ export function computeNodeState(
   // visible" — emitted by the TeamsFilter "None" button.
   if (store.selectedTeams && store.selectedTeams.size > 0) {
     if (store.selectedTeams.has('__none__')) return 'filter-hidden'
-    const meta = attrs.metadata as { team?: string; project?: string } | undefined
-    // Phase 57 D-11 transitional read — prefer metadata.project (new writers,
-    // Plan 03 onwards) over metadata.team (legacy). selectedTeams (the Set
-    // name) is INTENTIONALLY NOT renamed in this phase; Phase 60 owns the
-    // rename + filter-UI rework per LOWERONTO-03.
-    const team = meta?.project ?? meta?.team ?? 'coding'
+    // One rule with the Teams rail and the D3 canvas — see team-of.ts.
+    const team = teamOf(attrs as { metadata?: Record<string, unknown> }, store.teamScope ?? null)
     if (!store.selectedTeams.has(team)) return 'filter-hidden'
   }
 

@@ -77,10 +77,16 @@ export interface ViewGroupRule {
 export interface TeamRegistry {
   teams: TeamRegistryEntry[]
   viewGroups: ViewGroupRule[]
+  /**
+   * The installation's tenant — what an entity with no team and no project
+   * belongs to (see graph/team-of.ts). null when the backend does not know:
+   * the OKB backend, an unconfigured install, an unreachable registry.
+   */
+  scope: string | null
 }
 
 /** The "no registry" answer — see ApiClient.listTeams, which never rejects. */
-export const EMPTY_TEAM_REGISTRY: TeamRegistry = { teams: [], viewGroups: [] }
+export const EMPTY_TEAM_REGISTRY: TeamRegistry = { teams: [], viewGroups: [], scope: null }
 
 /**
  * Phase 61-02 — uniform listRelations return shape on BOTH apiVersion branches.
@@ -457,6 +463,7 @@ export class ApiClient {
       return {
         teams: Array.isArray(body.teams) ? body.teams : [],
         viewGroups: Array.isArray(body.viewGroups) ? body.viewGroups : [],
+        scope: typeof body.scope === 'string' && body.scope.length > 0 ? body.scope : null,
       }
     } catch {
       return EMPTY_TEAM_REGISTRY

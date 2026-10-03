@@ -14,7 +14,7 @@ import {
   VIEWS_GROUP,
 } from './team-groups'
 
-const REGISTRY: TeamRegistry = {
+const REGISTRY: Pick<TeamRegistry, 'teams' | 'viewGroups'> = {
   teams: [
     { id: 'coding', label: 'Coding', kind: 'project', description: '' },
     { id: 'ui', label: 'UI', kind: 'project', description: '' },

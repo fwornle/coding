@@ -14,6 +14,7 @@
 //     calls this predicate.
 
 import { learningSourceOf } from './learning-source'
+import { teamOf } from './team-of'
 import type { Entity } from './types'
 import { deriveLayer } from './layer'
 import { deriveLevel } from './graph-builder'
@@ -22,6 +23,8 @@ export interface VisibilityFilters {
   /** Already-lowercased search query for case-insensitive substring match. */
   searchQueryLowered: string
   selectedTeams: ReadonlySet<string>
+  /** The installation's tenant for untagged entities — see team-of.ts. */
+  teamScope?: string | null
   learningSource: 'combined' | 'online' | 'batch' | string
   selectedLayers: readonly string[]
   hideDocNodes: boolean
@@ -377,7 +380,7 @@ export function isEntityVisible(e: Entity, filters: VisibilityFilters): boolean 
     const ocls = e.ontologyClass
     const isStructural = ocls === 'System' || ocls === 'Project' || ocls === 'Component'
     if (!isStructural) {
-      const team = meta.team ?? 'coding'
+      const team = teamOf(e as { metadata?: Record<string, unknown> }, filters.teamScope ?? null)
       if (!filters.selectedTeams.has(team)) return false
     }
   }

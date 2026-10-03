@@ -93,7 +93,7 @@ function compileRules(rules: readonly ViewGroupRule[]): Array<{ rule: ViewGroupR
  */
 export function buildTeamGroups(
   counts: ReadonlyMap<string, number>,
-  registry: TeamRegistry,
+  registry: Pick<TeamRegistry, 'teams' | 'viewGroups'>,
 ): TeamGroup[] {
   const registered = new Map(registry.teams.map((t) => [t.id, t]))
 
