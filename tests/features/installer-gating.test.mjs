@@ -11,7 +11,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
 
@@ -228,6 +228,21 @@ describe('host daemons follow DAEMONS', () => {
         assert.ok(has, `${id} is in DAEMONS but launchd/com.coding.${id}.plist does not exist`);
       }
     }
+  });
+
+  test('no daemon restarts only on failure — they all exit 0 on SIGTERM', () => {
+    // KeepAlive {SuccessfulExit: false} reads as "restart on crash", but every
+    // long-running daemon here traps SIGTERM and exits 0, so any stop launchd did
+    // not initiate became permanent: sub-agent daemons 14.5h (2026-09-01), the
+    // measurement reconciler five days (2026-09-28). A deliberate stop is
+    // `launchctl bootout`, which unloads the job, so <true/> loses nothing.
+    for (const f of readdirSync(join(REPO, 'launchd')).filter((n) => n.endsWith('.plist'))) {
+      const body = readFileSync(join(REPO, 'launchd', f), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+      assert.doesNotMatch(body, /<key>SuccessfulExit<\/key>/, `${f}: KeepAlive must be <true/>`);
+    }
+    // The Linux unit for the proxy, same rule in systemd's spelling.
+    assert.match(install, /^Restart=always$/m);
+    assert.doesNotMatch(install, /^Restart=on-failure$/m);
   });
 
   test('uninstall.sh removes every templated daemon, not just the proxy', () => {

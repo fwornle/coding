@@ -3230,6 +3230,10 @@ create_llm_proxy_systemd() {
         return 0
     fi
 
+    # Restart=always, not on-failure: the bridge traps SIGTERM and exits 0, so
+    # on-failure left the proxy down after any stray SIGTERM. A deliberate stop is
+    # `systemctl --user stop`, which Restart=always does not override. Same reasoning as
+    # the KeepAlive comment in launchd/com.coding.llm-cli-proxy.plist.
     mkdir -p "$HOME/.config/systemd/user"
     cat > "$service_path" << SYSTEMD_EOF
 [Unit]
@@ -3244,7 +3248,7 @@ Environment=CODING_REPO=${CODING_REPO}
 Environment=RAPID_LLM_PROXY_DIR=${proxy_dir}
 Environment=LLM_PROXY_PORT=${proxy_port}
 Environment=NODE_BIN=${node_path}
-Restart=on-failure
+Restart=always
 RestartSec=10
 
 [Install]
