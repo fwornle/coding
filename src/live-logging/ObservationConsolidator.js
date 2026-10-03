@@ -1461,7 +1461,7 @@ export class ObservationConsolidator {
         }).join('\n\n');
 
         const prompt = this._buildConsolidationPrompt(date, obsBlock, chunk.length);
-        const result = await this._callLLM(prompt, 'consolidator-digest');
+        const result = await this._callLLM(prompt, 'consolidator-digest', { project });
 
         if (!result) {
           process.stderr.write(`[Consolidator] LLM call failed for ${date}/${project} chunk ${ci + 1}/${chunks.length}, skipping chunk\n`);
@@ -1918,7 +1918,7 @@ export class ObservationConsolidator {
           process.stderr.write(`[Consolidator] Insight synthesis ${project} chunk ${ci + 1}/${digestChunks.length} (${chunk.length} digests)\n`);
           const prompt = buildChunkPrompt(chunk, snapshot);
           batchPromises.push(
-            this._callLLM(prompt, 'consolidator-insight').then((result) => {
+            this._callLLM(prompt, 'consolidator-insight', { project }).then((result) => {
               if (!result) {
                 process.stderr.write(`[Consolidator] LLM call failed for ${project} insight chunk ${ci + 1}, skipping\n`);
                 return null;
@@ -5035,7 +5035,7 @@ Respond with EXACTLY this structure:
    * @param {{system: string, user: string}} prompt
    * @returns {Promise<string|null>}
    */
-  async _callLLM(prompt, processName = 'consolidator') {
+  async _callLLM(prompt, processName = 'consolidator', { project } = {}) {
     // Per-call deadline budget for consolidation. Stage-2 insight prompts
     // can stuff 8-11 digests into a single LLM call, and the claude CLI on
     // sonnet routinely needs 2-3 minutes for those. Give the proxy 5 min
@@ -5072,6 +5072,9 @@ Respond with EXACTLY this structure:
     const MAX_TOKENS = 16384;
     const requestBody = {
       process: processName,
+      // The repo the tokens are spent on (token_usage.project, T4b). Only the
+      // call sites that work on one project's data pass it.
+      ...(project && project !== 'unknown' ? { project } : {}),
       ...(this.provider ? { provider: this.provider } : {}),
       timeout: PROXY_TIMEOUT_MS,
       maxTokens: MAX_TOKENS,

@@ -367,50 +367,6 @@ const SERVICE_CONFIGS = {
     }
   },
 
-  healthVerifier: {
-    name: 'Health Verifier',
-    feature: 'health',
-    psmPath: 'scripts/health-verifier.js',
-    required: false, // OPTIONAL - Layer 3 monitoring
-    maxRetries: 2,
-    timeout: 15000,
-    startFn: async () => {
-      console.log('[HealthVerifier] Starting health verification daemon...');
-
-      // Check if already running globally (parallel session detection)
-      const isRunning = await psm.isServiceRunning('health-verifier', 'global');
-      if (isRunning) {
-        console.log('[HealthVerifier] Already running globally - skipping startup');
-        return { pid: 'already-running', service: 'health-verifier', skipRegistration: true };
-      }
-
-      const child = spawn('node', [
-        path.join(SCRIPT_DIR, 'health-verifier.js'),
-        'start'
-      ], {
-        detached: true,
-        stdio: ['ignore', 'ignore', 'ignore'],
-        cwd: CODING_DIR
-      });
-
-      child.unref();
-
-      // Brief wait for process to start
-      await sleep(500);
-
-      // Check if process is still running
-      if (!isProcessRunning(child.pid)) {
-        throw new Error('Health verifier process died immediately');
-      }
-
-      return { pid: child.pid, service: 'health-verifier' };
-    },
-    healthCheckFn: async (result) => {
-      if (result.skipRegistration) return true;
-      return createPidHealthCheck()(result);
-    }
-  },
-
   statuslineHealthMonitor: {
     name: 'StatusLine Health Monitor',
     feature: 'health',
@@ -549,7 +505,17 @@ const SERVICE_CONFIGS = {
       ], {
         detached: true,
         stdio: ['ignore', 'ignore', 'ignore'],
-        cwd: CODING_DIR
+        cwd: CODING_DIR,
+        // This is the HOST copy of the dashboard API (the harness tier, no
+        // Docker): its coordinator is on this machine's loopback. server.js
+        // defaults to host.docker.internal:3034, which is right only inside
+        // the container — on a Docker-free Linux host the name does not
+        // resolve (503, the nav fails open and shows every tab), and inside
+        // another container it resolves to a DIFFERENT machine's coordinator.
+        env: {
+          ...process.env,
+          HEALTH_COORDINATOR_URL: process.env.HEALTH_COORDINATOR_URL || 'http://127.0.0.1:3034',
+        },
       });
 
       child.unref();
@@ -675,8 +641,18 @@ const SERVICE_CONFIGS = {
     },
     healthCheckFn: async (result) => {
       if (result.skipRegistration) return true;
-      // Vite dev server responds on the port
-      return isPortListening(PORTS.SYSTEM_HEALTH_DASHBOARD);
+      // Vite dev server responds on the port — but not 1.5s after `npm run dev`
+      // on a cold first start (npm startup + Vite's dependency pre-bundling).
+      // One probe failed there, the starter killed the "unhealthy" process,
+      // and the retry raced the first one's remains: a fresh harness-tier
+      // install (the only tier where this host-mode dashboard runs) ended with
+      // no dashboard at all. Poll within the attempt's 20s timeout instead.
+      const deadline = Date.now() + 17000;
+      while (Date.now() < deadline) {
+        if (await isPortListening(PORTS.SYSTEM_HEALTH_DASHBOARD, 2000)) return true;
+        await sleep(1000);
+      }
+      return false;
     }
   },
 
@@ -981,7 +957,6 @@ const SERVICE_ORDER = [
   { key: 'transcriptMonitor', section: 'required' },
   { key: 'liveLoggingCoordinator' },
   { key: 'constraintMonitor' },
-  { key: 'healthVerifier' },
   { key: 'statuslineHealthMonitor' },
   { key: 'systemHealthDashboardAPI' },
   { key: 'systemHealthDashboardFrontend' },

@@ -166,7 +166,6 @@ Started by `scripts/start-services-robust.js` (`SERVICE_CONFIGS`). Each entry ca
 | `observationsApi` | Observations API | `observations` |
 | `constraintMonitor` | Constraint Monitor | `constraints` |
 | `llmCliProxy` | LLM CLI Proxy | `llm-proxy` |
-| `healthVerifier` | Health Verifier | `health` |
 | `statuslineHealthMonitor` | StatusLine Health Monitor | `health` |
 | `systemHealthDashboardAPI` | System Health Dashboard API | `health` |
 | `systemHealthDashboardFrontend` | System Health Dashboard Frontend | `health` |

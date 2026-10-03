@@ -694,6 +694,19 @@ describe('ObservationConsolidator._callLLM — maxTokens budget + empty-content 
     );
   });
 
+  it('Test A2: the project a call is spent on reaches the proxy (token_usage.project); "unknown" never does', async () => {
+    const c = new ObservationConsolidator({ proxyUrl: 'http://localhost:0' });
+    await withFetchStub(
+      () => jsonResponse({ content: 'ok', tokens: { input: 1, output: 1 }, provider: 'copilot', model: 'm' }),
+      async (calls) => {
+        await c._callLLM(PROMPT, 'consolidator-digest', { project: 'coding' });
+        await c._callLLM(PROMPT, 'consolidator-insight', { project: 'unknown' });
+        await c._callLLM(PROMPT, 'consolidator-rollup');
+        assert.deepEqual(calls.map((b) => b.project), ['coding', undefined, undefined]);
+      },
+    );
+  });
+
   it('Test B: empty content with output near the cap → NO retry (deterministic truncation)', async () => {
     const c = new ObservationConsolidator({ proxyUrl: 'http://localhost:0' });
     await withFetchStub(

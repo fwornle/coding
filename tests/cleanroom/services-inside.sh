@@ -10,9 +10,17 @@
 #      that crash-loops under Restart=always reads "active" between crashes
 #   3. no unit for a daemon the tier does not own
 #   4. the health coordinator, obs-api and the proxy answer /health when on
-#   5. the status line renders
+#   5. the status line renders, with the badges of the tier's features and none
+#      of another's (docs/architecture/features.md, "Status-line badges")
+#   6. the coordinator's /features is exactly the tier (an oracle written out
+#      here, not read back from config/feature-profiles.yaml)
+#   7. harness only — the one Docker-free tier, so the dashboard runs on the
+#      host (scripts/start-services-robust.js): its OWN origin serves
+#      /api/features as JSON, which is what the nav bar drops tabs from
 #
-# Then ./uninstall.sh, and no coding unit may be left behind.
+# Installed as a colleague would (--scope=team-a), next to a planted sentinel
+# tenant `coding` (the developer's data home) that must be byte-identical at the
+# end. Then ./uninstall.sh, and no coding unit may be left behind.
 #
 # One PASS/FAIL line per assertion; exit status = number of failures.
 set -uo pipefail
@@ -24,6 +32,8 @@ done
 TOOLS="$HOME/coding"
 OUT="${CLEANROOM_OUT:-/tmp/cleanroom}"
 UNIT_DIR="$HOME/.config/systemd/user"
+SCOPE=team-a
+SENTINEL="$HOME/.coding/data/coding"
 mkdir -p "$OUT"
 cd "$TOOLS"
 
@@ -54,9 +64,28 @@ daemon_plan() {
   ' "$TOOLS"
 }
 
+# The tier → feature oracle (per-repo tenancy T1). Deliberately literal.
+tier_features() {
+  case "$1" in
+    harness)       echo "health llm-proxy statusline" ;;
+    learning)      echo "health knowledge llm-proxy lsl observations statusline" ;;
+    learning-perf) echo "health knowledge llm-proxy lsl observations performance statusline" ;;
+    everything)    echo "codegraph constraints health knowledge llm-proxy lsl observations performance statusline" ;;
+  esac
+}
+
+fingerprint() { (cd "$1" && find . -type f -print0 | sort -z | xargs -0 -r sha256sum); }
+
+step "sentinel tenant $SENTINEL"
+mkdir -p "$SENTINEL/history/2026/10" "$SENTINEL/kb/knowledge-graph/exports" "$SENTINEL/var/knowledge-graph"
+echo "the developer's session"            > "$SENTINEL/history/2026/10/2026-10-01_0900-1000_dev.md"
+echo '{"entities":[{"name":"DevOnly"}]}' > "$SENTINEL/kb/knowledge-graph/exports/general.json"
+echo "leveldb stand-in"                   > "$SENTINEL/var/knowledge-graph/CURRENT"
+fingerprint "$SENTINEL" > "$OUT/sentinel.before"
+
 for tier in "$@"; do
-  step "tier $tier: ./install.sh --ci --yes --features=$tier"
-  CODING_INSTALL_SYSTEM_SERVICES=1 ./install.sh --ci --yes --features="$tier" > "$OUT/install-$tier.log" 2>&1
+  step "tier $tier: ./install.sh --ci --yes --scope=$SCOPE --features=$tier"
+  CODING_INSTALL_SYSTEM_SERVICES=1 ./install.sh --ci --yes --scope="$SCOPE" --features="$tier" > "$OUT/install-$tier.log" 2>&1
   echo "installer exit=$?"
   grep -E '\[install-systemd-daemons\]' "$OUT/install-$tier.log" | sed 's/^/  /'
 
@@ -121,7 +150,52 @@ for tier in "$@"; do
   rc=$?
   [ $rc -eq 0 ] && [ -n "$line" ] && pass "[$tier] status line renders: $(printf '%s' "$line" | tr -s '\n' ' ' | cut -c1-160)" \
     || fail "[$tier] status line rc=$rc, output '${line:0:80}' ($(head -c 200 "$OUT/statusline-$tier.err"))"
+
+  want="$(tier_features "$tier")"
+  on() { case " $want " in *" $1 "*) return 0 ;; esac; return 1; }
+
+  # Badges. A disabled feature's badge is omitted outright; of the enabled
+  # ones, only health renders something in every state (offline included).
+  for b in "health:[🏥" "lsl:[LSL" "lsl:[📋" "observations:[📚" "constraints:[🔒"; do
+    f="${b%%:*}"; mark="${b#*:}"
+    case "$line" in *"$mark"*) has=yes ;; *) has=no ;; esac
+    if on "$f"; then
+      [ "$f" != health ] && continue
+      [ "$has" = yes ] && pass "[$tier] badge $mark present ($f on)" || fail "[$tier] badge $mark missing although $f is on"
+    else
+      [ "$has" = no ] && pass "[$tier] badge $mark absent ($f off)" || fail "[$tier] badge $mark shown although $f is off"
+    fi
+  done
+
+  # The coordinator serves exactly this tier (lsl-redirect is in no tier).
+  got="$(curl -sf -m 5 http://127.0.0.1:3034/features | node -e '
+    let s = ""; process.stdin.on("data", (d) => (s += d)).on("end", () => {
+      try { console.log(JSON.parse(s).enabled.filter((f) => f !== "lsl-redirect").sort().join(" ")); } catch { console.log("unparseable"); }
+    });')"
+  [ "$got" = "$want" ] && pass "[$tier] coordinator /features = the tier ($got)" \
+    || fail "[$tier] coordinator /features = '$got', want '$want'"
+
+  if [ "$tier" = harness ]; then
+    # What the launcher does when no enabled feature needs Docker.
+    timeout 180 node scripts/start-services-robust.js > "$OUT/start-services-$tier.log" 2>&1
+    echo "start-services-robust exit=$?"
+    for _ in $(seq 1 90); do curl -sf -m 2 -o /dev/null http://127.0.0.1:3032/ && break; sleep 1; done
+    ctype="$(curl -s -m 5 -o "$OUT/dash-features-$tier.json" -w '%{content_type}' http://127.0.0.1:3032/api/features)"
+    dash="$(node -e 'try { const j = require(process.argv[1]); console.log(j.enabled.filter((f) => f !== "lsl-redirect").sort().join(" ")); } catch { console.log("unparseable"); }' "$OUT/dash-features-$tier.json")"
+    [[ "$ctype" == application/json* ]] && [ "$dash" = "$want" ] \
+      && pass "[$tier] host dashboard :3032/api/features is JSON = the tier (nav tabs: Health + Token Usage only)" \
+      || fail "[$tier] host dashboard :3032/api/features: $ctype, '$dash' — the nav fails open and shows every tab"
+    pkill -f 'system-health-dashboard' 2>/dev/null; pkill -f 'vite' 2>/dev/null
+  fi
 done
+
+step "sentinel"
+fingerprint "$SENTINEL" > "$OUT/sentinel.after"
+diff -q "$OUT/sentinel.before" "$OUT/sentinel.after" >/dev/null \
+  && pass "the sentinel tenant is byte-identical after every tier" \
+  || { fail "the sentinel tenant changed:"; diff "$OUT/sentinel.before" "$OUT/sentinel.after" | head -10; }
+[ -d "$HOME/.coding/data/$SCOPE" ] && pass "this install's data went to its own scope ($SCOPE)" \
+  || fail "no data home for scope $SCOPE"
 
 step "uninstall"
 printf 'ynn' | ./uninstall.sh > "$OUT/uninstall.log" 2>&1
