@@ -84,6 +84,7 @@ import {
   ANCHORED_CLASSES,
   auditStructuralAnchors,
   auditParentMetadata,
+  auditParentEdges,
   classOf,
   projectSlug,
   resolveProjectKey,
@@ -106,6 +107,8 @@ const audit = auditStructuralAnchors(entities, relations);
 // The parent-METADATA invariant, from the same shared module for the same
 // reason: the guard and the coordinator must not drift apart.
 const parents = auditParentMetadata(entities);
+// Third invariant: the declared parent exists → there is an edge from it.
+const parentEdges = auditParentEdges(entities, relations);
 const unanchored = audit.rows.map((r) => entities.find((e) => e.id === r.id)).filter(Boolean);
 
 const projectsByName = new Map();
@@ -121,17 +124,21 @@ out(`missing parent metadata        : ${parents.missingParent}`);
 out(`parent names nothing in graph  : ${parents.danglingParent}`);
 out(`  of checked                   : ${parents.checked}`);
 out(`  by class: ${JSON.stringify(parents.byClass)}`);
+out(`no edge from its declared parent: ${parentEdges.unlinked}`);
+out(`  of checked                   : ${parentEdges.checked}`);
 
 if (CHECK) {
   out('');
   const parentViolations = parents.missingParent + parents.danglingParent;
   const parentFails = CHECK_PARENTS && parentViolations > 0;
-  if (audit.unanchored === 0 && !parentFails) {
+  if (audit.unanchored === 0 && parentEdges.unlinked === 0 && !parentFails) {
     out('OK — structural-anchor invariant holds.');
+    out('OK — every row with an existing declared parent has an edge from it.');
     if (CHECK_PARENTS) out('OK — parent-metadata invariant holds.');
     process.exit(0);
   }
   if (audit.unanchored > 0) out(`FAIL — ${audit.unanchored} row(s) carry no structural edge.`);
+  if (parentEdges.unlinked > 0) out(`FAIL — ${parentEdges.unlinked} row(s) have no edge from their declared parent.`);
   if (parentFails) {
     out(`FAIL — ${parents.missingParent} row(s) without metadata.parentEntityName, `
       + `${parents.danglingParent} naming a parent that is not in the graph.`);
@@ -146,14 +153,31 @@ for (const x of entities) {
   if (!byName.has(x.name)) byName.set(x.name, []);
   byName.get(x.name).push(x);
 }
-/** The row's declared parent, if it exists and is unambiguous. */
+const CONTAINERS = new Set(['Project', 'System', 'Component', 'SubComponent']);
+/**
+ * The row's declared parent, if it exists and is unambiguous. Several nodes by
+ * that name: a container class (a SubComponent, not an older Detail namesake),
+ * then the row's own project. Two rows naming EACH OTHER as parent is a cycle
+ * in the data — no edge is right, so it is reported, not written.
+ */
 function declaredParent(e) {
   const name = e.metadata?.parentEntityName;
-  const hits = (name && byName.get(name)) || [];
-  if (hits.length <= 1) return hits[0] ?? null;
-  const mine = hits.filter((h) => projectSlug(resolveProjectKey(h)) === projectSlug(resolveProjectKey(e)));
-  return mine.length === 1 ? mine[0] : null;
+  let hits = ((name && byName.get(name)) || []).filter((h) => h.id !== e.id);
+  if (hits.length > 1) {
+    const containers = hits.filter((h) => CONTAINERS.has(classOf(h)));
+    if (containers.length) hits = containers;
+  }
+  if (hits.length > 1) {
+    hits = hits.filter((h) => projectSlug(resolveProjectKey(h)) === projectSlug(resolveProjectKey(e)));
+  }
+  if (hits.length !== 1) return null;
+  if (hits[0].metadata?.parentEntityName === e.name) {
+    cycles.add([e.name, hits[0].name].sort().join(' <-> '));
+    return null;
+  }
+  return hits[0];
 }
+const cycles = new Set();
 let toParent = 0;
 for (const e of unanchored) {
   const parent = declaredParent(e);
@@ -256,17 +280,15 @@ for (const e of unanchored) {
 // parent (an insight's has_insight, a mentions-promoted contains). The audit
 // above counts them anchored; the viewer walks parent edges up to a Project
 // and finds none, so they still float. Same declared-parent rule.
-const linked = new Set();
-for (const rel of relations) {
-  const from = rel.from ?? rel.source; const to = rel.to ?? rel.target;
-  linked.add(`${from}|${to}`);
-}
+// The work list IS the guard's (auditParentEdges), so repair and check agree.
 const firstPass = new Set(unanchored.map((e) => e.id));
+const byId = new Map(entities.map((x) => [x.id, x]));
 let reparented = 0;
-for (const e of entities) {
-  if (firstPass.has(e.id)) continue;
+for (const row of auditParentEdges(entities, relations).rows) {
+  const e = byId.get(row.id);
+  if (!e || firstPass.has(e.id)) continue;
   const parent = declaredParent(e);
-  if (!parent || parent.id === e.id || linked.has(`${parent.id}|${e.id}`)) continue;
+  if (!parent) continue;
   reparented++;
   if (!APPLY) continue;
   const r = await fetch(`${OBS_API}/api/v1/relations`, {
@@ -284,6 +306,7 @@ for (const e of entities) {
 out('');
 out(`${APPLY ? 'edges written' : 'edges that WOULD be written'}: ${written} (${toParent} to the declared parent, the rest to the project)`);
 out(`${APPLY ? 'parent edges written' : 'parent edges that WOULD be written'} for anchored rows missing theirs: ${reparented}`);
+if (cycles.size) out(`left alone — rows naming each other as parent (fix the metadata): ${[...cycles].join('; ')}`);
 if (created.size > 0) out(`Project entities ${APPLY ? 'created' : 'that WOULD be created'}: ${[...created].join(', ')}`);
 if (Object.keys(unresolved).length > 0) {
   out(`left alone — project does not resolve to an entity: ${JSON.stringify(unresolved)}`);
