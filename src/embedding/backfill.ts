@@ -34,6 +34,7 @@ import { dirname, join } from "node:path";
 import { getEmbeddingService } from "./embedding-service.js";
 import { contentHash } from "./content-hash.js";
 import { keyToUuid } from "./point-id.js";
+import { tombstonedPointIds } from "./tombstones.js";
 import { makePreview, previewVersion, SUMMARY_PREVIEW_CHARS } from "./preview.js";
 import { ensureCollections, getQdrantClient } from "./qdrant-collections.js";
 
@@ -203,6 +204,7 @@ interface GraphNode {
 }
 
 interface SerializedGraph {
+  attributes?: Record<string, unknown>;
   nodes: GraphNode[];
   edges: unknown[];
   metadata?: unknown;
@@ -222,7 +224,14 @@ function dataHome(): DataHomeModule {
  * repo learning checkouts, shared clones, the data home's files) merged by
  * km-core's rule — the graph obs-api holds.
  */
-async function readMergedGraph(): Promise<SerializedGraph> {
+let mergedGraph: Promise<SerializedGraph> | null = null;
+
+function readMergedGraph(): Promise<SerializedGraph> {
+  mergedGraph ??= mergeExports();
+  return mergedGraph;
+}
+
+async function mergeExports(): Promise<SerializedGraph> {
   const layoutHref = pathToFileURL(join(projectRoot, "lib", "kb", "layout.mjs")).href;
   const { kbLayout } = (await import(layoutHref)) as {
     kbLayout: (o: object) => { sources(): string[] };
@@ -466,6 +475,35 @@ async function pruneOrphans(
   return orphans.length;
 }
 
+/**
+ * Delete the kg_entities points of tombstoned entities (see tombstones.ts).
+ * Exact ids, unlike --prune: a point the listener made for an entity that is
+ * not yet in an export is left alone.
+ *
+ * @returns number of points deleted (0 on dry run)
+ */
+async function pruneTombstoned(options: BackfillOptions): Promise<number> {
+  let ids: string[];
+  try {
+    ids = tombstonedPointIds(await readMergedGraph());
+  } catch {
+    return 0; // unreadable exports were already reported by the tier
+  }
+  if (ids.length === 0) return 0;
+  const qdrant = getQdrantClient();
+  let present = 0;
+  for (let i = 0; i < ids.length; i += 1000) {
+    const chunk = ids.slice(i, i + 1000);
+    const found = await qdrant.retrieve("kg_entities", { ids: chunk, with_payload: false, with_vector: false });
+    if (found.length === 0) continue;
+    present += found.length;
+    if (!options.dryRun) {
+      await qdrant.delete("kg_entities", { points: found.map((p) => p.id), wait: true });
+    }
+  }
+  return options.dryRun ? 0 : present;
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -508,6 +546,12 @@ async function main(): Promise<void> {
         const removed = await pruneOrphans(tier.collection, items, options);
         process.stderr.write(
           `[Backfill] ${tier.name}: pruned ${removed} point(s) absent from the source\n`
+        );
+      }
+      if (tier.collection === "kg_entities") {
+        const removed = await pruneTombstoned(options);
+        process.stderr.write(
+          `[Backfill] ${tier.name}: removed ${removed} point(s) of deleted entities\n`
         );
       }
     }
