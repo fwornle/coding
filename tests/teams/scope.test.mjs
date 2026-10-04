@@ -63,7 +63,7 @@ test('teamPredicate: null without a selection; never leaks across teams', () => 
   assert.equal(raas({}), false, 'no project = in no team');
 });
 
-test('defaultTeamsFor: active selection, else the teams of the cwd\'s repo', () => {
+test('defaultTeamsFor: the teams of the cwd\'s repo, else its own project — never the active selection', () => {
   mkdirSync(join(root, 'raas-api', 'src'), { recursive: true });
   assert.deepEqual(defaultTeamsFor(join(root, 'raas-api', 'src'), { teamsDoc }), ['raas']);
   assert.deepEqual(defaultTeamsFor(join(root, 'balance'), { teamsDoc }), ['ops'], 'a listed path');
@@ -72,5 +72,7 @@ test('defaultTeamsFor: active selection, else the teams of the cwd\'s repo', () 
   const own = projectsOfTeams(defaultTeamsFor(join(root, 'loose'), { teamsDoc }), { teamsDoc, repos });
   assert.deepEqual([...own.projects], ['loose'], 'resolves to that project only');
   assert.deepEqual(defaultTeamsFor(tmpdir(), { teamsDoc }), [], 'in no repo: no filter');
-  assert.deepEqual(defaultTeamsFor(join(root, 'coding'), { teamsDoc: { ...teamsDoc, active: ['ops'] } }), ['ops']);
+  const selecting = { ...teamsDoc, active: ['ops'] };
+  assert.deepEqual(defaultTeamsFor(join(root, 'coding'), { teamsDoc: selecting }), ['coding'], 'the viewer selection is not the session\'s repo');
+  assert.deepEqual(defaultTeamsFor(join(root, 'loose'), { teamsDoc: selecting }), ['loose']);
 });

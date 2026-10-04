@@ -86,10 +86,15 @@ export interface TeamRegistry {
    * the OKB backend, an unconfigured install, an unreachable registry.
    */
   scope: string | null
+  /**
+   * The user's team selection (`active:` in ~/.coding/teams.yaml, edited in
+   * Dashboard → Teams). Empty = all teams. The viewer starts from it.
+   */
+  active: string[]
 }
 
 /** The "no registry" answer — see ApiClient.listTeams, which never rejects. */
-export const EMPTY_TEAM_REGISTRY: TeamRegistry = { teams: [], viewGroups: [], scope: null }
+export const EMPTY_TEAM_REGISTRY: TeamRegistry = { teams: [], viewGroups: [], scope: null, active: [] }
 
 /**
  * Phase 61-02 — uniform listRelations return shape on BOTH apiVersion branches.
@@ -467,6 +472,7 @@ export class ApiClient {
         teams: Array.isArray(body.teams) ? body.teams : [],
         viewGroups: Array.isArray(body.viewGroups) ? body.viewGroups : [],
         scope: typeof body.scope === 'string' && body.scope.length > 0 ? body.scope : null,
+        active: Array.isArray(body.active) ? body.active.filter((t): t is string => typeof t === 'string') : [],
       }
     } catch {
       return EMPTY_TEAM_REGISTRY

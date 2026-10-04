@@ -2034,11 +2034,12 @@ function writeRetrievalCapture(taskId, result) {
  *         teams?: string[] | string }
  * Returns: { markdown: string, items?: [...], meta: { ..., teams?, projects? } }
  *
- * T6 team filter: `teams` (body, else `context.teams`), else the default for
- * the session's directory (`context.cwd`): the active selection
- * (~/.coding/teams.yaml / CODING_TEAMS), else the teams of the cwd's repo,
- * else that repo's own project. Only knowledge learned in those projects is
- * injected. [] = no filter (a cwd in no repo).
+ * T6 team filter: `teams` (body, else `context.teams` — hooks forward
+ * CODING_TEAMS), else the default for the session's directory (`context.cwd`):
+ * the teams its repo is a member of, else that repo's own project. The
+ * dashboard's active selection is a VIEW filter and plays no part. Only
+ * knowledge learned in those projects is injected. [] = no filter (a cwd in
+ * no repo).
  */
 function retrievalTeams(body) {
   const explicit = body?.teams ?? body?.context?.teams;

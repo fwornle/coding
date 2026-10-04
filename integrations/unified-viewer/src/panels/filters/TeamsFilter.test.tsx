@@ -22,6 +22,7 @@ const REGISTRY: TeamRegistry = {
     { id: 'kgbench', label: 'Kgbench', match: '^kgbench(-tree-.*)?$', description: '' },
   ],
   scope: 'coding',
+  active: [],
 }
 
 function ent(id: string, team?: string): Entity {
@@ -42,7 +43,7 @@ const renderFilter = (props: Partial<React.ComponentProps<typeof TeamsFilter>> =
 
 describe('TeamsFilter', () => {
   beforeEach(() => {
-    useViewerStore.setState({ selectedTeams: new Set<string>(), teamScope: null })
+    useViewerStore.setState({ selectedTeams: new Set<string>(), teamScope: null, teamSelectionSeeded: false })
     cleanup()
   })
 
@@ -176,5 +177,41 @@ describe('TeamsFilter', () => {
     fireEvent.click(screen.getByTestId('filter-team-group-toggle-views'))
     expect(screen.getByTestId('filter-team-untagged')).toHaveTextContent('1')
     expect(screen.getByTestId('filter-team-coding')).toHaveTextContent('2')
+  })
+
+  describe('the dashboard selection (Dashboard → Teams, `active:`)', () => {
+    const SELECTING: TeamRegistry = { ...REGISTRY, active: ['coding', 'raas'] }
+
+    test('an untouched rail starts from it, and the hint names it', () => {
+      renderFilter({ registry: SELECTING })
+      expect([...useViewerStore.getState().selectedTeams].sort()).toEqual(['coding', 'raas'])
+      expect(screen.getByTestId('filter-teams-dashboard-active')).toHaveTextContent('Coding, RaaS')
+      expect(screen.getByTestId('filter-teams-dashboard')).toHaveTextContent('shown')
+      expect(screen.getByTestId('filter-teams-dashboard-link').getAttribute('href')).toMatch(/\/teams$/)
+    })
+
+    test('seeded once per page load: a remount does not undo the rail\'s own clicks', () => {
+      renderFilter({ registry: SELECTING })
+      fireEvent.click(screen.getByRole('checkbox', { name: 'UI' }))
+      cleanup()
+      renderFilter({ registry: SELECTING })
+      expect([...useViewerStore.getState().selectedTeams].sort()).toEqual(['coding', 'raas', 'ui'])
+      fireEvent.click(screen.getByTestId('filter-teams-use-dashboard'))
+      expect([...useViewerStore.getState().selectedTeams].sort()).toEqual(['coding', 'raas'])
+    })
+
+    test('a selection made before the registry arrived is kept', () => {
+      useViewerStore.setState({ selectedTeams: new Set(['ui']) })
+      renderFilter({ registry: SELECTING })
+      expect([...useViewerStore.getState().selectedTeams]).toEqual(['ui'])
+      expect(screen.getByTestId('filter-teams-use-dashboard')).toBeInTheDocument()
+    })
+
+    test('no dashboard selection reads as all teams', () => {
+      renderFilter()
+      expect(useViewerStore.getState().selectedTeams.size).toBe(0)
+      expect(screen.getByTestId('filter-teams-dashboard-active')).toHaveTextContent('all teams')
+      expect(screen.getByTestId('filter-teams-dashboard')).toHaveTextContent('shown')
+    })
   })
 })

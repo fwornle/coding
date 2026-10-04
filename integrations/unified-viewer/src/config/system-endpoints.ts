@@ -38,6 +38,11 @@ export const SYSTEM_ENDPOINTS: Record<System, string> = {
   okb:    import.meta.env.VITE_BACKEND_OKB_URL    ?? 'http://127.0.0.1:8090',
 } as const
 
+// The health dashboard, for links to settings the viewer only reads — e.g. the
+// team selection (Dashboard → Teams), which this viewer applies but does not
+// edit. Same loopback convention as above.
+export const DASHBOARD_URL: string = import.meta.env.VITE_DASHBOARD_URL ?? 'http://127.0.0.1:3032'
+
 // 2026-06-11: tab labels switched from 'Coding'/'OKB' to 'VKB'/'VOKB' per
 // user request — the underlying systems have always been the *V*isual
 // Knowledge Base (km-core graph store) and the *V*isual *O*perational
