@@ -42,6 +42,20 @@ export function TeamsPage() {
   const [newKind, setNewKind] = useState<'team' | 'project'>('team')
 
   useEffect(() => { dispatch(fetchTeamsConfig()) }, [dispatch])
+  // The viewer writes the selection too (its Teams rail): pick that up when
+  // the tab is looked at again, and every 15s while visible. The slice only
+  // assigns what changed, so an unchanged answer re-renders nothing.
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') dispatch(fetchTeamsConfig({ background: true })) }
+    const timer = setInterval(refresh, 15_000)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', refresh)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', refresh)
+    }
+  }, [dispatch])
 
   const home = homeOf(discovery?.roots)
   const byId = useMemo(() => new Map(teams.map(t => [t.id, t])), [teams])

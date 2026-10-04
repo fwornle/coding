@@ -80,7 +80,9 @@ async function readJson(res: Response) {
   return body
 }
 
-export const fetchTeamsConfig = createAsyncThunk('teamsConfig/fetch', async () =>
+/** `{ background: true }` = a refresh (focus / poll): no loading state, so an
+ *  unchanged answer changes nothing on screen (see absorb). */
+export const fetchTeamsConfig = createAsyncThunk('teamsConfig/fetch', async (_opts: { background?: boolean } | void) =>
   readJson(await fetch('/api/teams-config')))
 
 export const saveTeamsConfig = createAsyncThunk(
@@ -104,21 +106,32 @@ const teamsConfigSlice = createSlice({
   initialState,
   reducers: {},
   extraReducers: (builder) => {
+    // Assign a field only when its CONTENT changed: the tab is refetched on
+    // focus and on a timer (the viewer writes the selection too), and a fresh
+    // but equal array would still re-render everything that reads it.
+    const put = <K extends keyof TeamsConfigState>(state: TeamsConfigState, key: K, value: TeamsConfigState[K]) => {
+      if (JSON.stringify(state[key]) !== JSON.stringify(value)) state[key] = value
+    }
     const absorb = (state: TeamsConfigState, p: any) => {
-      state.teams = p.teams ?? []
-      state.active = p.active ?? []
-      state.activeSource = p.activeSource ?? ''
-      state.discovery = p.discovery ?? null
-      state.repos = p.repos ?? []
-      state.shared = p.shared ?? []
-      state.warnings = p.warnings ?? []
+      put(state, 'teams', p.teams ?? [])
+      put(state, 'active', p.active ?? [])
+      put(state, 'activeSource', p.activeSource ?? '')
+      // `scannedAt` moves on every scan without the repos changing — not a change.
+      const { scannedAt: _a, ...nextDiscovery } = p.discovery ?? {}
+      const { scannedAt: _b, ...curDiscovery } = (state.discovery ?? {}) as Record<string, unknown>
+      if (JSON.stringify(nextDiscovery) !== JSON.stringify(curDiscovery) || !state.discovery !== !p.discovery) {
+        state.discovery = p.discovery ?? null
+      }
+      put(state, 'repos', p.repos ?? [])
+      put(state, 'shared', p.shared ?? [])
+      put(state, 'warnings', p.warnings ?? [])
       if (p.synced) state.lastSyncLog = p.synced.log ?? []
-      state.loaded = true
-      state.error = null
+      if (!state.loaded) state.loaded = true
+      if (state.error !== null) state.error = null
     }
     builder
-      .addCase(fetchTeamsConfig.pending, (s) => { s.loading = true })
-      .addCase(fetchTeamsConfig.fulfilled, (s, a) => { s.loading = false; absorb(s, a.payload) })
+      .addCase(fetchTeamsConfig.pending, (s, a) => { if (!a.meta.arg?.background) s.loading = true })
+      .addCase(fetchTeamsConfig.fulfilled, (s, a) => { if (s.loading) s.loading = false; absorb(s, a.payload) })
       .addCase(fetchTeamsConfig.rejected, (s, a) => { s.loading = false; s.error = a.error.message ?? 'could not read teams' })
     for (const thunk of [saveTeamsConfig, rescanRepos, syncSharedRepos]) {
       builder
