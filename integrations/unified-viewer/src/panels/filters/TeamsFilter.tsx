@@ -23,9 +23,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { useViewerStore } from '@/store/viewer-store'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Logger } from '@/lib/logging'
-import type { ApiClient, Entity, TeamRegistry } from '@/api/ApiClient'
+import type { Entity, TeamRegistry } from '@/api/ApiClient'
 import { EMPTY_TEAM_REGISTRY } from '@/api/ApiClient'
 import { DASHBOARD_URL } from '@/config/system-endpoints'
+import { applyTeamRegistry } from './team-registry'
 import { teamOf } from '@/graph/team-of'
 import {
   buildTeamGroups,
@@ -40,61 +41,24 @@ const OPEN_BY_DEFAULT: ReadonlySet<string> = new Set([PROJECTS_GROUP, TEAMS_GROU
 
 interface TeamsFilterProps {
   entities: readonly Entity[]
-  /** Omitted in unit tests that drive `registry` directly. */
-  apiClient?: ApiClient
-  /** Test seam — bypasses the fetch when provided. */
+  /** Test seam — published to the store as if useTeamRegistry had fetched it. */
   registry?: TeamRegistry
 }
 
-export function TeamsFilter({ entities, apiClient, registry: registryProp }: TeamsFilterProps) {
+export function TeamsFilter({ entities, registry: registryProp }: TeamsFilterProps) {
   const selectedTeams = useViewerStore((s) => s.selectedTeams)
   const set = useViewerStore.setState
 
-  const [fetched, setFetched] = useState<TeamRegistry | null>(null)
-  const registry = registryProp ?? fetched ?? EMPTY_TEAM_REGISTRY
-
+  // The registry is fetched and kept live by useTeamRegistry (viewer core), which
+  // also publishes the scope / team→project map the canvases use and follows the
+  // dashboard's selection — see ./team-registry.ts.
+  const stored = useViewerStore((s) => s.teamRegistry)
   useEffect(() => {
-    if (registryProp || !apiClient) return
-    let live = true
-    // listTeams never rejects — an unavailable registry (the OKB backend does
-    // not mount the route) degrades to "every team is a view", which is exactly
-    // the pre-registry behaviour.
-    void apiClient.listTeams().then((r) => {
-      if (live) setFetched(r)
-    })
-    return () => {
-      live = false
-    }
-  }, [apiClient, registryProp])
-
-  // The canvases filter with the same teamOf() rule, so they need the same
-  // scope; publishing it is what keeps a row's count equal to what a click on
-  // it shows.
+    if (registryProp) applyTeamRegistry(registryProp)
+  }, [registryProp])
+  const registry = registryProp ?? stored ?? EMPTY_TEAM_REGISTRY
   const scope = registry.scope
-  useEffect(() => {
-    set({ teamScope: scope })
-  }, [scope, set])
-  // What each registry team covers, so the canvases admit a team's repos.
-  useEffect(() => {
-    const map: Record<string, string[]> = {}
-    for (const t of registry.teams) if (t.projects?.length) map[t.id] = t.projects
-    set({ teamProjects: map })
-  }, [registry, set])
-
-  // The dashboard's selection (Dashboard → Teams, `active:`) is where the rail
-  // STARTS, once per page load: until it was read, choosing teams there changed
-  // nothing here. Only an untouched rail is seeded, so a click made before the
-  // registry arrived is not overwritten.
   const active = registry.active ?? EMPTY_TEAM_REGISTRY.active // a mocked or older backend may omit it
-  const seeded = useViewerStore((s) => s.teamSelectionSeeded)
-  useEffect(() => {
-    if (seeded || registry === EMPTY_TEAM_REGISTRY) return
-    const untouched = useViewerStore.getState().selectedTeams.size === 0
-    set({
-      teamSelectionSeeded: true,
-      ...(untouched && active.length ? { selectedTeams: new Set(active) } : {}),
-    })
-  }, [registry, active, seeded, set])
 
   const counts = useMemo(() => {
     const map = new Map<string, number>()

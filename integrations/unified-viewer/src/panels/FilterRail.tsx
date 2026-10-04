@@ -226,7 +226,7 @@ export function FilterRail({
             Scope
           </AccordionTrigger>
           <AccordionContent className="space-y-4 pt-1">
-            <TeamsFilter entities={entities} apiClient={apiClient} />
+            <TeamsFilter entities={entities} />
 
       {/* Level (Phase 45 BC) */}
       <div className="space-y-2">

@@ -22,6 +22,7 @@
 //   - URL `?mode=triage` persistence via useSearchParams.
 //   - Keyboard shortcut `m` flips the mode via setMode.
 
+import { useTeamRegistry } from '@/panels/filters/team-registry'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import {
@@ -122,6 +123,9 @@ function ViewerCore({ system, apiClient }: ViewerCoreProps) {
   }, [])
 
   const { entities, relations, ontology, isLoading, error } = useGraphData(apiClient, system)
+  // Team registry + the dashboard's team selection, live (refetched on focus and
+  // every 15s) whether or not the rail's Scope section is open.
+  useTeamRegistry(apiClient)
 
   // Post-filter visible entity set (same predicate the canvas applies) so the
   // LegendPanel lists only classes actually on screen — no phantom rows for
