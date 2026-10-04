@@ -108,9 +108,10 @@ points whose content hash and preview version are unchanged) 60 s after
 startup and after every `/api/kb/reload` that changed the graph — one pass at a
 time, a trigger during a pass queues one more (`lib/kb/embed-index.mjs`). The
 first pass on a machine embeds the whole backlog (≈150 s for 3.9k points);
-after that a pass embeds only the delta (3 s for one pulled insight). Points of
-entities deleted elsewhere are not pruned (retrieve's project filter still
-applies); `backfill.js --prune` removes them.
+after that a pass embeds only the delta (3 s for one pulled insight). The same pass
+deletes the `kg_entities` points of tombstoned entities by exact id
+(`src/embedding/tombstones.ts`); a key re-created after its deletion keeps
+its point.
 
 ## Commands
 

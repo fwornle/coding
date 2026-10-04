@@ -1,0 +1,47 @@
+@startuml learning-data-sharing
+!include _standard-style.puml
+
+title Sharing learned data across a team — git is the only transport
+
+actor "Alice" as A
+participant "Alice's obs-api\n(owns her store)" as OA
+participant "X/.coding\n(Alice)" as CA
+database "bmw.ghe.com\nX-history" as R
+participant "X/.coding\n(Bob)" as CB
+participant "Bob's obs-api" as OB
+actor "Bob's agent" as B
+
+== Alice learns ==
+A -> OA : session in X → observations,\ndigests, insights, KB entities
+OA -> CA : export kb/knowledge-graph/X.json\n(canonical order; unchanged file = not rewritten)
+note over CA
+  LSL transcripts land in history/ directly
+  (the session logger writes through the symlink).
+end note
+CA -> CA : local commit — at session end\nand every 30 min (health coordinator)
+A -> CA : ""coding sync --push"" (asks first)
+CA -> R : git push
+
+== Bob picks it up ==
+B -> CB : next ""coding"" launch in X\n(or ""coding sync pull"")
+CB -> R : git pull
+R --> CB : Alice's commits
+note over CB
+  Both changed X.json? The registered git merge
+  driver (lib/kb/merge-driver.mjs) merges the graph
+  with the hydrate rule — no text conflicts.
+end note
+CB -> OB : POST /api/kb/reload
+OB -> OB : union merge into the live store\nnewest updatedAt wins · relations by (from,type,to)\ntombstones delete everywhere (90 days)
+OB -> OB : embed backfill — only what arrived;\nprune points of tombstoned entities
+B -> OB : prompt → /api/retrieve\n(filtered to X's teams)
+OB --> B : Alice's insight injected
+
+== Teammates without a checkout of X ==
+note over CB, OB
+  A ""repos:"" entry that is only a remote (Alice's X-history)
+  is cloned under &#126;/.coding/data/<scope>/var/shared/X/ —
+  pull-only, merged into the store, never written.
+end note
+
+@enduml

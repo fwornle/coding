@@ -1,0 +1,56 @@
+@startuml learning-repo-setup
+!include _standard-style.puml
+
+title First ""coding"" launch in repo X — where X's learned data goes
+
+start
+:""coding"" in X (lib/history/repo-link.mjs ""ensure"");
+
+if (X is a git repo?) then (no)
+  #F0F0F0:nothing to do;
+  stop
+endif
+
+if (outer repo TRACKS .specstory/history?) then (yes)
+  #FFE8F4:refuse — transcripts are committed to X;
+  note right: migrate with\nscripts/migrate-history-to-private.sh
+  stop
+endif
+
+if (X in &#126;/.coding/repos.yaml?) then (yes — remote)
+  :reuse / clone the recorded remote;
+elseif (yes — skip) then
+  #FFFACD:local, untracked .coding/;
+else (no)
+  if (old nested .specstory/history checkout?) then (yes)
+    :move it to X/.coding/ and record its remote\n(no question asked);
+  else (no)
+    :ask: Remote URL [Enter = bmw.ghe.com/<you>/X-history,\na teammate's URL, or 'skip'];
+    note right
+      Non-interactive: LSL_HISTORY_AUTO=yes|no.
+      Nobody to ask: layout only, decide next time.
+    end note
+    if (answer?) then (skip)
+      #FFFACD:record skip — never asked again;
+    else (a URL)
+      switch (what is at that URL?)
+      case (public)
+        #FFE8F4:refused — learned data stays private;
+        stop
+      case (populated — e.g. a teammate's)
+        #E8F5E8:clone into X/.coding/ — SHARED from now on;
+      case (absent)
+        :gh repo create --private, push the skeleton;
+      case (empty)
+        :init + push the skeleton;
+      endswitch
+      :record the remote in &#126;/.coding/repos.yaml;
+    endif
+  endif
+endif
+
+:layout X/.coding/{history,kb}\n.specstory/history → ../.coding/history\nboth ignored via X/.git/info/exclude;
+:pull (background) → obs-api reloads what arrived;
+stop
+
+@enduml

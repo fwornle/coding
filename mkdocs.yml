@@ -108,6 +108,7 @@ nav:
     - Observational Memory: core-systems/observational-memory.md
   - Architecture:
     - Overview: architecture/index.md
+    - Per-Repo Tenancy: architecture/tenancy.md
     - Knowledge Injection: architecture/knowledge-injection.md
     - LLM Routing: architecture/llm-routing.md
     - LLM Architecture: architecture/llm-architecture.md
@@ -139,6 +140,7 @@ nav:
   - Guides:
     - Overview: guides/index.md
     - Composing What Runs: guides/features.md
+    - Teams & Shared Learning: guides/teams.md
     - Agent Integration: guides/agent-integration.md
     - Network Configuration: guides/network-configuration.md
     - Status Line: guides/status-line.md

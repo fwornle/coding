@@ -120,7 +120,7 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
 - [x] ETM writes through `<X>/.specstory/history` → `../.coding/history` (relative symlink) — no path change needed. Its `git add -f` now runs only when the nearest repo is not the outer project (a skipped repo used to get transcripts force-staged into the outer repo). Existing nested checkouts become `.coding/` and are restructured into `history/` with a LOCAL commit; plain dirs move into `.coding/history/`.
 - [x] Skip = untracked local `<X>/.coding/` (no `.git`), ignored by the outer repo.
 - Accept: `tests/history/repo-link.test.mjs` (17 cases, local bare remotes: new, existing current/old layout, skip, public-refused, migrations, stand-downs); launcher smoke via `ensure_private_history_repo` in a scratch repo; migration verified on copies of `balance` and `copi`.
-- Follow-up (T4): nothing is pushed beyond the skeleton — restructure commits and migrated transcripts wait for T4's confirmed push. `docs/puml/lsl-repo-split.puml` still shows the nested layout.
+- Follow-up (T4): nothing is pushed beyond the skeleton — restructure commits and migrated transcripts wait for T4's confirmed push. `docs/puml/lsl-repo-split.puml` showed the nested layout — replaced by `learned-data-layout.puml` (2026-10-04).
 
 ### T5 — Teams and discovery  `status: done`
 
@@ -184,7 +184,8 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
 
 ## Open questions (decide inside the phase)
 
-- (none open)
+- **Legacy `CODING_TEAM`** (found 2026-10-04): `install.sh configure_team_setup` still writes `export CODING_TEAM="coding ui"` into a colleague's shell rc, and `lib/adapters/copilot.js:68`, `lib/fallbacks/memory-fallback.js:35`, `lib/ukb-database/cli.js:71` read it — copilot stamps `team: "coding ui"`, bypassing the repo → project mapping. Proposal: drop the rc write, stamp via `projectIdFor`.
+- **Retire `.specstory/history`?** Still read/written by 93 tracked code files (337 occurrences), 14 files in 4 submodules, `/sl` and its user-level allow rules, discovery markers. Proposal (T9): one resolver for the history dir, cut every caller over, then stop creating the symlink; keep discovery accepting the old marker.
 
 ## Session protocol
 
@@ -290,3 +291,13 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
   `npm test` green (node:test 2015/0, jest 1268); history 23/0; live backfill 39 → 0. Open: real macOS +
   WSL installs (user); `sketcher-history` remote unreachable (`cc-github.bmwgroup.net`; push times out); four ~70 MB
   April transcripts (rapid-automations redirect) in coding-history trip GitHub's 50 MB warning.
+- **2026-10-04 (docs)** — sketcher-history moved to bmw.ghe.com (pushed). Docs: new
+  `architecture/tenancy.md` (+ deep partial) and `guides/teams.md`; installation page with the
+  real installer prompts (captured from `./install.sh` under a throwaway HOME, stopped before any
+  step) and the first-launch prompt; dashboard Teams/Features + viewer Teams-rail screenshots.
+  Diagrams: `installation-flow` (rewritten — was the 2025 flow), `learning-repo-setup`,
+  `learned-data-layout` (replaces `lsl-repo-split`), `learning-data-sharing`,
+  `team-filter-scoping`. Found + fixed: the first-launch learning-repo prompt was not gated —
+  a harness user (no lsl) was asked for an `X-history` in every repo; now only when `lsl` is on
+  (unset CODING_FEATURES keeps the old behaviour). Features tab `lsl` description no longer says
+  `.specstory markdown`. `mkdocs build --strict` clean; pages checked in gsd-browser.

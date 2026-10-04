@@ -10,7 +10,7 @@ you switch parts off.
 
     | id | what it is | needs Docker |
     |----|------------|--------------|
-    | `lsl` | Verbatim session transcripts written as `.specstory` markdown | no |
+    | `lsl` | Verbatim session transcripts, kept per repo in `<repo>/.coding/history/` | no |
     | `observations` | The observation → digest → insight pipeline | no |
     | `knowledge` | Semantic analysis, UKB workflows, the knowledge graph, VKB | **yes** |
     | `codegraph` | The graphify code knowledge graph and its MCP endpoint | **yes** |

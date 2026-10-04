@@ -1,134 +1,75 @@
 @startuml installation-flow
 !include _standard-style.puml
 
-title Safe Installation with Confirmation Prompts
+title ./install.sh — what it asks, in order, and what each answer decides
 
 start
 
-partition "Dependency Check with Confirmation" {
-  :Check System Dependencies;
-  note right: Git, Node.js, npm, Python3, jq
-
-  while (Missing dependency?) is (yes)
-    :Display Confirmation Prompt;
-    note right
-      Shows action and risk
-      Options: y/N/skip-all
-    end note
-
-    if (User response?) then (y - approve)
-      :Install dependency;
-      if (Install successful?) then (yes)
-        #lightgreen:Dependency installed;
-      else (no)
-        #orange:Warning: Install failed;
-      endif
-    elseif (skip-all) then
-      #lightblue:SKIP_ALL_SYSTEM_CHANGES = true;
-      :Skip remaining system changes;
-      break
-    else (N - skip)
-      #lightgray:Skip this dependency;
-      :Add to skipped list;
-    endif
-  endwhile (no)
-}
-
-:Network Detection;
+:Impact manifest;
 note right
-  Test SSH access to cc-github.bmwgroup.net
-  Fallback: HTTPS curl test
+  Lists every file, hook and daemon this run would touch,
+  BEFORE the first change. ""--dry-run"" stops here.
 end note
 
-if (cc-github.bmwgroup.net accessible?) then (yes)
-  :Inside Corporate Network (CN);
-  #lightblue:Set INSIDE_CN = true;
-
-  :Test Proxy Connectivity;
-
-  if (Proxy working?) then (yes)
-    #lightgreen:PROXY_WORKING = true;
-  else (no)
-    #orange:PROXY_WORKING = false;
-  endif
-
-  :Select CN Repository Strategy;
-
-else (no)
-  :Outside Corporate Network;
-  #lightgray:Set INSIDE_CN = false;
-  #lightgreen:PROXY_WORKING = true;
-
-  :Select Public Repository Strategy;
-endif
-
-partition "Install Submodule Components" {
-  :Install Memory Visualizer;
-  :Install Semantic Analysis;
-  :Install Constraint Monitor;
-}
-
-partition "Shell Configuration (with Backup)" {
-  :Detect shell config file;
-  note right: .bashrc, .zshrc, .bash_profile
-
-  :Create timestamped backup;
-  note right
-    Backup: .zshrc.coding-backup.YYYYMMDDHHMMSS
-  end note
-
-  :Display Confirmation Prompt;
-  note right
-    Modify shell configuration?
-    Shows what will be added
-  end note
-
-  if (User approves?) then (yes)
-    :Add coding tools section;
-    note right
-      CODING TOOLS START marker
-      export CODING_REPO=...
-      export PATH=...
-      CODING TOOLS END marker
-    end note
-
-    :Verify syntax;
-    if (Syntax valid?) then (yes)
-      #lightgreen:Shell config updated;
-    else (no)
-      :Restore from backup;
-      #red:Shell config error;
-    endif
-  else (no)
-    #lightgray:Shell config unchanged;
-    note right: Manual setup required
+partition "Question 1 — agent scope" {
+  if (Observe bare agents too? [y/N]) then (n — default)
+    #E8F5E8:wrapper-scoped;
+    note right: only sessions started via ""coding""\nare logged and get knowledge injected
+  else (y)
+    #FFF2E6:global;
+    note right: hooks + MCP written into &#126;/.claude,\n&#126;/.config/opencode (reversible)
   endif
 }
 
-:Build MCP Servers;
-
-:Generate Installation Report;
-
-if (Any skipped changes?) then (yes)
-  #lightblue:Show skipped system changes;
+partition "Question 2 — tier" {
+  switch (Choice [1-4] (default: harness))
+  case (1)
+    #E8F4FD:harness;
+  case (2)
+    #E8F4FD:learning;
+  case (3)
+    #E8F4FD:learning-perf;
+  case (4)
+    #E8F4FD:everything;
+  endswitch
+  :write &#126;/.coding/features.yaml;
   note right
-    Lists dependencies user chose to skip
-    Provides manual install commands
+    The ONE answer every later step, the launcher,
+    the container, the status line and the dashboard
+    read. Change it later: ""coding-features profile <tier>""
+    or the dashboard's Features tab.
   end note
+}
+
+:Network first: proxy detection + preflight;
+:System dependencies (each one asks y / N / skip-all);
+:Question 3 — machine scope\n(name of the runtime home &#126;/.coding/data/<scope>/);
+
+partition "Install steps — each gated by the tier" {
+  :npm dependencies, LLM proxy (rapid-llm-proxy) — every tier;
+  :session logging, observations, knowledge base,\nviewer, UKB — learning and up;
+  :performance measurement — learning-perf and up;
+  :constraints + code graph — everything;
+}
+
+if (platform?) then (macOS)
+  :launchd LaunchAgents\n(only the tier's daemons);
+elseif (Linux / WSL with systemd) then
+  :systemd --user units + timers\n(only the tier's daemons);
+else (WSL without systemd)
+  #FFFACD:no daemons + the /etc/wsl.conf fix;
 endif
 
-if (Any failures?) then (yes)
-  #red:**Installation completed with failures**;
-else (no)
-  if (Any warnings?) then (yes)
-    #orange:**Installation completed with warnings**;
-  else (no)
-    #lightgreen:**Installation completed successfully**;
-  endif
-endif
-
-:Create .activate script;
+:Verify, report warnings / failures;
+:""source .activate"" → ""coding"" is on PATH;
 
 stop
+
+note right
+  Learned data is set up per repo on the first
+  ""coding"" launch in it (see learning-repo-setup) —
+  only the coding checkout's own is asked here
+  (learning tiers: ""setup_history_repo"").
+end note
 
 @enduml
