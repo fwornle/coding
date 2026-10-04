@@ -608,10 +608,15 @@ agent_common_init() {
   ensure_data_directory_ignored "$target_project_dir"
   ensure_coding_runtime_ignored "$target_project_dir"
 
-  # Bootstrap a private <project>-history repo at .specstory/history/ on first launch
-  # (skips silently if already configured or user previously declined)
-  ensure_private_history_repo "$target_project_dir"
-  pull_learning_repo "$target_project_dir"
+  # The repo's learning checkout <project>/.coding/ — asked on first launch,
+  # silent once answered. Only a tier that learns has anything to keep there:
+  # `lsl` is the root of the learning chain, so harness never asks. An unset
+  # CODING_FEATURES (a caller that did not resolve features) keeps the old
+  # behaviour.
+  if [[ -z "${CODING_FEATURES+x}" || " $CODING_FEATURES " == *" lsl "* ]]; then
+    ensure_private_history_repo "$target_project_dir"
+    pull_learning_repo "$target_project_dir"
+  fi
 
   # Start robust transcript monitoring for target project
   if [ -d "$target_project_dir/.specstory" ] || mkdir -p "$target_project_dir/.specstory/history" 2>/dev/null; then

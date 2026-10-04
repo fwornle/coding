@@ -1,0 +1,66 @@
+@startuml learned-data-layout
+!include _standard-style.puml
+
+title Where learned data lives — per repo (shared) vs per machine (never shared)
+
+top to bottom direction
+
+skinparam folder {
+  BackgroundColor #FAFAFA
+  BorderColor #888888
+}
+
+folder "repo X  (your project — its own git repo, untouched)" as X {
+  component "src/, docs/, tests/ …" as code <<external>>
+  folder "X/.coding/   ← the X-history checkout (nested git repo,\nignored by X via .git/info/exclude)" as dotc {
+    component "history/<yyyy>/<mm>/*.jsonl\nLSL — live session logs" as hist <<storage>>
+    component "kb/knowledge-graph/X.json\nKB — entities + relations of project X\n(observations, digests, insights included)" as kg <<storage>>
+    component "kb/observation-export/\n{observations,digests,insights}.json\ncold archive slice of project X" as obs <<storage>>
+    component "kb/usage/<user_hash>.json\nmeasurements — token usage per day / task,\none file per user (no conflicts)" as usage <<storage>>
+    component "kb/insights/*.md  (coding only)\nUKB insight documents + diagrams" as ins <<storage>>
+  }
+  component ".specstory/history → ../.coding/history\n(symlink, SpecStory-compatible path)" as link <<util>>
+}
+
+folder "&#126;/.coding/  (per user, per machine)" as home {
+  component "repos.yaml — repo → remote | skip\nteams.yaml — teams, active selection\nfeatures.yaml — installed tier" as cfg <<core>>
+  folder "data/<scope>/var/  (runtime caches — never shared)" as var {
+    component "knowledge-graph/leveldb\nTHE live store (obs-api owns it)" as ldb <<storage>>
+    component "Qdrant volume — vectors for injection" as qd <<storage>>
+    component "llm-proxy token DB, measurements/,\nrun-snapshots/, projects.json, sync-state.json" as meas <<storage>>
+    component "shared/<Y>/ — clones of teammates'\nY-history (read-only)" as shared <<storage>>
+  }
+}
+
+cloud "bmw.ghe.com (private)" as ghe {
+  component "<you>/X-history.git" as remote <<external>>
+}
+
+link .[#757575].> hist : points to
+
+' stack vertically: the page is read top-down
+code -[hidden]down- link
+hist -[hidden]down- kg
+kg -[hidden]down- obs
+obs -[hidden]down- usage
+usage -[hidden]down- ins
+cfg -[hidden]down- var
+ldb -[hidden]down- qd
+qd -[hidden]down- meas
+meas -[hidden]down- shared
+X -[hidden]down- home
+ldb -[#FF9800,thickness=2]-> kg : exported per project\n(only obs-api writes into repos)
+kg -[#FF9800,thickness=2]-> ldb : hydrate = union merge
+meas -[#FF9800,thickness=2]-> usage : hourly export,\nthis machine's rows
+ldb -[#43A047,dashed]-> qd : embed on write;\nbackfill for what git brought
+dotc -[#E53935,thickness=2]-> remote : coding sync --push\n(only on confirmation)
+remote -[#E53935,thickness=2]-> dotc : pull at every launch
+shared .[#757575].> ldb : merged in, never written
+
+note bottom of var
+  The knowledge store is rebuildable: a fresh
+  LevelDB hydrates from every .coding/kb/ file,
+  and the backfill re-embeds it into Qdrant.
+end note
+
+@enduml

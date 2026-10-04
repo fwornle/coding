@@ -1,0 +1,45 @@
+@startuml team-filter-scoping
+!include _standard-style.puml
+
+title Teams are sets of repos — one mapping feeds every filter
+
+top to bottom direction
+
+package "Configuration (layers, last wins)" {
+  component "config/teams/<id>.json\nontology per team" as onto <<core>>
+  component "config/teams.yaml\nshipped — no memberships" as ship <<core>>
+  component "&#126;/.coding/teams.yaml\nyour teams, repos:, include:, active:\n(written by Dashboard → Teams)" as user <<core>>
+  component "CODING_TEAMS=a,b\nenv override" as env <<cli>>
+}
+
+component "lib/teams/discover.mjs\nscan $HOME (depth 4) for git repos\nwith .coding/ or .specstory/history\n→ var/projects.json" as disc <<util>>
+
+component "lib/teams/scope.mjs\nprojectsOfTeams(teams) → project ids of their repos\n(a selected id that is no team = a project id)" as scope <<core>>
+
+onto -down-> scope
+ship -down-> scope
+user -down-> scope
+env -down-> scope
+disc -down-> scope : which repo is where
+
+package "Consumers" {
+  component "Unified viewer (vkb)\nTeams rail starts from the dashboard's\nactive selection; two-way sync;\nentities filtered client-side" as viewer <<api>>
+  component "obs-api ?teams=a,b\nentities · observations · digests ·\ninsights · LSL sessions\n(filtered before pagination)" as api <<api>>
+  component "Injection /api/retrieve\nteams of the SESSION's repo\n(membership, not the active selection;\nno team → the repo's own project)" as inj <<agent>>
+}
+
+scope -[#9C27B0,thickness=2]-> viewer
+scope -[#9C27B0,thickness=2]-> api
+scope -[#9C27B0,thickness=2]-> inj
+
+database "Qdrant\n(project payload index)" as qd
+inj -[#FF9800,thickness=2]-> qd : project match.any filter\n+ hard post-filter on every hit
+
+note bottom of scope
+  Entities carry metadata.project = the REPO they were learned in.
+  Team membership is derived at read time, never stamped —
+  a repo can be in several teams and move between them
+  without rewriting the graph.
+end note
+
+@enduml
