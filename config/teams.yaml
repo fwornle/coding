@@ -26,7 +26,8 @@
 #     raas:
 #       include: [raas, 'rapid-*']
 #
-# Which teams are active (the viewer's and injection's primary filter):
+# Which teams are active (what the viewer shows by default; injection follows
+# the session repo's membership instead, not this):
 #   active: [raas, coding]          # empty or absent = all teams
 #
 # Where discovery looks for repos (defaults shown):

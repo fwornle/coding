@@ -25,6 +25,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Logger } from '@/lib/logging'
 import type { ApiClient, Entity, TeamRegistry } from '@/api/ApiClient'
 import { EMPTY_TEAM_REGISTRY } from '@/api/ApiClient'
+import { DASHBOARD_URL } from '@/config/system-endpoints'
 import { teamOf } from '@/graph/team-of'
 import {
   buildTeamGroups,
@@ -79,6 +80,21 @@ export function TeamsFilter({ entities, apiClient, registry: registryProp }: Tea
     for (const t of registry.teams) if (t.projects?.length) map[t.id] = t.projects
     set({ teamProjects: map })
   }, [registry, set])
+
+  // The dashboard's selection (Dashboard → Teams, `active:`) is where the rail
+  // STARTS, once per page load: until it was read, choosing teams there changed
+  // nothing here. Only an untouched rail is seeded, so a click made before the
+  // registry arrived is not overwritten.
+  const active = registry.active ?? EMPTY_TEAM_REGISTRY.active // a mocked or older backend may omit it
+  const seeded = useViewerStore((s) => s.teamSelectionSeeded)
+  useEffect(() => {
+    if (seeded || registry === EMPTY_TEAM_REGISTRY) return
+    const untouched = useViewerStore.getState().selectedTeams.size === 0
+    set({
+      teamSelectionSeeded: true,
+      ...(untouched && active.length ? { selectedTeams: new Set(active) } : {}),
+    })
+  }, [registry, active, seeded, set])
 
   const counts = useMemo(() => {
     const map = new Map<string, number>()
@@ -140,6 +156,14 @@ export function TeamsFilter({ entities, apiClient, registry: registryProp }: Tea
   }
 
   const isChecked = (team: string) => selectedTeams.size === 0 || selectedTeams.has(team)
+
+  // Whether the rail shows exactly the dashboard's selection (both empty = all).
+  const matchesDashboard =
+    !selectedTeams.has('__none__') &&
+    (active.length === 0
+      ? selectedTeams.size === 0
+      : selectedTeams.size === active.length && active.every((t) => selectedTeams.has(t)))
+  const labelOf = (id: string) => registry.teams.find((t) => t.id === id)?.label ?? id
 
   const renderRow = (row: { id: string; label: string; count: number }, depth: number) => (
     <label
@@ -241,6 +265,41 @@ export function TeamsFilter({ entities, apiClient, registry: registryProp }: Tea
           </button>
         </div>
       </div>
+      {registry !== EMPTY_TEAM_REGISTRY && (
+        <div
+          className="text-[10px] text-muted-foreground leading-snug px-1"
+          data-testid="filter-teams-dashboard"
+        >
+          <span>Dashboard selection: </span>
+          <span className="text-foreground" data-testid="filter-teams-dashboard-active">
+            {active.length ? active.map(labelOf).join(', ') : 'all teams'}
+          </span>
+          {' · '}
+          {matchesDashboard ? (
+            <span>shown</span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => apply(active.length ? new Set(active) : new Set(), 'use dashboard selection')}
+              className="underline hover:text-foreground"
+              data-testid="filter-teams-use-dashboard"
+            >
+              use it
+            </button>
+          )}
+          {' · '}
+          <a
+            href={`${DASHBOARD_URL}/teams`}
+            target="_blank"
+            rel="noreferrer"
+            className="underline hover:text-foreground"
+            title="Choose teams and which repos belong to them in the dashboard's Teams tab"
+            data-testid="filter-teams-dashboard-link"
+          >
+            change in Dashboard → Teams
+          </a>
+        </div>
+      )}
       <div className="space-y-1">{groups.map((g) => renderGroup(g, 0))}</div>
     </div>
   )

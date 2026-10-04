@@ -223,6 +223,12 @@ export interface ViewerState {
   /** Per registry team, the projects it covers (`/api/teams`); written by
    *  TeamsFilter. Selecting a team admits its projects' entities. */
   teamProjects: Readonly<Record<string, readonly string[]>>
+  /**
+   * Whether `selectedTeams` has taken its start value from the dashboard's
+   * selection (`/api/teams .active`) on this page load. Once set, the rail's
+   * own clicks rule until a reload — a remount must not reset them.
+   */
+  teamSelectionSeeded: boolean
 
   // Filters
   searchQuery: string
@@ -703,6 +709,7 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   selectedTeams: new Set<string>(),
   teamScope: null,
   teamProjects: {},
+  teamSelectionSeeded: false,
   theme: readPersistedThemeForStore(),
   // Default to the D3 renderer — that's the VKB-parity engine. The
   // UnifiedViewer route can override to 'sigma' for systems that

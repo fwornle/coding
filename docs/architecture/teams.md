@@ -92,7 +92,8 @@ compared case-insensitively with `metadata.project`, else `metadata.team`.
 - **Viewer**: selecting a team admits its repos' entities on both canvases, in the rail
   counts and in the History sidebar; the LSL strip asks the server.
 - **Injection**: `/api/retrieve` uses `teams` / `context.teams` (hooks forward
-  `CODING_TEAMS`), else the active selection, else the teams of the session's repo
-  (`context.cwd`), else — a repo in no team — that repo's own project. Qdrant is queried
-  with a `project` filter and every candidate is re-checked, so nothing from another team
-  is injected. Only a session outside every repo, with nothing selected, is unfiltered.
+  `CODING_TEAMS`), else the teams the session's repo is a member of (`context.cwd`), else —
+  a repo in no team — that repo's own project. The active selection is NOT used: it is
+  what you look at in the viewer, not what a session in some repo should know. Qdrant is
+  queried with a `project` filter and every candidate is re-checked, so nothing from
+  another team is injected. Only a session outside every repo is unfiltered.
