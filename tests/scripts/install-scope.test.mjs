@@ -37,12 +37,12 @@ describe('install.sh asks for the install scope', () => {
   });
 
   test('it runs before anything that resolves the data root', () => {
-    // configure_team_setup, setup_history_repo and configure_docker_mode all call
-    // bin/coding-data-home. If the scope is written AFTER them, they create the
+    // setup_history_repo and configure_docker_mode call bin/coding-data-home
+    // (configure_team_setup did too, before it was retired). If the scope is written AFTER them, they create the
     // data root under the placeholder and the user's knowledge is orphaned at the
     // first launch.
     const call = lineOf(INSTALL, '    ask_install_scope');
-    for (const later of ['    configure_team_setup', '    configure_docker_mode']) {
+    for (const later of ['    setup_history_repo', '    configure_docker_mode']) {
       assert.ok(
         call < lineOf(INSTALL, later),
         `ask_install_scope must be called before ${later.trim()}`,
