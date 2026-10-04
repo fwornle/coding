@@ -10,6 +10,13 @@ import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/re
 import { useViewerStore } from '@/store/viewer-store'
 import type { ApiClient, Entity, TeamRegistry } from '@/api/ApiClient'
 import { TeamsFilter } from './TeamsFilter'
+import { useTeamRegistry } from './team-registry'
+
+/** The viewer core mounts the registry hook; the rail only renders. */
+function WithRegistry({ client }: { client: Pick<ApiClient, 'listTeams'> }) {
+  useTeamRegistry(client)
+  return <TeamsFilter entities={ENTITIES} />
+}
 
 const REGISTRY: TeamRegistry = {
   teams: [
@@ -43,7 +50,7 @@ const renderFilter = (props: Partial<React.ComponentProps<typeof TeamsFilter>> =
 
 describe('TeamsFilter', () => {
   beforeEach(() => {
-    useViewerStore.setState({ selectedTeams: new Set<string>(), teamScope: null, teamSelectionSeeded: false })
+    useViewerStore.setState({ selectedTeams: new Set<string>(), teamScope: null, teamRegistry: null, dashboardSelectionKey: null })
     cleanup()
   })
 
@@ -149,7 +156,7 @@ describe('TeamsFilter', () => {
 
   test('fetches the registry from the client when none is passed', async () => {
     const listTeams = vi.fn().mockResolvedValue(REGISTRY)
-    render(<TeamsFilter entities={ENTITIES} apiClient={{ listTeams } as unknown as ApiClient} />)
+    render(<WithRegistry client={{ listTeams }} />)
     await waitFor(() => expect(screen.getByTestId('filter-team-group-projects')).toBeInTheDocument())
     expect(listTeams).toHaveBeenCalledOnce()
   })
@@ -158,7 +165,7 @@ describe('TeamsFilter', () => {
     // The OKB backend does not mount /api/teams; listTeams resolves empty
     // rather than rejecting, and the rail falls back to the pre-registry shape.
     const listTeams = vi.fn().mockResolvedValue({ teams: [], viewGroups: [] })
-    render(<TeamsFilter entities={ENTITIES} apiClient={{ listTeams } as unknown as ApiClient} />)
+    render(<WithRegistry client={{ listTeams }} />)
     await waitFor(() => expect(screen.getByTestId('filter-team-group-views')).toBeInTheDocument())
     expect(screen.queryByTestId('filter-team-group-projects')).not.toBeInTheDocument()
   })
@@ -212,6 +219,30 @@ describe('TeamsFilter', () => {
       expect(useViewerStore.getState().selectedTeams.size).toBe(0)
       expect(screen.getByTestId('filter-teams-dashboard-active')).toHaveTextContent('all teams')
       expect(screen.getByTestId('filter-teams-dashboard')).toHaveTextContent('shown')
+    })
+  })
+
+  describe('a dashboard change reaches an open viewer (no reload)', () => {
+    test('a CHANGED selection is adopted; re-reading an unchanged one keeps the rail\'s clicks', () => {
+      const { rerender } = render(<TeamsFilter entities={ENTITIES} registry={{ ...REGISTRY, active: ['coding', 'raas'] }} />)
+      fireEvent.click(screen.getByRole('checkbox', { name: 'UI' }))
+      rerender(<TeamsFilter entities={ENTITIES} registry={{ ...REGISTRY, active: ['raas', 'coding'] }} />)
+      expect([...useViewerStore.getState().selectedTeams].sort()).toEqual(['coding', 'raas', 'ui'])
+      rerender(<TeamsFilter entities={ENTITIES} registry={{ ...REGISTRY, active: ['ui'] }} />)
+      expect([...useViewerStore.getState().selectedTeams]).toEqual(['ui'])
+      rerender(<TeamsFilter entities={ENTITIES} registry={{ ...REGISTRY, active: [] }} />)
+      expect(useViewerStore.getState().selectedTeams.size).toBe(0)
+    })
+
+    test('the registry is refetched when the window regains focus', async () => {
+      let active = ['coding']
+      const listTeams = vi.fn().mockImplementation(async () => ({ ...REGISTRY, active }))
+      render(<WithRegistry client={{ listTeams }} />)
+      await waitFor(() => expect([...useViewerStore.getState().selectedTeams]).toEqual(['coding']))
+      active = ['raas']
+      window.dispatchEvent(new Event('focus'))
+      await waitFor(() => expect([...useViewerStore.getState().selectedTeams]).toEqual(['raas']))
+      expect(screen.getByTestId('filter-teams-dashboard-active')).toHaveTextContent('RaaS')
     })
   })
 })

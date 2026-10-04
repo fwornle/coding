@@ -32,6 +32,7 @@
 //
 //   Logger discipline: ZERO raw console.* per feedback_logger_class.md.
 
+import type { TeamRegistry } from '@/api/ApiClient'
 import { create } from 'zustand'
 import type { Observation } from '@/api/schemas'
 import { PROVENANCE_RELATION_TYPES } from '@/graph/relation-types'
@@ -223,12 +224,15 @@ export interface ViewerState {
   /** Per registry team, the projects it covers (`/api/teams`); written by
    *  TeamsFilter. Selecting a team admits its projects' entities. */
   teamProjects: Readonly<Record<string, readonly string[]>>
+  /** The team registry (`/api/teams`), kept live by useTeamRegistry. */
+  teamRegistry: TeamRegistry | null
   /**
-   * Whether `selectedTeams` has taken its start value from the dashboard's
-   * selection (`/api/teams .active`) on this page load. Once set, the rail's
-   * own clicks rule until a reload — a remount must not reset them.
+   * The dashboard selection (`/api/teams .active`, sorted, joined) the rail
+   * last adopted; null until the registry was first read. A different value
+   * on a later read = the user changed it in the dashboard → the rail follows
+   * (panels/filters/team-registry.ts).
    */
-  teamSelectionSeeded: boolean
+  dashboardSelectionKey: string | null
 
   // Filters
   searchQuery: string
@@ -709,7 +713,8 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   selectedTeams: new Set<string>(),
   teamScope: null,
   teamProjects: {},
-  teamSelectionSeeded: false,
+  teamRegistry: null,
+  dashboardSelectionKey: null,
   theme: readPersistedThemeForStore(),
   // Default to the D3 renderer — that's the VKB-parity engine. The
   // UnifiedViewer route can override to 'sigma' for systems that
