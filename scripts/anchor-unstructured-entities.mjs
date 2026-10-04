@@ -21,7 +21,16 @@
  *
  * THE ANCHOR
  *
- * Every row knows its project (`metadata.project`), and every project is an
+ * A row that declares its parent (`metadata.parentEntityName`) and whose
+ * parent exists is anchored THERE, with `contains` — that is its place in the
+ * hierarchy, and hanging it straight under its Project would flatten it (a
+ * Detail of ObservationPipeline is not a child of Coding). 68 hierarchy rows
+ * carried a parent name with no edge from that parent (2026-10-04), written
+ * since March by UKB and by hand; the viewer anchors along edges only, so they
+ * floated as "unanchored". Ambiguous names (two entities) prefer the row's own
+ * project; still ambiguous = fall through.
+ *
+ * Otherwise: every row knows its project (`metadata.project`), and every project is an
  * entity. Insights get `has_insight` — the same edge the consolidator already
  * writes for insights it mints — everything else gets `contains`. Both are
  * structural and drawn by default, so an anchored row can never strand under
@@ -132,7 +141,38 @@ if (CHECK) {
 
 const DECLARED = declaredProjects();
 let written = 0; const unresolved = {}; const created = new Set();
+const byName = new Map();
+for (const x of entities) {
+  if (!byName.has(x.name)) byName.set(x.name, []);
+  byName.get(x.name).push(x);
+}
+/** The row's declared parent, if it exists and is unambiguous. */
+function declaredParent(e) {
+  const name = e.metadata?.parentEntityName;
+  const hits = (name && byName.get(name)) || [];
+  if (hits.length <= 1) return hits[0] ?? null;
+  const mine = hits.filter((h) => projectSlug(resolveProjectKey(h)) === projectSlug(resolveProjectKey(e)));
+  return mine.length === 1 ? mine[0] : null;
+}
+let toParent = 0;
 for (const e of unanchored) {
+  const parent = declaredParent(e);
+  if (parent && parent.id !== e.id) {
+    toParent++;
+    if (!APPLY) { written++; continue; }
+    const r = await fetch(`${OBS_API}/api/v1/relations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        from: parent.id, to: e.id, type: 'contains',
+        metadata: { source: 'anchor-unstructured-entities', anchor: 'declared-parent', confidence: 1.0 },
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (r.ok) written++;
+    else out(`  FAILED contains ${parent.name} -> ${(e.name ?? '').slice(0, 40)}: ${r.status}`);
+    continue;
+  }
   const projectName = resolveProjectKey(e);
   let project = projectsByName.get(projectSlug(projectName));
   if (!project) {
@@ -212,8 +252,38 @@ for (const e of unanchored) {
   else out(`  FAILED ${type} -> ${(e.name ?? '').slice(0, 40)}: ${r.status}`);
 }
 
+// Second pass — rows that HAVE a structural edge, just not from their declared
+// parent (an insight's has_insight, a mentions-promoted contains). The audit
+// above counts them anchored; the viewer walks parent edges up to a Project
+// and finds none, so they still float. Same declared-parent rule.
+const linked = new Set();
+for (const rel of relations) {
+  const from = rel.from ?? rel.source; const to = rel.to ?? rel.target;
+  linked.add(`${from}|${to}`);
+}
+const firstPass = new Set(unanchored.map((e) => e.id));
+let reparented = 0;
+for (const e of entities) {
+  if (firstPass.has(e.id)) continue;
+  const parent = declaredParent(e);
+  if (!parent || parent.id === e.id || linked.has(`${parent.id}|${e.id}`)) continue;
+  reparented++;
+  if (!APPLY) continue;
+  const r = await fetch(`${OBS_API}/api/v1/relations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: parent.id, to: e.id, type: 'contains',
+      metadata: { source: 'anchor-unstructured-entities', anchor: 'declared-parent', confidence: 1.0 },
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!r.ok) { reparented--; out(`  FAILED contains ${parent.name} -> ${(e.name ?? '').slice(0, 40)}: ${r.status}`); }
+}
+
 out('');
-out(`${APPLY ? 'edges written' : 'edges that WOULD be written'}: ${written}`);
+out(`${APPLY ? 'edges written' : 'edges that WOULD be written'}: ${written} (${toParent} to the declared parent, the rest to the project)`);
+out(`${APPLY ? 'parent edges written' : 'parent edges that WOULD be written'} for anchored rows missing theirs: ${reparented}`);
 if (created.size > 0) out(`Project entities ${APPLY ? 'created' : 'that WOULD be created'}: ${[...created].join(', ')}`);
 if (Object.keys(unresolved).length > 0) {
   out(`left alone — project does not resolve to an entity: ${JSON.stringify(unresolved)}`);
