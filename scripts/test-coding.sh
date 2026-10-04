@@ -512,47 +512,27 @@ print_section "PHASE 3: Knowledge Management Tools"
 print_info "UKB command removed - use: semantic workflow run wave-analysis --team coding"
 print_info "Knowledge base updates are now triggered via MCP server only"
 
-print_test "Multi-Team Knowledge Base Configuration"
+print_test "Teams and per-repo learned data"
 
-print_check "Team environment variable"
-if [ -n "$CODING_TEAM" ]; then
-    print_pass "CODING_TEAM set to: $CODING_TEAM"
-
-    print_check "Team-specific knowledge export file"
-    TEAM_FILE="$CODING_ROOT/.data/knowledge-export/${CODING_TEAM}.json"
-    if file_exists "$TEAM_FILE"; then
-        print_pass "Team knowledge export exists: .data/knowledge-export/${CODING_TEAM}.json"
-        if [ -s "$TEAM_FILE" ]; then
-            TEAM_ENTITIES=$(jq '.entities | length' "$TEAM_FILE" 2>/dev/null || echo "0")
-            print_info "Team knowledge export contains $TEAM_ENTITIES entities"
-        fi
-    else
-        print_info "Team knowledge export not found: .data/knowledge-export/${CODING_TEAM}.json"
-        print_info "Will be exported from GraphDB when team adds first entity"
-    fi
+# Teams are sets of repos (config/teams.yaml + ~/.coding/teams.yaml); learned
+# data lives in each repo's .coding/ checkout. See docs-content/architecture/tenancy.md.
+print_check "Team configuration"
+if [ -f "$HOME/.coding/teams.yaml" ]; then
+    print_pass "User teams configured: ~/.coding/teams.yaml"
 else
-    print_info "CODING_TEAM not set - using individual developer mode"
+    print_info "No ~/.coding/teams.yaml yet - every team is its same-named repo (edit in Dashboard → Teams)"
 fi
 
-print_check "Cross-team coding knowledge export"
-CODING_FILE="$CODING_ROOT/.data/knowledge-export/coding.json"
-if file_exists "$CODING_FILE"; then
-    print_pass "Cross-team coding knowledge export exists"
-    if [ -s "$CODING_FILE" ]; then
-        CODING_ENTITIES=$(jq '.entities | length' "$CODING_FILE" 2>/dev/null || echo "0")
-        print_info "Coding knowledge export contains $CODING_ENTITIES entities"
+print_check "This repo's learning checkout"
+if [ -d "$CODING_ROOT/.coding/kb" ]; then
+    print_pass "Learned data at .coding/kb/"
+    PROJECT_EXPORT="$CODING_ROOT/.coding/kb/knowledge-graph/coding.json"
+    if [ -s "$PROJECT_EXPORT" ]; then
+        PROJECT_ENTITIES=$(jq '.nodes | length' "$PROJECT_EXPORT" 2>/dev/null || echo "0")
+        print_info "Knowledge-graph export contains $PROJECT_ENTITIES entities"
     fi
 else
-    print_info "Cross-team coding knowledge export not found"
-    print_info "Knowledge is managed in GraphDB at .data/knowledge-graph/"
-fi
-
-print_check "GraphDB directory"
-if [ -d "$CODING_ROOT/.data/knowledge-graph" ]; then
-    print_pass "GraphDB directory exists at .data/knowledge-graph/"
-else
-    print_info "GraphDB directory not yet created (normal for new installations)"
-    print_info "Will be created when first entity is added"
+    print_info "No .coding/kb/ yet - created on the first 'coding' launch here"
 fi
 
 # UKB command removed - use: semantic workflow run wave-analysis --team coding

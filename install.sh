@@ -2333,57 +2333,28 @@ detect_agents() {
     return 0
 }
 
-# Configure team-based knowledge management
-configure_team_setup() {
-    echo ""
-    echo -e "${PURPLE}🏢 Multi-Team Knowledge Base Configuration${NC}"
-    echo -e "${PURPLE}=========================================${NC}"
-    echo ""
-    
-    # Set default team configuration
-    export CODING_TEAM="coding ui"
-    
-    info "Team configuration automatically set to: coding and ui"
-    info ""
-    info "ℹ️  To change the team configuration, modify the CODING_TEAM environment variable"
-    info "   Available teams:"
-    echo "     • coding - General coding patterns and knowledge"
-    echo "     • ui     - UI/Frontend development (React, TypeScript, etc.)"
-    echo "     • resi   - Reprocessing/Simulation development (C++, systems, performance)"
-    echo "     • raas   - RaaS development (Java, DevOps, microservices)"
-    echo "     • custom - Any custom team name"
-    echo ""
-    info "   Example: export CODING_TEAM=\"resi raas\" for multiple teams"
-    info "   Example: export CODING_TEAM=\"myteam\" for a custom team"
+# Retire the CODING_TEAM export older installs wrote into the shell rc.
+#
+# It was a per-INSTALL team ("coding ui" by default) that the copilot adapter
+# stamped on everything it wrote, whatever repo the work was in. Teams are now
+# sets of repos (config/teams.yaml, ~/.coding/teams.yaml, Dashboard → Teams)
+# and an entity names the REPO it was learned in, so nothing reads it any more.
+# Removes exactly the three lines this installer wrote, nothing the user wrote.
+retire_coding_team_export() {
+    [[ "$SANDBOX_MODE" == "true" ]] && return 0
+    [[ -f "$SHELL_RC" ]] || return 0
+    grep -q '^# Coding Tools - Team Configuration$' "$SHELL_RC" 2>/dev/null || return 0
 
-    # Add to shell environment (only if not already configured and NOT in sandbox mode)
-    if [[ "$SANDBOX_MODE" == "true" ]]; then
-        warning "SANDBOX MODE: Skipping CODING_TEAM configuration in $SHELL_RC"
-        info "To use CODING_TEAM, export it manually: export CODING_TEAM=\"coding ui\""
-    elif grep -q "export CODING_TEAM=" "$SHELL_RC" 2>/dev/null; then
-        info "CODING_TEAM already configured in $SHELL_RC"
-    else
-        echo "" >> "$SHELL_RC"
-        echo "# Coding Tools - Team Configuration" >> "$SHELL_RC"
-        echo "# Modify this variable to change team scope (e.g., \"resi raas\" for multiple teams)" >> "$SHELL_RC"
-        echo "export CODING_TEAM=\"$CODING_TEAM\"" >> "$SHELL_RC"
-        success "Team configuration added to $SHELL_RC"
-    fi
-
-    # The export layout is NOT per team. km-core buckets its exports by
-    # DOMAIN — a topic name like 'development-workflow' — and CODING_TEAM is a
-    # node attribute, not a bucket, so every team's entities land in the same
-    # general.json. Naming a per-team file here promised one the exporter
-    # cannot produce: the 142-byte coding.json it implied sat on disk, empty,
-    # from June until it was deleted.
-    local _data_home
-    _data_home="$("$CODING_REPO/bin/coding-data-home" 2>/dev/null)" || _data_home=""
-    if [[ -n "$_data_home" ]]; then
-        info "Your knowledge lives under the data root, not in this repo:"
-        echo "  • $_data_home/var/knowledge-graph/leveldb (live graph, auto-persisted)"
-        echo "  • $_data_home/kb/knowledge-graph/exports/general.json (JSON export)"
-        info "CODING_TEAM tags the entities that get written; it does not split the files"
-    fi
+    local tmp_rc
+    tmp_rc="$(mktemp)"
+    awk '
+        /^# Coding Tools - Team Configuration$/ { drop=2; next }
+        drop > 0 && /^# Modify this variable to change team scope/ { drop--; next }
+        drop > 0 && /^export CODING_TEAM=/ { drop=0; next }
+        { drop=0; print }
+    ' "$SHELL_RC" > "$tmp_rc" && cat "$tmp_rc" > "$SHELL_RC"   # keeps a symlinked rc and its mode
+    rm -f "$tmp_rc"
+    info "Removed the old CODING_TEAM export from $SHELL_RC — teams are now sets of repos (Dashboard → Teams)"
 }
 
 # Build Docker infrastructure — the only supported deployment mode. Native
@@ -4756,7 +4727,7 @@ main() {
     check_dependencies
     run_step detect_agents
     ask_install_scope
-    configure_team_setup
+    retire_coding_team_export
     setup_history_repo
     run_step install_node_dependencies
     initialize_knowledge_databases

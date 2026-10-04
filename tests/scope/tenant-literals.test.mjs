@@ -28,6 +28,8 @@ const CONSUMERS = [
   'src/knowledge-management/KnowledgeQueryService.js',
   'src/knowledge-management/UKBDatabaseWriter.js',
   'lib/fallbacks/memory-fallback.js',
+  'lib/adapters/copilot.js',
+  'lib/ukb-database/cli.js',
   'scripts/sync-graph-to-qdrant.js',
   'scripts/migrate-sqlite-to-kmcore.mjs',
   'integrations/semantic-analysis/src/tools.ts',
