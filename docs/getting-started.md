@@ -611,7 +611,7 @@ chmod +x bin/*
 cat ~/.config/Claude/claude_desktop_config.json
 
 # Reinstall MCP config
-./install.sh --update-mcp-config
+bash -c 'source ./install.sh && setup_mcp_config'   # regenerate only the MCP config
 
 # Check server logs
 ls ~/.claude/logs/mcp*.log

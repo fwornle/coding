@@ -169,6 +169,27 @@ print_suggest() {
     echo -e "  ${CYAN}[SUGGEST]${NC} $1"
 }
 
+# The gate every in-line repair goes through (try_repair is the one-command
+# form). check-only must mean check-only: these blocks used to run whatever
+# followed print_repair in every mode — npm installs, builds, submodule
+# updates, and once a full unattended ./install.sh.
+may_repair() {
+    local description="$1"
+    case "$TEST_MODE" in
+        check-only)
+            print_suggest "Repair available (run with --interactive or --auto-repair): $description"
+            return 1
+            ;;
+        interactive)
+            local response
+            read -p "  Repair: $description? [y/N]: " response
+            [[ "$response" =~ ^[yY] ]] || { print_suggest "Skipped: $description"; return 1; }
+            ;;
+    esac
+    print_repair "$description"
+    return 0
+}
+
 # Mode-aware repair function for CODING-INTERNAL issues only
 # Usage: try_repair "description" "command"
 # Returns: 0 if repaired, 1 if skipped/failed
@@ -544,12 +565,13 @@ if node -e "require('better-sqlite3')" 2>/dev/null; then
     print_pass "better-sqlite3 module installed"
 else
     print_fail "better-sqlite3 not installed"
-    print_repair "Installing better-sqlite3..."
-    cd "$CODING_ROOT" && npm install better-sqlite3
-    if [ $? -eq 0 ]; then
-        print_fixed "better-sqlite3 installed"
-    else
-        print_fail "Failed to install better-sqlite3"
+    if may_repair "Installing better-sqlite3..."; then
+        cd "$CODING_ROOT" && npm install better-sqlite3
+        if [ $? -eq 0 ]; then
+            print_fixed "better-sqlite3 installed"
+        else
+            print_fail "Failed to install better-sqlite3"
+        fi
     fi
 fi
 
@@ -559,9 +581,10 @@ if dir_exists "$DATA_DIR"; then
     print_pass ".data directory exists"
 else
     print_fail ".data directory not found"
-    print_repair "Creating .data directory..."
-    mkdir -p "$DATA_DIR"
-    print_fixed ".data directory created"
+    if may_repair "Creating .data directory..."; then
+        mkdir -p "$DATA_DIR"
+        print_fixed ".data directory created"
+    fi
 fi
 
 print_check "Database initialization script"
@@ -581,14 +604,15 @@ if file_exists "$SQLITE_DB"; then
     print_info "Database size: $DB_SIZE"
 else
     print_warning "SQLite database not initialized"
-    print_repair "Initializing knowledge databases..."
-    cd "$CODING_ROOT"
-    # Use the same script as install.sh for consistency
-    if node scripts/initialize-knowledge-system.js --project-path "$CODING_ROOT" 2>&1 | grep -qE "(Knowledge Management System initialized|initialization complete)"; then
-        print_fixed "Knowledge databases initialized"
-    else
-        print_warning "Database initialization may need manual setup"
-        print_info "Run: node scripts/initialize-knowledge-system.js --project-path $CODING_ROOT"
+    if may_repair "Initializing knowledge databases..."; then
+        cd "$CODING_ROOT"
+        # Use the same script as install.sh for consistency
+        if node scripts/initialize-knowledge-system.js --project-path "$CODING_ROOT" 2>&1 | grep -qE "(Knowledge Management System initialized|initialization complete)"; then
+            print_fixed "Knowledge databases initialized"
+        else
+            print_warning "Database initialization may need manual setup"
+            print_info "Run: node scripts/initialize-knowledge-system.js --project-path $CODING_ROOT"
+        fi
     fi
 fi
 
@@ -613,10 +637,11 @@ if node -e "require('@qdrant/js-client-rest')" 2>/dev/null; then
     print_pass "@qdrant/js-client-rest module installed"
 else
     print_fail "@qdrant/js-client-rest not installed"
-    print_repair "Installing @qdrant/js-client-rest..."
-    cd "$CODING_ROOT" && npm install @qdrant/js-client-rest
-    if [ $? -eq 0 ]; then
-        print_fixed "@qdrant/js-client-rest installed"
+    if may_repair "Installing @qdrant/js-client-rest..."; then
+        cd "$CODING_ROOT" && npm install @qdrant/js-client-rest
+        if [ $? -eq 0 ]; then
+            print_fixed "@qdrant/js-client-rest installed"
+        fi
     fi
 fi
 
@@ -650,7 +675,7 @@ if command_exists claude-mcp; then
     if [ -f "$CODING_ROOT/claude-code-mcp-processed.json" ]; then
         print_pass "Claude Code MCP config found"
     else
-        print_warning "Claude Code MCP config not found - run ./install.sh --update-mcp-config"
+        print_warning "Claude Code MCP config not found - regenerate: bash -c 'source ./install.sh && setup_mcp_config'"
     fi
 else
     print_fail "claude-mcp command not found"
@@ -857,32 +882,33 @@ if command_exists code; then
         
         # Check if extension source exists for building
         if [ -d "$CODING_ROOT/integrations/vscode-km-copilot" ]; then
-            print_repair "VSCode KM Bridge source found, checking for built extension..."
+            if may_repair "Install the VSCode KM Bridge extension (build it if no .vsix exists)"; then
             
-            # Look for any VSIX files
-            VSIX_FILES=$(find "$CODING_ROOT/integrations/vscode-km-copilot" -name "*.vsix" 2>/dev/null)
-            if [ -n "$VSIX_FILES" ]; then
-                print_repair "Installing VSCode Knowledge Management Bridge..."
-                LATEST_VSIX=$(ls -t "$CODING_ROOT/integrations/vscode-km-copilot"/*.vsix | head -1)
-                code --install-extension "$LATEST_VSIX"
-                print_fixed "VSCode KM Bridge extension installed from: $(basename "$LATEST_VSIX")"
-            else
-                print_repair "Building VSCode KM Bridge extension..."
-                cd "$CODING_ROOT/integrations/vscode-km-copilot"
-                if [ -f "package.json" ] && command_exists npm; then
-                    npm install >/dev/null 2>&1
-                    npm run package >/dev/null 2>&1
-                    BUILT_VSIX=$(find . -name "*.vsix" | head -1)
-                    if [ -n "$BUILT_VSIX" ]; then
-                        code --install-extension "$BUILT_VSIX"
-                        print_fixed "VSCode KM Bridge built and installed"
-                    else
-                        print_fail "Failed to build VSCode KM Bridge extension"
-                    fi
+                # Look for any VSIX files
+                VSIX_FILES=$(find "$CODING_ROOT/integrations/vscode-km-copilot" -name "*.vsix" 2>/dev/null)
+                if [ -n "$VSIX_FILES" ]; then
+                    print_repair "Installing VSCode Knowledge Management Bridge..."
+                    LATEST_VSIX=$(ls -t "$CODING_ROOT/integrations/vscode-km-copilot"/*.vsix | head -1)
+                    code --install-extension "$LATEST_VSIX"
+                    print_fixed "VSCode KM Bridge extension installed from: $(basename "$LATEST_VSIX")"
                 else
-                    print_fail "Cannot build VSCode KM Bridge - missing package.json or npm"
+                    print_repair "Building VSCode KM Bridge extension..."
+                    cd "$CODING_ROOT/integrations/vscode-km-copilot"
+                    if [ -f "package.json" ] && command_exists npm; then
+                        npm install >/dev/null 2>&1
+                        npm run package >/dev/null 2>&1
+                        BUILT_VSIX=$(find . -name "*.vsix" | head -1)
+                        if [ -n "$BUILT_VSIX" ]; then
+                            code --install-extension "$BUILT_VSIX"
+                            print_fixed "VSCode KM Bridge built and installed"
+                        else
+                            print_fail "Failed to build VSCode KM Bridge extension"
+                        fi
+                    else
+                        print_fail "Cannot build VSCode KM Bridge - missing package.json or npm"
+                    fi
+                    cd "$CODING_ROOT"
                 fi
-                cd "$CODING_ROOT"
             fi
         else
             print_info "To create extension: Clone vscode-km-copilot source and run npm run package"
@@ -914,29 +940,16 @@ fi
 
 if file_exists "$MCP_CONFIG_PROCESSED"; then
     print_pass "MCP processed config found"
-    
-    # Check if the processed config includes the new environment variables
-    print_check "MCP config environment variables"
-    if grep -q "KNOWLEDGE_BASE_PATH" "$MCP_CONFIG_PROCESSED" 2>/dev/null; then
-        print_pass "MCP config includes KNOWLEDGE_BASE_PATH"
-    else
-        print_warning "MCP config missing KNOWLEDGE_BASE_PATH - regenerating..."
-        cd "$CODING_ROOT" && ./install.sh --update-mcp-config
-        print_fixed "MCP configuration updated"
-    fi
-    
-    if grep -q "CODING_DOCS_PATH" "$MCP_CONFIG_PROCESSED" 2>/dev/null; then
-        print_pass "MCP config includes CODING_DOCS_PATH"
-    else
-        print_warning "MCP config missing CODING_DOCS_PATH - regenerating..."
-        cd "$CODING_ROOT" && ./install.sh --update-mcp-config
-        print_fixed "MCP configuration updated"
-    fi
 else
     print_fail "MCP processed config not found"
-    print_repair "Generating MCP configuration..."
-    cd "$CODING_ROOT" && ./install.sh --update-mcp-config
-    print_fixed "MCP configuration generated"
+    # Through try_repair, so check-only stays check-only. The repair is the
+    # installer's own generator, run on its own — NOT ./install.sh with a flag:
+    # install.sh has no --update-mcp-config, ignored it and ran a full
+    # unattended install from inside a "check-only" run. (The two checks that
+    # used to sit here looked for KNOWLEDGE_BASE_PATH / CODING_DOCS_PATH, which
+    # the template no longer has, so they fired on every run.)
+    try_repair "Generate the MCP configuration" \
+        "bash -c 'cd \"$CODING_ROOT\" && source ./install.sh >/dev/null && setup_mcp_config'"
 fi
 
 print_test "MCP servers"
@@ -949,18 +962,20 @@ if dir_exists "$CODING_ROOT/integrations/llm-cli-proxy"; then
     if [ -d "$CODING_ROOT/integrations/llm-cli-proxy/node_modules" ]; then
         print_pass "LLM CLI Proxy dependencies installed"
     else
-        print_repair "Installing LLM CLI Proxy dependencies..."
-        cd "$CODING_ROOT/integrations/llm-cli-proxy" && npm install
-        print_fixed "LLM CLI Proxy dependencies installed"
+        if may_repair "Installing LLM CLI Proxy dependencies..."; then
+            cd "$CODING_ROOT/integrations/llm-cli-proxy" && npm install
+            print_fixed "LLM CLI Proxy dependencies installed"
+        fi
     fi
 
     print_check "LLM CLI Proxy build status"
     if [ -f "$CODING_ROOT/integrations/llm-cli-proxy/dist/server.js" ]; then
         print_pass "LLM CLI Proxy built"
     else
-        print_repair "Building LLM CLI Proxy..."
-        cd "$CODING_ROOT/integrations/llm-cli-proxy" && npm run build
-        print_fixed "LLM CLI Proxy built"
+        if may_repair "Building LLM CLI Proxy..."; then
+            cd "$CODING_ROOT/integrations/llm-cli-proxy" && npm run build
+            print_fixed "LLM CLI Proxy built"
+        fi
     fi
 
     print_check "LLM CLI Proxy status (port 12435)"
@@ -998,9 +1013,10 @@ if dir_exists "$CODING_ROOT/integrations/semantic-analysis"; then
     if [ -d "$CODING_ROOT/integrations/semantic-analysis/node_modules" ]; then
         print_pass "Semantic analysis dependencies installed"
     else
-        print_repair "Installing semantic analysis dependencies..."
-        cd "$CODING_ROOT/integrations/semantic-analysis" && npm install
-        print_fixed "Semantic analysis dependencies installed"
+        if may_repair "Installing semantic analysis dependencies..."; then
+            cd "$CODING_ROOT/integrations/semantic-analysis" && npm install
+            print_fixed "Semantic analysis dependencies installed"
+        fi
     fi
 
     print_check "Semantic analysis build"
@@ -1036,17 +1052,19 @@ if dir_exists "$CODING_ROOT/integrations/semantic-analysis"; then
             print_warning "Docs path not found: $CODING_DOCS_PATH"
         fi
     else
-        print_repair "Building semantic analysis server..."
-        cd "$CODING_ROOT/integrations/semantic-analysis" && npm run build
-        print_fixed "Semantic analysis server built"
+        if may_repair "Building semantic analysis server..."; then
+            cd "$CODING_ROOT/integrations/semantic-analysis" && npm run build
+            print_fixed "Semantic analysis server built"
+        fi
     fi
 else
     print_fail "Semantic analysis MCP server submodule not found"
-    print_repair "Initializing semantic analysis submodule..."
-    cd "$CODING_ROOT"
-    git submodule update --init --recursive integrations/semantic-analysis
-    cd integrations/semantic-analysis && npm install && npm run build
-    print_fixed "Semantic analysis submodule initialized and built"
+    if may_repair "Initializing semantic analysis submodule..."; then
+        cd "$CODING_ROOT"
+        git submodule update --init --recursive integrations/semantic-analysis
+        cd integrations/semantic-analysis && npm install && npm run build
+        print_fixed "Semantic analysis submodule initialized and built"
+    fi
 fi
 
 print_check "Graphify code-graph engine (git submodule, runs in coding-services)"
@@ -1154,9 +1172,10 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
     if [ -d "$CONSTRAINT_MONITOR_DIR/node_modules" ]; then
         print_pass "MCP Constraint Monitor dependencies installed"
     else
-        print_repair "Installing MCP Constraint Monitor dependencies..."
-        cd "$CONSTRAINT_MONITOR_DIR" && npm install
-        print_fixed "MCP Constraint Monitor dependencies installed"
+        if may_repair "Installing MCP Constraint Monitor dependencies..."; then
+            cd "$CONSTRAINT_MONITOR_DIR" && npm install
+            print_fixed "MCP Constraint Monitor dependencies installed"
+        fi
     fi
     
     print_check "Professional Dashboard (Next.js) setup"
@@ -1168,14 +1187,15 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
         if [ -d "$DASHBOARD_DIR/node_modules" ] || [ -f "$DASHBOARD_DIR/pnpm-lock.yaml" ]; then
             print_pass "Professional Dashboard dependencies installed"
         else
-            print_repair "Installing Professional Dashboard dependencies..."
-            cd "$DASHBOARD_DIR"
-            if command_exists pnpm; then
-                pnpm install
-            else
-                npm install
+            if may_repair "Installing Professional Dashboard dependencies..."; then
+                cd "$DASHBOARD_DIR"
+                if command_exists pnpm; then
+                    pnpm install
+                else
+                    npm install
+                fi
+                print_fixed "Professional Dashboard dependencies installed"
             fi
-            print_fixed "Professional Dashboard dependencies installed"
         fi
         
         print_check "Professional Dashboard port configuration"
@@ -1279,11 +1299,12 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
             print_warning "Grouped constraints not configured - professional dashboard may show limited grouping"
         fi
     else
-        print_repair "Setting up constraint monitor configuration..."
-        if [ -f "$CONSTRAINT_MONITOR_DIR/config/default-constraints.yaml" ]; then
-            cp "$CONSTRAINT_MONITOR_DIR/config/default-constraints.yaml" "$CONSTRAINT_MONITOR_DIR/constraints.yaml"
+        if may_repair "Setting up constraint monitor configuration..."; then
+            if [ -f "$CONSTRAINT_MONITOR_DIR/config/default-constraints.yaml" ]; then
+                cp "$CONSTRAINT_MONITOR_DIR/config/default-constraints.yaml" "$CONSTRAINT_MONITOR_DIR/constraints.yaml"
+            fi
+            print_fixed "Constraint monitor configuration created"
         fi
-        print_fixed "Constraint monitor configuration created"
     fi
     
     print_check "Health Coordinator Integration (Multi-Project Monitoring)"
@@ -1411,9 +1432,10 @@ if dir_exists "$CONSTRAINT_MONITOR_DIR"; then
     if [ -d "$CONSTRAINT_MONITOR_DIR/data" ]; then
         print_pass "Constraint monitor data directory exists"
     else
-        print_repair "Creating constraint monitor data directory..."
-        mkdir -p "$CONSTRAINT_MONITOR_DIR/data"
-        print_fixed "Constraint monitor data directory created"
+        if may_repair "Creating constraint monitor data directory..."; then
+            mkdir -p "$CONSTRAINT_MONITOR_DIR/data"
+            print_fixed "Constraint monitor data directory created"
+        fi
     fi
     
     print_check "Constraint monitor environment variables"
@@ -1657,9 +1679,10 @@ if npm list graphology >/dev/null 2>&1; then
     print_pass "Graphology dependency found"
 else
     print_fail "Graphology dependency missing"
-    print_repair "Installing Graphology..."
-    npm install graphology graphology-utils
-    print_fixed "Graphology installed"
+    if may_repair "Installing Graphology..."; then
+        npm install graphology graphology-utils
+        print_fixed "Graphology installed"
+    fi
 fi
 
 print_test "CoPilot fallback service test"
@@ -1730,14 +1753,16 @@ if dir_exists "$CODING_ROOT/.specstory"; then
         HISTORY_COUNT=$(ls -1 "$CODING_ROOT/.specstory/history" | wc -l)
         print_info "History files: $HISTORY_COUNT"
     else
-        print_repair "Creating .specstory/history directory..."
-        mkdir -p "$CODING_ROOT/.specstory/history"
-        print_fixed ".specstory/history directory created"
+        if may_repair "Creating .specstory/history directory..."; then
+            mkdir -p "$CODING_ROOT/.specstory/history"
+            print_fixed ".specstory/history directory created"
+        fi
     fi
 else
-    print_repair "Creating .specstory directory structure..."
-    mkdir -p "$CODING_ROOT/.specstory/history"
-    print_fixed ".specstory directory structure created"
+    if may_repair "Creating .specstory directory structure..."; then
+        mkdir -p "$CODING_ROOT/.specstory/history"
+        print_fixed ".specstory directory structure created"
+    fi
 fi
 
 print_check "Documentation structure"
@@ -1938,9 +1963,10 @@ print_check "Permission checks"
 if [ -x "$CODING_ROOT/install.sh" ]; then
     print_pass "install.sh is executable"
 else
-    print_repair "Making install.sh executable..."
-    chmod +x "$CODING_ROOT/install.sh"
-    print_fixed "install.sh permissions fixed"
+    if may_repair "Making install.sh executable..."; then
+        chmod +x "$CODING_ROOT/install.sh"
+        print_fixed "install.sh permissions fixed"
+    fi
 fi
 
 if [ -d "$CODING_ROOT/bin" ]; then
@@ -1956,9 +1982,10 @@ if [ -d "$CODING_ROOT/bin" ]; then
     if $ALL_EXECUTABLE; then
         print_pass "All bin files are executable"
     else
-        print_repair "Fixing bin file permissions..."
-        chmod +x "$CODING_ROOT/bin"/*
-        print_fixed "Bin file permissions fixed"
+        if may_repair "Fixing bin file permissions..."; then
+            chmod +x "$CODING_ROOT/bin"/*
+            print_fixed "Bin file permissions fixed"
+        fi
     fi
 fi
 
