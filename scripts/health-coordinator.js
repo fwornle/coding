@@ -255,6 +255,8 @@ const currentState = {
     missing_parent: null,
     dangling_parent: null,
     parent_by_class: null,
+    // Parent-EDGE invariant (drives status): declared parent exists, no edge from it.
+    unlinked_parent: null,
     last_probe_end: null
   },
   // Phase 51 Plan 11 — sub-agent capture freshness across all four agents.
@@ -3565,10 +3567,16 @@ async function pollGraphIntegrity() {
     // backfill lands — HEALTH_GRAPH_PARENT_STRICT=1 arms it without a code
     // change.
     const parentViolations = audit.parents.missingParent + audit.parents.danglingParent;
+    // The parent-EDGE invariant drives status from the start: the viewer draws
+    // a violating row floating, the repair fixes all of them, and the UKB
+    // causes are fixed at the source (wave-controller) — a new one is news.
+    const unlinkedParent = audit.parentEdges.unlinked;
     currentState.graph_integrity = {
-      status: audit.unanchored === 0 && (!GRAPH_PARENT_STRICT || parentViolations === 0)
+      status: audit.unanchored === 0 && unlinkedParent === 0 && (!GRAPH_PARENT_STRICT || parentViolations === 0)
         ? 'healthy'
         : 'degraded',
+      unlinked_parent: unlinkedParent,
+      unlinked_parent_by_class: audit.parentEdges.byClass,
       unanchored: audit.unanchored,
       orphans: audit.orphans,
       stranded: audit.stranded,
@@ -3588,6 +3596,12 @@ async function pollGraphIntegrity() {
         + `parent that is not in the graph (of ${audit.parents.checked} checked) `
         + `${JSON.stringify(audit.parents.byClass)}`,
         GRAPH_PARENT_STRICT ? 'WARN' : 'INFO');
+    }
+    if (unlinkedParent > 0) {
+      log(`graph_integrity: ${unlinkedParent} row(s) with no edge from their declared parent `
+        + `${JSON.stringify(audit.parentEdges.byClass)} (e.g. `
+        + `${audit.parentEdges.rows.slice(0, 3).map((r) => `${r.parentEntityName} -> ${r.name}`).join(', ')}) — `
+        + `repair with scripts/anchor-unstructured-entities.mjs --apply`, 'WARN');
     }
     if (audit.unanchored > 0) {
       log(`graph_integrity: ${audit.unanchored} row(s) without a structural edge `

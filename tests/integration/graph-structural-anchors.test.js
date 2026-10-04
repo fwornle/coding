@@ -22,6 +22,7 @@ import path from 'node:path';
 import {
   auditStructuralAnchors,
   auditParentMetadata,
+  auditParentEdges,
   projectSlug,
   ANCHORED_CLASSES,
   HIERARCHY_CLASSES,
@@ -289,9 +290,41 @@ describe('parent-metadata wiring', () => {
     assert.match(probe, /!GRAPH_PARENT_STRICT \|\| parentViolations === 0/);
   });
 
-  test('the CLI guard shares the audit and keeps --check edge-only', () => {
+  test('the CLI guard shares the audits; parent METADATA stays opt-in, parent EDGES are checked', () => {
     assert.match(cli, /auditParentMetadata/);
     assert.match(cli, /--check-parents/);
     assert.match(cli, /CHECK_PARENTS && parentViolations > 0/);
+    assert.match(cli, /auditParentEdges\(entities, relations\)/);
+    assert.match(cli, /parentEdges\.unlinked === 0/);
+  });
+
+  test('the coordinator degrades on rows with no edge from their declared parent', () => {
+    const probe = src.slice(src.indexOf('async function pollGraphIntegrity'),
+      src.indexOf('async function runAllChecks'));
+    assert.match(probe, /unlinkedParent === 0/);
+  });
+});
+
+describe('parent-edge invariant (declared parent exists → an edge from it)', () => {
+  const ent = (id, name, cls, parent) => ({ id, name, entityType: cls, metadata: parent ? { parentEntityName: parent } : {} });
+  const rel = (from, to, type = 'contains') => ({ from, to, type });
+
+  test('a row whose only structural edge comes from elsewhere is a violation', () => {
+    const entities = [ent('c', 'Coding', 'Project'), ent('p', 'Pipeline', 'SubComponent'), ent('d', 'Writer', 'Detail', 'Pipeline')];
+    const r = auditParentEdges(entities, [rel('c', 'd')]);
+    assert.equal(r.unlinked, 1);
+    assert.deepEqual(r.rows.map((x) => x.name), ['Writer']);
+    assert.equal(auditParentEdges(entities, [rel('c', 'd'), rel('p', 'd')]).unlinked, 0);
+  });
+
+  test('an edge from ANY node of the parent\'s name counts; provenance edges do not', () => {
+    const entities = [ent('p1', 'Pipeline', 'Detail'), ent('p2', 'Pipeline', 'SubComponent'), ent('d', 'Writer', 'Detail', 'Pipeline')];
+    assert.equal(auditParentEdges(entities, [rel('p1', 'd')]).unlinked, 0);
+    assert.equal(auditParentEdges(entities, [rel('p2', 'd', 'mentions')]).unlinked, 1);
+  });
+
+  test('a missing or non-existent parent is the METADATA audit\'s business, not this one', () => {
+    const entities = [ent('d', 'Writer', 'Detail', 'Nowhere'), ent('e', 'Loose', 'Detail')];
+    assert.deepEqual(auditParentEdges(entities, []), { checked: 0, unlinked: 0, byClass: {}, rows: [] });
   });
 });
