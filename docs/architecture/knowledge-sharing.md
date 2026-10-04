@@ -90,6 +90,15 @@ The slice in `kb/observation-export/` is merged with what is already in the
 repo, by row id, never replaced: a teammate's rows are in it and in no local
 store.
 
+## Retrieval without a vector index
+
+Injection is hybrid: Qdrant search plus a keyword search over the live km-core
+store (`src/retrieval/keyword-search.js` — query terms, IDF-weighted, title
+hits doubled, insights + kg_entities, the team filter applied before the
+limit). The keyword hits carry the Qdrant point id of the same entity, so they
+fuse with vector hits in RRF. With Qdrant empty or down, injection still finds
+what the store holds — a teammate's pushed insight included.
+
 ## Embedding what arrives by git
 
 Embeddings are made on write (`embedding:new` → the listener), and injection
@@ -113,8 +122,3 @@ coding sync --push          # asks, then pushes
 curl -s localhost:12436/api/kb/layout | jq   # which project is written where
 curl -s -X POST localhost:12436/api/kb/reload # merge pulled files into the live graph
 ```
-
-## Not yet
-
-- Keyword search still reads the archived SQLite file and returns nothing, so
-  a machine without Qdrant gets no injection at all.

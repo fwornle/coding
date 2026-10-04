@@ -146,6 +146,29 @@ describe('retrieve() with a team selection', () => {
     }
   });
 
+  test('Qdrant down: keyword search over the store still injects, and stays in the team', async () => {
+    const { default: Graph } = await import('graphology');
+    const graph = new Graph();
+    const add = (id, topic, project) => graph.addNode(id, {
+      id, name: topic, entityType: 'Insight', updatedAt: '2026-10-01T00:00:00Z',
+      metadata: { topic, summary: `${topic}: retry with exponential backoff for flaky upstream calls`, confidence: 0.9, project },
+    });
+    add('ins-raas', 'Upstream retry backoff (raas)', 'raas-api');
+    add('ins-coding', 'Upstream retry backoff (coding)', 'coding');
+    const svc = new RetrievalService({ codingRoot, judge: async (_q, c) => c, kmStoreGetter: () => ({ ...graphStore, graph }) });
+    svc._initialized = true;
+    svc.embeddingService = { embedOne: async () => new Array(384).fill(0.01) };
+    svc.qdrantClient = { search: async () => { throw new Error('fetch failed'); } };
+    svc._applyFreshnessRerank = async () => {};
+    const projects = [...projectsOfTeams(['raas'], { teamsDoc, repos }).projects];
+    const res = await svc.retrieve('retry with exponential backoff for flaky upstream calls', {
+      budget: 3000, threshold: 0.1, context: { agent: 'claude' }, teams: ['raas'], projects,
+    });
+    expect(res.items.map((it) => it.id)).toEqual(['ins-raas']);
+    expect(res.markdown).toMatch(/Upstream retry backoff \(raas\)/);
+    expect(res.markdown).not.toMatch(/\(coding\)/);
+  });
+
   test('no teams: no filter requested (previous behaviour)', async () => {
     const svc = makeService();
     const res = await svc.retrieve('retry with exponential backoff for flaky upstream calls', {
