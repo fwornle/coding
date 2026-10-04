@@ -20,7 +20,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const REPO = process.env.CODING_REPO || new URL('../..', import.meta.url).pathname;
@@ -83,9 +83,12 @@ function hits(files, re) {
   return found;
 }
 
-const FILES = sources(SUBMODULE);
+// CI checks out without submodules (private; see .github/workflows/tests.yml):
+// nothing to scan there, so the suite is skipped rather than crashing at import.
+const CHECKED_OUT = existsSync(SUBMODULE);
+const FILES = CHECKED_OUT ? sources(SUBMODULE) : [];
 
-describe('the phantom store does not come back', () => {
+describe('the phantom store does not come back', { skip: !CHECKED_OUT && 'semantic-analysis submodule not checked out' }, () => {
   test('no source addresses .data/knowledge-graph-migrated', () => {
     const found = hits(FILES, /knowledge-graph-migrated/);
     assert.deepEqual(found, [], `that directory exists nowhere:\n${found.join('\n')}`);
