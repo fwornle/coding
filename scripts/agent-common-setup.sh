@@ -108,12 +108,18 @@ ensure_data_directory_ignored() {
 # These are created by coding services and should never be committed
 ensure_coding_runtime_ignored() {
   local project_dir="$1"
-  local gitignore_file="$project_dir/.gitignore"
 
-  # Create .gitignore if it doesn't exist
-  if [ ! -f "$gitignore_file" ]; then
-    touch "$gitignore_file"
-  fi
+  # Into the repo's LOCAL exclude file, never its tracked .gitignore: that file
+  # belongs to the project, and writing it meant every `coding` launch left an
+  # uncommitted change in the user's repo (and, in coding itself, re-added a
+  # line T3 had already moved to .git/info/exclude). Same mechanism as
+  # lib/history/repo-link.mjs uses for .coding/. Not a git repo yet = nothing
+  # can be committed, so nothing to ignore.
+  local exclude_file
+  exclude_file="$(git -C "$project_dir" rev-parse --git-path info/exclude 2>/dev/null)" || return 0
+  [[ "$exclude_file" = /* ]] || exclude_file="$project_dir/$exclude_file"
+  mkdir -p "$(dirname "$exclude_file")" 2>/dev/null || return 0
+  [ -f "$exclude_file" ] || touch "$exclude_file"
 
   # Essential entries that coding services create in target projects.
   # Each must be an exact line match (grep -xF) to avoid substring false positives.
@@ -126,33 +132,27 @@ ensure_coding_runtime_ignored() {
     "*.log"
     ".specstory/validation-report.json"
     ".specstory/change-log.json"
-    # Session transcripts. Ignored unconditionally, NOT only once
-    # ensure_private_history_repo has bootstrapped the nested private repo.
-    # That bootstrap is skipped whenever the project is not yet a git repo,
-    # the user declined, or gh is unavailable — and without this line a single
-    # `git add -A` in any of those states sweeps verbatim chat logs into the
-    # outer repo. Observed on a project that was git-init'd after the session
-    # had already started, so the launch-time offer had nothing to act on.
-    # Ignoring the path does not impede the private nested checkout: git
-    # treats a directory containing .git as a separate repo regardless.
-    ".specstory/history/"
+    # Session transcripts and the learning checkout. repo-link.mjs adds these
+    # too once the repo has a .coding/; listed here as well so a launch that
+    # could not set one up (no gh, declined, not yet decided) still never lets
+    # `git add -A` sweep verbatim chat logs into the outer repo.
+    ".specstory/history"
+    ".coding/"
   )
 
   local added=false
   for entry in "${entries[@]}"; do
-    # Use -xF for exact whole-line matching to avoid substring false positives.
-    if ! grep -qxF -- "$entry" "$gitignore_file" 2>/dev/null; then
+    if ! grep -qxF -- "$entry" "$exclude_file" 2>/dev/null; then
       if [ "$added" = false ]; then
-        echo "" >> "$gitignore_file"
-        echo "# Coding infrastructure runtime files (auto-added by coding startup)" >> "$gitignore_file"
+        echo "# coding: runtime files (auto-added by coding startup)" >> "$exclude_file"
         added=true
       fi
-      echo "$entry" >> "$gitignore_file"
+      echo "$entry" >> "$exclude_file"
     fi
   done
 
   if [ "$added" = true ]; then
-    log "✅ Added coding runtime entries to .gitignore"
+    log "✅ Added coding runtime entries to $exclude_file"
   fi
 }
 export -f ensure_coding_runtime_ignored

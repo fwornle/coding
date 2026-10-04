@@ -187,14 +187,24 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
 The symlink `<repo>/.specstory/history → ../.coding/history` exists only because code still
 addresses the old path. Goal: nothing addresses it; new repos get no `.specstory/` at all.
 
-- [ ] One resolver: `historyDir(repo)` (+ `.cjs`/bash twins) → `<repo>/.coding/history`, the
-      single place that knows the layout.
+- [x] One resolver: `lib/history/paths.cjs` `repoHistoryDir(repo)` (+ `isHistoryDir`,
+      `repoOfHistoryDir`) and its bash twin `scripts/lib/history-dir.sh` — `.coding/history`,
+      or a REAL legacy `.specstory/history` while a repo has no `.coding/` yet; never resolves
+      through the symlink. `tests/history/paths.test.mjs` keeps the twins equal (mutation-checked).
 - [ ] Cut every caller over (93 code files / 337 refs in coding; 14 files in semantic-analysis,
       km-core, constraint-monitor, memory-visualizer) — writers first (ETM, sub-agent writers,
       exporters), then readers (obs-api LSL routes, dashboard, `/sl`, tools).
-- [ ] `ensure_coding_runtime_ignored` must stop appending `.specstory/history/` to a TRACKED
-      `.gitignore` (it did on 2026-10-04 when `coding` launched in coding itself).
-- [ ] Discovery keeps ACCEPTING the old marker (repos not relaunched yet), but stops requiring it.
+      **Batch 1 done:** ETM (write path, project validation accepts `.coding/`, git auto-track
+      matches either layout, readers), sub-agent LSL writer default root, `lib/lsl/window.mjs`,
+      obs-api `/api/coding/lsl/sessions`, discovery's new `history` marker (either layout; cache
+      v2, a v1 cache still answers) used by obs-api + dashboard. Live: all three ETMs respawned on
+      the new code; coding's next prompt set landed in `.coding/history/` and was staged; LSL
+      sessions list coding + a2a-xpr + rec.
+- [x] `ensure_coding_runtime_ignored` writes `.git/info/exclude`, never the project's tracked
+      `.gitignore` (it appended nine lines to every repo on launch, and re-added
+      `.specstory/history/` in coding itself on 2026-10-04); non-git dirs are left alone.
+- [x] Discovery keeps ACCEPTING the old marker (repos not relaunched yet), but stops requiring it
+      (`history` marker = either layout).
 - [ ] `/sl` + its user-level allow rules move to `.coding/history`.
 - [ ] Then: `ensureLayout` stops creating the symlink; an existing one is left (harmless) or
       removed on launch once nothing reads it.

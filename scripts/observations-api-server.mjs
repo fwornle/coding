@@ -28,6 +28,7 @@ import cors from 'cors';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { repoHistoryDir } from '../lib/history/paths.cjs';
 import { ObservationWriter, subscribeObservationWritten } from '../src/live-logging/ObservationWriter.js';
 import { ObservationConsolidator } from '../src/live-logging/ObservationConsolidator.js';
 import { RetrievalService } from '../src/retrieval/retrieval-service.js';
@@ -3885,10 +3886,10 @@ app.get('/api/coding/lsl/sessions', async (req, res) => {
     } else {
       const seenDirs = new Set();
       let repos = [];
-      try { repos = discoveredProjects({ codingRoot: REPO_ROOT, marker: 'specstory' }); } catch { /* none */ }
+      try { repos = discoveredProjects({ codingRoot: REPO_ROOT, marker: 'history' }); } catch { /* none */ }
       if (!repos.some((r) => path.resolve(r.path) === path.resolve(REPO_ROOT))) repos.unshift({ path: REPO_ROOT });
       for (const r of repos) {
-        const dir = path.join(r.path, '.specstory', 'history');
+        const dir = repoHistoryDir(r.path);
         let real;
         try { real = fs.realpathSync(dir); } catch { continue; }
         if (seenDirs.has(real)) continue;

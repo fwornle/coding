@@ -61,7 +61,7 @@ function parseChainId(id) {
  */
 export function discoverProjects(codingRoot) {
   const out = [];
-  for (const repo of discoveredProjects({ codingRoot, marker: 'specstory' })) {
+  for (const repo of discoveredProjects({ codingRoot, marker: 'history' })) {
     const hist = path.join(repo.path, '.specstory', 'history');
     if (!fs.existsSync(hist)) continue;
     if (!out.some((p) => p.project === repo.name)) out.push({ project: repo.name, history: hist });
