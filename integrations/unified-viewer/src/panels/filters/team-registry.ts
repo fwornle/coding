@@ -7,7 +7,7 @@
 // selection never reached the viewer. Once fetched it never changed either.
 //
 // FETCH: useTeamRegistry (mounted by the viewer core) reads the registry on
-// mount, when the window regains focus and every POLL_MS while visible.
+// mount, when the window regains focus and every POLL_MS.
 //
 // NOTHING CHANGES UNLESS SOMETHING CHANGED. Every store field the canvases read
 // is written only when its content differs: a poll that finds the same teams,
@@ -116,9 +116,10 @@ export function useTeamRegistry(
       if (document.visibilityState === 'visible') refresh()
     }
     refresh()
-    const timer = setInterval(() => {
-      if (document.visibilityState === 'visible') refresh()
-    }, POLL_MS)
+    // Not gated on visibility: with the dashboard in the foreground this tab is
+    // hidden, and a change made there must be here when you come back even if
+    // no focus event fires (a second window). Unchanged answers write nothing.
+    const timer = setInterval(refresh, POLL_MS)
     window.addEventListener('focus', refresh)
     document.addEventListener('visibilitychange', onVisible)
 

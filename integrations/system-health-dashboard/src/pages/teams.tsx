@@ -42,18 +42,22 @@ export function TeamsPage() {
   const [newKind, setNewKind] = useState<'team' | 'project'>('team')
 
   useEffect(() => { dispatch(fetchTeamsConfig()) }, [dispatch])
-  // The viewer writes the selection too (its Teams rail): pick that up when
-  // the tab is looked at again, and every 15s while visible. The slice only
-  // assigns what changed, so an unchanged answer re-renders nothing.
+  // The viewer writes the selection too (its Teams rail): pick that up at
+  // once when the tab is looked at again, and every 15s regardless — NOT only
+  // while visible: with the viewer in the foreground this tab IS hidden, and
+  // gating the poll on visibility left its buttons stale. The request is
+  // small and the slice only assigns what changed, so an unchanged answer
+  // re-renders nothing.
   useEffect(() => {
-    const refresh = () => { if (document.visibilityState === 'visible') dispatch(fetchTeamsConfig({ background: true })) }
+    const refresh = () => { dispatch(fetchTeamsConfig({ background: true })) }
+    const onVisible = () => { if (document.visibilityState === 'visible') refresh() }
     const timer = setInterval(refresh, 15_000)
     window.addEventListener('focus', refresh)
-    document.addEventListener('visibilitychange', refresh)
+    document.addEventListener('visibilitychange', onVisible)
     return () => {
       clearInterval(timer)
       window.removeEventListener('focus', refresh)
-      document.removeEventListener('visibilitychange', refresh)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [dispatch])
 
