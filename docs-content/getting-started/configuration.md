@@ -39,11 +39,16 @@ All ports are centralized in `.env.ports`:
 | 3848 | Semantic Analysis SSE | Docker |
 | 3849 | Constraint Monitor SSE | Docker |
 | 3851 | Graphify (HTTP MCP, in `coding-services`) | Docker |
-| 8080 | VKB Server (Knowledge visualization) | Docker |
 | 6333 | Qdrant HTTP | Docker |
 | 6379 | Redis | Docker |
+| 3034 | Health coordinator (features, teams, sync APIs) | Host |
+| 5173 | Knowledge viewer (`npm --prefix integrations/unified-viewer run dev`) | Host |
 | 12435 | LLM CLI Proxy | Host |
+| 12436 | obs-api — the knowledge store, retrieval, KB export/reload | Host |
 | 12434 | Docker Model Runner | Host |
+
+The `harness` tier runs only the host rows (no Docker); the Docker rows come with
+`learning` and up.
 
 ## MCP & Hook Configuration
 

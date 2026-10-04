@@ -182,10 +182,30 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
 
 ---
 
+### T9 — Retire `.specstory/history`  `status: in progress`
+
+The symlink `<repo>/.specstory/history → ../.coding/history` exists only because code still
+addresses the old path. Goal: nothing addresses it; new repos get no `.specstory/` at all.
+
+- [ ] One resolver: `historyDir(repo)` (+ `.cjs`/bash twins) → `<repo>/.coding/history`, the
+      single place that knows the layout.
+- [ ] Cut every caller over (93 code files / 337 refs in coding; 14 files in semantic-analysis,
+      km-core, constraint-monitor, memory-visualizer) — writers first (ETM, sub-agent writers,
+      exporters), then readers (obs-api LSL routes, dashboard, `/sl`, tools).
+- [ ] `ensure_coding_runtime_ignored` must stop appending `.specstory/history/` to a TRACKED
+      `.gitignore` (it did on 2026-10-04 when `coding` launched in coding itself).
+- [ ] Discovery keeps ACCEPTING the old marker (repos not relaunched yet), but stops requiring it.
+- [ ] `/sl` + its user-level allow rules move to `.coding/history`.
+- [ ] Then: `ensureLayout` stops creating the symlink; an existing one is left (harmless) or
+      removed on launch once nothing reads it.
+- Accept: `git grep '\.specstory/history'` = docs/migration code only; a fresh repo launched
+  with `learning` has no `.specstory/`; tests green; live session logs still land.
+
 ## Open questions (decide inside the phase)
 
-- **Legacy `CODING_TEAM`** (found 2026-10-04): `install.sh configure_team_setup` still writes `export CODING_TEAM="coding ui"` into a colleague's shell rc, and `lib/adapters/copilot.js:68`, `lib/fallbacks/memory-fallback.js:35`, `lib/ukb-database/cli.js:71` read it — copilot stamps `team: "coding ui"`, bypassing the repo → project mapping. Proposal: drop the rc write, stamp via `projectIdFor`.
-- **Retire `.specstory/history`?** Still read/written by 93 tracked code files (337 occurrences), 14 files in 4 submodules, `/sl` and its user-level allow rules, discovery markers. Proposal (T9): one resolver for the history dir, cut every caller over, then stop creating the symlink; keep discovery accepting the old marker.
+- ~~Legacy `CODING_TEAM`~~ — done 2026-10-04 (d6f88527).
+- **No launcher for the knowledge viewer** (found 2026-10-04): `bin/vkb` went with vkb-server (2fb090da, 2026-09-08); the unified viewer is only reachable via `npm --prefix integrations/unified-viewer run dev` (:5173), and nothing starts it. The `learning` tier promises a viewer. Proposal: a `vkb` command (start-if-needed + open) and/or a `viewer` daemon under the `knowledge` feature.
+- **Stale `bin/status`**: still points at :3001 / `bin/dashboard` (both gone).
 
 ## Session protocol
 
@@ -301,3 +321,18 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
   a harness user (no lsl) was asked for an `X-history` in every repo; now only when `lsl` is on
   (unset CODING_FEATURES keeps the old behaviour). Features tab `lsl` description no longer says
   `.specstory markdown`. `mkdocs build --strict` clean; pages checked in gsd-browser.
+- **2026-10-04 (CI, CODING_TEAM, Getting Started)** — CI red since 2026-09-30 → green
+  (3129a6d3): submodule-reading tests skip an absent submodule; `lib/teams/config.cjs` lint +
+  `expandHome` honoured a sandboxed home. CODING_TEAM retired (d6f88527). Getting Started chapter
+  rewritten (overview, installation, verify & repair, configuration ports): no `coding --health`
+  / `vkb` / :8080 (none exist); fresh startup + health screenshots replace the Feb-2026 ones.
+  **Incident:** running `scripts/test-coding.sh --check-only` to verify a doc claim ran a FULL
+  unattended `./install.sh` (it called `install.sh --update-mcp-config`, a flag that does not
+  exist, on a check that could never pass) — rebuilt natives + proxy + memory-visualizer, started
+  a docker build (killed by timeout, containers untouched), and — forced to wrapper scope —
+  removed the developer's global agent setup (8 `~/.claude/commands`, 3 hooks, 2 opencode
+  plugins). Restored (scope global, commands, hooks, plugins). Fixed: (1) test-coding.sh — every
+  repair goes through `may_repair`/`try_repair`, check-only verified to change nothing; (2)
+  install.sh — unknown options exit 2 instead of being ignored; (3) an unattended re-run keeps a
+  recorded `global` scope; (4) the root TypeScript build ran before the km-core link (TS2307 →
+  a fresh install shipped no `dist/`), now after it. Next: **T9**.
