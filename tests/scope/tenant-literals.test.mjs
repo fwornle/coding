@@ -94,6 +94,17 @@ const ALLOWED = [
   },
 ];
 
+/**
+ * Whether the file's submodule is checked out. CI checks out without
+ * submodules (they are private, see .github/workflows/tests.yml), so an
+ * integrations/<x>/ path there is an empty directory — absent, not deleted.
+ * Files of this repo are always "checked out".
+ */
+function checkedOut(rel) {
+  const m = rel.match(/^integrations\/([^/]+)\//);
+  return !m || existsSync(join(REPO, 'integrations', m[1], 'package.json'));
+}
+
 function allowed(rel, text) {
   return ALLOWED.some((a) => a.file === rel && text.includes(a.match));
 }
@@ -113,7 +124,7 @@ function hits(re) {
 describe('the tenant literal does not come back', () => {
   test('every CONSUMERS entry still exists', () => {
     // A renamed or deleted file must not silently drop out of the guard.
-    const missing = CONSUMERS.filter((r) => !existsSync(join(REPO, r)));
+    const missing = CONSUMERS.filter((r) => checkedOut(r) && !existsSync(join(REPO, r)));
     assert.deepEqual(missing, [], `update CONSUMERS: ${missing.join(', ')}`);
   });
 
@@ -157,6 +168,7 @@ describe('the tenant literal does not come back', () => {
     // An allowlist entry whose line is gone is no longer documenting a decision,
     // it is just dead text that would silently permit a future reintroduction.
     for (const a of ALLOWED) {
+      if (!checkedOut(a.file)) continue;
       const p = join(REPO, a.file);
       assert.ok(existsSync(p), `allowlisted file missing: ${a.file}`);
       const found = codeLines(p).some(({ text }) => text.includes(a.match));
