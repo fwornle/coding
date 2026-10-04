@@ -50,7 +50,7 @@ const renderFilter = (props: Partial<React.ComponentProps<typeof TeamsFilter>> =
 
 describe('TeamsFilter', () => {
   beforeEach(() => {
-    useViewerStore.setState({ selectedTeams: new Set<string>(), teamScope: null, teamRegistry: null, dashboardSelectionKey: null })
+    useViewerStore.setState({ selectedTeams: new Set<string>(), teamScope: null, teamRegistry: null, dashboardSelectionKey: null, teamSelectionLocalAt: 0, teamSelectionWritePending: false })
     cleanup()
   })
 

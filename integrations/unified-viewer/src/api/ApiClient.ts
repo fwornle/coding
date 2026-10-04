@@ -480,6 +480,25 @@ export class ApiClient {
   }
 
   /**
+   * Write the user's team selection (`active:`) — the viewer's half of the
+   * two-way sync with Dashboard → Teams (obs-api forwards to the health
+   * coordinator, the one writer). Resolves false when the backend has no such
+   * route (OKB) or the write failed; never rejects.
+   */
+  async setActiveTeams(active: string[]): Promise<boolean> {
+    try {
+      const res = await fetch(`${this.baseUrl}/api/teams/active`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ active }),
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  }
+
+  /**
    * Phase 55 Plan 09 — lazy fetch the Confidence sub-tab bands.
    * Backend wired in Plan 55-06 (UI-SPEC §18 row 8). The EntityDetailPanel
    * Confidence sub-tab calls this once per `selectedNodeId`; on rejection

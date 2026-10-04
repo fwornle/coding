@@ -1575,6 +1575,37 @@ app.get('/api/teams', (_req, res) => {
 });
 
 /**
+ * PUT /api/teams/active  { active: string[] } — the viewer's Teams rail writes
+ * the user's team selection (`active:` in ~/.coding/teams.yaml), so a choice
+ * made there shows in Dashboard → Teams and the other way round.
+ *
+ * Forwarded to the health coordinator's PUT /teams — the one writer
+ * (lib/teams/config.cjs writeUserTeams) — rather than writing here: the
+ * viewer only knows this origin, the coordinator owns the file.
+ */
+app.put('/api/teams/active', async (req, res) => {
+  const active = req.body?.active;
+  if (!Array.isArray(active) || !active.every((t) => typeof t === 'string')) {
+    return res.status(400).json({ error: 'expected { active: string[] }' });
+  }
+  const base = process.env.HEALTH_COORDINATOR_URL || 'http://127.0.0.1:3034';
+  try {
+    const r = await fetch(`${base}/teams`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ active }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) return res.status(r.status).json({ error: body.error || `coordinator HTTP ${r.status}` });
+    res.json({ active: body.active ?? active });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /teams/active error: ${err.message}\n`);
+    res.status(502).json({ error: 'health coordinator unreachable' });
+  }
+});
+
+/**
  * GET /api/projects/:project/coverage
  *
  * Per-project truthfulness + coverage summary used by the dashboard's

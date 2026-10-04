@@ -233,6 +233,10 @@ export interface ViewerState {
    * (panels/filters/team-registry.ts).
    */
   dashboardSelectionKey: string | null
+  /** When the rail's selection last changed locally (ms) — older poll answers are ignored. */
+  teamSelectionLocalAt: number
+  /** A rail change is waiting to be written as `active:` — polls are ignored meanwhile. */
+  teamSelectionWritePending: boolean
 
   // Filters
   searchQuery: string
@@ -715,6 +719,8 @@ export const useViewerStore = create<ViewerState>((set, get) => ({
   teamProjects: {},
   teamRegistry: null,
   dashboardSelectionKey: null,
+  teamSelectionLocalAt: 0,
+  teamSelectionWritePending: false,
   theme: readPersistedThemeForStore(),
   // Default to the D3 renderer — that's the VKB-parity engine. The
   // UnifiedViewer route can override to 'sigma' for systems that
