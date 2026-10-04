@@ -18,6 +18,11 @@ import { loadTeamRegistry, loadViewGroups, loadRegistry } from '../../lib/teams/
 
 const REPO = (process.env.CODING_REPO || new URL('../..', import.meta.url).pathname).replace(/\/$/, '');
 
+// The registry layers the user's ~/.coding/teams.yaml over the shipped tree
+// (lib/teams/config.cjs). These tests pin the SHIPPED contract, so they read
+// an empty user layer — a team someone adds in the dashboard is not a failure.
+process.env.CODING_HOME = mkdtempSync(join(tmpdir(), 'coding-teams-home-'));
+
 /** Build a throwaway repo root with the given config/teams/ contents. */
 function sandbox(files) {
   const root = mkdtempSync(join(tmpdir(), 'coding-teams-'));

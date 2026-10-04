@@ -38,10 +38,8 @@ import { ObservationExporter } from '../src/live-logging/ObservationExporter.js'
 import { LslObservationResolver } from '../src/live-logging/LslObservationResolver.js';
 // Plan 44-18 — the legacy SQLite handle is gone. ObservationPruner cut to
 // km-core in Plan 44-18 Task 2 (no more direct SQLite reads). RetrievalService
-// freshness-rerank cut to km-core in Plan 44-18 Task 3. KeywordSearch (FTS5
-// over the legacy SQLite file) loses its handle here and degrades silently
-// to [] until that path is also cut to km-core; semantic search via Qdrant
-// continues to dominate /api/retrieve responses.
+// freshness-rerank cut to km-core in Plan 44-18 Task 3; KeywordSearch reads
+// the live km-core store too (T8).
 // Phase 35 plan 35-04 - pure merge helpers extracted into a sibling module so
 // the Jest integration test can import them without dragging in RetrievalService
 // and its TS dist deps.  Re-exported below for backwards-compatible discovery.
@@ -199,12 +197,9 @@ function ensureRetrieval() {
   if (!process.env.QDRANT_URL) {
     process.env.QDRANT_URL = 'http://localhost:6333';
   }
-  // Plan 44-18 (Task 4) — retrieval reads insight metadata exclusively
-  // through km-core (`kmStoreGetter`). The `dbGetter` is gone with the rest
-  // of the legacy plumbing; KeywordSearch.search() receives `null` and the
-  // _keywordSearch helper short-circuits to [] (graceful degradation —
-  // already the catch in the helper). Semantic search via Qdrant continues
-  // to dominate the /api/retrieve response.
+  // Retrieval reads km-core through `kmStoreGetter`: keyword search scans
+  // the live store (so injection works with an empty or absent Qdrant),
+  // Working Memory and the freshness rerank read entity metadata.
   _retrieval = new RetrievalService({
     kmStoreGetter: () => (_kmStoreReady ? _kmStore : null),
   });

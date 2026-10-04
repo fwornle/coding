@@ -1,12 +1,12 @@
 /**
  * RetrievalService -- orchestrator combining embed, search, fuse, and assemble.
  *
- * Combines semantic vector search (Qdrant), keyword search (SQLite FTS5/LIKE),
+ * Combines semantic vector search (Qdrant), keyword search (the km-core store),
  * and recency scoring via Reciprocal Rank Fusion with tier-weighted multipliers,
  * then assembles token-budgeted markdown output.
  *
  * Usage:
- *   const svc = getRetrievalService({ dbGetter: () => db });
+ *   const svc = getRetrievalService({ kmStoreGetter: () => store });
  *   await svc.initialize();
  *   const { markdown, meta } = await svc.retrieve("Docker build timeout");
  *
@@ -15,7 +15,7 @@
 
 import { getEmbeddingService } from '../../dist/embedding/embedding-service.js';
 import { getQdrantClient } from '../../dist/embedding/qdrant-collections.js';
-import { KeywordSearch } from './keyword-search.js';
+import { KeywordSearch, queryTerms } from './keyword-search.js';
 import { rrfFuse, buildRecencyList, TIER_WEIGHTS, loadAgentProfiles } from './rrf-fusion.js';
 import { assembleBudgetedMarkdown } from './token-budget.js';
 import { buildWorkingMemory } from './working-memory.js';
@@ -100,14 +100,10 @@ export class RetrievalService {
    * @param {number} [options.scoreThreshold=0.82] - Minimum Qdrant similarity score (D-04)
    * @param {number} [options.defaultBudget=3000] - Default token budget (D-08). Sized so ~3
    *   complete insights fit: a p90 insight preview (3,300 chars) costs ~825 tokens.
-   * @param {function} [options.dbGetter] - DEPRECATED — kept only so the
-   *   keyword-search path (which still reads FTS5 from the legacy SQLite
-   *   handle via KeywordSearch.search) keeps working until that consumer
-   *   is itself cut. The freshness-rerank path no longer uses this.
    * @param {function} [options.kmStoreGetter] - Function returning a
-   *   `GraphKMStore` instance. Called lazily inside `_applyFreshnessRerank`
-   *   so the service stays construction-eager but km-core-access-lazy
-   *   (mirrors the prior `dbGetter` pattern). Plan 44-18 (D-44-18-03).
+   *   `GraphKMStore` instance (or null while it opens). Called lazily — by
+   *   keyword search, Working Memory and `_applyFreshnessRerank` — so the
+   *   service stays construction-eager but km-core-access-lazy.
    */
   constructor(options = {}) {
     // Default 0.70 (was 0.82). MiniLM-L6-v2 cosine similarities cluster
@@ -121,12 +117,6 @@ export class RetrievalService {
     this.embeddingService = null;
     this.qdrantClient = null;
     this.keywordSearch = new KeywordSearch();
-    // Plan 44-18 — freshness rerank reads through km-core. The legacy
-    // `dbGetter` is kept for the keyword-search path (KeywordSearch.search
-    // still uses FTS5 against the legacy SQLite file). When the SQLite
-    // file is archived in Task 5 the dbGetter will return null and
-    // _keywordSearch degrades to [] (graceful — already in the catch).
-    this.dbGetter = options.dbGetter ?? null;
     this.kmStoreGetter = options.kmStoreGetter ?? null;
     this.codingRoot = options.codingRoot
       || process.env.CODING_REPO
@@ -227,7 +217,7 @@ export class RetrievalService {
     // Step 2: Parallel semantic + keyword search
     const [semanticResults, keywordHits] = await Promise.all([
       this._semanticSearch(vector, 20, threshold, projects),
-      this._keywordSearch(query),
+      this._keywordSearch(query, projects),
     ]).then(([sem, kw]) => (projects ? [onlyProjects(sem, projects), onlyProjects(kw, projects)] : [sem, kw]));
 
     // Step 3: Build recency list from combined unique results
@@ -653,25 +643,9 @@ export class RetrievalService {
   _applyTopicRelevance(results, query) {
     if (!query || !results.length) return;
 
-    // Stop words that appear everywhere and carry no topic signal
-    const STOP_WORDS = new Set([
-      'the', 'and', 'for', 'that', 'this', 'with', 'from', 'are', 'was',
-      'were', 'been', 'have', 'has', 'had', 'not', 'but', 'what', 'how',
-      'why', 'when', 'where', 'which', 'who', 'will', 'can', 'does', 'did',
-      'should', 'would', 'could', 'may', 'about', 'into', 'out', 'all',
-      'also', 'just', 'than', 'then', 'very', 'some', 'any', 'each',
-      'use', 'using', 'used', 'make', 'like', 'need', 'know', 'here',
-      'context', 'you', 'your', 'our', 'its', 'their', 'they', 'she',
-      'coding', 'project', 'file', 'files', 'system', 'service',
-    ]);
-
-    // Extract meaningful words from query (3+ chars, not stop words)
-    const queryWords = new Set(
-      query.toLowerCase()
-        .replace(/[^a-z0-9\s]/g, ' ')
-        .split(/\s+/)
-        .filter(w => w.length >= 3 && !STOP_WORDS.has(w))
-    );
+    // Meaningful words of the query (3+ chars, no stop words) — the same
+    // tokenizer keyword search uses.
+    const queryWords = queryTerms(query);
 
     if (queryWords.size === 0) return;
 
@@ -725,32 +699,23 @@ export class RetrievalService {
   }
 
   /**
-   * Run keyword search across SQLite observation/digest/insight tables.
+   * Keyword search over the live km-core store (keyword-search.js). Items
+   * carry the Qdrant point id of the same entity, so a keyword hit and a
+   * vector hit fuse into one RRF entry.
    *
    * @param {string} query - Search query text
-   * @returns {Array<object>} Flattened results with tier, tierWeight, and synthetic id
+   * @param {string[]|null} [projects] - T6 team filter, applied before the per-tier limit
+   * @returns {Array<object>} Ranked results with tier and tierWeight
    */
-  _keywordSearch(query) {
-    const db = this.dbGetter ? this.dbGetter() : null;
-    if (!db) return [];
+  _keywordSearch(query, projects = null) {
+    const store = this.kmStoreGetter ? this.kmStoreGetter() : null;
+    if (!store) return [];
 
     try {
-      const results = this.keywordSearch.search(db, query);
-
-      // Flatten { observations, digests, insights } into a single array
-      const all = [];
-      for (const tier of ['observations', 'digests', 'insights']) {
-        for (const item of results[tier] || []) {
-          all.push({
-            ...item,
-            // Synthetic id to avoid collisions with Qdrant point IDs
-            id: item.id ? `kw-${tier}-${item.id}` : `kw-${tier}-${Math.random().toString(36).slice(2)}`,
-            tier,
-            tierWeight: TIER_WEIGHTS[tier] ?? 1.0,
-          });
-        }
-      }
-      return all;
+      return this.keywordSearch.search(store, query, { projects }).map((item) => ({
+        ...item,
+        tierWeight: TIER_WEIGHTS[item.tier] ?? 1.0,
+      }));
     } catch (err) {
       process.stderr.write(`[RetrievalService] Keyword search failed: ${err.message}\n`);
       return [];
