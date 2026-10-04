@@ -11,6 +11,8 @@ import { fileURLToPath } from 'url';
 import { createRequire } from 'module';
 import { dirname, join } from 'path';
 const require = createRequire(import.meta.url);
+// Where a repo's transcripts live (T9): <repo>/.coding/history, not the legacy symlink.
+const { repoHistoryDir, CODING_DIR } = require('../lib/history/paths.cjs');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -2337,17 +2339,17 @@ class EnhancedTranscriptMonitor {
 
     if (this.debug_enabled) console.error(`Checking project paths: ${JSON.stringify(checkPaths)}`);
 
-    // Look for .specstory directory to confirm it's a valid project
+    // A valid project has its learning checkout (.coding/, T3) or — not yet
+    // relaunched since — the legacy .specstory/ directory.
     for (const checkPath of checkPaths) {
-      const specstoryDir = path.join(checkPath, '.specstory');
-      if (fs.existsSync(specstoryDir)) {
-        if (this.debug_enabled) console.error(`Found project with .specstory at: ${checkPath}`);
+      if (fs.existsSync(path.join(checkPath, CODING_DIR)) || fs.existsSync(path.join(checkPath, '.specstory'))) {
+        if (this.debug_enabled) console.error(`Found project with .coding/ or .specstory/ at: ${checkPath}`);
         return checkPath;
       }
     }
 
     // CRITICAL: Fail fast if no valid project found - DO NOT fall back to process.cwd()
-    const errorMsg = `CRITICAL: No valid project path found with .specstory directory.\n` +
+    const errorMsg = `CRITICAL: No valid project path found with a .coding/ or .specstory/ directory.\n` +
       `Checked paths: ${JSON.stringify(checkPaths)}\n` +
       `This prevents LSL files from being written to wrong directories.\n` +
       `Set TRANSCRIPT_SOURCE_PROJECT or ensure CODING_REPO points to a valid project.`;
@@ -3638,11 +3640,11 @@ ORDER BY m.time_created ASC;`;
     if (samePath(targetProject, this.config.projectPath)) {
       // Local project - use generateLSLFilename with same target/source
       const filename = generateLSLFilename(timestamp, currentProjectName, targetProject, targetProject);
-      return lslWritePath(path.join(targetProject, '.specstory', 'history'), filename);
+      return lslWritePath(repoHistoryDir(targetProject), filename);
     } else {
       // Redirected to coding project - use generateLSLFilename with different target/source
       const filename = generateLSLFilename(timestamp, currentProjectName, targetProject, this.config.projectPath);
-      return lslWritePath(path.join(targetProject, '.specstory', 'history'), filename);
+      return lslWritePath(repoHistoryDir(targetProject), filename);
     }
   }
 
@@ -4257,11 +4259,12 @@ ORDER BY m.time_created ASC;`;
     const writtenBasenames = writtenFiles.map(f => path.basename(f)).join(', ');
     process.stderr.write(`[LSL] Completed user prompt set: ${meaningfulExchanges.length}/${completedSet.length} exchanges → ${writtenBasenames}\n`);
 
-    // Git auto-track: stage LSL files in the project's own .specstory directory
+    // Git auto-track: stage LSL files in the project's learning checkout
     // Fire-and-forget: don't block the monitor on git operations
     if (samePath(targetProject, this.config.projectPath)) {
       for (const sessionFile of writtenFiles) {
-        if (!sessionFile.includes('.specstory/history/') && !sessionFile.includes('.specstory/logs/')) continue;
+        // .coding/history/ (T9) or the legacy spelling (a repo not relaunched since T3).
+        if (!/[\\/](?:\.coding|\.specstory)[\\/](?:history|logs)[\\/]/.test(sessionFile)) continue;
         try {
           const { exec } = await import('child_process');
           // LSL files live in a NESTED git repo (.specstory/history/.git) and are
@@ -4331,6 +4334,7 @@ ORDER BY m.time_created ASC;`;
       'coding/bin/',
       'coding/src/',
       'coding/.specstory/',
+      'coding/.coding/',
       'coding/integrations/'
     ];
     
@@ -5313,7 +5317,7 @@ async function reprocessHistoricalTranscripts(projectPath = null) {
     // Commenting out a span silently takes its declarations with it; eslint
     // no-undef is what catches it (the daemon path never touches this function,
     // so nothing else would).
-    const historyDir = path.join(targetProject, '.specstory', 'history');
+    const historyDir = repoHistoryDir(targetProject);
     const codingPath = HOST_CODING_PATH;
     
     // CRITICAL FIX: NEVER delete existing LSL files from CLOSED sessions!
@@ -5348,7 +5352,7 @@ async function reprocessHistoricalTranscripts(projectPath = null) {
 
     // Also clear redirected session files in coding project if different
     if (targetProject !== codingPath) {
-      const codingHistoryDir = path.join(codingPath, '.specstory', 'history');
+      const codingHistoryDir = repoHistoryDir(codingPath);
       if (fs.existsSync(codingHistoryDir)) {
         const redirectedFiles = fs.readdirSync(codingHistoryDir).filter(file =>
           file.includes('from-' + path.basename(targetProject)) && file.endsWith('.md')
@@ -5410,10 +5414,10 @@ async function reprocessHistoricalTranscripts(projectPath = null) {
       process.stderr.write(`📁 Created ${newFiles.length} session files in ${path.basename(targetProject)}\n`);
     }
 
-    if (targetProject !== codingPath && fs.existsSync(path.join(codingPath, '.specstory', 'history'))) {
+    if (targetProject !== codingPath && fs.existsSync(repoHistoryDir(codingPath))) {
       const projectBase = path.basename(targetProject);
       const codingFiles = lslListAll(
-        path.join(codingPath, '.specstory', 'history'),
+        repoHistoryDir(codingPath),
         (name) => name.includes('from-' + projectBase) && isLslFile(name)
       );
       process.stderr.write(`📁 Created ${codingFiles.length} redirected session files in coding project\n`);

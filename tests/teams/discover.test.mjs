@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { scan, discover, discoveredProjects, readCache } from '../../lib/teams/discover.mjs';
+import { scan, discover, discoveredProjects, readCache, describeRepo } from '../../lib/teams/discover.mjs';
 import { sharedPlan, syncShared, sharedName } from '../../lib/teams/shared.mjs';
 
 let root;
@@ -58,12 +58,18 @@ function tree() {
 }
 
 describe('scan', () => {
+  test('a repo set up after T9 (.coding/history, no .specstory/) has transcripts', () => {
+    const home = join(root, `home-${Math.random().toString(36).slice(2, 8)}`);
+    const r = mk(join(home, 'fresh'), { '.git/HEAD': '', '.coding/history/.keep': '' });
+    assert.deepEqual(describeRepo(r).markers, ['coding', 'history']);
+  });
+
   test('finds marked git repos only, honouring ignore and depth, never through symlinks', () => {
     const home = tree();
     const found = scan({ roots: [home], depth: 4, ignore: ['node_modules'], home });
     assert.deepEqual(found.map((r) => r.path.slice(home.length + 1)), ['Agentic/_work/raas', 'Agentic/coding']);
     const coding = found.find((r) => r.name === 'coding');
-    assert.deepEqual(coding.markers, ['coding', 'specstory']);
+    assert.deepEqual(coding.markers, ['coding', 'specstory', 'history']);
     assert.equal(coding.learningRemote, 'https://h/me/coding-history.git');
     assert.equal(found.find((r) => r.name === 'raas').learningRepo, false);
   });
@@ -97,22 +103,38 @@ describe('the cache', () => {
     const tools = mk(join(root, 'tools-in-container'), { '.git/HEAD': '', '.specstory/history/.keep': '' });
     const cachePath = join(root, 'container-cache.json');
     writeFileSync(cachePath, JSON.stringify({
-      version: 1, scannedAt: new Date().toISOString(), home: hostHome, toolsRepo: `${hostHome}/Agentic/coding`, roots: [hostHome], depth: 4,
+      version: 2, scannedAt: new Date().toISOString(), home: hostHome, toolsRepo: `${hostHome}/Agentic/coding`, roots: [hostHome], depth: 4,
       repos: [
-        { path: `${hostHome}/Agentic/raas`, name: 'raas', markers: ['specstory'] },
-        { path: `${hostHome}/Agentic/coding`, name: 'coding', markers: ['coding', 'specstory'] },
+        { path: `${hostHome}/Agentic/raas`, name: 'raas', markers: ['specstory', 'history'] },
+        { path: `${hostHome}/Agentic/coding`, name: 'coding', markers: ['coding', 'specstory', 'history'] },
         { path: `${hostHome}/elsewhere/x`, name: 'x', markers: ['coding'] },
       ],
     }));
     const prev = process.env.LSL_WORKSPACE_ROOT;
     process.env.LSL_WORKSPACE_ROOT = ws;
     try {
-      const got = discoveredProjects({ cachePath, codingRoot: tools, marker: 'specstory' });
+      const got = discoveredProjects({ cachePath, codingRoot: tools, marker: 'history' });
       assert.deepEqual(got.map((r) => r.path).sort(), [join(ws, 'raas'), tools].sort());
       assert.equal(got.find((r) => r.name === 'raas').hostPath, `${hostHome}/Agentic/raas`);
     } finally {
       if (prev === undefined) delete process.env.LSL_WORKSPACE_ROOT; else process.env.LSL_WORKSPACE_ROOT = prev;
     }
+  });
+
+  test('a version-1 cache (written before the history marker) still answers `history`', () => {
+    const dir = join(root, `v1-${Math.random().toString(36).slice(2, 8)}`);
+    const tools = mk(join(dir, 'coding'), { '.git/HEAD': '', '.coding/history/.keep': '' });
+    const legacy = mk(join(dir, 'legacy'), { '.git/HEAD': '', '.specstory/history/.keep': '' });
+    const cachePath = join(dir, 'projects.json');
+    writeFileSync(cachePath, JSON.stringify({
+      version: 1, scannedAt: new Date().toISOString(), roots: [dir], depth: 4,
+      repos: [
+        { path: tools, name: 'coding', markers: ['coding'] },
+        { path: legacy, name: 'legacy', markers: ['specstory'] },
+      ],
+    }));
+    const got = discoveredProjects({ cachePath, codingRoot: tools, marker: 'history' });
+    assert.deepEqual(got.map((r) => r.name).sort(), ['coding', 'legacy']);
   });
 
   test('with no cache it falls back to the sibling scan', () => {

@@ -42,6 +42,7 @@
 
 import process from 'node:process';
 import path from 'node:path';
+import { repoHistoryDir } from '../lib/history/paths.cjs';
 
 import { createRegistry } from '../lib/lsl/registry.mjs';
 import { AGENTS, loadAdapter, getAgentSearchPaths } from '../lib/lsl/adapters/index.mjs';
@@ -59,7 +60,9 @@ import { parseCopilotExchanges } from '../lib/lsl/adapters/copilot-events.mjs';
 import { parseOpencodeExchanges } from '../lib/lsl/adapters/opencode-sqlite.mjs';
 
 const DEFAULT_LIMIT = 100;
-const DEFAULT_OUTPUT_ROOT = path.join('.specstory', 'history');
+// The repo's transcript dir (T9: <repo>/.coding/history), resolved from cwd —
+// the daemons run with the project as cwd.
+const DEFAULT_OUTPUT_ROOT = repoHistoryDir(process.cwd());
 
 /** Parse `--flag value` from argv. Returns the value or null. */
 function parseStrArg(argv, flag) {
