@@ -10,7 +10,7 @@ Prerequisites, the install itself, and what it puts on your machine.
     git clone --recurse-submodules https://github.com/fwornle/coding ~/Agentic/coding
     cd ~/Agentic/coding && ./install.sh
     source ~/.zshrc          # or ~/.bashrc
-    coding --health
+    cd ~/my-project && coding
     ```
 
     `--recurse-submodules` is not optional — several integrations are submodules and the install
@@ -133,22 +133,24 @@ Prerequisites, the install itself, and what it puts on your machine.
 
     | Component | Does |
     |-----------|------|
-    | `coding` | Launches an agent with every integration attached |
-    | `vkb` | Opens the knowledge viewer |
-    | `semantic` | Knowledge-base workflows and ontology management |
-    | MCP servers | Graphify, and the containerised services behind it |
-    | Session logging | Automatic transcript capture |
-    | Hooks | PreToolUse for constraints, PostToolUse for logging |
+    | `coding` | Launches an agent with every enabled integration attached |
+    | `coding-features` | Shows and changes the installed tier |
+    | `coding sync` | Commits, pulls and pushes each repo's learning repo |
+    | `semantic` | Knowledge-base workflows and ontology management (`learning`+) |
+    | Dashboard | [localhost:3032](http://localhost:3032) — health, sessions, insights, tokens, teams, features |
+    | Session logging | Automatic transcript capture into each repo's `.coding/history/` (`learning`+) |
 
     ## When it does not work
 
     Work in this order, because the failures nest:
 
-    1. **Is Docker running?** Not installed — running. This is the most common first-run failure.
+    1. **Is Docker running?** (`learning` tiers and up) Not installed — running. This is the
+       most common first-run failure.
     2. **Has the shell been reloaded?** `source ~/.zshrc`, or open a new terminal.
     3. **Did the submodules come down?** `git submodule update --init --recursive` if the clone
        omitted `--recurse-submodules`.
-    4. **Then** `coding --health` and [Verify & Repair](verify-repair.md) for anything remaining.
+    4. **Then** the dashboard at [localhost:3032](http://localhost:3032), `coding-features status`,
+       and [Verify & Repair](verify-repair.md) for anything remaining.
 
 === "📚 Deep Dive (full)"
 

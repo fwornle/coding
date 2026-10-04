@@ -6,21 +6,20 @@ Checking that the installation actually works, and fixing it when it does not.
 
     ## The check
 
-    ```bash
-    coding --health
-    ```
-
-    Everything should be green. For a deeper pass:
+    The status line's `[🏥●]` badge, and the dashboard at
+    [localhost:3032](http://localhost:3032) — it should read **Healthy**. For a pass over every
+    subsystem:
 
     ```bash
-    ./scripts/test-coding.sh --interactive
+    ./scripts/test-coding.sh                 # checks only, changes nothing
+    ./scripts/test-coding.sh --interactive   # offers each repair it finds
     ```
 
     ## Diagnose in order
 
     The failures nest, so checking out of order misdiagnoses them:
 
-    1. **Is Docker running?** Most failures are this.
+    1. **Is Docker running?** (learning tiers) Most failures are this.
     2. **Is the coordinator reachable?** `curl -s localhost:3034/health/state | jq .` — a grey
        badge means nothing else on the dashboard can be trusted.
     3. **Is that state fresh?** Older than ~3 minutes means the writer stopped, not the services.
@@ -45,14 +44,15 @@ Checking that the installation actually works, and fixing it when it does not.
     ## Verifying
 
     ```bash
-    coding --health                          # every service at once
+    coding-features status                   # which features are on — check THIS first
     ./scripts/test-coding.sh --interactive   # a guided pass with repairs offered
     curl -s localhost:3034/health/state | jq .   # the raw truth
     ```
 
-    The three differ in what they can tell you. The first is a summary, the second walks through
-    each subsystem and offers fixes, and the third is the document the other two are rendering —
-    useful precisely when they disagree with each other.
+    The three differ in what they can tell you. The first says what is *supposed* to be running
+    (a service that is off by tier is not broken), the second walks through each subsystem and
+    offers fixes, and the third is the document the dashboard renders — useful precisely when it
+    and the status line disagree.
 
     ## Why the order matters
 

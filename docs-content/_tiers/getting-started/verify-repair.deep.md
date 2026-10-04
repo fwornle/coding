@@ -4,15 +4,19 @@ Test your installation and fix common issues.
 
 ## Quick Health Check
 
-Run the comprehensive health check:
-
-```bash
-coding --health
-```
+Open the dashboard at [localhost:3032](http://localhost:3032); **Run Verification** re-checks
+everything on demand:
 
 ![System Healthy](../images/system-healthy.png)
 
-A healthy system shows all services in green. If you see red indicators, follow the troubleshooting steps below.
+A healthy system reads **Healthy** with no critical issues. First confirm what is supposed to be
+running — a feature switched off by your tier is not a failure:
+
+```bash
+coding-features status
+```
+
+If you see red indicators, follow the troubleshooting steps below.
 
 ---
 
@@ -21,7 +25,7 @@ A healthy system shows all services in green. If you see red indicators, follow 
 The test script verifies all components:
 
 ```bash
-# Check-only mode (default)
+# Check-only mode (default) — changes nothing, suggests each repair it would make
 ./scripts/test-coding.sh
 
 # Interactive repair mode
@@ -36,7 +40,7 @@ The test script verifies all components:
 | Test | What It Checks |
 |------|----------------|
 | Prerequisites | Node.js, Git, jq, Docker versions |
-| Commands | `coding`, `vkb`, `ukb` in PATH |
+| Commands | `coding`, `coding-features`, `semantic` in PATH |
 | Configuration | `.env`, hooks, MCP config |
 | Services | Docker containers or native processes |
 | Connectivity | Health endpoints, port availability |
@@ -68,11 +72,11 @@ docker info
 ```bash
 # Should show help
 coding --help
-vkb --help
+coding-features status
 
 # Check locations
 which coding
-which vkb
+which coding-features
 ```
 
 If commands not found, check your PATH:
@@ -102,8 +106,14 @@ curl -s http://localhost:3848/health | jq .
 # Constraint Monitor MCP
 curl -s http://localhost:3031/health | jq .
 
-# VKB Server
-curl -s http://localhost:8080/health | jq .
+# obs-api (knowledge store, retrieval)
+curl -s http://localhost:12436/health | jq .
+
+# Health coordinator
+curl -s http://localhost:3034/health | jq .
+
+# LLM proxy
+curl -s http://localhost:12435/health | jq .
 
 # Health Dashboard
 curl -s http://localhost:3032/health | jq .
@@ -124,11 +134,11 @@ ps aux | grep -v grep | grep "enhanced-transcript-monitor"
 ### 6. Test Knowledge Base
 
 ```bash
-# Check knowledge store exists
-ls -la .data/knowledge-graph/
+# The live store answers (obs-api owns it)
+curl -s 'http://localhost:12436/api/v1/entities?limit=1' | jq '.success'
 
-# Test VKB connection
-curl -s http://localhost:8080/api/entities | jq 'length'
+# Where each project's knowledge is persisted
+curl -s http://localhost:12436/api/kb/layout | jq
 ```
 
 ---
@@ -155,8 +165,8 @@ docker compose -f docker/docker-compose.yml up -d --build
 
 **Fix**:
 ```bash
-# Find what's using the port
-lsof -i :8080
+# Find what's using the port (obs-api shown)
+lsof -i :12436
 
 # Kill the process or change port in .env.ports
 nano .env.ports
@@ -198,20 +208,31 @@ tail -100 .logs/transcript-monitor-test.log
 
 ### Knowledge Base Corrupted
 
-**Symptoms**: VKB shows errors, `ukb` fails
+**Symptoms**: obs-api will not start or crash-loops on its store, the viewer shows errors,
+the knowledge-base workflow fails.
+
+The live store (LevelDB) is a machine-local cache: every project's knowledge is persisted in
+its repo's `.coding/kb/` (see [Per-Repo Tenancy](../architecture/tenancy.md)), and a fresh
+store hydrates from all of them. So the fix is to rebuild the cache, never to delete
+`.coding/kb/`.
 
 **Fix**:
 ```bash
-# Backup current data
-cp -r .data/knowledge-graph .data/knowledge-graph.backup
+# 1. Stop obs-api — the only process that owns the store
+launchctl bootout gui/$(id -u)/com.coding.obs-api          # macOS
+systemctl --user stop obs-api                              # Linux / WSL
 
-# Reset knowledge base
-rm -rf .data/knowledge-graph
-mkdir -p .data/knowledge-graph
+# 2. Move the store aside (keep it until the rebuild is verified)
+DATA_HOME=$(~/Agentic/coding/bin/coding-data-home)
+mv "$DATA_HOME/var/knowledge-graph/leveldb" "$DATA_HOME/var/knowledge-graph/leveldb.broken"
 
-# Re-run full analysis
-# (within Claude session)
-ukb full
+# 3. Start obs-api again — it hydrates from every .coding/kb/ it can see
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.coding.obs-api.plist   # macOS
+systemctl --user start obs-api                                                      # Linux / WSL
+
+# 4. Check, then re-embed what is missing from Qdrant (idempotent)
+curl -s 'http://localhost:12436/api/v1/entities?limit=1' | jq '.success'
+node ~/Agentic/coding/dist/embedding/backfill.js
 ```
 
 ---
@@ -283,7 +304,8 @@ docker compose version >> diagnostics.txt
 echo "=== Services ===" >> diagnostics.txt
 docker compose -f docker/docker-compose.yml ps 2>&1 >> diagnostics.txt
 echo "=== Health ===" >> diagnostics.txt
-coding --health 2>&1 >> diagnostics.txt
+coding-features status >> diagnostics.txt 2>&1
+curl -s http://localhost:3034/health/state >> diagnostics.txt 2>&1
 ```
 
 ---

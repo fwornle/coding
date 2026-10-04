@@ -3427,12 +3427,23 @@ install_node_dependencies() {
     done
     [[ "$native_failed" == "0" ]] || log "One or more native builds failed; logs retained under ${TMPDIR:-/tmp}"
 
+    # Tokenizer FIRST: install_fastembed_native runs `npm install <pkg> --no-save`
+    # in the root, and npm prunes everything package.json does not declare — which
+    # includes the @fwornle/km-core link. In this order the clean room's obs-api
+    # died with "Cannot find package '@fwornle/km-core'".
+    install_fastembed_native
+    ensure_km_core_link
+
     # The root's own TypeScript (src/**/*.ts → dist/). dist/ is gitignored, and
     # JS under src/ imports it by relative path — src/retrieval/retrieval-service.js
     # loads ../../dist/embedding/embedding-service.js — so a fresh clone that never
     # ran this has an obs-api that starts, accepts a write, then dies on its first
     # embedding before the store's export debounce persists anything. The clean
     # room caught exactly that. Nothing here ran `npm run build` for the root.
+    #
+    # AFTER ensure_km_core_link: src/embedding/backfill.ts imports
+    # @fwornle/km-core, so building before the link fails with TS2307 and a
+    # fresh install shipped no dist/ at all.
     info "Building the root TypeScript (src/ → dist/)..."
     if npm run build >>"$INSTALL_LOG" 2>&1 && [[ -f "$CODING_REPO/dist/embedding/embedding-service.js" ]]; then
         success "✓ root TypeScript built"
@@ -3441,13 +3452,6 @@ install_node_dependencies() {
         info "  → retrieval and embeddings in obs-api will fail until: npm run build"
         INSTALLATION_WARNINGS+=("root TypeScript build failed — obs-api retrieval/embeddings unavailable")
     fi
-
-    # Tokenizer FIRST: install_fastembed_native runs `npm install <pkg> --no-save`
-    # in the root, and npm prunes everything package.json does not declare — which
-    # includes the @fwornle/km-core link. In this order the clean room's obs-api
-    # died with "Cannot find package '@fwornle/km-core'".
-    install_fastembed_native
-    ensure_km_core_link
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -4138,7 +4142,12 @@ parse_args() {
             --features)                  shift; CODING_INSTALL_FEATURES="${1:-harness}" ;;
             -h|--help)                   show_usage; exit 0 ;;
             --skip-hooks)                : ;;  # accepted, no-op at root level
-            *)                           warning "Unknown option: $1 (ignored)" ;;
+            # Fatal, never "ignored": an ignored typo used to fall through to a FULL
+            # unattended install — test-coding.sh's "check-only" mode called
+            # `install.sh --update-mcp-config` and reinstalled the machine.
+            *)                           echo "install.sh: unknown option: $1" >&2
+                                         echo "Run ./install.sh --help for the options." >&2
+                                         exit 2 ;;
         esac
         shift
     done
@@ -4495,6 +4504,17 @@ ask_agent_scope() {
     fi
 
     if [[ "$NON_INTERACTIVE" == "true" ]]; then
+        # An unattended RE-run keeps the scope this machine already chose. Forcing
+        # wrapper here made cleanup_stale_global_artifacts remove a global
+        # install's commands, hooks and plugins — a repair run (test-coding.sh)
+        # silently stripped the developer's bare-agent setup.
+        local recorded
+        recorded="$(grep -m1 '^CODING_AGENT_SCOPE=' "$CODING_REPO/.env" 2>/dev/null | cut -d= -f2- || true)"
+        if [[ "$recorded" == "global" ]]; then
+            CODING_AGENT_SCOPE="global"
+            info "Agent scope: GLOBAL (kept from .env — this machine chose it earlier)"
+            return 0
+        fi
         CODING_AGENT_SCOPE="wrapper"
         info "Agent scope: WRAPPER-SCOPED (default for unattended runs)"
         info "  Global agent configs are NOT modified. Re-run with --global-agents to opt in."
