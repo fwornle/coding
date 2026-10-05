@@ -229,7 +229,7 @@ class MonitoringVerifier {
     try {
       const projectName = path.basename(this.projectPath);
 
-      // Verify .specstory directory exists
+      // Verify the history directory exists
       const specstoryPath = repoHistoryDir(this.projectPath);
       if (!fs.existsSync(specstoryPath)) {
         fs.mkdirSync(specstoryPath, { recursive: true });

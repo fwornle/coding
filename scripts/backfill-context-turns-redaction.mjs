@@ -14,7 +14,7 @@
  * stop the leak going forward; this script purges data captured BEFORE those fixes.
  *
  * Reuses redactCorporateIds() from measurement-stop.mjs (single source of truth,
- * mirrors .specstory/config/redaction-patterns.json#corporate_user_ids — q + 6
+ * mirrors config/redaction/redaction-patterns.json#corporate_user_ids — q + 6
  * alphanumerics with ≥1 digit, so plain words like "quality" are never matched).
  *
  * SCOPE: capture files only — context-turns.jsonl(.gz) and raw-bodies.jsonl(.gz)

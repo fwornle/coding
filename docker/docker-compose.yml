@@ -127,7 +127,10 @@ services:
       # owner of observations.db, and the container reaches it via HTTP at
       # OBS_API_URL (host.docker.internal:12436). Eliminates SQLite WAL/SHM
       # corruption from concurrent openers across the Docker bind-mount boundary.
-      - ${CODING_REPO:-.}/.specstory:/coding/.specstory
+      # Redaction rules (config/redaction/, per-repo tenancy T10 — formerly
+      # .specstory/config). Mounted live so an edited rule reaches the
+      # container's writers without an image rebuild.
+      - ${CODING_REPO:-.}/config/redaction:/coding/config/redaction:ro
       # ...and the data root AGAIN, at its own host path. Before per-repo
       # tenancy T7 .specstory/history was an absolute symlink into the data
       # home; a checkout not yet migrated still has one, and without this mount

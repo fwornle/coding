@@ -19,7 +19,7 @@ import { mkTmpMeasurementsDir } from '../context-turns/_helpers.mjs';
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(__dirname, '..', '..');
-const CONFIG_PATH = path.join(REPO_ROOT, '.specstory', 'config', 'redaction-patterns.json');
+const CONFIG_PATH = path.join(REPO_ROOT, 'config', 'redaction', 'redaction-patterns.json');
 const MODULE_PATH = path.join(REPO_ROOT, 'scripts', 'enhanced-redaction-system.cjs');
 
 const mod = require(MODULE_PATH);

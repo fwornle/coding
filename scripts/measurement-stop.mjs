@@ -418,7 +418,7 @@ export async function loadObservationsForWindow({ from, to, agent } = {}) {
  * Corporate staff-ID redaction (q + 6 alphanumerics with at least one digit —
  * the digit lookahead avoids matching plain words like "quality"/"queried").
  * Mirrors the canonical corporate_user_ids rule in
- * `.specstory/config/redaction-patterns.json`. Context-turns message previews
+ * `config/redaction/redaction-patterns.json`. Context-turns message previews
  * carry raw filesystem paths (e.g. /Users/<staff-id>/…), so the persisted digest
  * would otherwise store the staff number. Applied to the serialized JSON string:
  * the replacement contains no JSON-special chars, so validity is preserved.

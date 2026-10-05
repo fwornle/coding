@@ -22,8 +22,8 @@ if (X in &#126;/.coding/repos.yaml?) then (yes — remote)
 elseif (yes — skip) then
   #FFFACD:local, untracked .coding/;
 else (no)
-  if (old nested .specstory/history checkout?) then (yes)
-    :move it to X/.coding/ and record its remote\n(no question asked);
+  if (legacy real .specstory/history dir?) then (yes)
+    :migrate (no question asked):\nnested checkout → becomes X/.coding/, remote recorded\nplain dir → transcripts move to X/.coding/history/;
   else (no)
     :ask: Remote URL [Enter = bmw.ghe.com/<you>/X-history,\na teammate's URL, or 'skip'];
     note right
@@ -49,7 +49,7 @@ else (no)
   endif
 endif
 
-:layout X/.coding/{history,kb}\n.specstory/history → ../.coding/history\nboth ignored via X/.git/info/exclude;
+:layout X/.coding/{history,kb}, ignored via X/.git/info/exclude\nremove an old .specstory/history symlink — no .specstory/ is created;
 :pull (background) → obs-api reloads what arrived;
 stop
 

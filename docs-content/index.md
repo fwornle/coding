@@ -52,7 +52,7 @@ builds knowledge from them, and stops known mistakes before they happen.
     ## Capture, learn, prevent
 
     **Live Session Logging** records every conversation automatically into
-    `.specstory/history/`, classifying content so that work touching several projects is routed
+    `.coding/history/`, classifying content so that work touching several projects is routed
     to the right one, and redacting secrets on the way through. Nothing is asked of you.
 
     **Knowledge Management** turns that history, plus your git log, into a knowledge graph via a

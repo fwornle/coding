@@ -1339,10 +1339,7 @@ export class ObservationConsolidator {
   async init() {
     // Initialize redactor for PII/secret scrubbing (defense-in-depth for LLM outputs)
     try {
-      const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
-      this._redactor = new ConfigurableRedactor({
-        configDir: path.join(projectRoot, '.specstory', 'config'),
-      });
+      this._redactor = new ConfigurableRedactor();
       await this._redactor.initialize();
     } catch (err) {
       process.stderr.write(`[Consolidator] Redactor init failed: ${err.message}\n`);

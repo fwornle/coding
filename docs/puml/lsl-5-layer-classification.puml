@@ -115,7 +115,7 @@ deactivate Classifier
 
 note over Logger
   Logs stored in:
-  .specstory/logs/classification/
+  .coding/history/logs/classification/
   - JSONL (machine-readable)
   - Markdown summary (human-readable)
   - All 5 layers tracked

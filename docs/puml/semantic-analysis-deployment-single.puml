@@ -28,7 +28,7 @@ node "Host Machine" as host {
     component [10. CoordinatorAgent] as ca
   }
 
-  folder [.specstory/history] as history
+  folder [.coding/history] as history
   folder [.data/knowledge-graph/] as kg_storage
 }
 

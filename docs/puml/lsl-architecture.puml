@@ -47,8 +47,8 @@ package "Live Session Logging (LSL)" <<core>> {
   }
   
   package "Storage & Output" {
-    database "Project History\n(.specstory/history/)" as ProjectHistory <<storage>>
-    database "Coding History\n(coding/.specstory/)" as CodingHistory <<storage>>
+    database "Project History\n(.coding/history/)" as ProjectHistory <<storage>>
+    database "Coding History\n(coding/.coding/history/)" as CodingHistory <<storage>>
     [Status Line Integrator] as StatusLine <<api>>
   }
 }
@@ -157,7 +157,7 @@ note right of Redactor
   **Security Sanitization (ConfigurableRedactor)**
   • 13 pattern types: API keys, JWT tokens, DB URLs, emails, etc.
   • Applied during formatting (live) and pre-write (post-session)
-  • Configurable patterns: .specstory/config/redaction-patterns.json
+  • Configurable patterns: config/redaction/redaction-patterns.json
   • Severity levels: low, medium, high, critical
   • Redacts user messages, tool inputs/outputs, assistant responses
 end note

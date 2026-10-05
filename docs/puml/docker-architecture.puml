@@ -60,7 +60,7 @@ rectangle "DOCKER CONTAINERS" as docker #E3F2FD {
 rectangle "Volume Mounts" as volumes #FFF9C4 {
     storage "/coding/.data" as data_vol
     storage ".data/graphify/graph.json\n(static, bind-mounted)" as graphjson
-    storage "/coding/.specstory" as specstory_vol
+    storage "/coding/.coding/{history,kb}" as history_vol
     storage "/workspace (ro)" as workspace_vol
 }
 
@@ -94,7 +94,7 @@ cdash DATA_LINE cm_sse : "violations"
 
 ' Volume Connections
 docker ..> data_vol : bind mount
-docker ..> specstory_vol : bind mount
+docker ..> history_vol : bind mount
 docker ..> workspace_vol : read-only
 
 ' ============================================

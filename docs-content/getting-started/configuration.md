@@ -70,4 +70,4 @@ MCP servers and hooks are **configured automatically** by the installer. No manu
 | `~/.claude/` | Claude Code configs |
 | `.data/knowledge-graph/` | GraphDB storage |
 | `.data/knowledge-export/` | Git-tracked JSON exports |
-| `.specstory/history/` | LSL session logs |
+| `.coding/history/` | LSL session logs |

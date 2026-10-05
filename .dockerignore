@@ -19,7 +19,6 @@ __pycache__
 
 # Data directories (mounted as volumes)
 .data
-.specstory
 
 # IDE and editor files
 .vscode
@@ -74,7 +73,7 @@ Thumbs.db
 knowledge-management/ckb/
 knowledge-management/schemas/
 
-# Session history
+# Session history (legacy layout; transcripts now live in .coding/history)
 .specstory/
 
 # MCP sync

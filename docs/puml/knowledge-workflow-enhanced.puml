@@ -18,7 +18,7 @@ participant "Browser" as browser
 == Daily Development ==
 dev -> git : Make commits with\nconventional format\n(fix:, feat:, etc.)
 git -> git : Store commit history
-dev -> logs : AI agent interactions\n(.specstory/history/)
+dev -> logs : AI agent interactions\n(.coding/history/)
 logs -> logs : Store conversation logs
 dev -> vscode : Development in VSCode\nwith Copilot integration
 

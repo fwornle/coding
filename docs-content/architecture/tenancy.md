@@ -59,18 +59,29 @@ Teams are sets of repos, and they decide what the viewer shows and what an agent
     The knowledge on the per-machine side is a cache: a fresh machine hydrates its store from
     every `.coding/kb/` it can see and re-embeds it. The per-repo side is what travels.
 
-    `X/.specstory/history` is a symlink to `X/.coding/history`, so tools that look for
-    SpecStory's path keep working. Both are excluded through `X/.git/info/exclude` — no
-    change to `X`'s tracked `.gitignore`.
+    There is no `X/.specstory/` any more, and nothing addresses the old path. `X/.coding/` is
+    excluded through `X/.git/info/exclude` — no change to `X`'s tracked `.gitignore`.
+
+    ## What happened to `.specstory/`
+
+    | Was | Is now |
+    |---|---|
+    | `X/.specstory/history/` (session logs, `logs/`) | `X/.coding/history/` — an old real directory is migrated on the next launch; an old `.specstory/history` symlink is removed |
+    | `.specstory/config/redaction-patterns.json`, sensitivity topics | `config/redaction/` in the coding tools repo — shared by the ETM, the obs-api writers and the LLM proxy's raw-body redaction |
+    | `.specstory/config/knowledge-system.json` | `config/knowledge-system.json` in the tools repo |
+    | `.specstory/trajectory/` | deleted — nothing read it |
+
+    Machine-local leftovers (LSL archive, validator report) live in `X/.coding/var/`, which is
+    git-ignored.
 
     ## How a repo gets its learning repo
 
     ![Learning repo setup](../images/learning-repo-setup.png)
 
     - A **public** remote is refused: learned data contains prompts and code.
-    - An **old layout** (a git checkout nested in `.specstory/history`) is migrated on the
-      next launch without a question: it moves to `X/.coding/history/`, and the existing remote
-      is recorded.
+    - An **old layout** (a real `.specstory/history` directory, with or without its own git
+      checkout) is migrated on the next launch without a question: it moves to
+      `X/.coding/history/`, an existing remote is recorded, and `.specstory/` is not recreated.
     - Unattended launches use `LSL_HISTORY_AUTO=yes|no`; with nobody to ask, only the local
       layout is created and the question waits for the next interactive launch.
 

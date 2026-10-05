@@ -79,7 +79,7 @@ Commands, ports, paths and environment variables — the things you look up rath
 
     | Path | Holds |
     |------|-------|
-    | `.specstory/history/` | Session logs, `YYYY/MM/` |
+    | `.coding/history/` | Session logs, `YYYY/MM/` |
     | `.data/knowledge-graph/` | The knowledge graph (LevelDB) |
     | `.data/knowledge-export/` | Git-tracked JSON exports of it |
     | `.health/` | Health status files |

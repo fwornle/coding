@@ -49,7 +49,7 @@ vkb
 
 | Path | Purpose |
 |------|---------|
-| `.specstory/history/` | LSL session logs |
+| `.coding/history/` | LSL session logs |
 | `.data/knowledge-graph/` | GraphDB storage |
 | `.data/knowledge-export/` | Git-tracked JSON exports |
 | `.health/` | Health status files |

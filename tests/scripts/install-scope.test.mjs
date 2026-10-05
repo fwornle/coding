@@ -180,10 +180,11 @@ describe('the history repo belongs to the person installing, not the tools autho
     assert.match(fn, /lib\/history\/repo-link\.mjs" ensure/);
   });
 
-  test('the symlink is ignored by the tools repo', () => {
-    // `.specstory/history/` (trailing slash) matches directories only; git sees
-    // a symlink as a file, so `git add -A` would commit the link.
+  test('the insights symlink and a stray legacy .specstory/ are ignored by the tools repo', () => {
+    // `dir/` (trailing slash) matches directories only; git sees a symlink as
+    // a file, so the insights link must be listed without one.
     const ignore = readFileSync(join(REPO, '.gitignore'), 'utf8');
-    assert.match(ignore, /^\.specstory\/history$/m);
+    assert.match(ignore, /^\/knowledge-management\/insights$/m);
+    assert.match(ignore, /^\/\.specstory\/$/m);
   });
 });

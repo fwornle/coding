@@ -93,10 +93,7 @@ class BatchLSLProcessor {
     this.extractor = new ClaudeConversationExtractor(this.projectPath);
 
     // Initialize redactor for sensitive data protection
-    this.redactor = new ConfigurableRedactor({
-      projectPath: this.codingRepo, // Use coding repo for config
-      debug: false
-    });
+    this.redactor = new ConfigurableRedactor({ debug: false });
     this.redactorInitialized = false;
 
     // Initialize classification logger for batch mode

@@ -251,7 +251,7 @@ RUN chmod +x /entrypoint.sh
 COPY .env.example ./.env.example
 
 # Create data directories
-RUN mkdir -p /coding/.data /coding/.specstory /coding/.health
+RUN mkdir -p /coding/.data /coding/.health
 
 # Environment variables for service ports
 ENV SEMANTIC_ANALYSIS_PORT=3848 \

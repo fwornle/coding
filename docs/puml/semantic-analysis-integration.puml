@@ -108,8 +108,8 @@ package "External Integrations" {
   end note
 
   component [Git Repository] as GitRepo
-  component [.specstory/history] as SpecStory
-  note right of SpecStory
+  component [.coding/history] as SessionHistory
+  note right of SessionHistory
     • Conversation capture
     • Session logs
     • Historical context
@@ -155,8 +155,8 @@ WS --> DDG : web search
 WS --> SearchEngines : api search
 
 Git --> GitRepo : code analysis
-Git --> SpecStory : session logs
-Vibe --> SpecStory : conversation analysis
+Git --> SessionHistory : session logs
+Vibe --> SessionHistory : conversation analysis
 
 package "Integration Patterns" {
   rectangle "Workflow Orchestration" as WorkflowPattern {

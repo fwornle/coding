@@ -98,7 +98,7 @@ Auto-healing now flows through the coordinator (re-introduced after the initial 
 - Real-time per-project transcript monitoring
 - 2-second check interval for prompt detection
 - Writes health files to centralized `.health/` directory
-- Generates LSL files in `.specstory/history/`
+- Generates LSL files in `.coding/history/`
 
 ### Layer 5: LiveLoggingCoordinator
 

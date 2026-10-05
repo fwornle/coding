@@ -450,7 +450,7 @@ class KnowledgeMigration {
   async createBackup(jsonFiles) {
     console.log('💾 Creating backup...');
 
-    const backupDir = path.join(this.options.projectPath, '.specstory', 'backups');
+    const backupDir = path.join(this.options.projectPath, '.coding', 'var', 'knowledge-backups');
     if (!fs.existsSync(backupDir)) {
       fs.mkdirSync(backupDir, { recursive: true });
     }
@@ -561,7 +561,7 @@ class KnowledgeMigration {
    * Check if already migrated
    */
   async isMigrated() {
-    const flagFile = path.join(this.options.projectPath, '.specstory', '.knowledge-migrated');
+    const flagFile = path.join(this.options.projectPath, '.coding', 'var', 'knowledge-migrated.json');
     return fs.existsSync(flagFile);
   }
 
@@ -569,7 +569,7 @@ class KnowledgeMigration {
    * Mark as migrated
    */
   async markMigrated() {
-    const flagFile = path.join(this.options.projectPath, '.specstory', '.knowledge-migrated');
+    const flagFile = path.join(this.options.projectPath, '.coding', 'var', 'knowledge-migrated.json');
     const flagDir = path.dirname(flagFile);
 
     if (!fs.existsSync(flagDir)) {
@@ -589,7 +589,7 @@ class KnowledgeMigration {
     console.log('🔄 Rolling back migration...\n');
 
     // Find latest backup
-    const backupDir = path.join(this.options.projectPath, '.specstory', 'backups');
+    const backupDir = path.join(this.options.projectPath, '.coding', 'var', 'knowledge-backups');
     if (!fs.existsSync(backupDir)) {
       console.log('❌ No backups found');
       return;
@@ -613,7 +613,7 @@ class KnowledgeMigration {
     console.log('    This is a destructive operation and should be implemented carefully.');
 
     // Remove migration flag
-    const flagFile = path.join(this.options.projectPath, '.specstory', '.knowledge-migrated');
+    const flagFile = path.join(this.options.projectPath, '.coding', 'var', 'knowledge-migrated.json');
     if (fs.existsSync(flagFile)) {
       fs.unlinkSync(flagFile);
       console.log('✅ Migration flag removed');

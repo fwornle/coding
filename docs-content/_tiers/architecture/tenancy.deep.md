@@ -2,7 +2,7 @@
 
 | # | Decision |
 |---|---|
-| D1 | Learned data lives in a nested checkout `<repo>/.coding/` (the `<repo>-history` repo) with `history/` and `kb/`. `<repo>/.specstory/history` is a relative symlink into it. |
+| D1 | Learned data lives in a nested checkout `<repo>/.coding/` (the `<repo>-history` repo) with `history/` and `kb/`. There is no `<repo>/.specstory/` (T9 dropped the compatibility symlink; launch removes an old one). |
 | D3 | Pull automatically at session start, commit locally automatically, **push only on confirmation**. |
 | D6 | **One live store per machine** — obs-api is the single owner of km-core's LevelDB, one Qdrant. The repo is the unit of persistence and sharing; a team is a set of repos; every filter maps repo → team. No per-team or per-repo live stores. |
 | D7 | The scope (`~/.coding/scope`) names only this machine's runtime home `~/.coding/data/<scope>/`. It is not what is persisted or shared. |

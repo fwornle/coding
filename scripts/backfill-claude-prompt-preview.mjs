@@ -176,7 +176,7 @@ async function main() {
   const { loadRawBodyRedactionPatterns, makeRedactRawBody } = await import(
     path.join(args.proxy, 'proxy-bridge', 'raw-bodies.mjs'));
   const patterns = loadRawBodyRedactionPatterns(
-    REPO_ROOT, path.join(REPO_ROOT, '.specstory', 'config', 'redaction-patterns.json'));
+    REPO_ROOT, path.join(REPO_ROOT, 'config', 'redaction', 'redaction-patterns.json'));
   const redact = makeRedactRawBody(patterns);
   if (!patterns.length) {
     console.error('refusing to run: no redaction patterns loaded — previews would be stored raw');

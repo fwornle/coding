@@ -328,7 +328,7 @@ const SECRET_SCRUBS: [RegExp, string][] = [
   [/\bAKIA[0-9A-Z]{12,}/g, 'AKIA***'],
   // Corporate staff ID (q + 6 alphanumerics, at least one digit — the digit
   // lookahead avoids matching plain words like "quality"/"queried"). Mirrors the
-  // canonical corporate_user_ids rule in .specstory/config/redaction-patterns.json.
+  // canonical corporate_user_ids rule in config/redaction/redaction-patterns.json.
   // Context-turns previews carry raw filesystem paths (e.g. /Users/Q284340/…), so
   // this masks the staff number that would otherwise render in the timeline/modal.
   [/\bq(?=[0-9a-z]{6}\b)(?=[0-9a-z]*\d)[0-9a-z]{6}\b/gi, '<USER_ID_REDACTED>'],
