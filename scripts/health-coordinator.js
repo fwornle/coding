@@ -786,6 +786,7 @@ const PROXY_PROBE_INTERVAL_MS = 60_000;          // D-01: cheap probe every 60s
 // 'network_fetch failed' — a classic self-inflicted feedback loop.
 const PROXY_PROBE_TIMEOUT_MS = 25_000;
 const PROXY_MODE_POLL_TIMEOUT_MS = 2_000;         // GET /health is fast; 2s budget
+const PROXY_EGRESS_NUDGE_TIMEOUT_MS = 15_000;     // re-decision may probe a few proxy candidates (4s each)
 const PROXY_KICKSTART_WINDOW_MS = 5 * 60_000;     // D-06: 5 min sliding window
 const PROXY_KICKSTART_MAX = 3;                    // D-06: 3 kickstarts then cooldown
 // 3b strong probe runs much less often than the cheap probe (5 min vs 60s)
@@ -1750,6 +1751,39 @@ function dispatchProxyKickstart({ reason, logPrefix, detail = '', countsTowardCa
   return true;
 }
 
+/**
+ * Ask the LLM proxy to re-decide its egress NOW — re-read this coordinator's
+ * network verdict and re-pin (or drop) its upstream proxy — instead of waiting
+ * out its 30s recheck. This is how a network switch reaches the proxy without
+ * a restart: no request is dropped and :12435 never stops listening.
+ *
+ * Fire-and-forget at the call sites; the result is only logged. A failure
+ * (proxy down, or an old build without the endpoint → 404) is harmless:
+ * evaluateProxyStaleness() escalates to a restart if the mismatch persists.
+ *
+ * @param {string} why  logged with the outcome
+ * @returns {Promise<boolean>} whether the proxy accepted the nudge
+ */
+async function nudgeProxyEgress(why) {
+  try {
+    const r = await fetch(`${PROXY_URL}/api/egress/reevaluate`, {
+      method: 'POST',
+      signal: AbortSignal.timeout(PROXY_EGRESS_NUDGE_TIMEOUT_MS),
+    });
+    if (!r.ok) {
+      log(`proxy egress nudge (${why}): HTTP ${r.status}`, 'WARN');
+      return false;
+    }
+    const body = await r.json().catch(() => ({}));
+    log(`proxy egress nudge (${why}): networkMode=${body.networkMode || '?'} `
+      + `egress=${body.egress?.proxy || 'direct'}`, 'INFO');
+    return true;
+  } catch (err) {
+    log(`proxy egress nudge (${why}) failed: ${err.message}`, 'WARN');
+    return false;
+  }
+}
+
 // Strong-probe escalation FSM — runs once per pollProxySemanticStrong outcome
 // (via try/finally in the caller). Bridges the gap between the cheap-probe
 // auto-heal FSM (which can miss stale-env / pipeline-only outages because
@@ -2105,16 +2139,16 @@ async function pollProxyMode() {
     pendingNetworkModeFlip = flip.pending;
 
     if (flip.dispatch) {
-      // countsTowardCap: false — a network change is a user action, not a
-      // proxy failure, so it must not spend the failure budget. It IS
-      // debounced: if something restarted the proxy seconds ago, the fresh
-      // network detection this flip wants has already happened.
-      dispatchProxyKickstart({
-        reason: 'networkMode-flip',
-        logPrefix: `proxy networkMode flip ${flip.from} -> ${flip.to} confirmed`,
-        detail: flip.reason,
-        countsTowardCap: false,
-      });
+      // No restart. This used to kickstart the proxy so it would re-pin
+      // HTTPS_PROXY, but the proxy now re-decides its egress at runtime
+      // (egress-decision.mjs) and the host-location hook in pollNetworkStatus
+      // has already told it to do so. A restart here only added an outage:
+      // on 2026-10-05 a VPN drop SIGTERMed the proxy mid-stream and left
+      // :12435 refusing connections while the replacement booted. If the
+      // runtime switch ever fails to follow, evaluateProxyStaleness() still
+      // escalates to a restart.
+      log(`proxy networkMode flip ${flip.from} -> ${flip.to} confirmed (${flip.reason}) — `
+        + 'the proxy followed at runtime, no restart', 'INFO');
     } else if (flip.pending > 0) {
       log(`proxy networkMode flip ${flip.from} -> ${flip.to} ${flip.reason}`, 'DEBUG');
     }
@@ -2126,6 +2160,7 @@ async function pollProxyMode() {
 
 // Hysteresis state for the location-vs-proxyMode staleness detector below.
 let pendingProxyStaleMismatch = null;        // { class, count } or null
+let staleNudgedClass = null;                 // host class already nudged for, or null
 const PROXY_STALE_CONFIRM_TICKS = 3;         // sustained mismatch ticks before restart
 
 // classifyNetClass — collapses both network vocabularies onto two comparable
@@ -2137,7 +2172,9 @@ const PROXY_STALE_CONFIRM_TICKS = 3;         // sustained mismatch ticks before 
 /**
  * Restart the proxy when the host's authoritative network location disagrees
  * with the proxy's self-reported networkMode — i.e. the proxy is STALE after a
- * network switch it never re-detected.
+ * network switch it never re-detected. Since 2026-10-05 a confirmed mismatch is
+ * first answered with an egress nudge (nudgeProxyEgress); only one that
+ * survives the nudge is restarted.
  *
  * This complements the flip detector inside pollProxyMode(): that one only sees
  * transitions in the proxy's OWN self-report, which is frozen at proxy startup.
@@ -2163,6 +2200,7 @@ function evaluateProxyStaleness() {
   // Only actionable when BOTH classes are known and disagree. An 'unknown' on
   // either side is transient (startup / probe error) and must never restart.
   if (!hostClass || !proxyClass || hostClass === proxyClass) {
+    staleNudgedClass = null;
     if (pendingProxyStaleMismatch) {
       log(`proxy staleness cleared (host=${currentState.network?.location} proxy=${currentState.proxy?.networkMode})`, 'DEBUG');
       pendingProxyStaleMismatch = null;
@@ -2185,6 +2223,20 @@ function evaluateProxyStaleness() {
 
   const ticks = pendingProxyStaleMismatch.count;
   pendingProxyStaleMismatch = null;
+
+  // Ask before restarting. The proxy re-decides its egress at runtime, so a
+  // mismatch is usually just its 30s network-mode cache, which one nudge
+  // clears without dropping a single request. Only a mismatch that SURVIVES a
+  // nudge (an old build without the endpoint, or a runtime switch that did not
+  // take) earns the restart below.
+  if (staleNudgedClass !== hostClass) {
+    staleNudgedClass = hostClass;
+    log(`proxy stale: host=${hostClass} but proxy reports ${proxyClass} (${ticks} ticks) — asking it to re-decide before any restart`, 'INFO');
+    nudgeProxyEgress(`stale: host=${hostClass} proxy=${proxyClass}`);
+    return;
+  }
+  staleNudgedClass = null;
+
   // countsTowardCap: false, as before — a network change is a user action. But
   // debounced now: the mismatch this reads is exactly what a just-dispatched
   // restart is on its way to correcting, and re-dispatching mid-restart is how
@@ -3429,14 +3481,25 @@ async function pollNetworkStatus() {
   // lib/network/location-hysteresis.mjs; the counter lives here, in state, so a
   // pending demotion is visible in /health/state instead of hidden in a module
   // global. 0 whenever nothing is pending, which is the common case.
+  const previousLocation = netState.location;
   const settled = settleLocation({
     observed: observedLocation,
-    previous: netState.location,
+    previous: previousLocation,
     pending: netState.location_demotion_pending,
     networkChanged: networkChangeRecent(netState.last_network_change_at),
   });
   netState.location = settled.location;
   netState.location_demotion_pending = settled.pending;
+
+  // The network class just changed (VPN on/off, office ↔ home). Tell the LLM
+  // proxy now, so it re-decides its egress within a second instead of riding a
+  // dead route for up to its 30s recheck. netState IS currentState.network, so
+  // the verdict the proxy reads back from /health/state is already this one.
+  const fromClass = classifyNetClass(previousLocation);
+  const toClass = classifyNetClass(netState.location);
+  if (fromClass && toClass && fromClass !== toClass) {
+    nudgeProxyEgress(`host location ${previousLocation} -> ${netState.location}`);
+  }
 
    log(`network: location=${netState.location} (vpnCli=${vpnConnected}, pac=${pacResolved}, physCN=${onPhysicalCN}, px=${effectivePortListening}, envSet=${proxyEnvSet})`, 'DEBUG');
 
