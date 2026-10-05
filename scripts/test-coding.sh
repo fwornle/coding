@@ -1744,24 +1744,18 @@ else
     print_fail "Post-session logger not found"
 fi
 
-print_check "Specstory directory structure"
-if dir_exists "$CODING_ROOT/.specstory"; then
-    print_pass ".specstory directory found"
-    
-    if dir_exists "$CODING_ROOT/.specstory/history"; then
-        print_pass ".specstory/history directory found"
-        HISTORY_COUNT=$(ls -1 "$CODING_ROOT/.specstory/history" | wc -l)
-        print_info "History files: $HISTORY_COUNT"
-    else
-        if may_repair "Creating .specstory/history directory..."; then
-            mkdir -p "$CODING_ROOT/.specstory/history"
-            print_fixed ".specstory/history directory created"
-        fi
-    fi
+print_check "Session history directory"
+# shellcheck source=lib/history-dir.sh
+source "$CODING_ROOT/scripts/lib/history-dir.sh"
+HISTORY_DIR="$(repo_history_dir "$CODING_ROOT")"
+if dir_exists "$HISTORY_DIR"; then
+    print_pass "History directory found (${HISTORY_DIR#"$CODING_ROOT"/})"
+    HISTORY_COUNT=$(ls -1 "$HISTORY_DIR" | wc -l)
+    print_info "History files: $HISTORY_COUNT"
 else
-    if may_repair "Creating .specstory directory structure..."; then
-        mkdir -p "$CODING_ROOT/.specstory/history"
-        print_fixed ".specstory directory structure created"
+    if may_repair "Creating ${HISTORY_DIR#"$CODING_ROOT"/}..."; then
+        mkdir -p "$HISTORY_DIR"
+        print_fixed "History directory created"
     fi
 fi
 

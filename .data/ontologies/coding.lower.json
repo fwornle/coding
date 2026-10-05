@@ -10,7 +10,7 @@
       "extends": "Component",
       "level": 2,
       "parent": "Component",
-      "description": "Live Session Logging subsystem capturing time-windowed transcripts under .specstory/history/, including the ETM daemon and LSL resolver",
+      "description": "Live Session Logging subsystem capturing time-windowed transcripts under .coding/history/, including the ETM daemon and LSL resolver",
       "relationships": {}
     },
     "ConstraintMonitor": {

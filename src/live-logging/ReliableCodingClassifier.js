@@ -172,7 +172,7 @@ class ReliableCodingClassifier {
       });
       
       // Initialize operational logger.
-      // Let OperationalLogger use its default logDir (.specstory/history/logs)
+      // Let OperationalLogger use its default logDir (<history>/logs)
       // so we have one source of truth for the path. The previous explicit
       // override here was the actual reason system.log kept reappearing under
       // the old top-level .specstory/logs/ even after the default was fixed.

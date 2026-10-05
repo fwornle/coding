@@ -16,6 +16,7 @@ import zlib from 'zlib';
 import { promisify } from 'util';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import ProcessStateManager from './process-state-manager.js';
+import { repoHistoryDir } from '../lib/history/paths.cjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const gzip = promisify(zlib.gzip);
@@ -297,7 +298,7 @@ class LSLFileManager {
 class EnhancedOperationalLogger {
   constructor(options = {}) {
     this.options = {
-      logDir: options.logDir || join(process.cwd(), '.specstory', 'history', 'logs'),
+      logDir: options.logDir || join(repoHistoryDir(process.cwd()), 'logs'),
       enableMetrics: options.enableMetrics !== false,
       enableAlerts: options.enableAlerts !== false,
       metricsInterval: options.metricsInterval || 60000, // 1 minute
@@ -702,7 +703,7 @@ class LiveLoggingCoordinator {
   async initializeOperationalLogger() {
     try {
       this.operationalLogger = new EnhancedOperationalLogger({
-        logDir: join(process.cwd(), '.specstory', 'history', 'logs'),
+        logDir: join(repoHistoryDir(process.cwd()), 'logs'),
         enableMetrics: true,
         enableAlerts: true,
         metricsInterval: 60000,

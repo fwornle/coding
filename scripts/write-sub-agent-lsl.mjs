@@ -6,7 +6,7 @@
  *
  * Drives a sweep across the four supported coding agents
  * (claude/opencode/copilot), then writes per-sub-agent LSL files
- * under .specstory/history/{YYYY}/{MM}/ following the verbatim
+ * under <repo>/.coding/history/{YYYY}/{MM}/ following the verbatim
  * D-LSL-Filename convention:
  *   {YYYY-MM-DD}_{HHHH-HHHH}_S{parent-slot}-{sub-index}-{sub-hash}[-part{N}].md
  *

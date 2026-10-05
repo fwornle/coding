@@ -18,6 +18,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
+import { repoHistoryDir } from '../../lib/history/paths.cjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -26,7 +27,7 @@ class OperationalLogger {
     this.projectPath = options.projectPath || process.cwd();
     // Operational logs (system/classification/routing/performance/errors) live
     // alongside other LSL artifacts in the private history repo.
-    this.logDir = options.logDir || path.join(this.projectPath, '.specstory', 'history', 'logs');
+    this.logDir = options.logDir || path.join(repoHistoryDir(this.projectPath), 'logs');
     this.debug = options.debug || false;
     this.enabled = options.enabled !== false; // Default to enabled
     

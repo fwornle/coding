@@ -4,6 +4,7 @@ import { execSync } from 'child_process';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
+import { repoHistoryDir } from '../lib/history/paths.cjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,7 +13,7 @@ const __dirname = path.dirname(__filename);
  * Find the most recent session files, properly sorted by modification time
  * This prevents the alphabetical sorting mistake where 07-20 > 07-31
  */
-function findLatestSessions(directory = '.specstory/history', count = 1) {
+function findLatestSessions(directory = repoHistoryDir(process.cwd()), count = 1) {
     try {
         // Use ls -lt for proper time-based sorting
         const command = `find "${directory}" -name "*-session.md" -type f -exec ls -lt {} + | head -n ${count} | awk '{print $NF}'`;
@@ -27,7 +28,7 @@ function findLatestSessions(directory = '.specstory/history', count = 1) {
 /**
  * Find sessions newer than a given timestamp
  */
-function findSessionsNewerThan(timestamp, directory = '.specstory/history') {
+function findSessionsNewerThan(timestamp, directory = repoHistoryDir(process.cwd())) {
     try {
         // Parse timestamp YYYY-MM-DD_HH-MM-SS
         const [date, time] = timestamp.split('_');
@@ -66,7 +67,7 @@ runIfMain(import.meta.url, () => {
         sessions.forEach(s => console.log(s));
     } else {
         const count = parseInt(args[0]) || 1;
-        const sessions = findLatestSessions('.specstory/history', count);
+        const sessions = findLatestSessions(repoHistoryDir(process.cwd()), count);
         sessions.forEach(s => console.log(s));
     }
 }

@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { GrokAnalyzer } from './GroqAnalyzer.js';
 import { SessionDatabase } from './SessionDatabase.js';
+import { repoHistoryDir } from '../../lib/history/paths.cjs';
 
 export class TranscriptAnalyzer {
   constructor(config = {}) {
@@ -399,7 +400,7 @@ export class TranscriptAnalyzer {
    */
   updateSessionFile(sessionId, interaction, analysis) {
     try {
-      const sessionDir = path.join(process.cwd(), '.specstory', 'history');
+      const sessionDir = repoHistoryDir(process.cwd());
       if (!fs.existsSync(sessionDir)) {
         fs.mkdirSync(sessionDir, { recursive: true });
       }

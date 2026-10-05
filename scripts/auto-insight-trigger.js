@@ -18,6 +18,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import { lslListAll } from './lsl-paths.js';
+import { repoHistoryDir } from '../lib/history/paths.cjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -216,13 +217,13 @@ class AutoInsightTrigger {
    */
   async detectNewSessions() {
     try {
-      const specstoryPath = path.join(CODING_ROOT, '.specstory', 'history');
+      const specstoryPath = repoHistoryDir(CODING_ROOT);
       
       // Check if specstory directory exists
       try {
         await fs.access(specstoryPath);
       } catch {
-        this.logger.debug('No .specstory/history directory found');
+        this.logger.debug(`No LSL history directory found (${specstoryPath})`);
         return false;
       }
       

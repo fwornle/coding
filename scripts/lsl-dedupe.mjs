@@ -11,6 +11,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { removePromptSet } from '../src/live-logging/PiSessionWriter.js';
+import { repoHistoryDir } from '../lib/history/paths.cjs';
 
 const log = (msg) => process.stdout.write(msg + '\n');
 
@@ -27,7 +28,7 @@ const date = dateArg || (() => {
 })();
 
 const [year, month] = date.split('-');
-const dir = path.join(REPO_ROOT, '.specstory', 'history', year, month);
+const dir = path.join(repoHistoryDir(REPO_ROOT), year, month);
 if (!fs.existsSync(dir)) {
   log(`No directory: ${dir}`);
   process.exit(0);

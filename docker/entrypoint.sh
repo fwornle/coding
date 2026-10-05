@@ -78,7 +78,7 @@ fi
 # ===========================================
 
 mkdir -p /coding/.data/knowledge-graph
-mkdir -p /coding/.specstory/history
+mkdir -p /coding/.coding/history
 mkdir -p /var/log/supervisor
 
 echo "=== Data directories ready ==="

@@ -55,6 +55,16 @@ describe('strip_history_dir', () => {
     );
   });
 
+  test('the learning checkout (T9: <project>/.coding) resolves to its project', () => {
+    assert.equal(strip('/w/a2a-xpr/.coding'), '/w/a2a-xpr');
+    assert.equal(strip('/w/a2a-xpr/.coding/history/2026/10'), '/w/a2a-xpr');
+    assert.equal(strip('/w/a2a-xpr/.coding/kb'), '/w/a2a-xpr');
+  });
+
+  test('a name merely starting with .coding is not the learning checkout', () => {
+    assert.equal(strip('/w/a2a-xpr/.codingx'), '/w/a2a-xpr/.codingx');
+  });
+
   test('a project root is left alone', () => {
     assert.equal(strip('/w/a2a-xpr'), '/w/a2a-xpr');
   });

@@ -287,18 +287,20 @@ fi
 INVOKED_FROM_DIR="$(pwd)"
 
 # A cwd inside a private history checkout is still the PROJECT's launch, not a
-# project of its own. `<project>/.specstory/history/` is a nested git repo holding
+# project of its own. `<project>/.coding/` (T9; formerly the nested git repo at
+# `<project>/.specstory/history/`) is the learning checkout holding
 # verbatim transcripts; taking it as PROJECT_DIR made every agent_common_init step
 # act on it — offering a `history-history` remote (basename of the directory),
 # writing CLAUDE.md and the agent instruction files into it, and appending a bare
 # `logs/` to its .gitignore, which ignores the very classification tree that repo
-# exists to carry. Resolve up to the directory that owns .specstory instead.
+# exists to carry. Resolve up to the directory that owns it instead.
 #
 # `%%` strips the LONGEST matching suffix, so truncation lands on the FIRST
-# `/.specstory/history` segment. That also collapses an already-nested
+# such segment. That also collapses an already-nested
 # `.../.specstory/history/.specstory/history` in a single pass.
 strip_history_dir() {
   case "$1" in
+    */.coding|*/.coding/*) printf '%s' "${1%%/.coding*}" ;;
     */.specstory/history|*/.specstory/history/*) printf '%s' "${1%%/.specstory/history*}" ;;
     *) printf '%s' "$1" ;;
   esac

@@ -18,46 +18,8 @@ _AGENT_COMMON_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source CN/proxy detection
 source "$_AGENT_COMMON_DIR/detect-network.sh"
-
-# ==============================================================================
-# GITIGNORE VALIDATION
-# ==============================================================================
-# Ensure .specstory/history/logs/ is not ignored by gitignore
-# This is critical for classification logs from both live logging and batch processing
-ensure_specstory_logs_tracked() {
-  local project_dir="$1"
-  local gitignore_file="$project_dir/.gitignore"
-
-  # Skip if no .gitignore exists
-  if [ ! -f "$gitignore_file" ]; then
-    return 0
-  fi
-
-  # Check if logs/ pattern exists and .specstory/history/logs/ is not exempted
-  if grep -q "^logs/" "$gitignore_file" 2>/dev/null; then
-    if ! grep -q "^\!\.specstory/history/logs/" "$gitignore_file" 2>/dev/null; then
-      log "⚠️  .gitignore has 'logs/' pattern that will ignore .specstory/history/logs/classification/"
-      log "🔧 Adding exception '!.specstory/history/logs/' to .gitignore..."
-
-      # Insert the exception right after the logs/ line (cross-platform compatible)
-      if [[ "$OSTYPE" == "darwin"* ]]; then
-        sed -i '' '/^logs\//a\
-!.specstory/history/logs/
-' "$gitignore_file"
-      else
-        sed -i '/^logs\//a\
-!.specstory/history/logs/
-' "$gitignore_file"
-      fi
-
-      if [ $? -eq 0 ]; then
-        log "✅ Added .specstory/history/logs/ exception to .gitignore"
-      else
-        log "❌ Failed to update .gitignore - please manually add: !.specstory/history/logs/"
-      fi
-    fi
-  fi
-}
+# Where a repo's transcripts live (T9): repo_history_dir
+source "$_AGENT_COMMON_DIR/lib/history-dir.sh"
 
 # Ensure .data/ directory is ignored in gitignore
 # This directory contains MCP Memory LevelDB files (volatile runtime data)
@@ -201,42 +163,37 @@ export -f pull_learning_repo
 # ==============================================================================
 # SESSION REMINDER
 # ==============================================================================
+# Newest transcript in a history dir: last YYYY/MM tranche, last file by name.
+_latest_history_file() {
+  local dir="$1" month
+  month=$(ls -d "$dir"/[0-9][0-9][0-9][0-9]/[0-9][0-9] 2>/dev/null | tail -1)
+  [ -n "$month" ] || return 0
+  ls -1 "$month" 2>/dev/null | grep -E '\.(md|jsonl)$' | tail -1 | sed "s|^|$month/|"
+}
+
 # Show latest session log for continuity
 show_session_reminder() {
   local target_project_dir="$1"
   local coding_repo="$2"
 
-  # Check target project directory first
-  local target_specstory_dir="$target_project_dir/.specstory/history"
-  local coding_specstory_dir="$coding_repo/.specstory/history"
-
   local latest_session=""
   local session_location=""
 
-  # Look for recent sessions in target project
-  if [ -d "$target_specstory_dir" ]; then
-    latest_session=$(ls -t "$target_specstory_dir"/*.md 2>/dev/null | head -1)
-    if [ -n "$latest_session" ]; then
-      session_location="target project"
-    fi
-  fi
-
-  # Also check coding repo for comparison
-  if [ -d "$coding_specstory_dir" ]; then
-    local coding_session=$(ls -t "$coding_specstory_dir"/*.md 2>/dev/null | head -1)
-    if [ -n "$coding_session" ]; then
-      # Compare timestamps if both exist
-      if [ -n "$latest_session" ]; then
-        if [ "$coding_session" -nt "$latest_session" ]; then
-          latest_session="$coding_session"
-          session_location="coding repo"
-        fi
+  # Newest transcript BY FILENAME (date-encoded; mtimes are rewritten by
+  # checkouts), in the target project first, then the coding repo.
+  local dir candidate
+  for dir in "$(repo_history_dir "$target_project_dir")" "$(repo_history_dir "$coding_repo")"; do
+    candidate=$(_latest_history_file "$dir")
+    [ -n "$candidate" ] || continue
+    if [ -z "$latest_session" ] || [[ "$(basename "$candidate")" > "$(basename "$latest_session")" ]]; then
+      latest_session="$candidate"
+      if [ "$dir" = "$(repo_history_dir "$target_project_dir")" ]; then
+        session_location="target project"
       else
-        latest_session="$coding_session"
         session_location="coding repo"
       fi
     fi
-  fi
+  done
 
   if [ -n "$latest_session" ] && [ -f "$latest_session" ]; then
     local session_file=$(basename "$latest_session")
@@ -256,13 +213,8 @@ start_transcript_monitoring() {
 
   log "Using Global LSL Coordinator for robust transcript monitoring: $(basename "$project_dir")"
 
-  # Create .specstory directory if needed
-  if [ ! -d "$project_dir/.specstory/history" ]; then
-    mkdir -p "$project_dir/.specstory/history"
-  fi
-
-  # Ensure .specstory/history/logs/ is tracked in git
-  ensure_specstory_logs_tracked "$project_dir"
+  # The history dir the ETM writes into (.coding/history, T9).
+  mkdir -p "$(repo_history_dir "$project_dir")"
 
   # Phase 33: global-lsl-coordinator.js is gone (deleted in 33-07). The host-side
   # coordinator at :3034 owns lifecycle now; this function just spawns ETM directly.
@@ -619,10 +571,10 @@ agent_common_init() {
   fi
 
   # Start robust transcript monitoring for target project
-  if [ -d "$target_project_dir/.specstory" ] || mkdir -p "$target_project_dir/.specstory/history" 2>/dev/null; then
+  if mkdir -p "$(repo_history_dir "$target_project_dir")" 2>/dev/null; then
     start_transcript_monitoring "$target_project_dir" "$coding_repo"
   else
-    log "Warning: Could not create .specstory directory for transcript monitoring"
+    log "Warning: Could not create the history directory for transcript monitoring"
   fi
 
   # Start the health monitor for global session monitoring
@@ -648,10 +600,10 @@ agent_common_init() {
 
 # Export functions for use in agent-specific launchers
 export -f log
-export -f ensure_specstory_logs_tracked
 export -f ensure_data_directory_ignored
 export -f ensure_private_history_repo
 export -f show_session_reminder
+export -f _latest_history_file repo_history_dir
 export -f start_transcript_monitoring
 export -f start_statusline_health_monitor
 export -f ensure_claude_md_with_skill_instruction
