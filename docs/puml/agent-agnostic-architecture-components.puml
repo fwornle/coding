@@ -24,12 +24,13 @@ package "Tmux Wrapper Layer" {
 
 package "Common Setup Layer" {
     component "agent-common-setup.sh" as common <<common>> {
-        [ensure_specstory_logs_tracked()]
+        [agent_common_init()]
+        [ensure_coding_runtime_ignored()]
+        [ensure_private_history_repo()]
+        [pull_learning_repo()]
         [start_transcript_monitoring()]
         [start_statusline_health_monitor()]
-        [start_global_lsl_monitoring()]
         [show_session_reminder()]
-        [agent_common_init()]
     }
 }
 
@@ -102,11 +103,13 @@ end note
 
 note right of common
   **Agent-Agnostic Functions:**
-  • LSL (Live Session Logging)
-  • Gitignore validation
+  • Runtime ignores (.git/info/exclude,
+    never the tracked .gitignore)
+  • Per-repo learning checkout <repo>/.coding/
+    (history/ + kb/), pulled at session start
+  • Transcript monitoring (ETM → .coding/history)
   • Health monitoring
   • Session continuity
-  • Transcript monitoring
 end note
 
 note right of adapter_interface
