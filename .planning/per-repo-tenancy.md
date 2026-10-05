@@ -182,7 +182,7 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
 
 ---
 
-### T9 — Retire `.specstory/history`  `status: done (proxy restart pending)`
+### T9 — Retire `.specstory/history`  `status: done`
 
 The symlink `<repo>/.specstory/history → ../.coding/history` exists only because code still
 addresses the old path. Goal: nothing addresses it; new repos get no `.specstory/` at all.
@@ -227,10 +227,10 @@ addresses the old path. Goal: nothing addresses it; new repos get no `.specstory
       `.specstory/`). Last legacy writer found by it: rapid-llm-proxy's
       `bin/start-llm-proxy.sh` pinned `LLM_PROXY_TOKEN_EXPORT_DIR` under
       `<coding>/.specstory/history/logs/` at start — fixed to coding's resolver; the RUNNING
-      proxy still writes the old path (recreating a real dir) until it restarts. After the
-      restart: move `<coding>/.specstory/history/logs/llm-proxy-export/**` over
-      `.coding/history/logs/llm-proxy-export/` (buckets are cumulative per hour — the stray
-      copy is the superset) and remove `<coding>/.specstory/history`.
+      proxy wrote the old path until restarted. Restarted 18:26 (export dir now
+      `.coding/history/logs/llm-proxy-export`); its stray 18:00 bucket was union-merged by row
+      id into the new path (the restarted proxy's copy was already the superset) and
+      `<coding>/.specstory/history` removed — still absent afterwards.
 - Accept: `git grep '\.specstory/history'` = docs/migration code only; a fresh repo launched
   with `learning` has no `.specstory/`; tests green; live session logs still land.
 
