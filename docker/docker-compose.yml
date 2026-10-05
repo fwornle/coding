@@ -135,11 +135,12 @@ services:
       - ${CODING_DATA_HOME:?unset — export it from bin/coding-data-home, or start via coding --claude}:${CODING_DATA_HOME:?unset — export it from bin/coding-data-home, or start via coding --claude}
       - ${CODING_REPO:-.}/knowledge-management:/coding/knowledge-management
       # The tools repo's own learning checkout (per-repo tenancy T7, the
-      # coding-history repo). knowledge-management/insights and
-      # .specstory/history are RELATIVE symlinks into it (bin/init-history.sh),
-      # so without these two mounts both would dangle in here: semantic-analysis
-      # would fail to write insight documents and the history readers would see
-      # an empty tree. Mounted next to .coding/runtime (read-only, below).
+      # coding-history repo). The history readers resolve .coding/history
+      # (lib/history/paths.cjs), and knowledge-management/insights is a
+      # RELATIVE symlink into .coding/kb (bin/init-history.sh): without these
+      # two mounts semantic-analysis would fail to write insight documents and
+      # the history readers would see an empty tree. Mounted next to
+      # .coding/runtime (read-only, below).
       - ${CODING_REPO:-.}/.coding/history:/coding/.coding/history
       - ${CODING_REPO:-.}/.coding/kb:/coding/.coding/kb
       - ${CODING_REPO:-.}/.git:/coding/.git:rw

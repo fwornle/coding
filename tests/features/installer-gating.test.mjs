@@ -56,7 +56,7 @@ describe('the mutation manifest tells the truth about the chosen profile', () =>
 
   test('the default lists everything, exactly as before', async () => {
     const out = await dryRun();
-    assert.match(out, /\.specstory\/history\b/);
+    assert.match(out, /\.coding\/history\b/);
     assert.match(out, AUTOSTART_UNIT);
     assert.match(out, /Dry run — nothing was changed/);
   });
@@ -66,7 +66,7 @@ describe('the mutation manifest tells the truth about the chosen profile', () =>
     // the installer will do. A row for a feature the user did not select is a
     // promise the installer will not keep.
     const out = await dryRun(['--features=harness']);
-    assert.doesNotMatch(out, /\.specstory\/history\b/, 'lsl is off, so no history checkout');
+    assert.doesNotMatch(out, /\.coding\/history\b/, 'lsl is off, so no history checkout');
     assert.match(out, AUTOSTART_UNIT, 'llm-proxy is on, so the autostart unit stays');
   });
 
@@ -110,7 +110,7 @@ describe('the mutation manifest tells the truth about the chosen profile', () =>
 
   test('minimal drops the proxy service too', async () => {
     const out = await dryRun(['--features=minimal']);
-    assert.doesNotMatch(out, /\.specstory\/history\b/);
+    assert.doesNotMatch(out, /\.coding\/history\b/);
     assert.doesNotMatch(out, AUTOSTART_UNIT);
   });
 

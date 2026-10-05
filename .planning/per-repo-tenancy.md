@@ -182,7 +182,7 @@ to main, push (sole developer — no PRs in coding; rapid-llm-proxy uses PRs).
 
 ---
 
-### T9 — Retire `.specstory/history`  `status: in progress`
+### T9 — Retire `.specstory/history`  `status: done (proxy restart pending)`
 
 The symlink `<repo>/.specstory/history → ../.coding/history` exists only because code still
 addresses the old path. Goal: nothing addresses it; new repos get no `.specstory/` at all.
@@ -220,8 +220,17 @@ addresses the old path. Goal: nothing addresses it; new repos get no `.specstory
       (`history` marker = either layout).
 - [x] `/sl` + its user-level allow rules move to `.coding/history` (the six legacy rules stay
       for repos still on a real `.specstory/history`; the skill says when to use that root).
-- [ ] Then: `ensureLayout` stops creating the symlink; an existing one is left (harmless) or
-      removed on launch once nothing reads it.
+- [x] Then: `ensureLayout` stops creating the symlink; an existing one is removed on launch
+      (only OUR `../.coding/history` link; a foreign link is left), and `.specstory/` with it
+      when that empties it. `migrateLegacy` no longer re-links after moving a real dir.
+      Live 2026-10-05: removed in coding, a2a-xpr, rec (the latter two now have no
+      `.specstory/`). Last legacy writer found by it: rapid-llm-proxy's
+      `bin/start-llm-proxy.sh` pinned `LLM_PROXY_TOKEN_EXPORT_DIR` under
+      `<coding>/.specstory/history/logs/` at start — fixed to coding's resolver; the RUNNING
+      proxy still writes the old path (recreating a real dir) until it restarts. After the
+      restart: move `<coding>/.specstory/history/logs/llm-proxy-export/**` over
+      `.coding/history/logs/llm-proxy-export/` (buckets are cumulative per hour — the stray
+      copy is the superset) and remove `<coding>/.specstory/history`.
 - Accept: `git grep '\.specstory/history'` = docs/migration code only; a fresh repo launched
   with `learning` has no `.specstory/`; tests green; live session logs still land.
 
