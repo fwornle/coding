@@ -2598,7 +2598,7 @@ function ensureEtmForActiveProjects(opts = {}) {
   // Without this the feature switched off its five sweeper daemons and left the
   // actual writer running: `coding-features set lsl off` with health still on
   // had this sweep respawning ETMs every 30s, which carried on filling
-  // .specstory/history for a feature the user had turned off.
+  // the session history for a feature the user had turned off.
   //
   // Fails OPEN, like every other feature read in this file: an unresolvable
   // config must not silently stop session logging.

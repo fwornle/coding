@@ -5,9 +5,9 @@ set -uo pipefail
 #
 # Driven by ~/Library/LaunchAgents/com.coding.lsl-lock-sweeper.plist
 # (StartInterval=60 + RunAtLoad). Clears orphaned `index.lock` files left in
-# `.specstory/history/.git/` when a committer is killed mid-commit.
+# the history repo's git dir (<repo>/.coding/.git/) when a committer is killed mid-commit.
 #
-# WHY this exists: the nested `.specstory/history` repo is committed by MULTIPLE
+# WHY this exists: the nested history repo is committed by MULTIPLE
 # independent writers — the project's own live-logging/ETM committer AND the
 # SpecStory IDE extension (`git -c user.useConfigOnly=true commit
 # --allow-empty-message --file -`). When any is killed mid-commit (obs-api/ETM
@@ -27,21 +27,24 @@ set -uo pipefail
 #
 # Env overrides (tests + hand-driving):
 #   LSL_LOCK_PATHS        space-separated lock files to sweep
-#                         (default: <repo>/.specstory/history/.git/index.lock)
+#                         (default: <history repo git dir>/index.lock)
 #   LSL_LOCK_STALE_SECS   min age in seconds before a lock is eligible (default 90)
 #
 # Mirrors scripts/sub-agent-sweep-job.sh conventions (Phase 54 LSL hardening).
 
 REPO_ROOT="${CODING_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 STALE_SECS="${LSL_LOCK_STALE_SECS:-90}"
-# Ask git where the history repo's git dir is rather than assuming it: with the
-# history in the data home, .specstory/history is a symlink and the repo may be
-# the whole data home (.git one level ABOVE history/), not history/ itself.
-HISTORY_GIT_DIR="$(git -C "${REPO_ROOT}/.specstory/history" rev-parse --absolute-git-dir 2>/dev/null || true)"
+# Ask git where the history repo's git dir is rather than assuming it: the
+# history dir (.coding/history, T9) sits inside the learning checkout, whose
+# .git is one level ABOVE history/, not history/ itself.
+# shellcheck source=lib/history-dir.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/history-dir.sh"
+HISTORY_DIR="$(repo_history_dir "${REPO_ROOT}")"
+HISTORY_GIT_DIR="$(git -C "${HISTORY_DIR}" rev-parse --absolute-git-dir 2>/dev/null || true)"
 case "${HISTORY_GIT_DIR}" in
   # Not the tools repo's own .git — a history with no checkout resolves to it.
   ""|"$(git -C "${REPO_ROOT}" rev-parse --absolute-git-dir 2>/dev/null)")
-    HISTORY_GIT_DIR="${REPO_ROOT}/.specstory/history/.git" ;;
+    HISTORY_GIT_DIR="${HISTORY_DIR}/.git" ;;
 esac
 DEFAULT_LOCK="${HISTORY_GIT_DIR}/index.lock"
 LOCK_PATHS="${LSL_LOCK_PATHS:-${DEFAULT_LOCK}}"

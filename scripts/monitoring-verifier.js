@@ -31,6 +31,7 @@ import { spawn, exec } from 'child_process';
 import { promisify } from 'util';
 import { fileURLToPath } from 'url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
+import { repoHistoryDir } from '../lib/history/paths.cjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -229,10 +230,10 @@ class MonitoringVerifier {
       const projectName = path.basename(this.projectPath);
 
       // Verify .specstory directory exists
-      const specstoryPath = path.join(this.projectPath, '.specstory', 'history');
+      const specstoryPath = repoHistoryDir(this.projectPath);
       if (!fs.existsSync(specstoryPath)) {
         fs.mkdirSync(specstoryPath, { recursive: true });
-        this.log(`Created .specstory/history for ${projectName}`);
+        this.log(`Created ${specstoryPath} for ${projectName}`);
       }
 
       this.results.projectRegistration = {

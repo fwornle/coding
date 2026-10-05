@@ -11,6 +11,7 @@ import { fileURLToPath } from 'url';
 import os from 'os';
 import { AutoInsightTrigger } from './auto-insight-trigger.js';
 import ConfigurableRedactor from '../src/live-logging/ConfigurableRedactor.js';
+import { repoHistoryDir } from '../lib/history/paths.cjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -217,7 +218,7 @@ class PostSessionLogger {
       const locations = [
         {
           name: 'local project',
-          path: path.join(this.projectPath, '.specstory', 'history'),
+          path: repoHistoryDir(this.projectPath),
           filePattern: (today) => (file) => {
             return (file.includes(today) && 
                     (file.includes('live-transcript') || 
@@ -229,7 +230,7 @@ class PostSessionLogger {
         },
         {
           name: 'coding repo',
-          path: path.join(this.codingRepo, '.specstory', 'history'), 
+          path: repoHistoryDir(this.codingRepo), 
           filePattern: (today) => (file) => {
             return (file.includes(today) && 
                     (file.includes('live-transcript') || 
@@ -369,7 +370,7 @@ class PostSessionLogger {
     const routingMarker = isRerouted ? '-rerouted' : '';
 
     const filename = `${date}_${time}_post-logged-${suffix}${routingMarker}.md`;
-    const logPath = path.join(targetRepo, '.specstory', 'history', filename);
+    const logPath = path.join(repoHistoryDir(targetRepo), filename);
 
     // Ensure directory exists
     const historyDir = path.dirname(logPath);

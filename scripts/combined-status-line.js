@@ -25,6 +25,7 @@ import { markClickable, buildProjectTag, decorate as decorateClickable } from '.
 import { loadFeatures } from '../lib/features/index.mjs';
 import { isToolsRepo } from '../lib/scope/index.mjs';
 import { restartingServices } from '../lib/health/deliberate-restart.mjs';
+import { repoHistoryDir } from '../lib/history/paths.cjs';
 
 const { statusLeftReserveCells } = paneCacheKey;
 
@@ -420,8 +421,8 @@ class CombinedStatusLine {
       const today = new Date().toISOString().split('T')[0];
       const targetProject = process.env.TRANSCRIPT_SOURCE_PROJECT || process.cwd();
       const checkDirs = [
-        join(rootDir, '.specstory/history'),           // Coding repo
-        join(targetProject, '.specstory/history')      // Target project
+        repoHistoryDir(rootDir),           // Coding repo
+        repoHistoryDir(targetProject)      // Target project
       ];
       
       // Look specifically for current tranche session files (recurse YYYY/MM)
@@ -1381,10 +1382,10 @@ class CombinedStatusLine {
             } catch { /* try next candidate */ }
           }
           // OpenCode / specstory transcripts — these live in the project's
-          // .specstory/history/<YYYY>/<MM>/ dir as .md files, written in
+          // history dir (.coding/history/<YYYY>/<MM>/) as .md files, written in
           // real time by OpenCode sessions.
           for (const projectPath of candidates) {
-            const specstoryDir = join(projectPath, '.specstory', 'history');
+            const specstoryDir = repoHistoryDir(projectPath);
             if (!existsSync(specstoryDir)) continue;
             try {
               const now = new Date();
@@ -1610,7 +1611,7 @@ class CombinedStatusLine {
           }
           // OpenCode .specstory transcripts
           for (const projectPath of candidates) {
-            const specDir = join(projectPath, '.specstory', 'history');
+            const specDir = repoHistoryDir(projectPath);
             if (!existsSync(specDir)) continue;
             try {
               const now = new Date();

@@ -4267,7 +4267,7 @@ ORDER BY m.time_created ASC;`;
         if (!/[\\/](?:\.coding|\.specstory)[\\/](?:history|logs)[\\/]/.test(sessionFile)) continue;
         try {
           const { exec } = await import('child_process');
-          // LSL files live in a NESTED git repo (.specstory/history/.git) and are
+          // LSL files live in a NESTED git repo (the learning checkout <repo>/.coding/) and are
           // gitignored in the MAIN repo — so `git add` from the project root is
           // rejected ("paths are ignored by .gitignore"). Run git from the file's
           // own directory so git resolves to the nearest enclosing repo (the

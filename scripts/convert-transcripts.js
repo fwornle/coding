@@ -37,9 +37,9 @@ Options:
 Examples:
   node scripts/convert-transcripts.js claude ~/.claude/projects/logs/transcript.jsonl
   node scripts/convert-transcripts.js copilot ~/.config/github-copilot/events.jsonl
-  node scripts/convert-transcripts.js specstory .specstory/history/
-  node scripts/convert-transcripts.js specstory .specstory/history/2026-03-30_1500-1600_abc.md
-  node scripts/convert-transcripts.js specstory .specstory/history/ --force
+  node scripts/convert-transcripts.js specstory .coding/history/
+  node scripts/convert-transcripts.js specstory .coding/history/2026-03-30_1500-1600_abc.md
+  node scripts/convert-transcripts.js specstory .coding/history/ --force
 `.trim();
 
 // --- Argument Parsing ---

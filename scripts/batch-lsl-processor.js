@@ -36,6 +36,7 @@ import { runIfMain } from '../lib/utils/esm-cli.js';
 import ConfigurableRedactor from '../src/live-logging/ConfigurableRedactor.js';
 import { isToolsRepo } from '../lib/scope/index.mjs';
 import { isEnabled as featureEnabled } from '../lib/features/index.mjs';
+import { repoHistoryDir } from '../lib/history/paths.cjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -105,7 +106,7 @@ class BatchLSLProcessor {
     this.userHash = userHash; // Store for use in regenerate method
     // Built only when a redirect decision is possible. Its whole subject is
     // that decision, and initializeLogFile() creates a
-    // .specstory/history/logs/classification tree in whatever project it is
+    // <history>/logs/classification tree in whatever project it is
     // pointed at — so an install with the redirect off would grow an empty
     // one in every project it ever batch-processes. Same gate as the ETM.
     this.classificationLogger = this.classificationBypassed
@@ -373,7 +374,7 @@ class BatchLSLProcessor {
   async regenerateMarkdownFromJsonl(datePattern) {
     console.log(`🔄 Regenerating markdown from JSONL files matching: ${datePattern || 'all'}`);
 
-    const classificationLogDir = path.join(this.projectPath, '.specstory', 'history', 'logs', 'classification');
+    const classificationLogDir = path.join(repoHistoryDir(this.projectPath), 'logs', 'classification');
 
     // Find all JSONL files (recurses YYYY/MM subdirs and flat root)
     const jsonlFiles = lslListAll(classificationLogDir, (name) => name.endsWith('.jsonl'))
@@ -1055,10 +1056,10 @@ class BatchLSLProcessor {
       let targetBase;
       if (fileType === 'foreign') {
         // Foreign files go to coding repo
-        targetBase = path.join(this.codingRepo, '.specstory', 'history');
+        targetBase = repoHistoryDir(this.codingRepo);
       } else {
         // Local files go to project directory
-        targetBase = path.join(this.projectPath, '.specstory', 'history');
+        targetBase = repoHistoryDir(this.projectPath);
       }
 
       // File size control: split into part files when exceeding 200KB
@@ -1131,8 +1132,8 @@ class BatchLSLProcessor {
       // so the substring answer was right only by luck. Pairing the root with
       // the directory removes the guess.
       const dirsToCheck = [
-        { root: this.projectPath, dir: path.join(this.projectPath, '.specstory', 'history') },
-        { root: this.codingRepo, dir: path.join(this.codingRepo, '.specstory', 'history') },
+        { root: this.projectPath, dir: repoHistoryDir(this.projectPath) },
+        { root: this.codingRepo, dir: repoHistoryDir(this.codingRepo) },
       ];
 
       for (const { root, dir } of dirsToCheck) {
@@ -1576,13 +1577,13 @@ class BatchLSLProcessor {
     let targetDir;
     if (foreignOnly && classification.isCoding) {
       // Foreign mode: create in coding project
-      targetDir = path.join(this.codingRepo, '.specstory/history');
+      targetDir = repoHistoryDir(this.codingRepo);
     } else if (this.batchMode) {
       // Batch mode: skip local files
       return null;
     } else {
       // Normal mode: create in current project
-      targetDir = path.join(this.projectPath, '.specstory/history');
+      targetDir = repoHistoryDir(this.projectPath);
     }
 
     // Use original generateLSLFilename function from timezone-utils.js
@@ -1802,7 +1803,7 @@ ${foreignOnly ? `**Coding Repository:** ${this.codingRepo}` : ''}
   }
 
   async findExistingLSLFiles(start, end) {
-    const historyDir = path.join(this.projectPath, '.specstory/history');
+    const historyDir = repoHistoryDir(this.projectPath);
     if (!fs.existsSync(historyDir)) {
       return [];
     }

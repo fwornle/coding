@@ -13,6 +13,7 @@ import crypto from 'crypto';
 import yaml from 'js-yaml';
 import { fileURLToPath } from 'url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
+import { repoHistoryDir } from '../lib/history/paths.cjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -214,10 +215,10 @@ class LSLConfigValidator {
   async validateDirectoryStructure() {
     console.log('📁 Validating directory structure...');
 
+    const historyDir = path.relative(this.projectPath, repoHistoryDir(this.projectPath));
     const requiredDirs = [
-      '.specstory',
-      '.specstory/history',
-      '.specstory/history/logs',
+      historyDir,
+      path.join(historyDir, 'logs'),
       '.specstory/config'
     ];
 
@@ -521,7 +522,7 @@ class LSLConfigValidator {
     console.log(`   ✅ USER hash: ${userHash} (from USER="${user}")`);
 
     // Check for potential hash collisions in existing files
-    const historyDir = path.join(this.projectPath, '.specstory', 'history');
+    const historyDir = repoHistoryDir(this.projectPath);
     if (fs.existsSync(historyDir)) {
       const files = fs.readdirSync(historyDir).filter(f => f.endsWith('.md'));
       const hashesInFiles = new Set();
@@ -766,7 +767,7 @@ class LSLConfigValidator {
     console.log('🚀 Analyzing performance optimization opportunities...');
 
     // Analyze current LSL files for optimization opportunities
-    const historyDir = path.join(this.projectPath, '.specstory', 'history');
+    const historyDir = repoHistoryDir(this.projectPath);
     if (fs.existsSync(historyDir)) {
       const files = fs.readdirSync(historyDir).filter(f => f.endsWith('.md'));
       let totalSize = 0;
@@ -907,7 +908,7 @@ class LSLConfigValidator {
   checkFilePermissionCompliance() {
     const criticalPaths = [
       this.configDir,
-      path.join(this.projectPath, '.specstory', 'history', 'logs'),
+      path.join(repoHistoryDir(this.projectPath), 'logs'),
       this.lslConfigPath,
       this.redactionConfigPath
     ];
@@ -943,7 +944,7 @@ class LSLConfigValidator {
   }
 
   checkLogRetentionCompliance() {
-    const logDir = path.join(this.projectPath, '.specstory', 'history', 'logs');
+    const logDir = path.join(repoHistoryDir(this.projectPath), 'logs');
     if (!fs.existsSync(logDir)) {
       return { compliant: true, message: 'No logs directory (compliant by default)' };
     }
@@ -971,7 +972,7 @@ class LSLConfigValidator {
 
   checkSensitiveDataExposure() {
     // Check for sensitive patterns in recent LSL files
-    const historyDir = path.join(this.projectPath, '.specstory', 'history');
+    const historyDir = repoHistoryDir(this.projectPath);
     if (!fs.existsSync(historyDir)) {
       return { compliant: true, message: 'No history files to check' };
     }

@@ -191,7 +191,7 @@ addresses the old path. Goal: nothing addresses it; new repos get no `.specstory
       `repoOfHistoryDir`) and its bash twin `scripts/lib/history-dir.sh` — `.coding/history`,
       or a REAL legacy `.specstory/history` while a repo has no `.coding/` yet; never resolves
       through the symlink. `tests/history/paths.test.mjs` keeps the twins equal (mutation-checked).
-- [ ] Cut every caller over (93 code files / 337 refs in coding; 14 files in semantic-analysis,
+- [x] Cut every caller over (93 code files / 337 refs in coding; 14 files in semantic-analysis,
       km-core, constraint-monitor, memory-visualizer) — writers first (ETM, sub-agent writers,
       exporters), then readers (obs-api LSL routes, dashboard, `/sl`, tools).
       **Batch 1 done:** ETM (write path, project validation accepts `.coding/`, git auto-track
@@ -200,6 +200,19 @@ addresses the old path. Goal: nothing addresses it; new repos get no `.specstory
       v2, a v1 cache still answers) used by obs-api + dashboard. Live: all three ETMs respawned on
       the new code; coding's next prompt set landed in `.coding/history/` and was staged; LSL
       sessions list coding + a2a-xpr + rec.
+      **Batch 2 done:** the readers and tools — classification logger (incl. its `file://`
+      links), batch processor, status line, dashboard LSL sessions (container gets
+      `lib/history` mounted ro), OperationalLogger / live-logging coordinator / LSLFileManager /
+      scan-and-convert (either layout), lock sweeper, validators, finders, adapters;
+      `agent-common-setup.sh` no longer `mkdir`s a real `.specstory/history` on launch, no
+      longer edits the project's tracked `.gitignore` (`ensure_specstory_logs_tracked` removed),
+      and its session reminder works again (tranches, by filename); `bin/coding` treats a cwd
+      inside `<project>/.coding/` as the project's launch; workspace/VS Code point at `.coding`;
+      semantic-analysis `lslHistoryRoot` follows the same rule; constraint-monitor test tools.
+      Left on purpose: discovery/teams markers and `strip_history_dir` (recognise the legacy
+      layout), migration tools (`repo-link`, `init-history`, `migrate-*`, `backfill-lsl-to-pi`),
+      km-core fixtures, `.specstory/config` (not history). Dead, not migrated:
+      `knowledge-management/ukb-original`, `scripts/start-auto-logger.sh` — delete?
 - [x] `ensure_coding_runtime_ignored` writes `.git/info/exclude`, never the project's tracked
       `.gitignore` (it appended nine lines to every repo on launch, and re-added
       `.specstory/history/` in coding itself on 2026-10-04); non-git dirs are left alone.

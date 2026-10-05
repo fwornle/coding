@@ -10,7 +10,7 @@
  * observed: a 9.8MB single file (`...1600-1700-99_c197ef.md`).
  *
  * This script finds every oversized LSL file under
- * `.specstory/history/{YYYY}/{MM}/` and splits it at prompt-set anchor
+ * `<repo>/.coding/history/{YYYY}/{MM}/` and splits it at prompt-set anchor
  * boundaries (`<a name="ps_*">`) into multiple ≤maxSizeBytes parts named
  * `<base>.md`, `<base>-1.md`, `<base>-2.md`, ... matching the ETM's
  * forward-flowing naming convention.
@@ -30,7 +30,7 @@
  *   --apply      Execute the plan against disk.
  *   --max-kb=N   Override maxSizeKB (default: 200, matching
  *                config/live-logging-config.json max_lsl_file_size_kb).
- *   --root=PATH  Override `.specstory/history/` root (for testing).
+ *   --root=PATH  Override the history root (for testing).
  *   --year=YYYY  Limit scan to one year (e.g. --year=2026).
  *
  * Safety:
@@ -45,6 +45,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { repoHistoryDir } from '../lib/history/paths.cjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -59,7 +60,7 @@ const MAX_KB = (() => {
 })();
 const ROOT = (() => {
   const a = args.find((x) => x.startsWith('--root='));
-  return a ? path.resolve(a.slice('--root='.length)) : path.join(REPO_ROOT, '.specstory', 'history');
+  return a ? path.resolve(a.slice('--root='.length)) : repoHistoryDir(REPO_ROOT);
 })();
 const YEAR_FILTER = (() => {
   const a = args.find((x) => x.startsWith('--year='));

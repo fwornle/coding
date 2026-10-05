@@ -115,6 +115,9 @@ services:
       # <data home>/var/projects.json and maps its paths onto /workspace), and
       # the vendored YAML parser lib/teams/config.cjs loads.
       - ${CODING_REPO:-.}/lib/teams:/coding/lib/teams:ro
+      # Where a repo's transcripts live (T9, lib/history/paths.cjs) — the
+      # dashboard's LSL session listing resolves through it.
+      - ${CODING_REPO:-.}/lib/history:/coding/lib/history:ro
       # Knowledge-export layout (T4): the container's stores read every
       # project's export through it (lib/kb/layout.mjs, 'local' mode).
       - ${CODING_REPO:-.}/lib/kb:/coding/lib/kb:ro

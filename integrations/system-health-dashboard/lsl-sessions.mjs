@@ -25,6 +25,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { discoveredProjects } from '../../lib/teams/discover.mjs';
+import { repoHistoryDir } from '../../lib/history/paths.cjs';
 
 import {
   groupChains, concatChain, parseChain, partAt,
@@ -62,7 +63,7 @@ function parseChainId(id) {
 export function discoverProjects(codingRoot) {
   const out = [];
   for (const repo of discoveredProjects({ codingRoot, marker: 'history' })) {
-    const hist = path.join(repo.path, '.specstory', 'history');
+    const hist = repoHistoryDir(repo.path);
     if (!fs.existsSync(hist)) continue;
     if (!out.some((p) => p.project === repo.name)) out.push({ project: repo.name, history: hist });
   }

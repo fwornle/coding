@@ -155,7 +155,7 @@ if [[ -f "$SHARED_MEMORY" ]]; then
 
 4. **Verify logging is working:**
    - Check if today's session is being logged
-   - Ensure appropriate .specstory/history location
+   - Ensure the repo's history dir (.coding/history)
 
 ## ⚠️ FAILURE TO FOLLOW = ARCHITECTURAL MISTAKES ⚠️
 
@@ -201,10 +201,13 @@ if [[ -f "$POST_SESSION_LOGGER" ]]; then
 
         # Check if LSL captured the session (look for recent .md files with correct naming pattern)
         local session_found=false
+        source "$CODING_REPO_DIR/scripts/lib/history-dir.sh"
         for project_dir in "$(pwd)" "$CODING_REPO_DIR"; do
-            if [[ -d "$project_dir/.specstory/history" ]]; then
-                # LSL files are named: YYYY-MM-DD_HHMM-HHMM_<hash>.md
-                local recent_files=$(find "$project_dir/.specstory/history" -name "*.md" -newermt '10 minutes ago' 2>/dev/null | head -1)
+            local history_dir
+            history_dir="$(repo_history_dir "$project_dir")"
+            if [[ -d "$history_dir" ]]; then
+                # LSL files are named: YYYY-MM-DD_HHMM-HHMM_<hash>.{md,jsonl}
+                local recent_files=$(find "$history_dir" \( -name "*.md" -o -name "*.jsonl" \) -newermt '10 minutes ago' 2>/dev/null | head -1)
                 if [[ -n "$recent_files" ]]; then
                     session_found=true
                     break

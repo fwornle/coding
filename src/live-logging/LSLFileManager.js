@@ -723,7 +723,8 @@ class LSLFileManager extends EventEmitter {
       const directories = new Set();
       for (const [filePath] of this.watchedFiles.entries()) {
         const dir = path.dirname(filePath);
-        if (dir.includes('.specstory/history')) {
+        // .coding/history (T9) or a legacy .specstory/history not migrated yet
+        if (/[\\/](?:\.coding|\.specstory)[\\/]history(?:[\\/]|$)/.test(dir)) {
           directories.add(dir);
         }
       }

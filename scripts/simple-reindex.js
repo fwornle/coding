@@ -19,6 +19,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { glob } from 'glob';
 import { getFastEmbeddingGenerator } from './fast-embedding-generator.js';
+import { repoHistoryDir } from '../lib/history/paths.cjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -225,7 +226,7 @@ class RepositoryIndexer {
   async indexLSLSessions() {
     console.log(`🔍 Finding LSL session files in ${this.projectPath}...`);
 
-    const lslDir = path.join(this.projectPath, '.specstory', 'history');
+    const lslDir = repoHistoryDir(this.projectPath);
 
     if (!fs.existsSync(lslDir)) {
       console.error(`❌ LSL directory not found: ${lslDir}`);

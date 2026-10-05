@@ -129,7 +129,7 @@ export async function listEtms(opts = {}) {
  *
  * This exists because the coordinator's own reap cannot cover every case: turn
  * `lsl` and `health` off in one change and the coordinator is stopped in the
- * same pass, leaving detached ETMs writing .specstory/history indefinitely —
+ * same pass, leaving detached ETMs writing session history indefinitely —
  * measured at two of them, up 8-9 hours, under `minimal`.
  *
  * SIGTERM so the ETM's shutdown handler runs; a dead pid is success, not an

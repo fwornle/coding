@@ -12,11 +12,12 @@
  * already rotates on size via getActiveSessionFilePath(); this script exists
  * only to repair the legacy corpus.
  * 
- * Usage: node scripts/split-lsl-files.js [--dry-run] [--max-kb=200] [--dir=.specstory/history]
+ * Usage: node scripts/split-lsl-files.js [--dry-run] [--max-kb=200] [--dir=<repo>/.coding/history]
  */
 
 const fs = require('fs');
 const path = require('path');
+const { repoHistoryDir } = require('../lib/history/paths.cjs');
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
@@ -25,7 +26,7 @@ const dirArg = args.find(a => a.startsWith('--dir='));
 
 const MAX_SIZE_KB = maxKbArg ? parseInt(maxKbArg.split('=')[1]) : 200;
 const MAX_SIZE = MAX_SIZE_KB * 1024;
-const HISTORY_DIR = dirArg ? dirArg.split('=')[1] : path.join(__dirname, '..', '.specstory', 'history');
+const HISTORY_DIR = dirArg ? dirArg.split('=')[1] : repoHistoryDir(path.join(__dirname, '..'));
 
 // Match base LSL filenames: YYYY-MM-DD_HHMM-HHMM_hash[_from-project].md
 const BASE_FILE_RE = /^(\d{4}-\d{2}-\d{2}_\d{4}-\d{4})_([a-z0-9]{6}(?:_from-[a-zA-Z0-9_-]+)?)\.md$/;

@@ -9,13 +9,10 @@
   "git.repositoryScanIgnoredFolders": [
     "node_modules",
     ".specstory",
-    ".specstory/history",
-    ".specstory/history/.git"
+    ".coding"
   ],
   "git.ignoredRepositories": [
-    "${workspaceFolder}/.specstory/history",
-    "${workspaceFolder}/.specstory/history/.git",
-    ".specstory/history",
-    ".specstory/history/.git"
+    "${workspaceFolder}/.coding",
+    ".coding"
   ]
 }

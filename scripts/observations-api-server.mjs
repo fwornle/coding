@@ -3784,9 +3784,8 @@ app.get('/api/coding/observations/stream', (req, res) => {
 
 // ── Phase 55 Plan 06 Task 3: GET /api/coding/lsl/sessions ─────────────────
 //
-// Walks the LSL history directory (env-overridable for tests via
-// OBSERVATIONS_LSL_HISTORY_DIR; defaults to `.specstory/history` relative
-// to REPO_ROOT). Parses the Phase 51 filename convention:
+// Walks each repo's LSL history directory (lib/history/paths.cjs:
+// `<repo>/.coding/history`). Parses the Phase 51 filename convention:
 //   {YYYY-MM-DD}_{HHMM-HHMM}[-{idx}][_S{slot}-{sub-idx}-{sub-hash}][_partN]_{hash}.{md,jsonl}
 // per `.planning/phases/51-.../51-CONTEXT.md`. For each session, derives:
 //   - `id` from the hash group
