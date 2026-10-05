@@ -11,12 +11,12 @@
 #   └── kb/                           knowledge exports, insight documents
 #       └── insights/                 UKB insight documents + their images
 #
-#   <coding>/.specstory/history            →  ../.coding/history     (symlink)
 #   <coding>/knowledge-management/insights →  ../.coding/kb/insights (symlink)
 #
-# Both symlinks keep every writer that addresses the old path working
-# unchanged (the ETM, semantic-analysis, obs-api, the viewer). Both paths are
-# gitignored in this repo, so a UKB run leaves `git status` clean here.
+# The symlink keeps every writer that addresses the old insights path working
+# unchanged (semantic-analysis, obs-api, the viewer). Transcripts need none:
+# every reader resolves .coding/history (T9). Both paths are gitignored in this
+# repo, so a UKB run leaves `git status` clean here.
 #
 # The checkout itself is lib/history/repo-link.mjs's job — the same code every
 # other repo goes through. CODING_HISTORY_REPO (written to .env by install.sh)

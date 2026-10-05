@@ -1,8 +1,8 @@
 /**
  * bin/init-history.sh sets up the tools repo's own learning checkout — the
  * tools repo is an ordinary linked repo since per-repo tenancy T7:
- * `<coding>/.coding/` (history/ + kb/), `.specstory/history` and
- * `knowledge-management/insights` symlinks into it.
+ * `<coding>/.coding/` (history/ + kb/), `knowledge-management/insights` a
+ * symlink into it. `.specstory/history` is migrated and never re-linked (T9).
  *
  * Behavioural: the script runs on every `bin/coding` launch and moves the most
  * private data this system holds, so the properties that matter — the
@@ -91,8 +91,7 @@ beforeEach(() => {
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 
 function assertLinks() {
-  assert.ok(lstatSync(link()).isSymbolicLink(), '.specstory/history must be a symlink');
-  assert.equal(readlinkSync(link()), join('..', '.coding', 'history'));
+  assert.ok(!lstatSync(link(), { throwIfNoEntry: false }), 'no .specstory/history symlink (T9)');
   assert.ok(lstatSync(insights()).isSymbolicLink(), 'knowledge-management/insights must be a symlink');
   assert.equal(readlinkSync(insights()), join('..', '.coding', 'kb', 'insights'));
   assert.ok(existsSync(join(checkout(), 'history', 'logs', 'classification')));
@@ -117,7 +116,7 @@ describe('bin/init-history.sh', () => {
     setRemote(url);
     run();
     assertLinks();
-    assert.equal(readFileSync(join(link(), '2026', '10', 's.jsonl'), 'utf8'), 'session');
+    assert.equal(readFileSync(join(checkout(), 'history', '2026', '10', 's.jsonl'), 'utf8'), 'session');
     assert.equal(readFileSync(join(checkout(), 'kb', 'notes.json'), 'utf8'), '{}');
     assert.match(registry(), new RegExp(url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   });
@@ -127,7 +126,7 @@ describe('bin/init-history.sh', () => {
     setRemote(url);
     run();
     assertLinks();
-    assert.equal(readFileSync(join(link(), '2026', '09', 'old.md'), 'utf8'), 'old');
+    assert.equal(readFileSync(join(checkout(), 'history', '2026', '09', 'old.md'), 'utf8'), 'old');
     assert.equal(git(checkout(), 'status', '--porcelain'), '');
     assert.notEqual(git(checkout(), 'rev-parse', 'HEAD'), git(checkout(), 'rev-parse', 'origin/main'), 'restructure is local');
   });
@@ -140,7 +139,7 @@ describe('bin/init-history.sh', () => {
     writeFileSync(join(checkout(), 'session-state.json'), '{}');
     run();
     assertLinks();
-    assert.equal(readFileSync(join(link(), '2026', '10', 'mine.md'), 'utf8'), 'precious');
+    assert.equal(readFileSync(join(checkout(), 'history', '2026', '10', 'mine.md'), 'utf8'), 'precious');
     assert.ok(existsSync(join(checkout(), 'runtime', 'features.json')));
     assert.doesNotMatch(git(checkout(), 'ls-files'), /runtime\/|session-state/);
     assert.equal(git(checkout(), 'status', '--porcelain'), '');

@@ -152,7 +152,7 @@ repo|$CODING_REPO/.git/hooks/pre-commit|replace|yes|knowledge-snapshot guard (or
 repo|$CODING_REPO/lib/km-core|checkout|yes|git submodule required for session logging
 repo|$CODING_REPO/.coding/|create|yes|per-launch agent config, so nothing global has to change
 repo|$CODING_REPO/integrations/unified-viewer/dist|create|yes|the knowledge viewer's build, served by obs-api at /viewer/ and opened by `vkb` [feature:knowledge]
-repo|$CODING_REPO/.specstory/history|symlink|yes|points at history/ in your data home below, so this checkout holds no transcripts of its own. A pre-existing history directory here is left as it is [feature:lsl]
+repo|$CODING_REPO/.coding/history|create|yes|this checkout's session transcripts, in its own learning repo (ignored by this repo). An older .specstory/history here is moved into it [feature:lsl]
 home|~/.coding/features.yaml|create|yes|which tier (or features) of coding you chose to install
 home|~/.coding/scope|create|no|which tenant owns this machine's knowledge; also names the data root below. Not written if you decline to name one, and never overwritten
 home|~/.coding/data/<scope>/|create|no|your knowledge base and session history, optionally a checkout of YOUR private <scope>-history repo (cloned if it exists, never pushed without confirmation). uninstall.sh never deletes it — removing the scope while leaving this would strand the data behind an unresolvable name
@@ -3983,8 +3983,8 @@ setup_history_repo() {
       history/YYYY/MM/<file>     verbatim session transcripts
       history/logs/              classification + operational logs
       kb/                        knowledge exports and insight documents
-  (.specstory/history and knowledge-management/insights are symlinks
-  into it.) Every other repo you run coding in gets the same layout.
+  (knowledge-management/insights is a symlink into it.) Every other
+  repo you run coding in gets the same layout.
 
   Back it with a SEPARATE PRIVATE repo so conversation content
   (including occasional unredacted secrets, internal paths, stakeholder

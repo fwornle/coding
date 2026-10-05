@@ -7,7 +7,7 @@
 
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, lstatSync, readlinkSync, rmSync, realpathSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, lstatSync, symlinkSync, rmSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -67,9 +67,8 @@ function seededRemote(base, name, files) {
 }
 
 function assertLayout(project) {
-  const l = join(project, '.specstory', 'history');
-  assert.ok(lstatSync(l).isSymbolicLink(), '.specstory/history is a symlink');
-  assert.equal(readlinkSync(l), join('..', '.coding', 'history'));
+  // T9: nothing addresses the legacy path, so no .specstory/ is created.
+  assert.ok(!existsSync(join(project, '.specstory')), 'no .specstory/ of our making');
   for (const p of ['history', 'kb', 'README.md', '.gitignore']) {
     assert.ok(existsSync(join(project, '.coding', p)), `.coding/${p}`);
   }
@@ -118,7 +117,7 @@ describe('an existing remote is cloned and shared', () => {
     const r = await link.ensure(project, { ...opts, ask: async () => remote });
     assert.equal(r.action, 'cloned');
     assertLayout(project);
-    assert.equal(readFileSync(join(project, '.specstory', 'history', '2026', '09', '2026-09-01_0900-1000_ab.md'), 'utf8'), 'turn\n');
+    assert.equal(readFileSync(join(project, '.coding', 'history', '2026', '09', '2026-09-01_0900-1000_ab.md'), 'utf8'), 'turn\n');
     assert.equal(readFileSync(join(project, '.coding', 'kb', 'insights.json'), 'utf8'), '[]\n');
   });
 
@@ -231,7 +230,23 @@ describe('migration from the older layouts', () => {
     // .specstory/history/ ignored the old way, as ensure_coding_runtime_ignored writes it.
     await link.ensure(project, { ...opts, auto: 'no' });
     assert.ok(existsSync(join(project, '.coding', 'history', '2026', '02', 'p.md')));
-    assert.ok(lstatSync(join(project, '.specstory', 'history')).isSymbolicLink());
+    assert.ok(!existsSync(join(project, '.specstory', 'history')), 'the emptied legacy dir is gone, no symlink in its place');
+  });
+
+  test('the symlink an earlier launch created is removed; a foreign one is left', async () => {
+    const { project, opts } = fixture();
+    mkdirSync(join(project, '.coding', 'history'), { recursive: true });
+    mkdirSync(join(project, '.specstory'), { recursive: true });
+    symlinkSync(join('..', '.coding', 'history'), join(project, '.specstory', 'history'));
+    await link.ensure(project, { ...opts, auto: 'no' });
+    assert.ok(!existsSync(join(project, '.specstory')), 'link and the emptied .specstory/ removed');
+
+    const other = fixture();
+    mkdirSync(join(other.project, '.specstory'), { recursive: true });
+    symlinkSync(other.base, join(other.project, '.specstory', 'history'));
+    writeFileSync(join(other.project, '.specstory', 'keep.json'), '{}');
+    await link.ensure(other.project, { ...other.opts, auto: 'no' });
+    assert.ok(lstatSync(join(other.project, '.specstory', 'history')).isSymbolicLink(), 'not ours: left alone');
   });
 
   test('migrated transcripts are committed locally but never pushed on seeding', async () => {

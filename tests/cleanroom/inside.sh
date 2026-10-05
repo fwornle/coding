@@ -169,21 +169,22 @@ diff -q "$OUT/sentinel.before" "$OUT/sentinel.after" >/dev/null \
 [ ! -e "$DATA/default" ] && pass "nothing was filed under the placeholder scope" \
   || fail "a data home exists for the placeholder: $DATA/default"
 
-# History: the tools repo is an ordinary linked repo (T7) — its own slot is a
-# symlink into its learning checkout, <tools>/.coding/history.
+# History: the tools repo is an ordinary linked repo (T7) — its transcripts are
+# in its learning checkout, <tools>/.coding/history, and nothing re-creates the
+# legacy .specstory/history path (T9).
 link="$TOOLS/.specstory/history"
 TH="$TOOLS/.coding/history"
-if [ -L "$link" ] && [ "$(readlink "$link")" = "../.coding/history" ]; then
-  pass ".specstory/history → ../.coding/history"
+if [ ! -e "$link" ] && [ ! -L "$link" ]; then
+  pass "no .specstory/history in the tools checkout"
 else
-  fail ".specstory/history is not a symlink into ../.coding/history ($(ls -ld "$link" 2>&1))"
+  fail ".specstory/history exists in the tools checkout ($(ls -ld "$link" 2>&1))"
 fi
 
 # Session logs: each landed with its own project, and only there.
 has_probe() { grep -rlF "$1" "$2" 2>/dev/null | grep -v '/logs/' | head -1; }
-f="$(has_probe 'cleanroom-outside' "$PROJECT/.specstory/history")"
+f="$(has_probe 'cleanroom-outside' "$PROJECT/.coding/history")"
 [ -n "$f" ] && pass "the outside project's session landed in the outside project ($f)" \
-  || fail "the outside project's session is not in $PROJECT/.specstory/history (see lsl-outside.log)"
+  || fail "the outside project's session is not in $PROJECT/.coding/history (see lsl-outside.log)"
 [ -z "$(has_probe 'cleanroom-outside' "$TH")" ] \
   && pass "the outside project's session was NOT redirected into the tools history" \
   || fail "the outside project's session was redirected into $TH"

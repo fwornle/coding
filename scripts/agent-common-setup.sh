@@ -123,7 +123,7 @@ export -f ensure_coding_runtime_ignored
 # PER-REPO LEARNING REPO
 # ==============================================================================
 # Ensure <project>/.coding/ — the project's private <project>-history checkout
-# (history/ + kb/), with .specstory/history a symlink into it. The whole flow
+# (history/ + kb/); an older .specstory/history is migrated into it. The whole flow
 # lives in lib/history/repo-link.mjs (one implementation, also used by
 # bin/init-history.sh); this is only its launcher entry point. The tools repo is
 # no exception: its coding-history checkout is <coding>/.coding/ too.
