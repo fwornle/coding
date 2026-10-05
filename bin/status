@@ -1,10 +1,15 @@
 #!/usr/bin/env node
 
 /**
- * Status Command: Show detailed system status and open dashboard
+ * Status Command: show detailed system status and open the dashboard
+ *
+ *   status             features, status line, constraint details, dashboard links; opens
+ *                      the system health dashboard
+ *   status --no-open   the same, without opening a browser
  */
 
-import { execSync } from 'child_process';
+import { execSync, spawn } from 'child_process';
+import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -28,45 +33,95 @@ async function showDetailedStatus() {
     console.log(`\n🎛️  Features: unreadable — ${error.message}`);
   }
 
+  let features = null;
   try {
-    // Get status line output
-    const output = execSync('node ./scripts/combined-status-line.js', { 
-      encoding: 'utf8', 
-      timeout: 5000,
-      cwd: rootDir
-    });
-    
-    console.log(`\n📊 Current Status: ${output.trim()}`);
-    
-    // Get constraint details
-    const constraintOutput = execSync('node ./integrations/constraint-monitor/src/status/constraint-status-line.js', {
+    const { loadFeatures } = await import('../lib/features/index.mjs');
+    features = new Set(loadFeatures().enabled);
+  } catch { /* reported above; show everything below (fail open, like every display) */ }
+  const on = (id) => !features || features.has(id);
+
+  try {
+    const output = execSync('node ./scripts/combined-status-line.js', {
       encoding: 'utf8',
       timeout: 5000,
       cwd: rootDir
     });
-    
-    const constraintData = JSON.parse(constraintOutput);
-    
-    console.log('\n🛡️  CONSTRAINT MONITOR DETAILS:');
-    console.log(constraintData.tooltip);
-    
-    // Offer to open dashboard
-    console.log('\n🌐 Web Dashboard Available:');
-    console.log('• URL: http://localhost:3001/dashboard');
-    console.log('• Command: ./bin/dashboard');
-    
-    // Auto-open dashboard
-    console.log('\n🚀 Opening dashboard...');
-    execSync(`"${join(rootDir, 'integrations/constraint-monitor/bin/dashboard')}"`, {
-      stdio: 'inherit',
-      timeout: 10000,
-      cwd: rootDir
-    });
-    
+    console.log(`\n📊 Current Status: ${output.trim()}`);
   } catch (error) {
-    console.error('❌ Failed to get status:', error.message);
-    console.log('\n💡 Try running: ./bin/dashboard');
+    console.error(`❌ Status line failed: ${error.message}`);
   }
+
+  if (on('constraints')) {
+    try {
+      const constraintOutput = execSync('node ./integrations/constraint-monitor/src/status/constraint-status-line.js', {
+        encoding: 'utf8',
+        timeout: 5000,
+        cwd: rootDir
+      });
+      console.log('\n🛡️  CONSTRAINT MONITOR DETAILS:');
+      console.log(JSON.parse(constraintOutput).tooltip);
+    } catch (error) {
+      console.error(`❌ Constraint status failed: ${error.message}`);
+    }
+  }
+
+  // The dashboards that exist today (ports from .env.ports): the system health
+  // dashboard, and the constraint monitor's own frontend. The old standalone
+  // constraint dashboard on :3001 and its launcher are gone.
+  const dashboards = [
+    { feature: 'health', name: 'System health dashboard', url: `http://localhost:${port('SYSTEM_HEALTH_DASHBOARD_PORT', 3032)}/` },
+    { feature: 'constraints', name: 'Constraint monitor', url: `http://localhost:${port('CONSTRAINT_DASHBOARD_PORT', 3030)}/` },
+  ].filter((d) => on(d.feature));
+
+  if (!dashboards.length) return;
+  console.log('\n🌐 Web Dashboards:');
+  for (const d of dashboards) {
+    d.up = await reachable(d.url);
+    console.log(`• ${d.name}: ${d.url}${d.up ? '' : '  (not answering — check: coding-features status, docker ps)'}`);
+  }
+
+  const main = dashboards[0];
+  if (process.argv.includes('--no-open') || !main.up) return;
+  console.log(`\n🚀 Opening ${main.name}...`);
+  openUrl(main.url);
+}
+
+/** A port from the environment, else .env.ports, else the documented default. */
+function port(name, fallback) {
+  if (process.env[name]) return process.env[name];
+  try {
+    const m = readFileSync(join(rootDir, '.env.ports'), 'utf8').match(new RegExp(`^${name}=(\\d+)`, 'm'));
+    if (m) return m[1];
+  } catch { /* no .env.ports: use the default */ }
+  return fallback;
+}
+
+async function reachable(url) {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
+    return res.status < 500;
+  } catch {
+    return false;
+  }
+}
+
+/** Same per-platform opener as bin/vkb; prints the URL where there is none. */
+function openUrl(url) {
+  const opener = process.platform === 'darwin' ? ['open', [url]]
+    : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]]
+    : isWsl() && hasCommand('wslview') ? ['wslview', [url]]
+    : hasCommand('xdg-open') ? ['xdg-open', [url]]
+    : null;
+  if (!opener) { console.log(url); return; }
+  spawn(opener[0], opener[1], { stdio: 'ignore', detached: true }).unref();
+}
+
+function isWsl() {
+  try { return /microsoft/i.test(readFileSync('/proc/version', 'utf8')); } catch { return false; }
+}
+
+function hasCommand(cmd) {
+  try { execSync(`command -v ${cmd}`, { stdio: 'ignore' }); return true; } catch { return false; }
 }
 
 showDetailedStatus();
