@@ -410,4 +410,4 @@ const system = new KnowledgeLearningSystem({
 | `.data/ukb-last-run.json` | Incremental processing checkpoint |
 | `.cache/knowledge.db` | SQLite analytics database |
 | Coordinator `state.knowledge_pipeline` slice (`http://localhost:3034/health/state`) | Knowledge extraction health (Phase 33+; supersedes the retired `.health/*-transcript-monitor-health.json`) |
-| `.specstory/config/knowledge-system.json` | Knowledge system configuration |
+| `config/knowledge-system.json` | Knowledge system configuration |

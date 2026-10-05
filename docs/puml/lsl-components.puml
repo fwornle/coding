@@ -44,8 +44,8 @@ package "Data Sources" {
 }
 
 package "Output Files" {
-  database "Local Project\n.specstory/history/" as localfiles <<storage>>
-  database "Coding Infrastructure\ncoding/.specstory/history/" as codingfiles <<storage>>
+  database "Local Project\n.coding/history/" as localfiles <<storage>>
+  database "Coding Infrastructure\ncoding/.coding/history/" as codingfiles <<storage>>
   component "Health Coordinator\nstate.lsl[sid:project]" as healthcoord <<api>>
 }
 
@@ -109,7 +109,7 @@ note right of redactor
   **Security Sanitization (ConfigurableRedactor)**
   - 13 pattern types: API keys, JWT, DB URLs, emails
   - Applied during formatting (live) & pre-write (post-session)
-  - Config: .specstory/config/redaction-patterns.json
+  - Config: config/redaction/redaction-patterns.json
   - Severity levels: low, medium, high, critical
   - Redacts all content types before storage
 end note

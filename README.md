@@ -107,7 +107,7 @@ The `coding` system (this repo) is one of three sibling consumers of the shared 
 - **LLM providers:** `_work/rapid-llm-proxy/bin/start-llm-proxy.sh` (host-side launchd-managed proxy on port 12435 routing through Claude Code, GitHub Copilot, Groq, Anthropic, OpenAI, Gemini, GitHub Models, DMR, Ollama) + `scripts/configure-wave-analysis-routing.sh` (per-process `processOverrides` — routes `wave-analysis-*` through `copilot`, keeps `health-coordinator` / `observation-writer` on `claude-code`).
 - **Ingest adapters:** `src/live-logging/` — `ObservationWriter`, ETM (spawned per project by the health coordinator), the in-process `LslObservationResolver` (30-min sweep inside obs-api), `sub-agent-live-{claude,copilot,opencode}`. All host-side observation writers ingest into the obs-api at `http://localhost:12436` (km-core REST router).
 - **Domain dedup:** `src/live-logging/ObservationWriter.js` — Jaccard text similarity at 0.45, containment threshold 0.7, 4-keyword floor (per the dedup rules in `MEMORY.md > ObservationWriter`).
-- **Redaction:** `src/live-logging/redaction-patterns.json` — PII redaction patterns applied at ingest before any observation is persisted (the 98.3% security-effectiveness surface).
+- **Redaction:** `config/redaction/redaction-patterns.json` — PII redaction patterns applied at ingest before any observation is persisted (the 98.3% security-effectiveness surface).
 
 The `coding` system does NOT own per-agent prompts (that's `semantic-analysis`'s `config/agents/*.json`) and does NOT own RaaS / KPI-FW / business lower ontologies (those are owned by [`operational-knowledge-management`](https://bmw.ghe.com/adpnext-apps/operational-knowledge-management)).
 
@@ -115,7 +115,7 @@ The `coding` system does NOT own per-agent prompts (that's `semantic-analysis`'s
 
 ![Coding system architecture](docs/images/coding-system-architecture.png)
 
-The `coding` host runtime is anchored on a set of launchd-managed daemons (`com.coding.obs-api`, `com.coding.health-coordinator`, `com.coding.llm-cli-proxy`, `com.coding.sub-agent-live-{claude,copilot,opencode}`, `com.coding.sub-agent-sweep`) plus a three-container Docker stack (`coding-services`, Qdrant, Redis) supervised by supervisord — code-graph analysis is served by graphify, a file-based `graph.json` inside `coding-services`. Live conversations land in `.specstory/history/` and flow through the ETM + sub-agent-live writers into `ObservationWriter`, which dedups locally and POSTs to the obs-api at `localhost:12436`. The wave-analysis workflow runs in `semantic-analysis` over SSE on port `3848` and writes the materialized knowledge graph back through the same km-core REST contract. Persistence is the Graphology + LevelDB pair at `.data/knowledge-graph/` with debounced per-domain JSON exports under `.data/knowledge-graph/exports/`. The unified viewer serves the graph at `http://localhost:3032/viewer/coding` against the same REST endpoints.
+The `coding` host runtime is anchored on a set of launchd-managed daemons (`com.coding.obs-api`, `com.coding.health-coordinator`, `com.coding.llm-cli-proxy`, `com.coding.sub-agent-live-{claude,copilot,opencode}`, `com.coding.sub-agent-sweep`) plus a three-container Docker stack (`coding-services`, Qdrant, Redis) supervised by supervisord — code-graph analysis is served by graphify, a file-based `graph.json` inside `coding-services`. Live conversations land in `.coding/history/` and flow through the ETM + sub-agent-live writers into `ObservationWriter`, which dedups locally and POSTs to the obs-api at `localhost:12436`. The wave-analysis workflow runs in `semantic-analysis` over SSE on port `3848` and writes the materialized knowledge graph back through the same km-core REST contract. Persistence is the Graphology + LevelDB pair at `.data/knowledge-graph/` with debounced per-domain JSON exports under `.data/knowledge-graph/exports/`. The unified viewer serves the graph at `http://localhost:3032/viewer/coding` against the same REST endpoints.
 
 ## Where to Edit
 
@@ -126,7 +126,7 @@ The `coding` host runtime is anchored on a set of launchd-managed daemons (`com.
 | A per-process LLM routing override | `scripts/configure-wave-analysis-routing.sh` (or call `POST /api/process-overrides` directly) | `bash scripts/configure-wave-analysis-routing.sh --show` |
 | A new ingest source (writer) | New writer under `src/live-logging/<Writer>.js` + test in `tests/live-logging/*.test.js` | `npm test -- tests/live-logging` |
 | A domain dedup rule change | `src/live-logging/ObservationWriter.js` (Jaccard / containment / keyword constants) | `npm test -- tests/live-logging/observation-writer.test.js` |
-| A new redaction pattern | `src/live-logging/redaction-patterns.json` | `npm test -- tests/live-logging/redaction` |
+| A new redaction pattern | `config/redaction/redaction-patterns.json` | `npm test -- tests/live-logging/redaction` |
 
 Every row gives a path AND a verification command — this table is the SC-1 (5-minute-discoverability) enforcement surface for the coding system.
 
@@ -368,7 +368,7 @@ curl http://localhost:3031/api/violations
 
 ```bash
 # Automatic during Claude Code sessions
-# Session files in .specstory/history/
+# Session files in .coding/history/
 
 # Status line shows:
 📋🟠2130-2230(3min) →coding
@@ -402,7 +402,7 @@ dashboard and do not appear in the status line.
 
 | feature | what it is |
 |---------|------------|
-| `lsl` | verbatim session logging (`.specstory` markdown) |
+| `lsl` | verbatim session logging (`.coding/history/`, `.jsonl`) |
 | `observations` | the observation → digest → insight pipeline |
 | `knowledge` | semantic analysis, UKB workflows, knowledge graph, VKB |
 | `codegraph` | the graphify code knowledge graph |

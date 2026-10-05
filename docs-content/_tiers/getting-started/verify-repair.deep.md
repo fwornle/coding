@@ -191,7 +191,7 @@ cat ~/.claude/settings.json | jq '.mcpServers'
 
 ### LSL Not Recording
 
-**Symptoms**: No files in `.specstory/history/`
+**Symptoms**: No files in `.coding/history/`
 
 **Fix**:
 ```bash
@@ -276,7 +276,7 @@ docker compose -f docker/docker-compose.yml down 2>/dev/null
 pkill -f "coding"
 
 # Remove state files
-rm -rf .data .specstory .health .logs .cache
+rm -rf .data .health .logs .cache
 rm -f .transition-in-progress
 
 # Reinstall

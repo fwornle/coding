@@ -6,14 +6,14 @@ top to bottom direction
 
 rectangle "<Project> Project" as NanoDegree {
   component "Claude Session" as NanoSession
-  folder ".specstory/history" as NanoFiles {
+  folder ".coding/history" as NanoFiles {
     file "1530-1630-session.md" as NanoLSL
   }
   file ".redirect-status" as RedirectStatus
 }
 
 rectangle "Coding Project" as Coding {
-  folder ".specstory/history" as CodingFiles {
+  folder ".coding/history" as CodingFiles {
     file "1530-1630_from-<project>.md" as CodingLSL
   }
 }

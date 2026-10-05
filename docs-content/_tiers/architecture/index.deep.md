@@ -38,7 +38,7 @@ Multi-tier storage for reliability and performance:
 
 - LevelDB (persistent graph storage)
 - JSON exports (git-tracked)
-- `.specstory/history/` (session logs)
+- `.coding/history/` (session logs)
 
 ### 3. Real-Time Quality Enforcement
 

@@ -40,7 +40,7 @@ other.
 
     ## What each system is for
 
-    **[Live Session Logging](lsl.md)** captures every conversation into `.specstory/history/`
+    **[Live Session Logging](lsl.md)** captures every conversation into `.coding/history/`
     without being asked. A five-layer classifier decides which project each piece of content
     belongs to, so work that spans repositories is filed where it will be found again, and a
     redactor strips secrets before anything is written.

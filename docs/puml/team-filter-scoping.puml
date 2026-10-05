@@ -12,7 +12,7 @@ package "Configuration (layers, last wins)" {
   component "CODING_TEAMS=a,b\nenv override" as env <<cli>>
 }
 
-component "lib/teams/discover.mjs\nscan $HOME (depth 4) for git repos\nwith .coding/ or .specstory/history\n→ var/projects.json" as disc <<util>>
+component "lib/teams/discover.mjs\nscan $HOME (depth 4) for git repos\nwith .coding/ (or a legacy\nnot-yet-migrated .specstory/history)\n→ var/projects.json" as disc <<util>>
 
 component "lib/teams/scope.mjs\nprojectsOfTeams(teams) → project ids of their repos\n(a selected id that is no team = a project id)" as scope <<core>>
 

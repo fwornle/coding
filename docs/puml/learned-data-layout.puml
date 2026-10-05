@@ -19,7 +19,6 @@ folder "repo X  (your project — its own git repo, untouched)" as X {
     component "kb/usage/<user_hash>.json\nmeasurements — token usage per day / task,\none file per user (no conflicts)" as usage <<storage>>
     component "kb/insights/*.md  (coding only)\nUKB insight documents + diagrams" as ins <<storage>>
   }
-  component ".specstory/history → ../.coding/history\n(symlink, SpecStory-compatible path)" as link <<util>>
 }
 
 folder "&#126;/.coding/  (per user, per machine)" as home {
@@ -36,10 +35,8 @@ cloud "bmw.ghe.com (private)" as ghe {
   component "<you>/X-history.git" as remote <<external>>
 }
 
-link .[#757575].> hist : points to
-
 ' stack vertically: the page is read top-down
-code -[hidden]down- link
+code -[hidden]down- dotc
 hist -[hidden]down- kg
 kg -[hidden]down- obs
 obs -[hidden]down- usage

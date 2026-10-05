@@ -22,7 +22,7 @@ rectangle "Host Machine (macOS)" as host {
   rectangle "Bind Mounts" as mounts {
     folder ".data/" as data_mount
     folder ".data/graphify/\ngraph.json (static)" as graph_mount
-    folder ".specstory/" as spec_mount
+    folder ".coding/{history,kb}" as history_mount
     folder ".env" as env_mount
     folder "~/Agentic/" as workspace_mount
   }
@@ -98,7 +98,7 @@ qdrant --> qvol
 redis --> rvol
 
 data_mount ..> cs_container : "/coding/.data"
-spec_mount ..> cs_container : "/coding/.specstory"
+history_mount ..> cs_container : "/coding/.coding"
 env_mount ..> cs_container : "/coding/.env"
 workspace_mount ..> cs_container : "/workspace (ro)"
 

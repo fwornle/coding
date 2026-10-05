@@ -46,12 +46,12 @@ The transcript monitor is managed by a priority-ordered supervisor chain:
 
 **LOCAL Content** (Project-Specific):
 
-- Stored in: `project/.specstory/history/YYYY/MM/`
+- Stored in: `project/.coding/history/YYYY/MM/`
 - Format: `YYYY-MM-DD_HHMM-HHMM_<userhash>.jsonl`
 
 **CODING Content** (Infrastructure):
 
-- Redirected to: `coding/.specstory/history/YYYY/MM/`
+- Redirected to: `coding/.coding/history/YYYY/MM/`
 - Format: `YYYY-MM-DD_HHMM-HHMM_<userhash>_from-<project>.jsonl`
 
 Rotation appends a part index before the hash (`…-1_<userhash>.jsonl`). A part
@@ -103,7 +103,7 @@ Safety properties, in the order they matter:
   locally modified is kept, whatever else happens.
 - Every chain is verified before its markdown is removed. A chain that fails, or
   that converts to **nothing**, is quarantined with its markdown intact and a
-  reason written to `.specstory/quarantine/`.
+  reason written to `.coding/quarantine/`.
 - Not every `.md` yields a `.jsonl`. A part in which no block *starts* belongs to
   its predecessor's blocks; those are recorded in `chain-map.json` as
   `absorbedInto`, so a missing output file is provably accounted for rather than
@@ -252,7 +252,7 @@ symlink.
 tail -50 .logs/transcript-monitor-test.log
 
 # Check today's files
-ls -la .specstory/history/ | grep "$(date +%Y-%m-%d)"
+ls -la .coding/history/$(date +%Y/%m)/ | grep "$(date +%Y-%m-%d)"
 
 # Recover from transcripts
 PROJECT_PATH=/path/to/project CODING_REPO=/path/to/coding \
@@ -263,7 +263,7 @@ PROJECT_PATH=/path/to/project CODING_REPO=/path/to/coding \
 
 ```bash
 # Check classification logs
-ls -la .specstory/logs/classification/
+ls -la .coding/history/logs/classification/
 
 # Verify config
 cat config/live-logging-config.json | jq '.embedding_classifier'

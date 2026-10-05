@@ -50,7 +50,7 @@ package "Test Data" {
 package "Test Results" {
     database "comprehensive-constraint-test-report.md" as Report
     database "LSL Transcripts" as LSL
-    database ".specstory/history/" as History
+    database ".coding/history/" as History
 }
 
 AutoTest --> Scenarios : Load test cases

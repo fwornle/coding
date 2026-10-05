@@ -41,7 +41,7 @@ How to group your repos into teams, choose what the knowledge viewer shows, and 
     | Part | What it does |
     |---|---|
     | **Active teams** chips | the selection the viewer shows (click to toggle) |
-    | **Repos on this machine** | the discovery scan of `$HOME` (depth 4): git repos with a `.coding/` or `.specstory/history` |
+    | **Repos on this machine** | the discovery scan of `$HOME` (depth 4): git repos with a `.coding/` (or a legacy, not yet migrated `.specstory/history`) |
     | **Learning repo** column | where that repo's learned data is pushed; `—` means no choice yet (asked at the next `coding` launch there) |
     | team columns | membership — a repo may be in several teams |
     | **Rescan** | re-runs discovery now (it otherwise refreshes every 10 minutes) |

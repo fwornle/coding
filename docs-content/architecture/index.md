@@ -23,7 +23,7 @@ The design principles behind the infrastructure, and where each of them lives in
     | Shared startup | `scripts/launch-agent-common.sh` |
     | Session wrapping | `scripts/tmux-session-wrapper.sh` |
     | Knowledge storage | `.data/knowledge-graph/` |
-    | Session logs | `.specstory/history/` |
+    | Session logs | `.coding/history/` |
 
     ## Read next
 

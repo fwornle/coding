@@ -91,7 +91,7 @@ coding --restart-monitor
 
 ```bash
 # Check classification logs
-ls -la .specstory/logs/classification/
+ls -la .coding/history/logs/classification/
 
 # Verify configuration
 cat config/live-logging-config.json | jq '.embedding_classifier'
@@ -156,8 +156,8 @@ curl -v http://localhost:3848/health
 
 ```bash
 # Fix directory permissions
-mkdir -p .data/knowledge-graph .specstory/history
-chmod -R 755 .data/ .specstory/
+mkdir -p .data/knowledge-graph
+chmod -R 755 .data/
 
 # Restart
 docker compose -f docker/docker-compose.yml restart
@@ -267,7 +267,7 @@ echo -e "\n=== Environment ===" >> diagnostics.txt
 env | grep -E "(USER|CODING|LSL)" >> diagnostics.txt
 
 echo -e "\n=== Configuration ===" >> diagnostics.txt
-cat .specstory/lsl-config.json 2>/dev/null >> diagnostics.txt
+cat .coding/var/validation-report.json 2>/dev/null >> diagnostics.txt
 
 echo "Diagnostics collected in diagnostics.txt"
 ```

@@ -7,7 +7,7 @@ secrets — without you doing anything.
 
     ## Where your sessions go
 
-    `.specstory/history/YYYY/MM/`, one file per time window, named
+    `.coding/history/YYYY/MM/`, one file per time window, named
     `YYYY-MM-DD_HHMM-HHMM-<hash>.jsonl`.
 
     There is nothing to run. Logging starts with the session and stops with it.
@@ -68,7 +68,7 @@ secrets — without you doing anything.
 
     ## The files
 
-    One file per time window under `.specstory/history/YYYY/MM/`, named with its date, its window
+    One file per time window under `.coding/history/YYYY/MM/`, named with its date, its window
     and a hash. Suffixed siblings (`…-1_<hash>`) are continuations of the same window.
 
     **Order by filename, never by mtime.** A `git checkout`, a clone or a submodule update

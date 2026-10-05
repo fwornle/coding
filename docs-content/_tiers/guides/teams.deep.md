@@ -17,7 +17,7 @@ why the graph does not redraw while you look at it.
 
 `lib/teams/discover.mjs`: roots `discovery.roots` (default `~`), depth 4, skipping dot-dirs,
 symlinks and an ignore list, never descending into a repo it has classified. A repo counts
-when it is a git repo with `.coding/` or `.specstory/history`. The result is cached in
+when it is a git repo with `.coding/` or a legacy `.specstory/history` (one not yet migrated). The result is cached in
 `<data home>/var/projects.json` for 10 minutes; **Rescan** (`POST /teams/discover`) refreshes
 it now. Inside the `coding-services` container the cache is read through the data-home mount
 and `$HOME/Agentic/…` is mapped to `/workspace/…`.

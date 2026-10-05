@@ -178,7 +178,7 @@ The systems interact through shared data stores:
 ```mermaid
 flowchart LR
     subgraph Storage["Data Storage"]
-        A[(".specstory/history/\nLSL Files")]
+        A[(".coding/history/\nLSL Files")]
         B[(".data/knowledge-graph/\nGraph DB")]
         C[(".data/vector-store/\nVector DB")]
         D[(".health/\nHealth Files")]

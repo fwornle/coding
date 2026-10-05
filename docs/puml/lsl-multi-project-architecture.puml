@@ -14,18 +14,18 @@ end box
 box "Project: curriculum-alignment" #LightGreen
   participant "Enhanced Transcript\nMonitor (78406)" as etm1 <<core>>
   database "Claude Transcript\n.jsonl" as trans1 <<external>>
-  database "Local LSL Files\n.specstory/history/" as lsl1 <<storage>>
+  database "Local LSL Files\n.coding/history/" as lsl1 <<storage>>
 end box
 
 box "Project: nano-degree" #LightYellow  
   participant "Enhanced Transcript\nMonitor (78100)" as etm2 <<core>>
   database "Claude Transcript\n.jsonl" as trans2 <<external>>
-  database "Local LSL Files\n.specstory/history/" as lsl2 <<storage>>
+  database "Local LSL Files\n.coding/history/" as lsl2 <<storage>>
 end box
 
 box "Shared Services" #LightPink
   participant "ReliableCoding\nClassifier" as rcc <<core>>
-  database "coding/.specstory/\nhistory/" as coding_lsl <<storage>>
+  database "coding/.coding/\nhistory/" as coding_lsl <<storage>>
 end box
 
 == Project Startup ==

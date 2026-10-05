@@ -25,7 +25,7 @@ flowchart TB
     end
 
     subgraph "Storage Layer"
-        LSL --> FS[.specstory/history/]
+        LSL --> FS[.coding/history/]
         SA --> KMC[("@fwornle/km-core<br/>GraphKMStore<br/>shared by A/B/C")]
         CGR --> MG[graph.json]
         SA --> QD[Qdrant]
@@ -125,8 +125,8 @@ The host-side Claude CLI talks to lightweight stdio proxies, which forward to th
 
 | System | Storage | Format |
 |--------|---------|--------|
-| LSL | `.specstory/history/` | Markdown |
-| Classification | `.specstory/logs/classification/` | JSONL + MD |
+| LSL | `.coding/history/YYYY/MM/` | JSONL (pi session format; older files Markdown) |
+| Classification | `.coding/history/logs/classification/` | JSONL + MD |
 | Observational Memory (System A) | `.data/knowledge-graph/` (legacy `.observations/observations.db` archived 2026-06-05) | km-core GraphKMStore |
 | Observation Export | `.data/observation-export/` | JSON (per tier) |
 | UKB (System B) | `.data/knowledge-graph-migrated/` | km-core GraphKMStore (LevelDB) |
@@ -153,7 +153,7 @@ OKB ingestion does not consume LSL — it pulls from documentation sources direc
 PostToolUse hooks log all tool interactions:
 
 ```
-Tool Execution --> PostToolUse Hook --> LSL Logger --> .specstory/history/
+Tool Execution --> PostToolUse Hook --> LSL Logger --> .coding/history/
 ```
 
 ### Health + All Systems
