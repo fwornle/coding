@@ -50,10 +50,10 @@ common -> config : agent_check_requirements()
 common -> config : agent_pre_launch()
 
 common -> setup : agent_common_init()
-setup -> setup : ensure_specstory_logs_tracked()
+setup -> setup : ensure_coding_runtime_ignored()
+setup -> setup : ensure_private_history_repo()\npull_learning_repo()
 setup -> setup : start_transcript_monitoring()
 setup -> setup : start_statusline_health_monitor()
-setup -> setup : start_global_lsl_monitoring()
 setup -> setup : show_session_reminder()
 setup --> common : common setup complete
 
@@ -82,8 +82,9 @@ end note
 
 note right of setup
   **Common setup ensures:**
-  - LSL system running
-  - Gitignore configured
+  - Runtime files ignored (.git/info/exclude)
+  - Learning checkout <repo>/.coding/ ready
+  - ETM writing .coding/history
   - Monitoring active
   - Session continuity
 end note
