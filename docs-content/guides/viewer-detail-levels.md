@@ -4,7 +4,7 @@ A walkthrough of the Unified Viewer's two summarization controls, followed end t
 real node: how a single `Detail` row at the bottom of the ontology turns into `CollectiveKnowledge`
 at the top, and how the **Detail level** control applies that same fold to the whole canvas at once.
 
-**Viewer**: <http://127.0.0.1:5173/viewer/coding> · **Data**: obs-api on `:12436` ·
+**Viewer**: `vkb` → <http://127.0.0.1:12436/viewer/coding> · **Data**: obs-api on `:12436` ·
 **Corpus measured**: 2026-09-25 16:34Z, 2,801 entities / 18,696 edges
 
 > The store is live — the ETM writes to it continuously, so the header counts in the screenshots

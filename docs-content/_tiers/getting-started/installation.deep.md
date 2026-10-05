@@ -177,6 +177,7 @@ With a learning tier, the first launch in a repo asks where its learned data goe
 | `coding-features` | `~/Agentic/coding/bin/` | Show / change the installed tier and features |
 | `coding sync` | (part of `coding`) | Commit, pull and push the per-repo learning repos |
 | `semantic` | `~/Agentic/coding/bin/` | Knowledge-base workflows (UKB) and ontology |
+| `vkb` | `~/Agentic/coding/bin/` | Open the knowledge viewer (`learning`+) |
 | Host services | launchd / systemd user units | health coordinator, LLM proxy, obs-api, session capture — only the tier's |
 | Containers (`learning`+) | Docker | semantic analysis, constraints, code graph, dashboard, Qdrant, Redis |
 | Agent hooks + MCP | supplied per launch by `bin/coding` | written globally only with `--global-agents` |

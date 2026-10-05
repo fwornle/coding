@@ -1,7 +1,7 @@
 # VKB Visualization
 
-The knowledge graph, in a browser — how to run the viewer, drive it from a script, and
-fix it when it will not start.
+The knowledge graph in a browser — how to open the viewer, what it shows, and what to check
+when it shows nothing.
 
 === "⚡ Quick (~3 min)"
 
@@ -11,99 +11,80 @@ fix it when it will not start.
     vkb
     ```
 
-    That starts the server and opens [localhost:8080](http://localhost:8080). Add `--no-browser`
-    to skip the browser.
-
-    ## The commands
+    That opens [127.0.0.1:12436/viewer/coding](http://127.0.0.1:12436/viewer/coding). The
+    first run builds the viewer (about half a minute); after that it opens at once.
 
     ```bash
-    vkb start        # same as bare `vkb`
-    vkb status       # is it running
-    vkb stop         # graceful shutdown
-    vkb restart      # stop, then start
-    vkb logs         # server logs
-    vkb fg           # run in the foreground, for debugging
-    vkb port         # what is holding the port
+    vkb okb          # the operational knowledge base (VOKB) instead
+    vkb --no-open    # just print the URL
+    vkb --build      # rebuild, e.g. after changing the viewer's sources
     ```
+
+    `vkb` needs the `knowledge` feature (the `learning` tiers). There is no server to start or
+    stop: obs-api — always running with a learning tier — serves the viewer.
 
     ## What you see
 
     ![Knowledge Graph Viewer](../images/viewer.png)
 
-    Entities laid out as a graph, filterable by type, team and learning source. Click a node for
-    its details — type, source, confidence, observations and relations — and where an entity has
-    a full insight document, a button opens it as rendered markdown with diagrams and code.
+    Entities as a graph — projects, components, insights, details — filterable by team, type,
+    learning source and detail level. Click a node for its details and relations; where an
+    entity has a full insight document, a button opens it rendered, with diagrams.
 
-    ## If it will not start
+    ## Teams
 
-    ```bash
-    vkb port     # something else on 8080?
-    vkb logs     # what did it say
-    vkb fg       # run in the foreground and watch it fail
-    ```
-
-    `vkb fg` is the one that actually tells you why — the others report that it failed, not what
-    happened.
+    The **Teams / Views** rail on the left starts from the selection in **Dashboard → Teams**
+    and changes it both ways. See [Teams & Shared Learning](teams.md).
 
 === "📖 Standard (~15 min)"
 
-    ## What VKB is
+    ## How it is served
 
-    A cross-platform server that renders the knowledge graph for interactive exploration, with
-    its own lifecycle management, health checks and a programmatic API for driving it from code.
+    The viewer is a static single-page app (`integrations/unified-viewer`). `vkb`:
 
-    ![VKB CLI Architecture](../images/vkb-cli-architecture.png)
+    1. checks the `knowledge` feature is on (`coding-features status`);
+    2. builds the app if `dist/` is missing or older than any of its sources — dependencies are
+       installed first if needed; the build log is `.logs/vkb-build.log`;
+    3. checks obs-api answers on `:12436`;
+    4. opens `http://127.0.0.1:12436/viewer/<system>` (macOS `open`, Linux `xdg-open`, WSL
+       `wslview`; otherwise it prints the URL).
+
+    obs-api serves the build under `/viewer/` and every viewer route falls back to the app's
+    shell; the app reads the graph from the same obs-api. The installer builds the viewer once
+    for `learning` tiers, so the first `vkb` is usually instant.
 
     ## Exploring the graph
 
     ![Node Details Panel](../images/viewer-details.png)
 
-    The graph view filters by entity type, by team, and by learning source — which matters more
-    than it sounds, because it separates knowledge from the deliberate extraction pass from
-    knowledge picked up continuously during sessions. Being able to view either alone, or both
-    together, is what lets you tell "the system worked this out while I was working" from "the
-    extraction pass concluded this".
+    | Panel | Does |
+    |---|---|
+    | Filters (left) | search, detail level (Full · Overview · Summary), legend, teams / projects / views, ontology class, source |
+    | Canvas | the graph; drag to pan, scroll to zoom, click a node to select it |
+    | Entity / History (right) | the selected node's details, or the newest insights |
+    | Timeline (bottom) | when knowledge was learned; click a bar to jump to it |
 
-    Selecting a node opens its details: type, source, team, confidence score, the observations
-    behind it, and its incoming relations. Confidence is worth attending to — a low-confidence
-    entity is a hypothesis, not a fact.
+    [Reading the Graph](viewer-detail-levels.md) explains the detail levels.
 
-    Entities that carry a full insight document open it in an overlay, rendered as markdown with
-    diagrams and code blocks intact.
+    ## When it shows nothing
 
-    ![Insight Document Viewer](../images/viewer-details-insight.png)
+    | Symptom | Check |
+    |---|---|
+    | "This command needs the 'knowledge' feature" | `coding-features set knowledge on` (or a learning tier) |
+    | `obs-api is not answering on :12436` | `curl -s localhost:12436/health`; Dashboard → Health |
+    | "The knowledge viewer has not been built yet" | `vkb --build`; the log is `.logs/vkb-build.log` |
+    | "Showing 0 of 0 nodes" for a long time | `curl -s 'localhost:12436/api/v1/entities?limit=1'` — is the store hydrated? |
+    | Old UI after an update | `vkb --build` |
 
-    ## Running the server
-
-    ```bash
-    vkb              # start and open a browser
-    vkb start        # the same
-    vkb status       # running or not
-    vkb restart      # bounce it
-    vkb stop         # graceful shutdown
-    ```
-
-    The server recovers automatically from most failures and refreshes its data without needing a
-    restart, so a stale-looking graph is usually a browser cache rather than a stopped server.
-
-    ## Driving it from code
-
-    There is a programmatic API for starting, stopping and querying the server from Node, which
-    is what to use when a script needs the graph rather than a person. It exposes the same
-    lifecycle operations as the CLI plus HTTP endpoints for the data itself, so a script can pull
-    entities directly instead of scraping the page.
-
-    ## When it will not come up
+    ## Developing the viewer
 
     ```bash
-    vkb port    # is something already on 8080
-    vkb logs    # the recorded failure
-    vkb fg      # run in the foreground and watch it happen
+    cd integrations/unified-viewer
+    npm run dev            # http://127.0.0.1:5173/viewer/coding, hot reload
+    npm test               # vitest
     ```
 
-    Work down that list in order. `vkb port` catches the common case — a previous instance that
-    did not exit — and `vkb fg` is the one that shows you an actual stack trace rather than a
-    report that startup failed.
+    The dev server reads the same obs-api; `vkb --build` produces what everyone else sees.
 
 === "📚 Deep Dive (full)"
 

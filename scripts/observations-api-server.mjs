@@ -29,6 +29,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { repoHistoryDir } from '../lib/history/paths.cjs';
+import { mountViewer } from '../lib/viewer/mount.mjs';
 import { ObservationWriter, subscribeObservationWritten } from '../src/live-logging/ObservationWriter.js';
 import { ObservationConsolidator } from '../src/live-logging/ObservationConsolidator.js';
 import { RetrievalService } from '../src/retrieval/retrieval-service.js';
@@ -961,6 +962,9 @@ function runRollUp(options = {}) {
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
+
+// The built knowledge viewer at /viewer/ (bin/vkb) — see lib/viewer/mount.mjs.
+mountViewer(app, express, { repoRoot: REPO_ROOT });
 
 app.get('/health', (_req, res) => {
   // Phase 44 Plan 14 — readiness switched from `_writer.db` (SQLite

@@ -214,7 +214,7 @@ addresses the old path. Goal: nothing addresses it; new repos get no `.specstory
 ## Open questions (decide inside the phase)
 
 - ~~Legacy `CODING_TEAM`~~ — done 2026-10-04 (d6f88527).
-- **No launcher for the knowledge viewer** (found 2026-10-04): `bin/vkb` went with vkb-server (2fb090da, 2026-09-08); the unified viewer is only reachable via `npm --prefix integrations/unified-viewer run dev` (:5173), and nothing starts it. The `learning` tier promises a viewer. Proposal: a `vkb` command (start-if-needed + open) and/or a `viewer` daemon under the `knowledge` feature.
+- ~~No launcher for the knowledge viewer~~ — done 2026-10-05: `vkb` builds the viewer if stale and opens it; obs-api serves the build at `/viewer/` (`lib/viewer/mount.mjs`); the installer builds it for `knowledge`.
 - **Stale `bin/status`**: still points at :3001 / `bin/dashboard` (both gone).
 
 ## Session protocol
@@ -346,3 +346,11 @@ addresses the old path. Goal: nothing addresses it; new repos get no `.specstory
   install.sh — unknown options exit 2 instead of being ignored; (3) an unattended re-run keeps a
   recorded `global` scope; (4) the root TypeScript build ran before the km-core link (TS2307 →
   a fresh install shipped no `dist/`), now after it. Next: **T9**.
+- **2026-10-05 (vkb)** — the viewer without a dev server: viewer build base `/viewer/`; obs-api
+  serves `integrations/unified-viewer/dist` there (shell for every route, hashed assets cached,
+  503 page when unbuilt, `/` → `/viewer/coding`); `bin/vkb [coding|okb] [--no-open] [--build]`
+  gated on `knowledge`, builds when sources are newer (vite only, no typecheck gate), checks
+  obs-api, opens per platform; installer step `install_unified_viewer` + manifest row; docs
+  (VKB guide rewritten, every `localhost:8080`/dev-server reference). Verified: tests 5/5 mount +
+  gating; live obs-api serves shell + assets; gsd-browser loaded the served viewer with data
+  (104/2948 nodes). Next: **T9 batch 2**.

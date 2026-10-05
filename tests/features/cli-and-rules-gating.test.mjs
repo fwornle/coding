@@ -23,6 +23,7 @@ const { FEATURE_IDS } = require(join(REPO, 'lib/features/catalogue.cjs'));
 /** CLI -> the feature it must refuse to run without. */
 const GUARDED = {
   'bin/semantic': 'knowledge',
+  'bin/vkb': 'knowledge',
   'bin/clean-knowledge-base': 'knowledge',
   'bin/fix-knowledge-base': 'knowledge',
   'bin/graphify': 'codegraph',

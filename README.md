@@ -238,7 +238,7 @@ Real-time code quality enforcement through PreToolUse hooks
 **Two Complementary Approaches** for knowledge capture and retrieval:
 - **Manual/Batch (UKB)**: Git analysis and interactive capture for team sharing
 - **Online (Continuous Learning)**: Real-time session learning with semantic search
-- **Visualization (VKB)**: Web-based graph visualization at `http://localhost:8080`
+- **Visualization (VKB)**: Web-based graph visualization — `vkb` opens it (served by obs-api at `http://127.0.0.1:12436/viewer/coding`)
 - **Ontology Classification**: 4-layer classification pipeline
 
 #### [👁️ Observational Memory](docs/observations/)
@@ -349,7 +349,7 @@ Capture, organize, and visualize development insights with git-based team collab
 # Start visualization server
 vkb
 
-# View at http://localhost:8080
+# Opens http://127.0.0.1:12436/viewer/coding
 ```
 
 ### Constraint Monitoring

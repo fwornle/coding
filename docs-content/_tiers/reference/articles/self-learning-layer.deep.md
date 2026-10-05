@@ -335,7 +335,7 @@ Coding has the option to run in dockerized mode to keep the machine footprint lo
 ![Coding dockerzied](images/docker-architecture.png)
 *Coding running in dockerized mode - only the coding agent is installed natively, plus a set of thin layer of proxies.*
 
-The dashboard is at `localhost:3030`. The knowledge graph viewer is at `localhost:8080`. Health monitoring shows you exactly what's running and catches problems automatically.
+The dashboard is at `localhost:3030`. The knowledge graph viewer is at `127.0.0.1:12436/viewer/coding` (`vkb`). Health monitoring shows you exactly what's running and catches problems automatically.
 
 If a process crashes or a status has gone stale, the 3-layer supervision architecture detects it and restarts or refreshes the status. Sessions can run for days without intervention. The health monitor detects all running agents (Claude, Copilot, OpenCode) and tracks their sessions with a graduated cooling scheme — active sessions glow green, idle ones fade through cooling stages, and sleeping sessions show as dormant. Sessions are only removed when the agent process exits, never hidden.
 

@@ -95,7 +95,7 @@ builds knowledge from them, and stops known mistakes before they happen.
     |---------|------|
     | `coding` | Start a session with everything running |
     | `coding --health` | Check every service |
-    | `vkb` | Open the knowledge graph at `localhost:8080` |
+    | `vkb` | Open the knowledge graph viewer |
     | `semantic workflow run wave-analysis --team coding` | Refresh the knowledge base |
 
     ## What is production-ready

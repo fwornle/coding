@@ -137,6 +137,7 @@ Prerequisites, the install itself, and what it puts on your machine.
     | `coding-features` | Shows and changes the installed tier |
     | `coding sync` | Commits, pulls and pushes each repo's learning repo |
     | `semantic` | Knowledge-base workflows and ontology management (`learning`+) |
+    | `vkb` | Opens the knowledge viewer (`learning`+) |
     | Dashboard | [localhost:3032](http://localhost:3032) — health, sessions, insights, tokens, teams, features |
     | Session logging | Automatic transcript capture into each repo's `.coding/history/` (`learning`+) |
 

@@ -151,6 +151,7 @@ repo|$CODING_REPO/.npmrc|create|yes|proxy for npm, only if env vars are not hono
 repo|$CODING_REPO/.git/hooks/pre-commit|replace|yes|knowledge-snapshot guard (original saved as pre-commit.coding-orig) [feature:knowledge]
 repo|$CODING_REPO/lib/km-core|checkout|yes|git submodule required for session logging
 repo|$CODING_REPO/.coding/|create|yes|per-launch agent config, so nothing global has to change
+repo|$CODING_REPO/integrations/unified-viewer/dist|create|yes|the knowledge viewer's build, served by obs-api at /viewer/ and opened by `vkb` [feature:knowledge]
 repo|$CODING_REPO/.specstory/history|symlink|yes|points at history/ in your data home below, so this checkout holds no transcripts of its own. A pre-existing history directory here is left as it is [feature:lsl]
 home|~/.coding/features.yaml|create|yes|which tier (or features) of coding you chose to install
 home|~/.coding/scope|create|no|which tenant owns this machine's knowledge; also names the data root below. Not written if you decline to name one, and never overwritten
@@ -1046,6 +1047,24 @@ check_dependencies() {
 }
 
 # Install memory-visualizer (git submodule)
+# The knowledge viewer (integrations/unified-viewer, part of this repo): its
+# dependencies and a production build, which obs-api serves under /viewer/
+# (lib/viewer/mount.mjs) and `vkb` opens. Without this the viewer was only
+# reachable through its dev server. vite only — a type error must not cost a
+# user the viewer; bin/vkb rebuilds whenever the sources are newer.
+install_unified_viewer() {
+    skip_unless_feature knowledge "the knowledge viewer" || return 0
+    local dir="$CODING_REPO/integrations/unified-viewer"
+    [[ -f "$dir/package.json" ]] || { warning "integrations/unified-viewer missing — skipping the viewer"; return 0; }
+    info "Building the knowledge viewer (served by obs-api at /viewer/, opened by vkb)..."
+    if (cd "$dir" && npm ci --no-audit --no-fund && npx --no-install vite build) >>"$INSTALL_LOG" 2>&1; then
+        success "✓ knowledge viewer built — open it with: vkb"
+    else
+        warning "Knowledge viewer build failed — see $INSTALL_LOG (vkb retries on first use)"
+        INSTALLATION_WARNINGS+=("knowledge viewer not built — run vkb to retry")
+    fi
+}
+
 install_memory_visualizer() {
     skip_unless_feature knowledge "the memory visualizer" || return 0
     echo -e "\n${CYAN}📊 Installing memory-visualizer (git submodule)...${NC}"
@@ -4757,6 +4776,7 @@ main() {
     setup_llm_cli_proxy  # HTTP bridge for claude/copilot CLI in Docker
     setup_claude_ctx_sweeper  # Windows-only scheduled task; a no-op elsewhere
     install_memory_visualizer
+    install_unified_viewer
     run_step install_semantic_analysis
     run_step install_constraint_monitor
     run_step install_system_health_dashboard

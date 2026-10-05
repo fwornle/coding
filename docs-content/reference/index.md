@@ -9,7 +9,7 @@ Commands, ports, paths and environment variables — the things you look up rath
     ```bash
     coding                  # launch the default agent with everything wired up
     coding --health         # check every service
-    vkb                     # knowledge viewer at localhost:8080
+    vkb                     # knowledge viewer (127.0.0.1:12436/viewer/coding)
     semantic workflow run wave-analysis --team coding    # refresh the knowledge base
     ./scripts/test-coding.sh                             # verify the installation
     ```
@@ -41,7 +41,7 @@ Commands, ports, paths and environment variables — the things you look up rath
     coding --health          # check every service
     coding --project ~/p     # run against another directory
 
-    vkb                      # knowledge viewer at localhost:8080
+    vkb                      # knowledge viewer (127.0.0.1:12436/viewer/coding)
     semantic workflow run wave-analysis --team coding    # knowledge extraction pass
     semantic workflow status                             # progress of that pass
     constraints              # constraint status and violation history

@@ -8,7 +8,11 @@ import path from 'path'
 //   - vendor-markdown chunk (react-markdown / remark-gfm / rehype-highlight / highlight.js)
 //   - server.port: 5173 + strictPort (per 45-RESEARCH.md Wave-0 CORS probe row 1)
 // https://vitejs.dev/config/
-export default defineConfig({
+// The production build is served by obs-api under /viewer/ (bin/vkb), so its
+// assets must resolve there; the dev server keeps serving from /. The routes
+// are absolute (/viewer/:system), so no router basename is needed either way.
+export default defineConfig(({ command }) => ({
+  base: command === 'build' ? '/viewer/' : '/',
   plugins: [react()],
   resolve: {
     alias: {
@@ -43,4 +47,4 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
   },
-})
+}))
