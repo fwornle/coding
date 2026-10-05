@@ -22,8 +22,14 @@ Load and summarize recent Live Session Logs (LSL) to provide continuity from pre
 > unavailable before falling back to an ad-hoc `find`. The two commands below are the
 > replacement; they are pre-allowed, so they do not prompt.
 
-The two allowed discovery commands (`<ROOT>` is `.specstory/history` for the current project,
+The two allowed discovery commands (`<ROOT>` is `.coding/history` for the current project,
 or the absolute coding path for Step 3):
+
+> `<ROOT>` is the repo's learning checkout (`<repo>/.coding/history`). A repo nobody has
+> launched since per-repo tenancy has no `.coding/` yet and keeps a REAL `.specstory/history`
+> directory instead — use that as `<ROOT>` there (the same rule as `lib/history/paths.cjs`).
+> Never read through `.specstory/history` when `.coding/` exists: it is only a leftover
+> symlink.
 
 ```
 ls -d <ROOT>/[0-9][0-9][0-9][0-9]/[0-9][0-9]      # list YYYY/MM tranche dirs, oldest→newest
@@ -35,7 +41,7 @@ prompt-free in **any** project.
 
 Two things the numeric `[0-9]` pattern buys you — do not "simplify" it away:
 
-- `.specstory/history` also contains non-LSL subtrees (`logs/`, `docs/`). A recursive
+- `.coding/history` also contains non-LSL subtrees (`logs/`, `docs/`). A recursive
   `**/*.md` sweep over the coding project returns **~23,000 files**, almost all noise. The
   numeric year/month pattern selects only real LSL tranches.
 - Listing one month at a time keeps the result at tens of files, not thousands.
@@ -54,15 +60,15 @@ two `ls` forms plus `Read`.
 ### Step 1: Determine Current Project
 
 1. Get the current working directory
-2. Identify the project name (the directory name containing `.specstory/history`)
+2. Identify the project name (the directory that contains `.coding/history`)
 3. Note if this IS the `coding` project or a DIFFERENT project
 
 ### Step 2: Load LSL Files from Current Project
 
-1. `ls -d .specstory/history/[0-9][0-9][0-9][0-9]/[0-9][0-9]` — take the **last** line as the
-   newest tranche. Files are nested by year/month (`.specstory/history/YYYY/MM/`); a flat
-   `.specstory/history/*.md` finds nothing.
-2. `ls -1r .specstory/history/<YYYY>/<MM>` for that tranche — newest first.
+1. `ls -d .coding/history/[0-9][0-9][0-9][0-9]/[0-9][0-9]` — take the **last** line as the
+   newest tranche. Files are nested by year/month (`.coding/history/YYYY/MM/`); a flat
+   `.coding/history/*.md` finds nothing.
+2. `ls -1r .coding/history/<YYYY>/<MM>` for that tranche — newest first.
    **This orders by filename, NOT by modification time**, which is what you want: filenames
    are date-encoded (`YYYY-MM-DD_HHMM-HHMM-<hash>.<ext>`) and are the only reliable ordering.
    A `git checkout`, clone, or submodule update rewrites mtimes wholesale and would surface
@@ -100,8 +106,8 @@ two `ls` forms plus `Read`.
 
 **Only if current project is NOT `coding`:**
 
-1. `ls -d "$CODING_REPO"/.specstory/history/[0-9][0-9][0-9][0-9]/[0-9][0-9]`,
-   then `ls -1r "$CODING_REPO"/.specstory/history/<YYYY>/<MM>` for the
+1. `ls -d "$CODING_REPO"/.coding/history/[0-9][0-9][0-9][0-9]/[0-9][0-9]`,
+   then `ls -1r "$CODING_REPO"/.coding/history/<YYYY>/<MM>` for the
    tranche(s) covering the Step 2 range
 2. Find files that fall within or overlap the timestamp range from Step 2
 3. **Read** the most recent coding LSL file from that time range
@@ -155,8 +161,8 @@ Judged from the `Read` result — do not shell out to `wc`/`ls -l` to measure a 
 
 ## Path Constants
 
-- Current project LSL: `.specstory/history/YYYY/MM/*.md`
-- Coding project LSL: `$CODING_REPO/.specstory/history/YYYY/MM/*.md`
+- Current project LSL: `.coding/history/YYYY/MM/*.{jsonl,md}`
+- Coding project LSL: `$CODING_REPO/.coding/history/YYYY/MM/*.{jsonl,md}`
 
 ## Permissions
 
@@ -164,13 +170,16 @@ Judged from the `Read` result — do not shell out to `wc`/`ls -l` to measure a 
 user-level rules in `~/.claude/settings.json`:
 
 ```json
-"Read(//<your-home>/**/.specstory/history/**)",
-"Read(//<your-coding-checkout>/.specstory/history/**)",
-"Bash(ls -d .specstory/history/:*)",
-"Bash(ls -1r .specstory/history/:*)",
-"Bash(ls -d /<your-coding-checkout>/.specstory/history/:*)",
-"Bash(ls -1r /<your-coding-checkout>/.specstory/history/:*)"
+"Read(//<your-home>/**/.coding/history/**)",
+"Read(//<your-coding-checkout>/.coding/history/**)",
+"Bash(ls -d .coding/history/:*)",
+"Bash(ls -1r .coding/history/:*)",
+"Bash(ls -d /<your-coding-checkout>/.coding/history/:*)",
+"Bash(ls -1r /<your-coding-checkout>/.coding/history/:*)"
 ```
+
+For a repo still on the legacy layout (see the note under Tooling Rules), the same six rules
+with `.specstory/history` in place of `.coding/history` cover it.
 
 Substitute your own absolute paths. Permission rules are matched as literal globs —
 unlike the commands above, they do **not** expand `$CODING_REPO` or `~`, so a rule written

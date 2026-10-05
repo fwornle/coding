@@ -58,14 +58,8 @@ This directory contains utility scripts for the Coding Knowledge Management Syst
   - Converts spaces to hyphens in conversation log filenames
   - Usage: Run from knowledge-management directory
 
-- **`start-auto-logger.sh`** - Automatic conversation logging via I/O interception
-  - Called automatically by `claude-mcp` at startup
-  - Intercepts stdin/stdout streams to capture conversations
-  - Usage: Called internally by claude-mcp (not run directly)
-
 - **`claude-mcp-launcher.sh`** - Main Claude MCP launcher with knowledge base integration
   - Loads shared-memory.json summary and activates MCP memory server
-  - Starts automatic conversation logging via start-auto-logger.sh
   - Usage: Called by bin/claude-mcp wrapper (not run directly)
 
 ### Testing Scripts

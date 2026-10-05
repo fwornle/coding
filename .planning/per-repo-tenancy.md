@@ -211,14 +211,15 @@ addresses the old path. Goal: nothing addresses it; new repos get no `.specstory
       semantic-analysis `lslHistoryRoot` follows the same rule; constraint-monitor test tools.
       Left on purpose: discovery/teams markers and `strip_history_dir` (recognise the legacy
       layout), migration tools (`repo-link`, `init-history`, `migrate-*`, `backfill-lsl-to-pi`),
-      km-core fixtures, `.specstory/config` (not history). Dead, not migrated:
-      `knowledge-management/ukb-original`, `scripts/start-auto-logger.sh` — delete?
+      km-core fixtures, `.specstory/config` (not history). Dead and deleted:
+      `knowledge-management/ukb-original`, `scripts/start-auto-logger.sh`.
 - [x] `ensure_coding_runtime_ignored` writes `.git/info/exclude`, never the project's tracked
       `.gitignore` (it appended nine lines to every repo on launch, and re-added
       `.specstory/history/` in coding itself on 2026-10-04); non-git dirs are left alone.
 - [x] Discovery keeps ACCEPTING the old marker (repos not relaunched yet), but stops requiring it
       (`history` marker = either layout).
-- [ ] `/sl` + its user-level allow rules move to `.coding/history`.
+- [x] `/sl` + its user-level allow rules move to `.coding/history` (the six legacy rules stay
+      for repos still on a real `.specstory/history`; the skill says when to use that root).
 - [ ] Then: `ensureLayout` stops creating the symlink; an existing one is left (harmless) or
       removed on launch once nothing reads it.
 - Accept: `git grep '\.specstory/history'` = docs/migration code only; a fresh repo launched
