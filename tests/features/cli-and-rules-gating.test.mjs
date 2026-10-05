@@ -190,6 +190,14 @@ describe('bin/status', () => {
       'the feature set must be printed before the per-service report it explains',
     );
   });
+
+  test('links only dashboards that exist, each gated on its feature', () => {
+    const src = readFileSync(join(REPO, 'bin/status'), 'utf8');
+    // The :3001 constraint dashboard and bin/dashboard are gone.
+    assert.doesNotMatch(src, /localhost:3001|bin\/dashboard|constraint-monitor\/bin\/dashboard/);
+    assert.match(src, /feature: 'health'.*SYSTEM_HEALTH_DASHBOARD_PORT/);
+    assert.match(src, /feature: 'constraints'.*CONSTRAINT_DASHBOARD_PORT/);
+  });
 });
 
 describe('guard file', () => {
