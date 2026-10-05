@@ -15,13 +15,14 @@
  * - Fast path and keyword checks (<1ms)
  * - Embedding similarity for semantic matching (~50ms)
  * - LLM fallback using LOCAL models only (never sends sensitive data to remote APIs)
- * - Configurable sensitivity topics via .specstory/config/sensitivity-topics.json
+ * - Configurable sensitivity topics via config/redaction/sensitivity-topics.json (tools repo)
  * - Classification levels: public, internal, confidential, secret
  * - >99% accuracy with <1% false negatives (better to over-classify as sensitive)
  */
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { EventEmitter } from 'events';
 
 // Sensitive file path patterns
@@ -110,7 +111,8 @@ export class SensitivityClassifier extends EventEmitter {
 
     // Sensitivity topics configuration
     this.sensitivityTopicsPath = config.sensitivityTopicsPath ||
-      path.join(this.projectPath, '.specstory', 'config', 'sensitivity-topics.json');
+      path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..',
+        'config', 'redaction', 'sensitivity-topics.json');
 
     // Custom sensitive paths and keywords (loaded from config)
     this.customSensitivePaths = [];

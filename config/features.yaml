@@ -47,7 +47,7 @@
 #   performance  requires llm-proxy
 #
 # features:
-#   lsl:          on   # verbatim session transcripts (.specstory markdown)
+#   lsl:          on   # verbatim session transcripts (.coding/history)
 #   lsl-redirect: on   # file tools-infrastructure turns into the tools repo
 #                      #   DEVELOPERS OF THIS TOOLCHAIN ONLY. It moves turns out
 #                      #   of the project you are working in; for a team using

@@ -22,7 +22,7 @@ config({ path: join(codingRoot, '.env') });
 // ETM runs on the host, but the `claude-mcp` launcher exports
 // CODING_TOOLS_PATH=/coding (the in-container bind-mount path) for tools that
 // run inside docker. ETM inheriting that env then tries to mkdir('/coding/.health')
-// and read '/coding/.specstory/config/redaction-patterns.json' on the host —
+// and read '/coding/config/redaction/redaction-patterns.json' on the host —
 // neither exists, every poll fails, the pipeline stalls silently. Resolve a
 // host-safe coding path for ETM's own filesystem ops, keeping the env var as
 // a last-resort fallback for legitimately host-side overrides (like a
@@ -344,7 +344,7 @@ let redactor = null;
 async function initializeRedactor() {
   if (!redactor) {
     const candidate = new ConfigurableRedactor({
-      configPath: path.join(HOST_CODING_PATH, '.specstory', 'config', 'redaction-patterns.json'),
+      configPath: path.join(HOST_CODING_PATH, 'config', 'redaction', 'redaction-patterns.json'),
       debug: false
     });
     // Initialize BEFORE assigning the singleton — otherwise a thrown init()

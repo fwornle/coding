@@ -28,11 +28,7 @@ class PostSessionLogger {
 
   async initializeRedactor() {
     if (!this.redactor) {
-      const codingPath = this.codingRepo;
-      this.redactor = new ConfigurableRedactor({
-        configPath: path.join(codingPath, '.specstory', 'config', 'redaction-patterns.json'),
-        debug: false
-      });
+      this.redactor = new ConfigurableRedactor({ debug: false });
       await this.redactor.initialize();
     }
     return this.redactor;

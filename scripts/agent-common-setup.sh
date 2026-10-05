@@ -92,12 +92,12 @@ ensure_coding_runtime_ignored() {
     ".logs/"
     "logs/"
     "*.log"
-    ".specstory/validation-report.json"
-    ".specstory/change-log.json"
     # Session transcripts and the learning checkout. repo-link.mjs adds these
     # too once the repo has a .coding/; listed here as well so a launch that
     # could not set one up (no gh, declined, not yet decided) still never lets
-    # `git add -A` sweep verbatim chat logs into the outer repo.
+    # `git add -A` sweep verbatim chat logs into the outer repo. The legacy
+    # path stays listed for a repo whose real .specstory/history has not been
+    # migrated yet (repo-link.mjs moves it on this same launch).
     ".specstory/history"
     ".coding/"
   )

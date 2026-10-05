@@ -17,9 +17,8 @@
  * `_isSemanticallyDuplicate`, `_maybePatchArtifacts`) now read+write via
  * km-core. The km-core helpers `findByContentHash` + `findRecentByAgent` +
  * `findByLegacyId` + `putEntity` (replay) back them. No SQLite handle is
- * constructed; the legacy startup ack log was retired. The `this.dbPath`
- * field is preserved as a path string used to derive `projectRoot`
- * for the redactor — it is a config path, NOT a handle.
+ * constructed; the legacy startup ack log was retired. `this.dbPath` is a
+ * legacy path string kept for callers that still pass it — NOT a handle.
  *
  * Routes LLM summarization calls through the coding LLM proxy (port from
  * LLM_CLI_PROXY_PORT env, default 12435) rather than direct Google/Anthropic
@@ -337,19 +336,14 @@ export class ObservationWriter {
    * by the consolidator (deferred to Plan 44-15) and ultimately by
    * km-core's own JSON export under `.data/knowledge-graph/exports/`.
    *
-   * The `this.dbPath` field is preserved as a path string — used to
-   * derive `projectRoot` for the redactor config lookup. It is a config
-   * path, NOT a handle.
+   * `this.dbPath` is kept as a legacy path string — NOT a handle. The
+   * redactor's rules come from the tools repo (config/redaction/).
    */
   async init() {
-    // Initialize redactor for PII/secret scrubbing (same rules as LSL system).
-    // The redactor's configDir is derived from the (no-longer-opened) dbPath:
-    // ".observations/observations.db" → projectRoot = ".", config = ".specstory/config".
+    // Initialize redactor for PII/secret scrubbing (same rules as LSL system,
+    // the tools repo's config/redaction/).
     try {
-      const projectRoot = path.resolve(path.dirname(this.dbPath), '..');
-      this._redactor = new ConfigurableRedactor({
-        configDir: path.join(projectRoot, '.specstory', 'config'),
-      });
+      this._redactor = new ConfigurableRedactor();
       await this._redactor.initialize();
       process.stderr.write(`[ObservationWriter] Redactor initialized (${this._redactor.compiledPatterns?.length || 0} patterns)\n`);
     } catch (err) {

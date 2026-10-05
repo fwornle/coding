@@ -21,7 +21,11 @@ const __dirname = path.dirname(__filename);
 class LSLConfigValidator {
   constructor(projectPath = process.cwd()) {
     this.projectPath = projectPath;
-    this.configDir = path.join(projectPath, '.specstory', 'config');
+    // LSL configuration ships with the coding tools repo (config/), not with
+    // the project being validated; per-repo state lives in the learning
+    // checkout's machine-local var/ (or a legacy .specstory/ not migrated yet).
+    this.configDir = path.join(__dirname, '..', 'config');
+    this.stateDir = path.join(path.dirname(repoHistoryDir(projectPath)), 'var');
     this.lslConfigPath = path.join(this.configDir, 'lsl-config.json');
     this.redactionConfigPath = path.join(this.configDir, 'redaction-config.yaml');
     
@@ -218,8 +222,7 @@ class LSLConfigValidator {
     const historyDir = path.relative(this.projectPath, repoHistoryDir(this.projectPath));
     const requiredDirs = [
       historyDir,
-      path.join(historyDir, 'logs'),
-      '.specstory/config'
+      path.join(historyDir, 'logs')
     ];
 
     let valid = 0;
@@ -239,7 +242,7 @@ class LSLConfigValidator {
     }
 
     // Check for optional directories
-    const optionalDirs = ['.specstory/deployment-backups', 'scripts'];
+    const optionalDirs = ['scripts'];
     for (const dir of optionalDirs) {
       const dirPath = path.join(this.projectPath, dir);
       if (!fs.existsSync(dirPath)) {
@@ -261,7 +264,7 @@ class LSLConfigValidator {
     console.log('⚙️  Validating LSL configuration...');
 
     if (!fs.existsSync(this.lslConfigPath)) {
-      this.addError('config', 'LSL configuration file missing: .specstory/config/lsl-config.json');
+      this.addError('config', `LSL configuration file missing: ${this.lslConfigPath}`);
       this.addRepair('config', 'Run deployment script: node scripts/deploy-multi-user-lsl.js');
       this.validationResults.categories.lslConfig = { status: 'missing' };
       console.log('   ❌ LSL configuration file missing\n');
@@ -298,7 +301,7 @@ class LSLConfigValidator {
 
     } catch (error) {
       this.addError('config', `Cannot parse LSL configuration: ${error.message}`);
-      this.addRepair('config', 'Fix JSON syntax errors in .specstory/config/lsl-config.json');
+      this.addRepair('config', `Fix JSON syntax errors in ${this.lslConfigPath}`);
       this.validationResults.categories.lslConfig = { status: 'error' };
       console.log(`   ❌ Configuration parsing failed: ${error.message}\n`);
     }
@@ -444,7 +447,7 @@ class LSLConfigValidator {
 
     } catch (error) {
       this.addError('redaction', `Cannot parse redaction configuration: ${error.message}`);
-      this.addRepair('redaction', 'Fix YAML syntax errors in .specstory/config/redaction-config.yaml');
+      this.addRepair('redaction', `Fix YAML syntax errors in ${this.redactionConfigPath}`);
       this.validationResults.categories.redactionConfig = { status: 'error' };
       console.log(`   ❌ Redaction configuration parsing failed: ${error.message}\n`);
     }
@@ -803,7 +806,7 @@ class LSLConfigValidator {
     }
 
     // Check for archive opportunities
-    const archiveDir = path.join(this.projectPath, '.specstory', 'archive');
+    const archiveDir = path.join(this.stateDir, 'archive');
     if (fs.existsSync(archiveDir)) {
       const archiveFiles = fs.readdirSync(archiveDir);
       const uncompressed = archiveFiles.filter(f => !f.endsWith('.gz'));
@@ -1275,8 +1278,9 @@ class LSLConfigValidator {
     }
 
     // Save detailed report
-    const reportPath = path.join(this.projectPath, '.specstory', 'validation-report.json');
+    const reportPath = path.join(this.stateDir, 'validation-report.json');
     try {
+      fs.mkdirSync(this.stateDir, { recursive: true });
       fs.writeFileSync(reportPath, JSON.stringify(this.validationResults, null, 2));
       console.log(`\n📄 Detailed report saved: ${reportPath}`);
     } catch (error) {

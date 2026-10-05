@@ -3729,7 +3729,7 @@ initialize_knowledge_databases() {
     info "Initializing knowledge management system..."
     if node scripts/initialize-knowledge-system.js --project-path "$CODING_REPO"; then
         success "✓ Knowledge management system initialized"
-        info "  • Configuration: .specstory/config/knowledge-system.json"
+        info "  • Configuration: config/knowledge-system.json"
         if [[ "$qdrant_available" == true ]]; then
             info "  • Qdrant collections: knowledge_patterns, trajectory_analysis, session_memory"
         fi

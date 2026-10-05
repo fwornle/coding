@@ -234,6 +234,33 @@ addresses the old path. Goal: nothing addresses it; new repos get no `.specstory
 - Accept: `git grep '\.specstory/history'` = docs/migration code only; a fresh repo launched
   with `learning` has no `.specstory/`; tests green; live session logs still land.
 
+### T10 — Retire the rest of `.specstory/`  `status: done`
+
+T9 left `.specstory/` holding things that were never history. Goal: no repo has a
+`.specstory/` of coding's making; the legacy layout is only recognised and migrated.
+
+- [x] Redaction + sensitivity rules → `config/redaction/` (tools repo — they ship with coding):
+      `ConfigurableRedactor` resolves `REDACTION_CONFIG_DIR` from its own module (was
+      `<cwd>/.specstory/config` — obs-api's writer/consolidator passed a `configDir` the
+      constructor ignored, and a missing file made it WRITE a default `.specstory/config/` into
+      whatever cwd it ran in); `enhanced-redaction-system.cjs` exports `DEFAULT_CONFIG_PATH`;
+      `SensitivityClassifier` default; ETM, post-session logger, batch processor, backfills.
+- [x] rapid-llm-proxy's raw-body redactor takes the location from that export instead of
+      spelling `.specstory/config` (PR #41, branch `fix/redaction-config-location`).
+- [x] `knowledge-system.{json,schema,template}` → `config/`; `.specstory/trajectory/` (dead since
+      May) deleted; per-repo machine-local state (LSL archive, validator report, knowledge
+      migration flag/backups) → `<repo>/.coding/var/` — a legacy repo's archive stays in its
+      `.specstory/` so creating `.coding/` cannot hide its unmigrated history from the resolver.
+- [x] Container: `.specstory` bind mount + `mkdir` dropped; `config/redaction` mounted ro.
+      `.gitignore`: one `/.specstory/` line replaces eleven.
+- [x] Docs + 17 diagrams (MkDocs strict build clean); `tenancy.md` gets "What happened to `.specstory/`".
+- Left on purpose: legacy recognition (discovery, ETM project check, coordinator markers,
+  `repo-link` migration, `/sl`), the SpecStory VS Code extension (`~/.specstory`), the
+  `.specstory` markdown transcript format (converters), sandbox exclude lists.
+- Not done: ~30 repos on this machine still hold a real `.specstory/history` (+ old
+  `logs/`/`trajectory/`); the history moves on their next `coding` launch, the old runtime
+  leftovers beside it are NOT deleted automatically (user data in someone else's repo).
+
 ## Open questions (decide inside the phase)
 
 - ~~Legacy `CODING_TEAM`~~ — done 2026-10-04 (d6f88527).

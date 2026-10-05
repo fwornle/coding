@@ -31,7 +31,7 @@ class LSLFileManager extends EventEmitter {
       
       // Retention settings
       maxArchivedFiles: options.maxArchivedFiles || 50, // Keep up to 50 archived files
-      archiveDirectory: options.archiveDirectory || '.specstory/archive',
+      archiveDirectory: options.archiveDirectory || 'archive',
       
       // Monitoring settings
       monitoringInterval: options.monitoringInterval || (5 * 60 * 1000), // 5 minutes
@@ -399,12 +399,18 @@ class LSLFileManager extends EventEmitter {
   getArchiveDirectory(filePath) {
     const fileDir = path.dirname(filePath);
     
-    // If file is already in a .specstory directory, use its archive subdirectory
-    if (fileDir.includes('.specstory')) {
-      const specstoryRoot = fileDir.substring(0, fileDir.indexOf('.specstory') + '.specstory'.length);
-      return path.join(specstoryRoot, 'archive');
+    // A transcript under <repo>/.coding/history/ archives into the learning
+    // checkout's machine-local, git-ignored var/ — never into history/, which
+    // is pushed. A legacy <repo>/.specstory/history not migrated yet keeps
+    // its old sibling: creating <repo>/.coding/ there would make the history
+    // resolver (lib/history/paths.cjs) stop seeing the unmigrated transcripts.
+    const m = fileDir.match(/^(.*)[\\/](\.coding|\.specstory)[\\/]history(?:[\\/]|$)/);
+    if (m) {
+      return m[2] === '.coding'
+        ? path.join(m[1], '.coding', 'var', 'archive')
+        : path.join(m[1], '.specstory', 'archive');
     }
-    
+
     // Otherwise, create archive directory alongside the file
     return path.join(fileDir, this.config.archiveDirectory);
   }

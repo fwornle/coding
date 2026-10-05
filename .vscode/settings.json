@@ -8,7 +8,6 @@
   "git.repositoryScanMaxDepth": 0,
   "git.repositoryScanIgnoredFolders": [
     "node_modules",
-    ".specstory",
     ".coding"
   ],
   "git.ignoredRepositories": [

@@ -352,7 +352,7 @@
     },
 
     "sqlite": {
-      "path": "${PROJECT_ROOT}/.specstory/knowledge/analytics.db",
+      "path": "${PROJECT_ROOT}/.coding/var/knowledge/analytics.db",
       "_path_description": "Path to SQLite database for analytics and metadata",
 
       "walMode": true,

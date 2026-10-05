@@ -17,15 +17,22 @@
 
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// The redaction rules ship with the coding tools repo (config/redaction/), not
+// with the project being logged: every writer — ETM, obs-api, the batch
+// processor, rapid-llm-proxy via enhanced-redaction-system.cjs — applies the
+// same set, wherever its cwd happens to be.
+export const REDACTION_CONFIG_DIR = path.join(
+  path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'config', 'redaction');
 
 class ConfigurableRedactor {
   constructor(options = {}) {
     this.debug = options.debug || false;
     this.configPath = options.configPath || null;
-    this.projectPath = options.projectPath || process.cwd();
-    
+
     // Default configuration directory
-    this.defaultConfigDir = path.join(this.projectPath, '.specstory', 'config');
+    this.defaultConfigDir = REDACTION_CONFIG_DIR;
     this.defaultConfigPath = path.join(this.defaultConfigDir, 'redaction-patterns.json');
     this.defaultSchemaPath = path.join(this.defaultConfigDir, 'redaction-schema.json');
     

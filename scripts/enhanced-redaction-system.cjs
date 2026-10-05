@@ -8,8 +8,10 @@
 const fs = require('fs');
 const path = require('path');
 
-// Default config path resolved relative to this script (repo-root/.specstory/config).
-const DEFAULT_CONFIG_PATH = path.join(__dirname, '..', '.specstory', 'config', 'redaction-patterns.json');
+// Default config path resolved relative to this script (repo-root/config/redaction).
+// Exported: rapid-llm-proxy resolves the rules' location through it, so the
+// path is decided in one place.
+const DEFAULT_CONFIG_PATH = path.join(__dirname, '..', 'config', 'redaction', 'redaction-patterns.json');
 
 /**
  * Load and compile the configured redaction pattern set.
@@ -142,6 +144,7 @@ class EnhancedRedactionSystem {
 module.exports = EnhancedRedactionSystem;
 module.exports.EnhancedRedactionSystem = EnhancedRedactionSystem;
 module.exports.loadRedactionPatterns = loadRedactionPatterns;
+module.exports.DEFAULT_CONFIG_PATH = DEFAULT_CONFIG_PATH;
 
 // CLI test when run directly
 if (require.main === module) {

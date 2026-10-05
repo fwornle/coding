@@ -94,15 +94,9 @@ class KnowledgeSystemInitializer {
   async createConfigFile() {
     this.log('Step 1: Creating configuration file...');
 
-    const configDir = path.join(this.projectPath, '.specstory', 'config');
+    const configDir = path.join(this.projectPath, 'config');
     const configPath = path.join(configDir, 'knowledge-system.json');
     const templatePath = path.join(configDir, 'knowledge-system.template.json');
-
-    // Ensure config directory exists
-    if (!fs.existsSync(configDir)) {
-      fs.mkdirSync(configDir, { recursive: true });
-      this.log('Created .specstory/config directory');
-    }
 
     // Check if config already exists
     if (fs.existsSync(configPath)) {
@@ -192,7 +186,7 @@ class KnowledgeSystemInitializer {
     const checks = [];
 
     // Check 1: Config file exists
-    const configPath = path.join(this.projectPath, '.specstory', 'config', 'knowledge-system.json');
+    const configPath = path.join(this.projectPath, 'config', 'knowledge-system.json');
     checks.push({
       name: 'Configuration file',
       pass: fs.existsSync(configPath)
