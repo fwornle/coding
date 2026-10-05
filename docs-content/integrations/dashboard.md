@@ -6,13 +6,13 @@ Web-based visualization and monitoring interfaces.
 
 | Dashboard | URL | Purpose |
 |-----------|-----|---------|
-| VKB | http://localhost:8080 | Knowledge graph visualization |
+| VKB | http://127.0.0.1:12436/viewer/coding (`vkb`) | Knowledge graph visualization |
 | Constraint Monitor | http://localhost:3030 | Compliance monitoring |
 | System Health | http://localhost:3032 | Service health monitoring |
 
 ## VKB (Knowledge Visualization)
 
-**URL**: http://localhost:8080
+**URL**: http://127.0.0.1:12436/viewer/coding — served by obs-api
 
 **Start**:
 
@@ -152,11 +152,11 @@ cd lib/vkb-server && node index.js
 ### Data not updating
 
 ```bash
-# Check backend service
-curl http://localhost:8080/api/health
+# Check the backend (obs-api serves both the viewer and its data)
+curl http://127.0.0.1:12436/health
 
-# Restart service
-docker compose -f docker/docker-compose.yml restart coding-services
+# Rebuild the viewer if it looks out of date
+vkb --build
 ```
 
 ### Graph out of date or missing

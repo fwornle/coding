@@ -53,7 +53,7 @@ watch it on the dashboard or poll `semantic workflow status` rather than waiting
 
 **View Knowledge Base (VKB)**:
 ```bash
-vkb           # Opens http://localhost:8080
+vkb           # Opens http://127.0.0.1:12436/viewer/coding
 ```
 
 [Learn more about Knowledge Management](core-systems/ukb-vkb.md){ .md-button }

@@ -336,7 +336,7 @@ node scripts/test-knowledge-extraction.js [--verbose]
 # In terminal:
 vkb server start
 
-# Open browser to http://localhost:8080
+# Opens http://127.0.0.1:12436/viewer/coding
 ```
 
 ### VKB Features

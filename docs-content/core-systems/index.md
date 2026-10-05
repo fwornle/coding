@@ -77,7 +77,7 @@ other.
     | Logging | *(none)* | Runs in the background |
     | Knowledge | `semantic workflow run wave-analysis --team coding` | Extraction pass, async, 10–20 min |
     | Knowledge | `semantic workflow status` | Progress of the current run |
-    | Knowledge | `vkb` | Viewer at `localhost:8080` |
+    | Knowledge | `vkb` | Viewer at `127.0.0.1:12436/viewer/coding` |
     | Constraints | *(dashboard)* | `localhost:3030` |
     | Health | `coding --health` | Check every service |
     | Health | *(dashboard)* | `localhost:3032` |

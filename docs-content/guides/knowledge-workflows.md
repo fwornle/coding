@@ -36,7 +36,7 @@ continuous learning that runs beside it.
     ## Looking at it
 
     ```bash
-    vkb     # the viewer at localhost:8080
+    vkb     # the viewer (127.0.0.1:12436/viewer/coding)
     ```
 
 === "📖 Standard (~15 min)"

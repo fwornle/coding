@@ -164,7 +164,7 @@ flowchart TB
 | **UKB** | `semantic workflow run wave-analysis --team coding` | Knowledge extraction pass (async, 10–20 min) |
 | **UKB** | `semantic workflow run wave-analysis --team coding --debug` | Same pass with a mocked LLM, single-stepped |
 | **UKB** | `semantic workflow status` | Progress of the current run |
-| **VKB** | `vkb` | Open knowledge viewer at `localhost:8080` |
+| **VKB** | `vkb` | Open the knowledge viewer (`127.0.0.1:12436/viewer/coding`) |
 | **Constraints** | Dashboard | View at `localhost:3030` |
 | **Health** | `coding --health` | Check all service health |
 | **Health** | Dashboard | View at `localhost:3032` |

@@ -90,7 +90,7 @@ Sensitivity-aware routing for summarization is handled by the [LLM CLI Proxy](..
 # Start visualization server
 vkb
 
-# Opens browser to http://localhost:8080
+# Opens http://127.0.0.1:12436/viewer/coding
 ```
 
 ### Features

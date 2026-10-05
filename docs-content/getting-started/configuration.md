@@ -42,9 +42,9 @@ All ports are centralized in `.env.ports`:
 | 6333 | Qdrant HTTP | Docker |
 | 6379 | Redis | Docker |
 | 3034 | Health coordinator (features, teams, sync APIs) | Host |
-| 5173 | Knowledge viewer (`npm --prefix integrations/unified-viewer run dev`) | Host |
+| 5173 | Knowledge viewer dev server (only while developing it; `vkb` uses obs-api) | Host |
 | 12435 | LLM CLI Proxy | Host |
-| 12436 | obs-api — the knowledge store, retrieval, KB export/reload | Host |
+| 12436 | obs-api — the knowledge store, retrieval, KB export/reload, and the viewer at `/viewer/` | Host |
 | 12434 | Docker Model Runner | Host |
 
 The `harness` tier runs only the host rows (no Docker); the Docker rows come with
