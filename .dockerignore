@@ -72,7 +72,6 @@ Thumbs.db
 
 # Knowledge management (exclude non-insight files)
 knowledge-management/ckb/
-knowledge-management/ukb-original/
 knowledge-management/schemas/
 
 # Session history
