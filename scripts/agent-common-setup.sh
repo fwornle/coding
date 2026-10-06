@@ -21,51 +21,6 @@ source "$_AGENT_COMMON_DIR/detect-network.sh"
 # Where a repo's transcripts live (T9): repo_history_dir
 source "$_AGENT_COMMON_DIR/lib/history-dir.sh"
 
-# Ensure .data/ directory is ignored in gitignore
-# This directory contains MCP Memory LevelDB files (volatile runtime data)
-ensure_data_directory_ignored() {
-  local project_dir="$1"
-  local gitignore_file="$project_dir/.gitignore"
-
-  # Create .gitignore if it doesn't exist
-  if [ ! -f "$gitignore_file" ]; then
-    touch "$gitignore_file"
-  fi
-
-  # Check if the granular .data/ patterns are already present
-  if ! grep -q "^\.data/knowledge-graph/" "$gitignore_file" 2>/dev/null; then
-    log "🔧 Adding .data/ patterns to .gitignore (ignore binary DB, track JSON exports)..."
-
-    # Remove old blanket .data/ ignore if present
-    if grep -q "^\.data/$" "$gitignore_file" 2>/dev/null; then
-      # Use sed to remove the old pattern (cross-platform compatible)
-      if [[ "$OSTYPE" == "darwin"* ]]; then
-        sed -i '' '/^\.data\/$/d' "$gitignore_file"
-      else
-        sed -i '/^\.data\/$/d' "$gitignore_file"
-      fi
-      log "  Removed old blanket .data/ pattern"
-    fi
-
-    # Add granular .data/ patterns to gitignore
-    echo "" >> "$gitignore_file"
-    echo "# MCP Memory LevelDB (volatile runtime data)" >> "$gitignore_file"
-    echo "# Ignore binary database files, but track JSON exports" >> "$gitignore_file"
-    echo ".data/knowledge-graph/" >> "$gitignore_file"
-    echo ".data/knowledge.db" >> "$gitignore_file"
-    echo ".data/knowledge.db-shm" >> "$gitignore_file"
-    echo ".data/knowledge.db-wal" >> "$gitignore_file"
-    echo ".data/backups/" >> "$gitignore_file"
-    echo "" >> "$gitignore_file"
-    echo "# Track knowledge exports (git-reviewable JSON)" >> "$gitignore_file"
-    echo "!.data/" >> "$gitignore_file"
-    echo "!.data/knowledge-export/" >> "$gitignore_file"
-    echo "!.data/knowledge-config.json" >> "$gitignore_file"
-
-    log "✅ Added granular .data/ patterns to .gitignore"
-  fi
-}
-
 # Ensure coding infrastructure runtime files are gitignored in target projects
 # These are created by coding services and should never be committed
 ensure_coding_runtime_ignored() {
@@ -555,8 +510,10 @@ agent_common_init() {
   # Initialize the unified hooks system
   initialize_unified_hooks "$target_project_dir" "$coding_repo"
 
-  # Ensure .data/ directory is ignored (MCP Memory LevelDB runtime data)
-  ensure_data_directory_ignored "$target_project_dir"
+  # Never the project's tracked .gitignore: runtime files go to .git/info/exclude.
+  # (The old ensure_data_directory_ignored appended twelve pre-tenancy .data/
+  # lines to every project's .gitignore on launch; learned data has lived in
+  # .coding/kb since T4.)
   ensure_coding_runtime_ignored "$target_project_dir"
 
   # The repo's learning checkout <project>/.coding/ — asked on first launch,
@@ -599,7 +556,6 @@ agent_common_init() {
 
 # Export functions for use in agent-specific launchers
 export -f log
-export -f ensure_data_directory_ignored
 export -f ensure_private_history_repo
 export -f show_session_reminder
 export -f _latest_history_file repo_history_dir

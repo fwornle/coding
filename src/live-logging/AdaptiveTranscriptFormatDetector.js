@@ -10,17 +10,31 @@
 
 import fs from 'fs';
 import path from 'path';
+import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
 import { EventEmitter } from 'events';
+
+const require = createRequire(import.meta.url);
+const { varDir } = require('../../lib/paths/data-home.cjs');
+
+// The formats coding ships with (tools repo) seed what this machine learns.
+// Learned state is rewritten on every match, so it lives in the data home's
+// var/ — never in the project the monitor watches (it used to default to
+// <cwd>/config/, and the ETM's cwd IS the project: every watched repo grew a
+// config/transcript-formats.json, often committed).
+const SHIPPED_FORMATS = path.join(
+  path.dirname(fileURLToPath(import.meta.url)), '..', '..', 'config', 'transcript-formats.json');
 
 class AdaptiveTranscriptFormatDetector extends EventEmitter {
   constructor(options = {}) {
     super();
     
     this.config = {
-      configPath: options.configPath || path.join(process.cwd(), 'config', 'transcript-formats.json'),
+      configPath: options.configPath || path.join(varDir(), 'transcript-formats.json'),
       sampleSize: options.sampleSize || 100, // Messages to analyze for format detection
       confidenceThreshold: options.confidenceThreshold || 0.8,
-      debug: options.debug || false
+      debug: options.debug || false,
+      explicitPath: Boolean(options.configPath)
     };
     
     this.knownFormats = new Map();
@@ -32,8 +46,10 @@ class AdaptiveTranscriptFormatDetector extends EventEmitter {
    */
   loadKnownFormats() {
     try {
-      if (fs.existsSync(this.config.configPath)) {
-        const configData = JSON.parse(fs.readFileSync(this.config.configPath, 'utf8'));
+      const source = fs.existsSync(this.config.configPath) ? this.config.configPath
+        : (!this.config.explicitPath && fs.existsSync(SHIPPED_FORMATS) ? SHIPPED_FORMATS : null);
+      if (source) {
+        const configData = JSON.parse(fs.readFileSync(source, 'utf8'));
         
         for (const [formatId, formatDef] of Object.entries(configData.formats || {})) {
           this.knownFormats.set(formatId, {
