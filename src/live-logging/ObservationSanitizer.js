@@ -69,7 +69,7 @@ export class ObservationSanitizer {
     return out.split('\n').filter((p) => {
       if (!p) return false;
       if (p.startsWith('node_modules/') || p.includes('/node_modules/')) return false;
-      if (p.startsWith('.specstory/')) return false;
+      if (p.startsWith('.coding/') || p.startsWith('.specstory/')) return false;
       if (/\.(png|jpg|jpeg|gif|webp|ico|woff2?|ttf|eot)$/i.test(p)) return false;
       return true;
     });

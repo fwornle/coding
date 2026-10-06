@@ -1274,13 +1274,7 @@ class BatchLSLProcessor {
             console.log(`🗑️  Deleted empty LSL file: ${filename} (${promptSetCount} void prompt sets, all interrupted/0ms/0 tools)`);
 
             // Also delete corresponding classification log file
-            const classificationDir = path.join(
-              root,
-              '.specstory',
-              'history',
-              'logs',
-              'classification'
-            );
+            const classificationDir = path.join(dir, 'logs', 'classification');
 
             if (fs.existsSync(classificationDir)) {
               // Find classification files matching this time window (recurse YYYY/MM)
