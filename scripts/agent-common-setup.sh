@@ -528,12 +528,11 @@ initialize_unified_hooks() {
     log "Created user hooks directory: $user_hooks_dir"
   fi
 
-  # Create project-level hooks directory if it doesn't exist
-  local project_hooks_dir="$target_project_dir/.coding"
-  if [ ! -d "$project_hooks_dir" ]; then
-    mkdir -p "$project_hooks_dir"
-    log "Created project hooks directory: $project_hooks_dir"
-  fi
+  # No project-level directory is created here: <project>/.coding/ is the
+  # learning checkout (repo-link.mjs owns it), and an optional
+  # .coding/hooks.json is only read when present. Creating an empty .coding/
+  # on every launch made the history resolver (lib/history/paths.cjs) stop
+  # seeing a legacy .specstory/history that had not been migrated yet.
 
   log "Unified hooks system initialized for agent: $agent_type"
 }

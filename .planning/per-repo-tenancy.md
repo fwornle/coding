@@ -257,6 +257,13 @@ T9 left `.specstory/` holding things that were never history. Goal: no repo has 
 - Left on purpose: legacy recognition (discovery, ETM project check, coordinator markers,
   `repo-link` migration, `/sl`), the SpecStory VS Code extension (`~/.specstory`), the
   `.specstory` markdown transcript format (converters), sandbox exclude lists.
+- [x] 2026-10-06, found launching pofo (no git repo): the launch never migrated, and still wrote
+      into a fresh `.coding/`. Two causes: `initialize_unified_hooks` created an empty
+      `<project>/.coding/` ("project hooks directory") BEFORE the learning-repo step, and the
+      resolver took any `.coding/` as "migrated" — so a real `.specstory/history` went invisible
+      (also the cause of four repos found with an empty `.coding/` the day before); and
+      `ensure()` returned `not-a-repo` before migrating. Fixed: no mkdir; the resolver keys on a
+      real `.coding/history`; a non-git folder still has its legacy history moved. pofo migrated.
 - Not done: ~30 repos on this machine still hold a real `.specstory/history` (+ old
   `logs/`/`trajectory/`); the history moves on their next `coding` launch, the old runtime
   leftovers beside it are NOT deleted automatically (user data in someone else's repo).
