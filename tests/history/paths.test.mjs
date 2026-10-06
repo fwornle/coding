@@ -37,6 +37,10 @@ const LAYOUTS = {
   }, '.coding/history'],
   'skipped: a local .coding/ only': [(r) => mkdirSync(join(r, '.coding')), '.coding/history'],
   'not launched since T3: a real .specstory/history': [(r) => mkdirSync(join(r, '.specstory', 'history'), { recursive: true }), '.specstory/history'],
+  'an empty .coding/ does not hide a real legacy history (pofo, 2026-10-06)': [(r) => {
+    mkdirSync(join(r, '.coding'));
+    mkdirSync(join(r, '.specstory', 'history'), { recursive: true });
+  }, '.specstory/history'],
   'both real (mid-migration): .coding wins': [(r) => {
     mkdirSync(join(r, '.coding', 'history'), { recursive: true });
     mkdirSync(join(r, '.specstory', 'history'), { recursive: true });

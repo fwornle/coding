@@ -233,6 +233,17 @@ describe('migration from the older layouts', () => {
     assert.ok(!existsSync(join(project, '.specstory', 'history')), 'the emptied legacy dir is gone, no symlink in its place');
   });
 
+  test('a folder that is no git repo still has its .specstory/history moved (pofo, 2026-10-06)', async () => {
+    const { base, opts } = fixture();
+    const dir = join(base, 'plain');
+    mkdirSync(join(dir, '.specstory', 'history', 'logs'), { recursive: true });
+    writeFileSync(join(dir, '.specstory', 'history', 'logs', 'system.log'), 'old\n');
+    const r = await link.ensure(dir, { ...opts, auto: 'no' });
+    assert.equal(r.action, 'not-a-repo');
+    assert.ok(existsSync(join(dir, '.coding', 'history', 'logs', 'system.log')));
+    assert.ok(!existsSync(join(dir, '.specstory')), 'nothing of ours left in .specstory/');
+  });
+
   test('the symlink an earlier launch created is removed; a foreign one is left', async () => {
     const { project, opts } = fixture();
     mkdirSync(join(project, '.coding', 'history'), { recursive: true });
