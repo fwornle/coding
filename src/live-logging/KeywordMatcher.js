@@ -358,7 +358,7 @@ class KeywordMatcher {
           'semantic-analysis', 'coding-keywords'
         ],
         path_patterns: [
-          '/coding/', 'scripts/', 'knowledge-management/', '.specstory/'
+          '/coding/', 'scripts/', 'knowledge-management/', '.coding/history/', '.specstory/'
         ],
         mcp_patterns: [
           // mcp__ tokens retained for transcripts predating the 2026-08-27 CLI move.

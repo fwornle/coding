@@ -59,7 +59,7 @@ function buildPathIndex() {
   const paths = out.split('\n').filter((p) => {
     if (!p) return false;
     if (p.startsWith('node_modules/') || p.includes('/node_modules/')) return false;
-    if (p.startsWith('.specstory/')) return false;  // these are huge LSL transcripts
+    if (p.startsWith('.coding/') || p.startsWith('.specstory/')) return false;  // huge LSL transcripts
     if (p.endsWith('.png') || p.endsWith('.jpg') || p.endsWith('.gif')) return false;
     return true;
   });

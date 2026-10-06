@@ -4112,6 +4112,7 @@ ${memberBlock}`,
   static EXCLUDED_PATHS = [
     ':!.data',
     ':!.planning',
+    ':!.coding',
     ':!.specstory',
     ':!.claude/worktrees',
     ':!node_modules',

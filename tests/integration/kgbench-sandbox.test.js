@@ -117,6 +117,11 @@ describe('DEFAULT_EXCLUDES', () => {
     expect(DEFAULT_EXCLUDES).toContain('.data');
   });
 
+  it('removes the session logs that recorded the solutions — both layouts', () => {
+    expect(DEFAULT_EXCLUDES).toContain('.coding');     // learning checkout: history/ + kb/
+    expect(DEFAULT_EXCLUDES).toContain('.specstory');  // a target repo not migrated yet
+  });
+
   it('does NOT remove config/kgbench wholesale — arms.json is a question\'s ground truth', () => {
     expect(DEFAULT_EXCLUDES).not.toContain('config/kgbench');
     expect(DEFAULT_EXCLUDES).not.toContain('lib/kgbench');

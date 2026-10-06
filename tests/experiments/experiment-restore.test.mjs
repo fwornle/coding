@@ -111,6 +111,9 @@ test('neutralizeSandboxKnowledge: removes the KB corpus and the agent-memory poi
   fs.mkdirSync(path.join(wt, '.planning'), { recursive: true });
   fs.writeFileSync(path.join(wt, '.planning', 'STATE.md'), 'state');
   fs.mkdirSync(path.join(wt, '.specstory'), { recursive: true });
+  // The learning checkout: verbatim transcripts of the sessions that solved the task, and the KB.
+  fs.mkdirSync(path.join(wt, '.coding', 'history', '2026', '10'), { recursive: true });
+  fs.writeFileSync(path.join(wt, '.coding', 'history', '2026', '10', 's.jsonl'), '{"text":"the fix is persistOnClose false"}');
   fs.mkdirSync(path.join(wt, '.claude'), { recursive: true });
   fs.writeFileSync(path.join(wt, '.claude', 'settings.local.json'), '{"permissions":{"allow":["Bash(ls ~/.claude/projects/-x/memory/foo.md)"]}}');
   // Ordinary source must survive — this strips knowledge, not the repo.
@@ -128,6 +131,11 @@ test('neutralizeSandboxKnowledge: removes the KB corpus and the agent-memory poi
     'the KB export is the corpus kb-on injects — kb-off must not be able to grep it',
   );
   assert.equal(fs.existsSync(path.join(wt, 'knowledge-management', 'insights', 'a.md')), false);
+  assert.ok(removed.includes('.coding'), 'the learning checkout must go');
+  assert.equal(
+    fs.existsSync(path.join(wt, '.coding', 'history', '2026', '10', 's.jsonl')), false,
+    'a session transcript records the solution — kb-off must not be able to grep it',
+  );
   assert.ok(removed.includes(path.join('.data', 'kb-ab-sampler')));
   assert.equal(
     fs.existsSync(path.join(wt, '.data', 'kb-ab-sampler', 'facts', 'kbm-x.json')), false,

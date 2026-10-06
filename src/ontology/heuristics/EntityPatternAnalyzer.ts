@@ -35,6 +35,7 @@ export class EntityPatternAnalyzer {
           'src/knowledge-management',
           'src/live-logging',
           'scripts',
+          '.coding/history',
           '.specstory',
         ],
       ],

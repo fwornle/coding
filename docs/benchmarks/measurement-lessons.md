@@ -557,7 +557,7 @@ label the number a lower bound.
 
 **An agent's report about its own environment is data, not ground truth.** Those five cells
 state that the repository is not checked out. It is: the sandbox is a verified worktree whose
-exclusion list covers `.data`, `.specstory` and `CLAUDE.md` — anti-leakage, not source. The
+exclusion list covers `.data`, the session logs (`.coding`, legacy `.specstory`) and `CLAUDE.md` — anti-leakage, not source. The
 arm had `Read` but no `Glob`/`Grep`, so with an index that does not cover YAML it had no path
 to read, and inferred absence from its own inability to search. Only one of four arms ever made
 this claim (at least 18 cells of 172; zero for the other three), which is what made it visible. **Check
