@@ -48,7 +48,7 @@ Implementation: `lib/teams/config.cjs` — `loadTeams()`, `teamsOf(repoPath)`,
 ## Discovery
 
 `lib/teams/discover.mjs` is the one scanner: git repos carrying `.coding/` or
-`.specstory/history`, under the configured roots (default `$HOME`), skipping dot-dirs
+a legacy `.specstory/history` not migrated yet, under the configured roots (default `$HOME`), skipping dot-dirs
 and the ignore list, never through symlinks, not descending into a classified repo.
 About 250 ms for `$HOME` at depth 4. The result is cached in
 `<data home>/var/projects.json`.

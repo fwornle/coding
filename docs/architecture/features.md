@@ -15,7 +15,7 @@ the historical single-stack behaviour. Upgrading changes nothing until the user 
 
 | id | what the user calls it |
 |----|------------------------|
-| `lsl` | verbatim session logging (`.specstory` markdown) |
+| `lsl` | verbatim session logging (`<repo>/.coding/history/`) |
 | `lsl-redirect` | filing tools-infrastructure turns into the tools repo |
 | `observations` | the observation → digest → insight pipeline |
 | `knowledge` | semantic analysis, UKB workflows, the knowledge graph |

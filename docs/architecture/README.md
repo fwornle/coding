@@ -75,7 +75,7 @@ Runtime (Fast):
 
 Persistence (Reliable):
 - shared-memory-*.json (git-tracked)
-- .specstory/history/*.md (session logs)
+- .coding/history/YYYY/MM/*.jsonl (session logs, per repo)
 ```
 
 ### 3. Real-Time Quality Enforcement

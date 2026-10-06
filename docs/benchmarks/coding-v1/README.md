@@ -712,7 +712,8 @@ any arm. The middle row is CodeGraph alone.
 
 **The repository was not absent.** The run's sandbox is a full worktree at `f4f13e86a`
 (`run.json` records `mode: worktree`, `verified: true`) whose exclusion list covers `.data`,
-`.specstory`, `CLAUDE.md` and `.claude` — anti-leakage, not the source tree. `docker-compose.yml`
+the session logs (`.specstory` at the time; `.coding` since per-repo tenancy), `CLAUDE.md` and
+`.claude` — anti-leakage, not the source tree. `docker-compose.yml`
 is present and carries all three facts at lines 82-86, which is how grep reads it in 16 of 16
 cells. CodeGraph is **the only arm that ever asserts otherwise**, and it does so far more widely
 than A1: **at least 18 cells of 172**, against 0 for grep, 0 for hybrid and 0 for Graphify. (An
