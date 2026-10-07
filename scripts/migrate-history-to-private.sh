@@ -1,25 +1,30 @@
 #!/usr/bin/env bash
-# Migrate .specstory/history/ from a public/outer repo into a private nested repo.
+# Move session transcripts that the OUTER repo tracks under .specstory/history/
+# into the repo's private learning checkout, <project>/.coding/ (per-repo tenancy).
+#
+# The launcher refuses to set up .coding/ over tracked transcripts
+# (lib/history/repo-link.mjs ensure → "tracked-history") and points here.
 #
 # Usage:
 #   migrate-history-to-private.sh <project-dir> [--purge] [--auto] [--remote URL]
 #
 # Phases:
-#   A. Untrack .specstory/history/ from the outer repo (non-destructive).
+#   A. Untrack .specstory/history/ in the outer repo and commit (non-destructive:
+#      the files stay on disk, and in the outer repo's past commits).
 #   B. (--purge only) Rewrite outer repo history with git-filter-repo to remove
 #      .specstory/history/ from every past commit, then FORCE-PUSH to origin.
 #      DESTRUCTIVE: rewrites shared history. Anyone with a clone must re-clone.
 #      The on-host backup is kept at <project>/../<project>.pre-purge-<ts>.bundle.
-#   C. Bootstrap a private nested git repo at .specstory/history/, set the
-#      remote (defaults to what the launcher offers: <gh user>/<name>-history),
-#      attempt to create the private repo via gh if missing, push initial commit.
+#   C. Hand over to lib/history/repo-link.mjs ensure — the same code every
+#      `coding` launch runs: the transcripts move into .coding/history/, the
+#      private remote (default: what the launcher offers, <user>/<name>-history)
+#      is created if missing and linked, the choice is recorded, and .coding/ is
+#      excluded through .git/info/exclude. Migrated transcripts are committed
+#      locally, never pushed from here — `coding sync --push` does that.
 #
 # Safety:
 #   - Phase B requires --purge AND an explicit "yes-purge-<repo>" typed back.
-#   - Working tree must be clean before phase A.
-#   - Outer remote must be reachable.
-#   - Skipped repos write .specstory/.history-repo-skipped so the launcher
-#     won't re-prompt.
+#   - Working tree must be clean outside .specstory/history/ before phase A.
 
 set -euo pipefail
 
@@ -35,7 +40,7 @@ while [ $# -gt 0 ]; do
     --auto)  AUTO=true; shift ;;
     --remote) REMOTE_URL="$2"; shift 2 ;;
     -h|--help)
-      sed -n '2,32p' "$0"
+      sed -n '2,28p' "$0"
       exit 0
       ;;
     *)
@@ -53,7 +58,6 @@ if [ -z "$PROJECT_DIR" ]; then
 fi
 PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"
 NAME="$(basename "$PROJECT_DIR")"
-HISTORY_DIR="$PROJECT_DIR/.specstory/history"
 
 step() { echo ""; echo "── $1"; }
 fail() { echo "❌ $1" >&2; exit 1; }
@@ -101,33 +105,18 @@ if [ -z "$REMOTE_URL" ]; then
 fi
 echo "  Private history remote: $REMOTE_URL"
 
-if [ -e "$HISTORY_DIR/.git" ]; then
-  ok "Nested repo already present — skipping phase A/C bootstrap"
-  NESTED_PRESENT=true
-else
-  NESTED_PRESENT=false
-fi
-
 # ----------------------------- phase A --------------------------------------
-if [ "$TRACKED_COUNT" -gt 0 ] && [ "$NESTED_PRESENT" = false ]; then
+if [ "$TRACKED_COUNT" -gt 0 ]; then
   step "Phase A: untrack .specstory/history/ in outer repo"
   if [ "$AUTO" != "true" ]; then
     read -r -p "Proceed with: git rm -r --cached .specstory/history/ + commit + push? [y/N] " ans
     case "$ans" in y|Y|yes) ;; *) fail "User aborted phase A" ;; esac
   fi
 
-  git -C "$PROJECT_DIR" rm -r --cached .specstory/history/ >/dev/null
-  # Add to .gitignore if not already
-  if ! grep -qxF ".specstory/history/" "$PROJECT_DIR/.gitignore" 2>/dev/null \
-     && ! grep -qxF ".specstory/history" "$PROJECT_DIR/.gitignore" 2>/dev/null; then
-    {
-      echo ""
-      echo "# Private history repo — chat logs live in a separate <name>-history repo"
-      echo ".specstory/history/"
-    } >> "$PROJECT_DIR/.gitignore"
-    git -C "$PROJECT_DIR" add .gitignore
-  fi
-  git -C "$PROJECT_DIR" commit -m "chore: stop tracking .specstory/history (moving to private repo)" >/dev/null
+  git -C "$PROJECT_DIR" rm -r -q --cached .specstory/history/
+  # No .gitignore edit: repo-link (phase C) excludes .coding/ and the legacy path
+  # through .git/info/exclude — a tracked .gitignore is the project's, not ours.
+  git -C "$PROJECT_DIR" commit -q -m "chore: stop tracking .specstory/history (session logs move to the private learning repo)"
   ok "Untracked + committed"
 
   if [ -n "$OUTER_REMOTE" ]; then
@@ -180,92 +169,20 @@ if [ "$PURGE" = true ]; then
 fi
 
 # ----------------------------- phase C --------------------------------------
-step "Phase C: bootstrap private nested history repo"
-
-if [ "$NESTED_PRESENT" = true ]; then
-  ok "Nested repo already exists at $HISTORY_DIR/.git — skipping init"
-else
-  mkdir -p "$HISTORY_DIR"
-  git -C "$HISTORY_DIR" init -b main >/dev/null
-  ok "Initialized $HISTORY_DIR as a git repo"
-
-  if [ -z "$(ls -A "$HISTORY_DIR" 2>/dev/null | grep -v '^\.git$')" ]; then
-    cat > "$HISTORY_DIR/README.md" <<EOF
-# ${NAME}-history
-
-Private LSL/session history for the **${NAME}** project. Created by
-\`migrate-history-to-private.sh\`. Do not make this repo public.
-EOF
-  fi
-
-  git -C "$HISTORY_DIR" remote add origin "$REMOTE_URL" 2>/dev/null \
-    || git -C "$HISTORY_DIR" remote set-url origin "$REMOTE_URL"
-  git -C "$HISTORY_DIR" add -A
-  git -C "$HISTORY_DIR" commit -m "Initial private history repo for ${NAME}" >/dev/null
-  ok "Configured remote $REMOTE_URL + initial commit"
+step "Phase C: move into the private learning checkout (.coding/)"
+TOOLS_REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if ! RESULT="$(node "$TOOLS_REPO/lib/history/repo-link.mjs" ensure "$PROJECT_DIR" --remote "$REMOTE_URL" --no-ask)"; then
+  fail "repo-link ensure failed — see the messages above"
 fi
-
-# Try to create the remote repo via gh if it doesn't exist
-if [ "$AUTO" = "true" ]; then
-  CREATE_ANS="y"
-elif command -v gh >/dev/null 2>&1; then
-  read -r -p "  Create the private repo on bmw.ghe.com via \`gh\` if missing? [Y/n] " CREATE_ANS
-  CREATE_ANS="${CREATE_ANS:-y}"
-fi
-
-if [ "${CREATE_ANS:-n}" = "y" ] || [ "$CREATE_ANS" = "Y" ]; then
-  # Parse host + owner/repo from either git@host:owner/repo.git or https://host/owner/repo.git
-  if [[ "$REMOTE_URL" =~ ^https://([^/]+)/(.+)\.git$ ]]; then
-    HOST_PART="${BASH_REMATCH[1]}"
-    REPO_PART="${BASH_REMATCH[2]}"
-  elif [[ "$REMOTE_URL" =~ ^[^@]+@([^:]+):(.+)\.git$ ]]; then
-    HOST_PART="${BASH_REMATCH[1]}"
-    REPO_PART="${BASH_REMATCH[2]}"
-  else
-    HOST_PART=""
-    REPO_PART=""
-  fi
-  if [ -z "$HOST_PART" ] || [ -z "$REPO_PART" ]; then
-    # The URL parsed as neither https://host/owner/repo.git nor git@host:owner/repo.git
-    # — e.g. a bare local path passed via --remote. Both branches below would then be
-    # called with an empty "/" argument, and `gh repo create /` is a request we have no
-    # business making. Skip the whole block; the push below still works for a local remote.
-    echo "  (remote is not a host/owner/repo URL — skipping gh existence check + auto-create)"
-  else
-    echo "  Checking gh for: $HOST_PART/$REPO_PART"
-    # Existence check via the REST API, NOT `gh -R <repo> repo view`: -R is not a valid
-    # pre-subcommand flag (gh 2.96 exits with "unknown shorthand flag: 'R' in -R"), so
-    # that form ALWAYS reported "missing" and fell through to create — silently, because
-    # stderr was discarded. On a repo that already exists the create then failed too and
-    # printed the manual-fix warning, which read as a real problem when nothing was wrong.
-    #
-    # REST rather than `gh repo view --json`: both work, but repo view goes through
-    # GraphQL, and this host returned a transient `Post https://api.bmw.ghe.com/graphql:
-    # Bad Gateway` during testing. A false "missing" is only mildly wrong (create fails,
-    # push still succeeds), but there is no reason to take the flakier path.
-    if gh api --hostname "$HOST_PART" "repos/$REPO_PART" >/dev/null 2>&1; then
-      ok "Remote repo exists"
-    else
-      if gh repo create "$HOST_PART/$REPO_PART" --private --description "Private LSL history for $NAME" >/dev/null 2>&1; then
-        ok "Created private remote repo: $HOST_PART/$REPO_PART"
-      else
-        echo "  ⚠️  Could not auto-create remote — create manually then re-run push"
-      fi
-    fi
-  fi
-fi
-
-# Push initial commit
-if git -C "$HISTORY_DIR" push -u origin main 2>&1 | tail -3; then
-  ok "Pushed initial private history to $REMOTE_URL"
-else
-  echo "  ⚠️  Push failed — fix remote and run: git -C $HISTORY_DIR push -u origin main"
-fi
-
-# Remove skip marker if present
-rm -f "$PROJECT_DIR/.specstory/.history-repo-skipped"
+echo "  $RESULT"
+case "$RESULT" in
+  *'"tracked-history"'*) fail "the outer repo still tracks .specstory/history — phase A did not run (pass a clean tree)" ;;
+esac
+[ -d "$PROJECT_DIR/.coding/history" ] || fail "no $PROJECT_DIR/.coding/history after ensure"
+ok "Transcripts in $PROJECT_DIR/.coding/history ($(find "$PROJECT_DIR/.coding/history" -type f -not -path '*/.git/*' | wc -l | tr -d ' ') files)"
 
 step "Done: $NAME"
-echo "  • Outer repo: tracked → ignored"
+echo "  • Outer repo: .specstory/history untracked (no .gitignore change; .coding/ excluded via .git/info/exclude)"
 [ "$PURGE" = true ] && echo "  • Outer history: purged + force-pushed"
-echo "  • Private repo: $HISTORY_DIR → $REMOTE_URL"
+echo "  • Learning checkout: $PROJECT_DIR/.coding → $REMOTE_URL"
+echo "  • Push the migrated transcripts when ready:  coding sync --push"

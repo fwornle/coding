@@ -41,7 +41,7 @@ sharing**: the repo, not the install.
 
 | # | Decision |
 |---|---|
-| D1 | Per-repo learned data lives in a nested checkout **`<repo>/.coding/`** (the `X-history` repo), with `history/` (LSL) and `kb/` (KB exports, measurement exports). Ignored by the outer repo. `<repo>/.specstory/history` becomes a symlink into `.coding/history/` for SpecStory compatibility. |
+| D1 | Per-repo learned data lives in a nested checkout **`<repo>/.coding/`** (the `X-history` repo), with `history/` (LSL) and `kb/` (KB exports, measurement exports). Ignored by the outer repo (`.git/info/exclude`). No `.specstory/` at all: the compatibility symlink this decision first called for was dropped by T9, and T10 moved the rest out; an old layout is only recognised and migrated. |
 | D2 | Windows = **WSL only**. No native PowerShell installer; `install.bat` is removed. |
 | D3 | Sync: **automatic pull** at session start; automatic **local commit**; **push only on confirmation** (same rule install uses today). |
 | D4 | Submodules move to **HTTPS** URLs so a colleague needs no SSH key / access to the developer's GitHub account. |
@@ -264,6 +264,12 @@ T9 left `.specstory/` holding things that were never history. Goal: no repo has 
       (also the cause of four repos found with an empty `.coding/` the day before); and
       `ensure()` returned `not-a-repo` before migrating. Fixed: no mkdir; the resolver keys on a
       real `.coding/history`; a non-git folder still has its legacy history moved. pofo migrated.
+- [x] 2026-10-07: `scripts/migrate-history-to-private.sh` (where the launcher sends a repo whose
+      outer git TRACKS its transcripts) still bootstrapped a nested `.specstory/history` checkout
+      and appended to the project's tracked `.gitignore`. Rewritten: phase A untracks + commits,
+      phase C is `repo-link ensure --remote` (the launcher's own code) → `.coding/history`, remote
+      created private if missing, choice recorded, `.coding/` excluded via `.git/info/exclude`.
+      `tests/scripts/migrate-history-to-private.test.mjs` runs it for real (local bare remote).
 - Not done: ~30 repos on this machine still hold a real `.specstory/history` (+ old
   `logs/`/`trajectory/`); the history moves on their next `coding` launch, the old runtime
   leftovers beside it are NOT deleted automatically (user data in someone else's repo).
