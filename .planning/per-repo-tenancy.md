@@ -270,9 +270,14 @@ T9 left `.specstory/` holding things that were never history. Goal: no repo has 
       phase C is `repo-link ensure --remote` (the launcher's own code) → `.coding/history`, remote
       created private if missing, choice recorded, `.coding/` excluded via `.git/info/exclude`.
       `tests/scripts/migrate-history-to-private.test.mjs` runs it for real (local bare remote).
-- Not done: ~30 repos on this machine still hold a real `.specstory/history` (+ old
-  `logs/`/`trajectory/`); the history moves on their next `coding` launch, the old runtime
-  leftovers beside it are NOT deleted automatically (user data in someone else's repo).
+- [x] This machine's other repos (2026-10-06/07): backup tarball first
+      (`<data home>/var/legacy-specstory-backup-2026-10-06.tar.gz`); four histories hidden by an
+      empty `.coding/` migrated; our symlinks + untracked runtime leftovers removed by a
+      user-run script; dyn-arch's and `_work/ui-template`'s TRACKED histories migrated (commits in
+      those repos); `~/mirror-history` (T8 test leftover) backed up and deleted.
+      Left: real `.specstory/history` in `Agentic/iso-9001`, Budapest, `~/Agentic/_work` (move on
+      their next launch); tracked old runtime files (`logs/`, `trajectory/`) in a few repos and the
+      SpecStory extension's own files — the projects' content, not coding's.
 
 ## Open questions (decide inside the phase)
 
@@ -438,3 +443,26 @@ T9 left `.specstory/` holding things that were never history. Goal: no repo has 
 - **2026-10-05 (bin/status)** — the open question closed: dashboards that exist, gated + probed
   (test guards against the :3001 / launcher targets returning). T8 step (3) corrected for T9 (no
   `.specstory/`). Next: **T8's fresh-machine installs** (macOS user account, WSL) — needs the user.
+- **2026-10-05/06 (T10 done)** — `.specstory/` retired in coding: redaction + sensitivity rules →
+  `config/redaction/` (the redactor resolved `<cwd>/.specstory/config` and WROTE a default there
+  when missing), knowledge-system config → `config/`, trajectory deleted, LSL archive / validator
+  report → `<repo>/.coding/var/`, container mount swapped (069b65e2). rapid-llm-proxy resolves the
+  rules through coding's exported `DEFAULT_CONFIG_PATH` (rapid-llm-proxy#41); proxy restarted,
+  27 patterns live. Docs + 17 diagrams (91352f3c). Launching pofo exposed two migration holes:
+  `initialize_unified_hooks` created an empty `.coding/` that hid an unmigrated history, and a
+  non-git folder was never migrated — resolver keys on a real `.coding/history`, `ensure()`
+  migrates either way (b62199eb). Two more writers into projects removed: twelve `.data/` lines
+  appended to every tracked `.gitignore`, and `config/transcript-formats.json` learned into
+  every watched repo (now `<data home>/var/`) (89969983); the stray copies are gone from all 23
+  repos (15 removal commits, 8 untracked deleted).
+- **2026-10-06 (anti-leakage)** — the kgbench and experiment sandbox strips named only
+  `.specstory`; they now also strip `.coding` (history + kb), with tests planting a transcript
+  (8075e4db). No leak had happened: a coding worktree carries no `.coding/` (verified with a real
+  `git worktree add`). coding-v1 A1 and `docs/architecture/` follow (a699263e); `report.json`
+  stays the run's record.
+- **2026-10-07** — `migrate-history-to-private.sh` rewritten for `.coding/` (phase C =
+  `repo-link ensure --remote`; real test against a local bare remote) and D1 corrected (7ff5ca56).
+  Used on `_work/ui-template`: 24 tracked transcripts → the shared `ui-template-history`, both
+  checkouts of the project merged through it. All 19 learning repos committed + pushed.
+  Next: **T8's fresh-machine installs** (macOS user account, WSL) — the only open tenancy item,
+  needs the user; this week's fixes are exactly what a first launch on a fresh machine hits.
