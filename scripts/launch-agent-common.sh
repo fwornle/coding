@@ -868,7 +868,7 @@ launch_agent() {
   #    feature runs in the container, so a machine without Docker Desktop is
   #    never nudged to start it.
   if [ "$CODING_NEEDS_DOCKER" = "true" ]; then
-    early_docker_launch
+    early_docker_launch || true
   fi
 
   # 8. Session ID + register

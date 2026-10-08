@@ -517,40 +517,31 @@ docker compose -f docker/docker-compose.yml logs coding-services
 
 The launcher automatically manages Docker Desktop availability via `scripts/ensure-docker.sh`, eliminating the need for users to manually start Docker before running `coding`.
 
-### Auto-Start Flow (macOS)
+### Supervised Start
 
 When the launcher detects that Docker is not running:
 
-1. **Check Docker client** — Verifies the `docker` CLI is installed
-2. **Check daemon responsiveness** — Runs `docker ps` with a 5-second timeout
-3. **Start Docker Desktop** — Launches via `open -F -a "Docker"` and waits for the process to appear
-4. **Wait for daemon** — Polls every second for up to 45 seconds with progress updates every 10 seconds
+1. **Check daemon** — `docker ps` with a 5-second timeout
+2. **Early launch** (non-blocking, runs in parallel with session setup) — macOS `open -g -F -a Docker`; Windows/WSL `Start-Process "Docker Desktop.exe"`; Linux `systemctl [--user] start --no-block` for Docker Desktop for Linux, rootless or system dockerd (`sudo -n`, never a password prompt)
+3. **Supervised wait** — polls every 2s for up to `DOCKER_TIMEOUT` (default 180s, counted from the early launch) and watches the *engine process* (`com.docker.backend`, `com.docker.backend.exe` via `tasklist.exe`, or the systemd unit):
+   - **engine exited** → the launch died; relaunch (up to `DOCKER_START_ATTEMPTS`, default 4)
+   - **engine alive but daemon unresponsive for `DOCKER_HUNG_AFTER`** (default 120s) → kill and relaunch once
 
-### Hung Docker Recovery
+### Why relaunching matters (macOS)
 
-Docker Desktop can enter a "process running but daemon unresponsive" state (common after failed updates). The launcher detects and auto-recovers:
+Shortly after a reboot — and also when launched right after a previous instance quit — Docker Desktop often kills itself: its internal fork/exec server fails with `sending file descriptors: broken pipe`, so the Electron UI and `com.docker.build` never spawn, and ~10s later the backend logs `shutting down engines` and exits. This is the "takes 2–3 attempts to start Docker" symptom — each attempt is a full launch that dies on its own, so waiting longer cannot help. The suspected trigger is endpoint-security software (Defender, CyberArk EPM) gating each exec; this is not confirmed. Evidence lives in `~/Library/Containers/com.docker.docker/Data/log/host/com.docker.backend.log`.
 
-1. **Graceful quit** — `osascript -e 'quit app "Docker"'` (2s wait)
-2. **Force kill** — `killall` for Docker Desktop, com.docker.backend, com.docker.vmnetd (3s wait)
-3. **Verify gone** — Loop up to 5s checking processes
-4. **Final force kill** — `pkill -9` for stubborn processes (2s wait)
-5. **Relaunch** — `open -F -a "Docker"` and wait for daemon readiness
+Liveness is keyed on `com.docker.backend`, not on the `Docker Desktop` UI process: the UI is spawned by the backend, appears late, and never appears in the failure above.
 
-### Timeout Strategy
+### Timeouts
 
-| Phase | Timeout | Purpose |
-|-------|---------|---------|
-| Daemon check | 5s | Quick responsiveness test |
-| Initial wait | 45s (configurable via `DOCKER_TIMEOUT`) | Fresh launch startup |
-| Smart elapsed | Remaining from 45s | Accounts for time already spent |
-| Restart recovery | +30s | Additional time after auto-restart |
-| Minimum fallback | 10s | Always gives at least 10s more |
+| Setting | Default | Purpose |
+|---------|---------|---------|
+| `DOCKER_TIMEOUT` | 180s | Total budget across all relaunches |
+| `DOCKER_START_ATTEMPTS` | 4 | Max launches when Docker dies during startup |
+| `DOCKER_HUNG_AFTER` | 120s | Engine alive but daemon silent → restart once |
 
-If Docker still isn't ready after all timeouts, the launcher continues with a warning — it does not block startup.
-
-### Linux Support
-
-On Linux, the launcher uses `systemctl start docker` if systemd is available. If not, it displays the appropriate manual command.
+If Docker is still not ready, the launcher exits with platform-specific help (it only requires Docker when `knowledge`, `codegraph` or `constraints` is enabled).
 
 ---
 
