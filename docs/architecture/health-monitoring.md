@@ -207,7 +207,7 @@ The verifier compares host `stat` vs `docker exec stat` for each bind-mounted fi
 
 | Watched file | Why |
 |--------------|-----|
-| `.constraint-monitor.yaml` | Constraint config — drift breaks the dashboard |
+| `config/constraints/constraint-monitor.yaml` | Constraint config — directory-mounted (a single-file mount goes stale on replace) |
 | `integrations/system-health-dashboard/server.js` | Dashboard code — drift causes startup failures |
 | `scripts/consolidate-observations.js` | Consolidator CLI — drift desyncs heartbeat schema |
 

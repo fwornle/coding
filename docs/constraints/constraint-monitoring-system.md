@@ -212,7 +212,7 @@ Your actual task description goes here...
 OVERRIDE_CONSTRAINT: documentation-style-skill-required
 OVERRIDE_CONSTRAINT: plantuml-standard-styling
 
-Fix the constraint patterns in .constraint-monitor.yaml
+Fix the constraint patterns in config/constraints/constraint-monitor.yaml
 ```
 
 #### Override Mechanism
