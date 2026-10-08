@@ -231,17 +231,21 @@ same gap hits OpenCode's `github-copilot` provider (it bypasses the proxy today)
 
   **Verdict: option A is technically viable** for both Copilot paths. Remaining gate:
   IT-security sign-off for a local TLS-intercepting proxy.
-- [ ] S6 Windows native: `node:sqlite`, spawn of the 4 agent CLIs (`.cmd` shims, with/without
-      shell), CA trust through the intercepting proxy (opencode, claude). Spike ready on branch
-      `g0-s6-windows` of the glass repo (`spike/db.mjs`, `spike/agents.mjs`, pure-JS CA via
-      node-forge; chained through the machine's corporate proxy via `GLASS_UPSTREAM_PROXY` /
-      `HTTPS_PROXY`; workflow `.github/workflows/s6-platform-spike.yml`). Local run behind
-      proxydetox: all four agents spawn with and without a shell; opencode (`models.dev` 200) and
-      claude (`api.anthropic.com` 401/200) both trust the pure-JS CA, no TLS errors.
-      As a personal repo the run never started (hosted runners disabled, run 304329072). Moved to
-      AIMAAD; the rules block updating `g0-s6-windows`, so the spike runs from the new branch
-      `g0-s6-platform` (run 304427957).
-- [ ] S7 copilot OTel against GitHub directly (needs a fresh `copilot /login` — user).
+- [x] S6 platform spike (glass branch `g0-s6-opencode-trust`, CI run 305053962 on AIMAAD
+      runners — ubuntu + windows-latest, Node 22.13.0 / 22.23.3; macOS run locally, Node 25.8.1,
+      chained through proxydetox :3128): `node:sqlite` WAL ok everywhere; all four agent CLIs
+      spawn (Windows: only with `shell: true` — npm `.cmd` shims); **all four trust the pure-JS CA**
+      through the intercepting proxy (opencode, claude, copilot, pi decrypted, 0 cert errors).
+      AIMAAD has no macOS runners (jobs only queue) — macOS stays a local/cleanroom check.
+      Findings for G1/G3: (1) enterprise copilot talks to `copilot-api.<tenant>.ghe.com`, which
+      must be in the intercept list; (2) with `shell: true` on Windows, args need cmd quoting
+      (a multi-word prompt splits) — use cross-spawn-style escaping; (3) copilot rejects classic
+      `ghp_` tokens client-side; (4) stored logins flow through the proxy even with dummy env keys
+      — captured traffic is sensitive by default.
+- [ ] S7 one measured copilot call, proxy vs OTel (`spike/copilot-measure.mjs` on
+      `g0-s6-opencode-trust`). 2026-10-08 run: blocked — copilot's stored bmw.ghe.com login is
+      invalid (`no authenticated GitHub host available`, models 401), with and without the proxy.
+      Needs `copilot` → `/login` (user), then `node spike/copilot-measure.mjs`.
 
 ## Phases
 
@@ -293,3 +297,6 @@ one package, zero native deps.
   runners disabled on bmw.ghe.com for this repo. Plan committed + pushed (270ebacb).
   Spike gained corporate-proxy chaining (verified locally). Repo transferred to `AIMAAD/glass`;
   AIMAAD's ruleset (PR-only, 3 Wiz checks, every branch) → spike re-pushed as `g0-s6-platform`.
+- **2026-10-08 (S6 done, S7)** — S6 green on ubuntu + windows (CI) and macOS (local, chained);
+  copilot + pi added to the trust check. S7 script written; blocked on copilot `/login`.
+  Repo still has no `main` (default = `g0-s6-windows`) — user to create it.
