@@ -83,6 +83,7 @@ import { filterConsequential, isTrivialRun } from '../lib/experiments/consequent
 import { recordHarnessFixtures } from '../lib/repro/fixtures/harness-record.mjs';
 import { sanitizeTaskId } from '../lib/repro/capture-snapshot.mjs';
 import { proxyDataDir, observationExportDir } from '../lib/paths/index.mjs';
+import { proxyDistDir } from '../lib/proxy/proxy-paths.cjs';
 
 const REPO_ROOT = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
 
@@ -94,8 +95,7 @@ const REPO_ROOT = process.env.CODING_REPO || path.resolve(import.meta.dirname, '
 // gzip an empty dir and link a snapshot that is not the one the run recorded.
 const DATA_DIR = proxyDataDir();
 
-const PROXY_DIST = process.env.LLM_PROXY_DIST_DIR
-  || path.resolve(REPO_ROOT, '..', '_work', 'rapid-llm-proxy', 'dist');
+const PROXY_DIST = proxyDistDir();
 
 // The three deterministic, harness-derived (non-LLM) rubric dims (76-03, D-08).
 const NON_GSD_DIMS = Object.freeze(['code_quality', 'test_coverage', 'regressions']);

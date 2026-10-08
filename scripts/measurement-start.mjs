@@ -49,11 +49,11 @@ import { captureSnapshot, sanitizeTaskId } from '../lib/repro/capture-snapshot.m
 import { resolveExperimentSpec } from '../lib/experiments/experiment-spec.mjs';
 import { SHELL_META_RE } from '../lib/experiments/evidence-harness.mjs';
 import { proxyDataDir } from '../lib/paths/index.mjs';
+import { proxyDistDir } from '../lib/proxy/proxy-paths.cjs';
 
 const REPO_ROOT = process.env.CODING_REPO || path.resolve(import.meta.dirname, '..');
 
-const PROXY_DIST = process.env.LLM_PROXY_DIST_DIR
-  || path.resolve(REPO_ROOT, '..', '_work', 'rapid-llm-proxy', 'dist');
+const PROXY_DIST = proxyDistDir();
 
 function parseStrArg(argv, flag) {
   const i = argv.indexOf(flag);
