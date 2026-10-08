@@ -113,25 +113,29 @@ The launcher automatically starts Docker Desktop if it isn't running — no need
 ### What Happens at Launch
 
 1. **Daemon check** — `docker ps` with 5-second timeout
-2. **Auto-start** — If Docker is not running, launches Docker Desktop and waits up to 45 seconds
-3. **Hung recovery** — If Docker Desktop is running but the daemon is unresponsive (common after failed updates), the launcher performs a graceful quit → force kill → relaunch cycle with an additional 30 seconds of wait time
-4. **Non-blocking** — If Docker still isn't ready after all timeouts, the launcher continues with a warning (degraded mode)
+2. **Auto-start** — If Docker is not running, launches it early (in parallel with session setup)
+3. **Supervised wait** — up to `DOCKER_TIMEOUT` (default 180s). If Docker **exits during startup** — which Docker Desktop on macOS regularly does right after a reboot — it is relaunched (up to `DOCKER_START_ATTEMPTS`, default 4). If the engine runs but the daemon stays silent for `DOCKER_HUNG_AFTER` (default 120s), it is killed and relaunched once.
+4. **Fail clearly** — if Docker is still not ready, the launcher stops with platform-specific help
+
+See `docs/health-system/robust-startup-system.md` § "Docker Auto-Start and Recovery" for the root cause of the post-reboot failures.
 
 ### Timeout Configuration
 
-The default timeout is 45 seconds, configurable via the `DOCKER_TIMEOUT` environment variable:
-
 ```bash
-# Extend timeout for slow machines
-DOCKER_TIMEOUT=90 coding --claude
+# Extend the budget on slow machines
+DOCKER_TIMEOUT=300 coding --claude
 ```
-
-Smart elapsed tracking ensures the total wait is predictable: if 20 seconds have already passed during early startup, only 25 seconds remain in the wait loop.
 
 ### Platform Support
 
 | Platform | Auto-Start Method |
 |----------|------------------|
+| macOS | `open -g -F -a Docker`; liveness = `com.docker.backend` |
+| Linux | `systemctl --user start docker-desktop` / rootless `docker`, or `sudo -n systemctl start docker` (`service docker start` without systemd) |
+| WSL | Docker Desktop on Windows via `powershell.exe Start-Process`; native dockerd in the distro falls back to the Linux path |
+| Windows (Git Bash) | `powershell.exe Start-Process "Docker Desktop.exe"`; liveness = `com.docker.backend.exe` |
+
+----------|------------------|
 | macOS | `open -F -a "Docker"` + daemon polling |
 | Linux | `systemctl start docker` (if systemd available) |
 
