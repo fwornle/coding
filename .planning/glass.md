@@ -8,7 +8,7 @@ GitHub-hosted runners). `main` is empty — generated content only.
 
 Living plan. Update the phase status and the Session log at the end of every session.
 
-Status: **G2 in progress** — extractor built (branch `glass-g2-extractor` in coding); left for G2: first published PR into glass `main`, merge. G1 done and merged (coding `main` cae5aad4, proxy PR #42 → 34c78e5). G0 done (IT-security sign-off for local TLS interception still pending).
+Status: **G2 done** — extractor merged into coding `main`; first generated tree is glass `main` (PR #1 → 322b3f2, from coding@3ccc8a6 + proxy@34c78e5, Wiz green). Next: G3 (daemon + CLI). G1 done and merged (coding `main` cae5aad4, proxy PR #42 → 34c78e5). G0 done (IT-security sign-off for local TLS interception still pending).
 
 ## Decisions (2026-10-08 — do not re-litigate)
 
@@ -353,6 +353,11 @@ Findings during G2:
   (~4.5k lines) only for `projectIdFor`. Later seam cut.
 - `token-usage.ts` still guesses a sibling `coding` checkout for `live-logging-config.json`;
   absent in glass → defaults. G3 sets `CODING_REPO`.
+- Published: glass PR #1 (`extract/3ccc8a6-34c78e5`), 3 Wiz checks pass, merged 2026-10-08 as 322b3f2.
+  `--publish` works in a temporary clone (never in the user's glass checkout); `gh` gets
+  `--repo` from the remote URL (bmw.ghe.com remotes use the SSH user `bmw@`, not `git@`).
+- For the G6 drift check: `EXTRACTED.json` names the coding commit, so every coding commit
+  changes it even when no glass file changed — compare `files`, not `sources`.
 - G3 needs, from the proxy: the `/v1/messages` forward without `resolveRoute`/keychain, a real
   OpenAI-shim **passthrough** (today the shim is rewritten into `/api/complete` routing), and
   the three `/api/token-usage/*` handlers moved out of `server.mjs` — next seam cuts.
@@ -385,3 +390,4 @@ Findings during G2:
 - **2026-10-08 (G1 WP6)** — bash parity matrix, then the agent → proxy wiring in one Node module used by the launcher, experiment cells and kgbench; tmux routing-env gap fixed. Next: cleanroom run, then merge G1 (coding: merge main into the branch first; proxy: PR).
 - **2026-10-08 (G1 cleanroom)** — cleanroom green after fixing the proxy start script's machine-specific paths. Next: merge G1.
 - **2026-10-08 (G2)** — G1 merged (coding main cae5aad4, proxy 34c78e5). Extractor, manifest, shared import scanner and tests built in worktree `glass-g2`; first extraction green (40 files, closed, smoke on Node 22.13 + 25). Decisions 7 (env names kept) and 8 (forbidden-dep allowlist). Next: publish the first generated PR into glass `main`, merge G2.
+- **2026-10-08 (G2 done)** — coding main 3ccc8a69 (+ 58a77d83 gh `--repo` fix); glass PR #1 merged (322b3f2): 40 generated files on `main`. Next: G3.
