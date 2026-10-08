@@ -125,3 +125,27 @@ test('retrieval-captures sweep runs even when the measurements dir is absent', (
     tmp.cleanup();
   }
 });
+
+test('without LLM_PROXY_DATA_DIR the sweep follows the data home the proxy writes to', () => {
+  // REGRESSION (glass G1): the default used to be <CODING_REPO>/.data, which the
+  // proxy no longer writes to — the launchd job (no LLM_PROXY_DATA_DIR) swept an
+  // empty dir while <dataHome>/var/measurements grew without bound.
+  const tmp = mkTmpMeasurementsDir();
+  try {
+    const dataHome = path.join(tmp.dir, 'data-home');
+    const dir = path.join(dataHome, 'var', 'measurements', 'taskZ');
+    fs.mkdirSync(dir, { recursive: true });
+    const aged = path.join(dir, 'context-turns.jsonl.gz');
+    fs.writeFileSync(aged, 'x');
+    const when = new Date((Date.now() / 1000 - 30 * DAY_SECS) * 1000);
+    fs.utimesSync(aged, when, when);
+
+    const env = { ...process.env, CODING_REPO: tmp.dir, CODING_DATA_HOME: dataHome, CONTEXT_TURNS_RETENTION_DAYS: '14' };
+    delete env.LLM_PROXY_DATA_DIR;
+    const res = spawnSync('bash', [SWEEPER], { env, encoding: 'utf8' });
+    assert.equal(res.status, 0, `sweeper exited non-zero: ${res.stderr}`);
+    assert.equal(fs.existsSync(aged), false, `aged capture under <dataHome>/var must be reclaimed: ${res.stderr}`);
+  } finally {
+    tmp.cleanup();
+  }
+});

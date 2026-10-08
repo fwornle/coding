@@ -32,11 +32,9 @@ set -uo pipefail
 # Env overrides (tests + hand-driving):
 #   CODING_REPO                   repo root (default the script's own checkout)
 #   LLM_PROXY_DATA_DIR            data root the proxy writes to (default
-#                                 `<CODING_REPO>/.data`). The measurements tree
-#                                 followed the data home out of the tools repo;
-#                                 this sweeper MUST resolve it the same way the
-#                                 writer does, or it silently sweeps an empty
-#                                 directory and retention quietly stops holding.
+#                                 proxyDataDir() — `<dataHome>/var`, resolved the
+#                                 same way the writer does; the old `<CODING_REPO>/
+#                                 .data` default swept an empty directory).
 #   CONTEXT_TURNS_RETENTION_DAYS  retention window in days before a file is
 #                                 eligible for deletion (default 14)
 #
