@@ -8,7 +8,7 @@ GitHub-hosted runners). `main` is empty — generated content only.
 
 Living plan. Update the phase status and the Session log at the end of every session.
 
-Status: **G1 in progress** — WP1–WP6 done (branch `glass-g1-seams` in coding + rapid-llm-proxy); left for G1: cleanroom run, merge. G0 done (IT-security sign-off for local TLS interception still pending).
+Status: **G1 in progress** — WP1–WP6 done (branch `glass-g1-seams` in coding + rapid-llm-proxy); cleanroom green; left for G1: merge. G0 done (IT-security sign-off for local TLS interception still pending).
 
 ## Decisions (2026-10-08 — do not re-litigate)
 
@@ -313,6 +313,7 @@ Findings during G1:
 - `@types/node` bump unnecessary — TS never imports `node:sqlite` (types live in `db-open.d.cts`).
 - tmux env allowlist omitted `ANTHROPIC_BASE_URL`, `ANTHROPIC_CUSTOM_HEADERS`, `COPILOT_PROVIDER_*`, `CODING_PROJECT_ID` — **fixed in WP6** (user decision): a new tmux session now gets exactly the launcher's routing env; stale tmux-server values are removed.
 - WP6 behaviour changes (user decision "one module, bash wins") — experiment cells: claude runs without the API-key vars (Max OAuth, like the launcher) and sends `x-project`; opencode gets the launcher's OPENCODE_CONFIG_CONTENT (enabled_providers rapid-proxy + github-copilot; the old cell-only anthropic / openai / github-copilot-enterprise task seams are gone — no spec in config/experiments uses those providers); copilot gets `/p/<project>`, task id no longer URL-encoded; pi writes its config into the cell sandbox (`<sandbox>/pi-agent`) and its sessions into the cell worktree; `CODING_PROXY_ROUTE` opt-out is case-sensitive, as in bash. kgbench claude cells: same claude change, plus one health probe per cell (proxy down → unbound).
+- Cleanroom (2026-10-08): first run FAILED — the proxy never started: `bin/start-llm-proxy.sh` hard-coded `/Users/Q284340/…` (bridge, .env, user-hash script) and `/opt/homebrew/bin/node`, on origin/main too (WP3 had cleaned the proxy's code, not its start script). Fixed in proxy 84ecfe7 (paths from the checkout, PATH, CODING_REPO); second run: all assertions passed. Run it from the worktree with `RAPID_LLM_PROXY_DIR=…` set, all submodules checked out, and no untracked `node_modules` symlink (the snapshot ships it).
 - Worktree: jest ignores `/.claude/worktrees/` and the worktree has no `dist/` build; suites were compared against the pre-change commit run the same way (identical failing sets).
 - WP5, not changed (characterised as-is): a per-agent span's `meta.capture_raw_bodies` is ignored by the `/v1/messages` tap — `tapCapturesRawBodies` reads the GLOBAL span, while the task id comes from the per-agent one.
 - WP5, pre-existing bug: the `auth.json` watcher in `server.mjs` main() assigns the undeclared `copilotSession` → a ReferenceError thrown from an `fs.watch` callback whenever opencode refreshes its token.
@@ -346,3 +347,4 @@ Findings during G1:
 - **2026-10-08 (G1 WP1–WP4)** — portable builders, SQLite adapter (both backends green), proxy resolver, no machine-specific paths, redaction injectable, retention ported + its data-dir bug fixed. Next: WP5 harness + extraction, WP6 wiring.
 - **2026-10-08 (G1 WP5)** — real-daemon characterisation harness (sandbox + TLS-terminating fake upstream, 16 scenarios, golden), then measurement moved out of `server.mjs` into `measurement.mjs` + `context-capture.mjs` with the golden unchanged on both SQLite backends. Next: WP6 wiring.
 - **2026-10-08 (G1 WP6)** — bash parity matrix, then the agent → proxy wiring in one Node module used by the launcher, experiment cells and kgbench; tmux routing-env gap fixed. Next: cleanroom run, then merge G1 (coding: merge main into the branch first; proxy: PR).
+- **2026-10-08 (G1 cleanroom)** — cleanroom green after fixing the proxy start script's machine-specific paths. Next: merge G1.
