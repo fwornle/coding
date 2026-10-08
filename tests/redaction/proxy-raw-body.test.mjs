@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRequire } from 'node:module';
 import {
   loadRawBodyRedactionPatterns,
   makeRedactRawBody,
@@ -41,6 +42,16 @@ test('loadRawBodyRedactionPatterns compiles the configured 27-pattern set from t
     assert.ok(p.re instanceof RegExp, `pattern ${p.id} compiled to a RegExp`);
     assert.equal(typeof p.replacement, 'string');
   }
+});
+
+test('the proxy compiles exactly what coding\'s shared loader compiles (no cross-repo require since glass G1)', () => {
+  const { loadRedactionPatterns, DEFAULT_CONFIG_PATH } = createRequire(import.meta.url)(
+    path.join(CODING_ROOT, 'scripts', 'enhanced-redaction-system.cjs'),
+  );
+  const shape = (ps) => ps.map((p) => [p.id, p.re.source, p.re.flags, p.replacement]);
+  assert.deepEqual(shape(patterns), shape(loadRedactionPatterns(DEFAULT_CONFIG_PATH)));
+  assert.deepEqual(shape(loadRawBodyRedactionPatterns('/nonexistent', DEFAULT_CONFIG_PATH)), shape(patterns),
+    'an explicit config path (LLM_PROXY_REDACTION_CONFIG) wins over codingRoot');
 });
 
 test('redactRawBody masks sk-/Bearer/JWT secrets — no raw secret substring survives before write', () => {
