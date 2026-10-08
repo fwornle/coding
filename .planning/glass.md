@@ -8,7 +8,7 @@ GitHub-hosted runners). `main` is empty — generated content only.
 
 Living plan. Update the phase status and the Session log at the end of every session.
 
-Status: **G3 published** — glass `main` = PR #2 → 63d224a (from coding@0154fa8 + proxy@7440525, proxy PR #43); CI green on ubuntu + windows (Node 22.13 / 22.x). Real runs on macOS measured for claude, copilot, opencode; pi proven through interception — its token row still waits on a pi login. Next: pi row, then G4 (UI + status line). G1 done and merged (coding `main` cae5aad4, proxy PR #42 → 34c78e5). G0 done (IT-security sign-off for local TLS interception still pending).
+Status: **G4 UI done** (branch `glass-g4-ui`, not merged; status line WP6 next). **G3 published** — glass `main` = PR #2 → 63d224a (from coding@0154fa8 + proxy@7440525, proxy PR #43); CI green on ubuntu + windows (Node 22.13 / 22.x). Real runs on macOS measured for claude, copilot, opencode; pi proven through interception — its token row still waits on a pi login. Next: pi row, then G4 (UI + status line). G1 done and merged (coding `main` cae5aad4, proxy PR #42 → 34c78e5). G0 done (IT-security sign-off for local TLS interception still pending).
 
 ## Decisions (2026-10-08 — do not re-litigate)
 
@@ -399,6 +399,38 @@ Findings during G3:
   (no such config → 60 min default).
 - `--no-intercept`, status line, `glass ui`, Windows verification: G4 / G5.
 
+## G4 plan (branch `glass-g4-ui` in coding)
+
+The UI is the dashboard's own components behind a reduced entry: no forked pages. The daemon
+serves the read shapes those components already fetch, so they run unchanged.
+
+| WP | Content | Accept |
+|---|---|---|
+| WP1 | Dashboard seams: `TokenUsagePage` takes `proxyBase` + `tabs` (coding: unchanged defaults); `timeline-read.mjs` opens the DB through `openDb` (no direct better-sqlite3) | coding dashboard typecheck + timeline tests green |
+| WP2 | Reduced entry `integrations/system-health-dashboard/glass-ui/` (index.html, main, app, vite config): Token Usage (Overview / Evolution / Recent) + Sessions with the context explainer and turn modal | `vite build` of the entry green |
+| WP3 | Daemon: static `ui/` (SPA fallback), `/api/experiments/runs` (glass sessions as runs), `/runs/:id/timeline`, `/runs/:id/context-turns`; `glass ui` opens the browser | overlay tests |
+| WP4 | Extractor `build` step: the entry built into `<tree>/ui`, verify that the page and its assets exist, drift-safe (deterministic) | two extractions identical |
+| WP5 | Live check: real daemon with real rows, gsd-browser on every page | screenshots + DOM assertions |
+| WP6 | Status line (fields table above): `glass click <tag>`, token badge, daemon badge, tmux / `--settings` statusLine | per field: render + click |
+
+### G4 progress
+
+| WP | Result | State |
+|---|---|---|
+| WP1 | `TokenUsagePage({ proxyBase, tabs, settings })`; `ContextCacheExplainer({ topology })` (`CODING_TOPOLOGY` default — glass shows its daemon, no Docker services); `timeline-read.mjs` → `openDb` | done — dashboard typecheck clean (one pre-existing semantic-analysis import, submodule absent in the worktree); timeline tests 7/7 on both backends |
+| WP2 | `glass-ui/`: HashRouter app, Token Usage (Overview / Evolution / Recent), Sessions (table → `PerformanceTimeline` + `TurnModal`, Context → explainer); own store with the performance slice only; `@/store` aliased to `glass-ui/store.ts` (coding's store pulls every slice → semantic-analysis dist) | done — 7 files, main chunk 139 KB gzip |
+| WP3 | `lib/glass/ui-api.mjs` (static + SPA fallback, traversal-safe; runs = live sessions + archived spans with per-task totals and dominant model; timeline via `readTimeline`; context turns), `open-url.mjs` (statusline-click's opener chain, no shell), `glass ui` | done — 13/13 overlay tests on Node 25.8.1 and 22.13.0 |
+| WP4 | manifest `build:` step (Vite with the dashboard's node_modules → `ui/`; verify + smoke skip browser code; index.html refs checked) | done — 67 files, 18,033 JS lines, closed; extract tests 12/12; two extractions identical |
+| WP5 | Real `glass claude` + `glass copilot` through the generated tree (port 12446, scratchpad home), gsd-browser on every page | done — Token Usage: 2 calls / 83.9K = the two rows; Recent Calls: both rows; Sessions: both runs, copilot timeline (cache-write 33,243), turn modal, explainer: claude 135.5 KB (tools 67.2 KB, history 61.4 KB, 50% cached), copilot 88.6 KB (system 50.0 KB, tools 38.4 KB) |
+
+Findings during G4:
+- The reused pages carry coding vocabulary glass has no use for: process names `token-adapter-<agent>`, the
+  Knowledge / Infrastructure lanes and "Development narrative" in the timeline (`/api/observations`,
+  `/api/digests` 404 → rejected quietly). Harmless; trim if users find it confusing.
+- The bundle still contains the Cost and Routing tabs (static imports, never rendered). Lazy-load if size matters.
+- The explainer verdict counts cache reads only: a single-turn session that only WROTE the cache reads
+  "does not reuse a prompt cache" — true, but terse.
+
 ## Session log
 
 - **2026-10-08** — proposal written; decisions taken (above); repo created
@@ -429,4 +461,5 @@ Findings during G3:
 - **2026-10-08 (G2)** — G1 merged (coding main cae5aad4, proxy 34c78e5). Extractor, manifest, shared import scanner and tests built in worktree `glass-g2`; first extraction green (40 files, closed, smoke on Node 22.13 + 25). Decisions 7 (env names kept) and 8 (forbidden-dep allowlist). Next: publish the first generated PR into glass `main`, merge G2.
 - **2026-10-08 (G2 done)** — coding main 3ccc8a69 (+ 58a77d83 gh `--repo` fix); glass PR #1 merged (322b3f2): 40 generated files on `main`. Next: G3.
 - **2026-10-08 (G3)** — binding spike (all three intercepted agents send Proxy-Authorization); proxy seam cuts (anthropic-forward, usage-api, model-canonical) under an extended golden; OpenAI measuring passthrough; intercept module; glass daemon + CLI in the overlay; real claude / copilot / opencode runs measured through glass. Next: pi login for its row, proxy PR, merge coding, publish glass PR #2.
+- **2026-10-08 (G4 UI)** — reduced UI from the dashboard's own components (three seams in coding), daemon serves it + the run reads, extractor builds it; verified live with gsd-browser on real claude + copilot rows. Next: WP6 status line, then merge (coding) + publish glass PR #3.
 - **2026-10-08 (G3 published)** — proxy PR #43 merged (7440525); coding main 0154fa83; glass PR #2 merged (63d224a, 57 files): Wiz IaC + Secret pass (Vulnerability Scanner "skipping" on both PRs, not blocking), glass tests pass on ubuntu + windows × Node 22.13.0 / 22.x. Live proxy checkout `_work/rapid-llm-proxy` left on 34c78e5 — pulling it needs `npm run build` (usage-api imports `getCost` from dist) before the proxy restarts.
