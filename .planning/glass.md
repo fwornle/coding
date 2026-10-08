@@ -313,7 +313,9 @@ one package, zero native deps.
   AIMAAD's ruleset (PR-only, 3 Wiz checks, every branch) → spike re-pushed as `g0-s6-platform`.
 - **2026-10-08 (S6 done, S7)** — S6 green on ubuntu + windows (CI) and macOS (local, chained);
   copilot + pi added to the trust check. S7 script written; blocked on copilot `/login`.
-  Repo still has no `main` (default = `g0-s6-windows`) — user to create it.
+  Repo still has no `main` (default = `g0-s6-windows`) — user to create it. *Resolved
+  2026-10-08:* empty `main` created and set as default branch; user is admin on `AIMAAD/glass`
+  (the transfer had dropped them to write). Clone over SSH needs `id_ed25519_ghe`.
 - **2026-10-08 (S7 done)** — after `/login`: copilot measured through the proxy, exact match with
   OTel. The 401 was VS Code's bundled copilot CLI 1.0.81 using the public host; 1.0.93 fine.
   G0 complete except the IT-security sign-off. Next: G1 (seams in coding).
