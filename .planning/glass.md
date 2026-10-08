@@ -8,7 +8,7 @@ GitHub-hosted runners). `main` is empty — generated content only.
 
 Living plan. Update the phase status and the Session log at the end of every session.
 
-Status: **G3 in progress** — daemon + CLI built and measured for real on macOS (claude, copilot, opencode); pi proven through interception, its token row waits on a pi login. Branches: `glass-g3-forward` (proxy), `glass-g3-daemon` (coding). Left: pi row, proxy PR, merge, publish glass PR #2. G2 done (glass PR #1 → 322b3f2). G1 done and merged (coding `main` cae5aad4, proxy PR #42 → 34c78e5). G0 done (IT-security sign-off for local TLS interception still pending).
+Status: **G3 published** — glass `main` = PR #2 → 63d224a (from coding@0154fa8 + proxy@7440525, proxy PR #43); CI green on ubuntu + windows (Node 22.13 / 22.x). Real runs on macOS measured for claude, copilot, opencode; pi proven through interception — its token row still waits on a pi login. Next: pi row, then G4 (UI + status line). G1 done and merged (coding `main` cae5aad4, proxy PR #42 → 34c78e5). G0 done (IT-security sign-off for local TLS interception still pending).
 
 ## Decisions (2026-10-08 — do not re-litigate)
 
@@ -429,3 +429,4 @@ Findings during G3:
 - **2026-10-08 (G2)** — G1 merged (coding main cae5aad4, proxy 34c78e5). Extractor, manifest, shared import scanner and tests built in worktree `glass-g2`; first extraction green (40 files, closed, smoke on Node 22.13 + 25). Decisions 7 (env names kept) and 8 (forbidden-dep allowlist). Next: publish the first generated PR into glass `main`, merge G2.
 - **2026-10-08 (G2 done)** — coding main 3ccc8a69 (+ 58a77d83 gh `--repo` fix); glass PR #1 merged (322b3f2): 40 generated files on `main`. Next: G3.
 - **2026-10-08 (G3)** — binding spike (all three intercepted agents send Proxy-Authorization); proxy seam cuts (anthropic-forward, usage-api, model-canonical) under an extended golden; OpenAI measuring passthrough; intercept module; glass daemon + CLI in the overlay; real claude / copilot / opencode runs measured through glass. Next: pi login for its row, proxy PR, merge coding, publish glass PR #2.
+- **2026-10-08 (G3 published)** — proxy PR #43 merged (7440525); coding main 0154fa83; glass PR #2 merged (63d224a, 57 files): Wiz IaC + Secret pass (Vulnerability Scanner "skipping" on both PRs, not blocking), glass tests pass on ubuntu + windows × Node 22.13.0 / 22.x. Live proxy checkout `_work/rapid-llm-proxy` left on 34c78e5 — pulling it needs `npm run build` (usage-api imports `getCost` from dist) before the proxy restarts.
