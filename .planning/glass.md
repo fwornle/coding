@@ -8,7 +8,7 @@ GitHub-hosted runners). `main` is empty — generated content only.
 
 Living plan. Update the phase status and the Session log at the end of every session.
 
-Status: **G1 in progress** — WP1–WP4 done (branch `glass-g1-seams` in coding + rapid-llm-proxy); next WP5, WP6. G0 done (IT-security sign-off for local TLS interception still pending).
+Status: **G1 in progress** — WP1–WP5 done (branch `glass-g1-seams` in coding + rapid-llm-proxy); next WP6. G0 done (IT-security sign-off for local TLS interception still pending).
 
 ## Decisions (2026-10-08 — do not re-litigate)
 
@@ -304,7 +304,7 @@ one package, zero native deps.
 | WP2 | SQLite adapter `proxy-bridge/db-open.cjs` (better-sqlite3 or node:sqlite via `CODING_SQLITE_BACKEND`; keeps 5 s busy timeout, savepoint transactions, better-sqlite3 error codes); token-usage.ts + 5 coding callers use it | proxy c10fac5, coding 0694d87e | done — suites green on both backends |
 | WP3 | No `/Users/Q284340` fallbacks in the proxy; redaction config injectable (`LLM_PROXY_REDACTION_CONFIG`), no cross-repo require; retention sweeper is `lib/measurement/context-turns-retention.mjs` | proxy 70b0a88, coding 9ccafe7d, 6bb1ed5b | done |
 | WP4 | `lib/proxy/proxy-paths.cjs`: one resolver for the sibling proxy (dist dir, db-open); falls back to coding's better-sqlite3 without the proxy (hosted CI) | coding 0694d87e | done |
-| WP5 | Measurement code out of `server.mjs` (task binding per endpoint, usage glue) | — | next: needs a characterisation harness that boots the real daemon against a fake upstream (upstreams are hard-coded `https://api.anthropic.com…`; route via `HTTPS_PROXY` to an intercepting fake built from the S6 spike — the same harness then tests G3's daemon) |
+| WP5 | Measurement code out of `server.mjs`: `proxy-bridge/measurement.mjs` (task binding per endpoint, Anthropic usage tap, token row of the tap, breakdowns, context turns, raw bodies, the two reads) + `context-capture.mjs` (pure analysers); server.mjs −870 lines. Safety net: `tests/harness/` boots the REAL daemon in a sandbox behind a TLS-terminating fake upstream (`HTTPS_PROXY` + per-run openssl CA), `tests/daemon-characterisation.test.mjs` compares 16 scenarios to a golden recorded before the move | proxy 16a4dfc, 89a2f50, 9d6ea1d | done — golden equal on better-sqlite3 and node:sqlite; mutation check fails it; suite 479/479 |
 | WP6 | Agent wiring in Node (bash parity matrix first) | — | open |
 
 Findings during G1:
@@ -312,6 +312,10 @@ Findings during G1:
 - Not unified: `resolveDataDir()` across server/token-usage/measurement-span — their defaults genuinely differ (`<coding>/.data` vs `<cwd>/.data`); glass always sets `LLM_PROXY_DATA_DIR`.
 - `@types/node` bump unnecessary — TS never imports `node:sqlite` (types live in `db-open.d.cts`).
 - tmux env allowlist (`tmux-session-wrapper.sh:353-378`) omits `ANTHROPIC_BASE_URL`, `ANTHROPIC_CUSTOM_HEADERS`, `COPILOT_PROVIDER_*`, `CODING_PROJECT_ID` — reported for a decision in WP6, not changed.
+- WP5, not changed (characterised as-is): a per-agent span's `meta.capture_raw_bodies` is ignored by the `/v1/messages` tap — `tapCapturesRawBodies` reads the GLOBAL span, while the task id comes from the per-agent one.
+- WP5, pre-existing bug: the `auth.json` watcher in `server.mjs` main() assigns the undeclared `copilotSession` → a ReferenceError thrown from an `fs.watch` callback whenever opencode refreshes its token.
+- WP5: the live proxy runs from the `_work/rapid-llm-proxy` checkout, which is on `glass-g1-seams` — the refactor goes live on the next proxy restart.
+- Worktree: coding tests that import the proxy by a static relative path (`tests/context-turns/*`, `tests/redaction/proxy-raw-body.test.mjs`) cannot run from `.claude/worktrees/glass-g1` — `../../../_work/…` resolves inside `.claude/worktrees/`.
 - Constraint `no-parallel-files` matches file PATHS: any `…lite.` name (e.g. `sqlite.cjs`) trips `lite[ ._-]`.
 
 ## Session log
@@ -338,3 +342,4 @@ Findings during G1:
   OTel. The 401 was VS Code's bundled copilot CLI 1.0.81 using the public host; 1.0.93 fine.
   G0 complete except the IT-security sign-off. Next: G1 (seams in coding).
 - **2026-10-08 (G1 WP1–WP4)** — portable builders, SQLite adapter (both backends green), proxy resolver, no machine-specific paths, redaction injectable, retention ported + its data-dir bug fixed. Next: WP5 harness + extraction, WP6 wiring.
+- **2026-10-08 (G1 WP5)** — real-daemon characterisation harness (sandbox + TLS-terminating fake upstream, 16 scenarios, golden), then measurement moved out of `server.mjs` into `measurement.mjs` + `context-capture.mjs` with the golden unchanged on both SQLite backends. Next: WP6 wiring.
