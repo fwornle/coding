@@ -66,38 +66,48 @@ describe('the composite task_id', () => {
 });
 
 describe('binding a cell to the wire', () => {
-  it('labels a claude request with x-task-id without redirecting it', () => {
-    const { env, bound, seam } = bindCellEnv({ agent: 'claude', env: {}, taskId: 'kgb--claude-sonnet--grep-L1-r1', model: 'claude-sonnet-4-6' });
+  // The proxy reported up, so the binding is deterministic on a machine running a real one.
+  const up = async () => true;
+
+  it('labels a claude request with x-task-id', async () => {
+    const { env, bound, seam } = await bindCellEnv({ agent: 'claude', env: {}, taskId: 'kgb--claude-sonnet--grep-L1-r1', model: 'claude-sonnet-4-6', probe: up });
     expect(bound).toBe(true);
     expect(seam).toBe('x-task-id header');
-    expect(env.ANTHROPIC_CUSTOM_HEADERS).toBe('x-task-id: kgb--claude-sonnet--grep-L1-r1');
+    expect(env.ANTHROPIC_CUSTOM_HEADERS).toBe('x-task-id: kgb--claude-sonnet--grep-L1-r1\nx-project: ');
   });
 
-  it('leaves copilot and opencode unbound by default', () => {
+  it('leaves the cell unbound when the proxy does not answer', async () => {
+    const { env, bound, seam } = await bindCellEnv({ agent: 'claude', env: {}, taskId: 'a--b--c', probe: async () => false });
+    expect(bound).toBe(false);
+    expect(seam).toBe('none');
+    expect(env.ANTHROPIC_CUSTOM_HEADERS).toBeUndefined();
+  });
+
+  it('leaves copilot and opencode unbound by default', async () => {
     // Binding those two means REDIRECTING them (BYOK base URL / task-scoped shim path), and a
     // redirect that fails produces a cell that ran on a path other than the one it claims.
     expect(DEFAULT_WIRE_BIND).toEqual(['claude']);
     for (const agent of ['copilot', 'opencode']) {
-      const { bound, env } = bindCellEnv({ agent, env: {}, taskId: 't--x--y', model: 'm' });
+      const { bound, env } = await bindCellEnv({ agent, env: {}, taskId: 't--x--y', model: 'm', probe: up });
       expect(bound).toBe(false);
       expect(env.COPILOT_PROVIDER_BASE_URL).toBeUndefined();
     }
   });
 
-  it('binds copilot onto the task-scoped BYOK path when asked explicitly', () => {
-    const { env, bound } = bindCellEnv({ agent: 'copilot', env: {}, taskId: 'kgb--copilot-sonnet--grep-L1-r1', model: 'claude-sonnet-4.6', wireBind: ['copilot'] });
+  it('binds copilot onto the task-scoped BYOK path when asked explicitly', async () => {
+    const { env, bound } = await bindCellEnv({ agent: 'copilot', env: {}, taskId: 'kgb--copilot-sonnet--grep-L1-r1', model: 'claude-sonnet-4.6', wireBind: ['copilot'], probe: up });
     expect(bound).toBe(true);
     expect(env.COPILOT_PROVIDER_BASE_URL).toContain('/v1/copilot/t/kgb--copilot-sonnet--grep-L1-r1');
     expect(env.COPILOT_MODEL).toBe('claude-sonnet-4.6');
   });
 
-  it('drops an inherited OPENCODE_CONFIG_CONTENT whether or not it binds', () => {
+  it('drops an inherited OPENCODE_CONFIG_CONTENT whether or not it binds', async () => {
     // The interactive launcher exports this, and it was reaching cells verbatim —
     // {"model":"github-copilot-enterprise/claude-opus-4.6","disabled_providers":["anthropic"]} —
     // so part of a cell's opencode configuration came from whichever session spawned the run.
     const leaked = { OPENCODE_CONFIG_CONTENT: '{"disabled_providers":["anthropic"]}' };
-    expect(bindCellEnv({ agent: 'opencode', env: leaked }).env.OPENCODE_CONFIG_CONTENT).toBeUndefined();
-    expect(bindCellEnv({ agent: 'claude', env: leaked, taskId: 'a--b--c' }).env.OPENCODE_CONFIG_CONTENT).toBeUndefined();
+    expect((await bindCellEnv({ agent: 'opencode', env: leaked })).env.OPENCODE_CONFIG_CONTENT).toBeUndefined();
+    expect((await bindCellEnv({ agent: 'claude', env: leaked, taskId: 'a--b--c', probe: up })).env.OPENCODE_CONFIG_CONTENT).toBeUndefined();
   });
 });
 

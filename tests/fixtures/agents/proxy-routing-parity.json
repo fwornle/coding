@@ -426,7 +426,7 @@
     "rc": 0,
     "log": [
       "[CoPilot] Starting CoPilot HTTP adapter server...",
-      "[CoPilot] ✅ HTTP adapter server started (PID: 29970)",
+      "[CoPilot] ✅ HTTP adapter server started (PID: <pid>)",
       "[CoPilot] 🔌 copilot: cleared inherited COPILOT_PROVIDER_* (proxy port <up>); BYOK is set by the health-gated wiring in configure_proxy_routing — measured AND ambient interactive (opt out with COPILOT_AMBIENT_ROUTE=0)",
       "[CoPilot] 📚 CoPilot features available:",
       "[CoPilot]    • Copilot CLI in tmux session with I/O capture",
@@ -465,7 +465,7 @@
     "rc": 0,
     "log": [
       "[CoPilot] Starting CoPilot HTTP adapter server...",
-      "[CoPilot] ✅ HTTP adapter server started (PID: 29992)",
+      "[CoPilot] ✅ HTTP adapter server started (PID: <pid>)",
       "[CoPilot] 🔌 copilot: cleared inherited COPILOT_PROVIDER_* (proxy port <up>); BYOK is set by the health-gated wiring in configure_proxy_routing — measured AND ambient interactive (opt out with COPILOT_AMBIENT_ROUTE=0)",
       "[CoPilot] 📚 CoPilot features available:",
       "[CoPilot]    • Copilot CLI in tmux session with I/O capture",
@@ -504,7 +504,7 @@
     "rc": 0,
     "log": [
       "[CoPilot] Starting CoPilot HTTP adapter server...",
-      "[CoPilot] ⚠️ HTTP adapter server may have failed to start",
+      "[CoPilot] ✅ HTTP adapter server started (PID: <pid>)",
       "[CoPilot] 🔌 copilot: cleared inherited COPILOT_PROVIDER_* (proxy port <up>); BYOK is set by the health-gated wiring in configure_proxy_routing — measured AND ambient interactive (opt out with COPILOT_AMBIENT_ROUTE=0)",
       "[CoPilot] 📚 CoPilot features available:",
       "[CoPilot]    • Copilot CLI in tmux session with I/O capture",
@@ -544,7 +544,7 @@
     "rc": 0,
     "log": [
       "[CoPilot] Starting CoPilot HTTP adapter server...",
-      "[CoPilot] ✅ HTTP adapter server started (PID: 30061)",
+      "[CoPilot] ✅ HTTP adapter server started (PID: <pid>)",
       "[CoPilot] 🔌 copilot: cleared inherited COPILOT_PROVIDER_* (proxy port <up>); BYOK is set by the health-gated wiring in configure_proxy_routing — measured AND ambient interactive (opt out with COPILOT_AMBIENT_ROUTE=0)",
       "[CoPilot] 📚 CoPilot features available:",
       "[CoPilot]    • Copilot CLI in tmux session with I/O capture",
@@ -583,7 +583,7 @@
     "rc": 0,
     "log": [
       "[CoPilot] Starting CoPilot HTTP adapter server...",
-      "[CoPilot] ✅ HTTP adapter server started (PID: 30103)",
+      "[CoPilot] ✅ HTTP adapter server started (PID: <pid>)",
       "[CoPilot] 🔌 copilot: cleared inherited COPILOT_PROVIDER_* (proxy port <up>); BYOK is set by the health-gated wiring in configure_proxy_routing — measured AND ambient interactive (opt out with COPILOT_AMBIENT_ROUTE=0)",
       "[CoPilot] 📚 CoPilot features available:",
       "[CoPilot]    • Copilot CLI in tmux session with I/O capture",
@@ -622,7 +622,7 @@
     "rc": 0,
     "log": [
       "[CoPilot] Starting CoPilot HTTP adapter server...",
-      "[CoPilot] ✅ HTTP adapter server started (PID: 30157)",
+      "[CoPilot] ✅ HTTP adapter server started (PID: <pid>)",
       "[CoPilot] 🔌 copilot: cleared inherited COPILOT_PROVIDER_* (proxy port <up>); BYOK is set by the health-gated wiring in configure_proxy_routing — measured AND ambient interactive (opt out with COPILOT_AMBIENT_ROUTE=0)",
       "[CoPilot] 📚 CoPilot features available:",
       "[CoPilot]    • Copilot CLI in tmux session with I/O capture",
@@ -664,11 +664,11 @@
       "[Pi] 🔒 Wrapper-scoped: pi config dir is <box>/coding/.pi-agent (bare `pi` still uses ~/.pi/agent)",
       "[Pi] Interactive launch: x-task-id omitted (proxy binds the ambient span)",
       "[Pi] Wrote pi provider config: <box>/coding/.pi-agent/models.json (rapid-proxy-pi + qwen-laptop)",
+      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/claude-sonnet-5)",
+      "[Pi] Session transcripts: <box>/project/.observations/pi-sessions",
       "[Pi] pi extensions installed: 1 in <box>/coding/.pi-agent/extensions",
       "[Pi] pi: /sl prompt installed in <box>/coding/.pi-agent/prompts",
       "[Pi] pi: APPEND_SYSTEM.md written (<box>/coding/.pi-agent)",
-      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/claude-sonnet-5)",
-      "[Pi] Session transcripts: <box>/project/.observations/pi-sessions",
       "[Pi] 🔌 pi → proxy http://127.0.0.1:<up>/v1/chat/completions (models.json provider rapid-proxy-pi; x-agent=pi; x-task-id=<ambient>)"
     ],
     "env": [
@@ -706,11 +706,11 @@
       "[Pi] 🔒 Wrapper-scoped: pi config dir is <box>/coding/.pi-agent (bare `pi` still uses ~/.pi/agent)",
       "[Pi] Task-bound launch: models.json carries x-task-id (TASK_ID=t-pi)",
       "[Pi] Merged pi provider config into <box>/coding/.pi-agent/models.json (rapid-proxy-pi + qwen-laptop; preserved: mine)",
+      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/claude-sonnet-5)",
+      "[Pi] Session transcripts: <box>/project/.observations/pi-sessions",
       "[Pi] pi extensions installed: 1 in <box>/coding/.pi-agent/extensions",
       "[Pi] pi: /sl prompt installed in <box>/coding/.pi-agent/prompts",
       "[Pi] pi: APPEND_SYSTEM.md written (<box>/coding/.pi-agent)",
-      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/claude-sonnet-5)",
-      "[Pi] Session transcripts: <box>/project/.observations/pi-sessions",
       "[Pi] 🔌 pi → proxy http://127.0.0.1:<up>/v1/chat/completions (models.json provider rapid-proxy-pi; x-agent=pi; x-task-id=t-pi)"
     ],
     "env": [
@@ -749,11 +749,11 @@
       "[Pi] 🔒 Wrapper-scoped: pi config dir is <box>/coding/.pi-agent (bare `pi` still uses ~/.pi/agent)",
       "[Pi] Interactive launch: x-task-id omitted (proxy binds the ambient span)",
       "[Pi] Wrote pi provider config: <box>/coding/.pi-agent/models.json (rapid-proxy-pi + qwen-laptop)",
+      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/claude-sonnet-5)",
+      "[Pi] Session transcripts: <box>/project/.observations/pi-sessions",
       "[Pi] pi extensions installed: 1 in <box>/coding/.pi-agent/extensions",
       "[Pi] pi: /sl prompt installed in <box>/coding/.pi-agent/prompts",
       "[Pi] pi: APPEND_SYSTEM.md written (<box>/coding/.pi-agent)",
-      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/claude-sonnet-5)",
-      "[Pi] Session transcripts: <box>/project/.observations/pi-sessions",
       "[Pi] 🔌 pi → proxy http://127.0.0.1:<up>/v1/chat/completions (models.json provider rapid-proxy-pi; x-agent=pi; x-task-id=<ambient>)"
     ],
     "env": [
@@ -792,11 +792,11 @@
       "[Pi] 🔒 Wrapper-scoped: pi config dir is <box>/coding/.pi-agent (bare `pi` still uses ~/.pi/agent)",
       "[Pi] Interactive launch: x-task-id omitted (proxy binds the ambient span)",
       "[Pi] Wrote pi provider config: <box>/coding/.pi-agent/models.json (rapid-proxy-pi + qwen-laptop)",
+      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/claude-sonnet-5)",
+      "[Pi] Session transcripts: <box>/project/.observations/pi-sessions",
       "[Pi] pi extensions installed: 1 in <box>/coding/.pi-agent/extensions",
       "[Pi] pi: /sl prompt installed in <box>/coding/.pi-agent/prompts",
       "[Pi] pi: APPEND_SYSTEM.md written (<box>/coding/.pi-agent)",
-      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/claude-sonnet-5)",
-      "[Pi] Session transcripts: <box>/project/.observations/pi-sessions",
       "[Pi] 🔌 pi → proxy http://127.0.0.1:<up>/v1/chat/completions (models.json provider rapid-proxy-pi; x-agent=pi; x-task-id=<ambient>)"
     ],
     "env": [
@@ -835,10 +835,10 @@
       "[Pi] 🌐 Global scope: using pi's default config dir <box>/home/.pi/agent",
       "[Pi] Interactive launch: x-task-id omitted (proxy binds the ambient span)",
       "[Pi] Wrote pi provider config: <box>/home/.pi/agent/models.json (rapid-proxy-pi + qwen-laptop)",
-      "[Pi] pi extensions installed: 1 in <box>/home/.pi/agent/extensions",
-      "[Pi] pi: /sl prompt installed in <box>/home/.pi/agent/prompts",
       "[Pi] Pinned pi provider/model in <box>/home/.pi/agent/settings.json (rapid-proxy-pi/claude-sonnet-5)",
       "[Pi] Session transcripts: <box>/project/.observations/pi-sessions",
+      "[Pi] pi extensions installed: 1 in <box>/home/.pi/agent/extensions",
+      "[Pi] pi: /sl prompt installed in <box>/home/.pi/agent/prompts",
       "[Pi] 🔌 pi → proxy http://127.0.0.1:<up>/v1/chat/completions (models.json provider rapid-proxy-pi; x-agent=pi; x-task-id=<ambient>)"
     ],
     "env": [
@@ -876,11 +876,11 @@
       "[Pi] 🔒 Wrapper-scoped: pi config dir is <box>/coding/.pi-agent (bare `pi` still uses ~/.pi/agent)",
       "[Pi] Interactive launch: x-task-id omitted (proxy binds the ambient span)",
       "[Pi] Wrote pi provider config: <box>/coding/.pi-agent/models.json (rapid-proxy-pi + qwen-laptop)",
+      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/claude-sonnet-5)",
+      "[Pi] Session transcripts: <box>/project/.observations/pi-sessions",
       "[Pi] pi extensions installed: 1 in <box>/coding/.pi-agent/extensions",
       "[Pi] pi: /sl prompt installed in <box>/coding/.pi-agent/prompts",
       "[Pi] pi: APPEND_SYSTEM.md written (<box>/coding/.pi-agent)",
-      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/claude-sonnet-5)",
-      "[Pi] Session transcripts: <box>/project/.observations/pi-sessions",
       "[Pi] 🔌 pi → proxy http://127.0.0.1:<up>/v1/chat/completions (models.json provider rapid-proxy-pi; x-agent=pi; x-task-id=<ambient>)"
     ],
     "env": [

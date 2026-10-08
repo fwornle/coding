@@ -213,7 +213,7 @@ function caseFor(agent, taskId) {
     }
 
     case 'opencode': {
-      // buildAgentRoutingEnv deliberately does NOT redefine `rapid-proxy`, which
+      // The launch wiring (lib/agents/proxy-routing.mjs) does not give `rapid-proxy` a task-scoped base URL, which
       // is exactly the provider a rapid-proxy/* model uses — so it must be
       // spliced here or the run is ambient-bound and measures nothing.
       const cfg = {

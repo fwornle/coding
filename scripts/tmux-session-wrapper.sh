@@ -354,19 +354,40 @@ EOF_MOUSE_COPY
     CODING_DOCKER_MODE CODING_PROJECT_DIR CODING_TOOLS_PATH
     CODING_AGENT_ADAPTER_PATH CODING_HOOKS_CONFIG CODING_TRANSCRIPT_FORMAT
     TRANSCRIPT_SOURCE_PROJECT CLAUDE_SESSION_ID COPILOT_SESSION_ID
-    ANTHROPIC_API_KEY COPILOT_HTTP_ADAPTER_PID COPI_LOG_DIR
+    COPILOT_HTTP_ADAPTER_PID COPI_LOG_DIR
     AGENT_ENABLE_PIPE_CAPTURE AGENT_PROMPT_REGEX SESSION_ID
     HTTP_PROXY HTTPS_PROXY http_proxy https_proxy NO_PROXY no_proxy
-    OPENCODE_CONFIG_CONTENT
     # The mouse opt-outs set above. They are exported into this shell, so they
     # ride the same propagation list as everything else rather than being
     # spliced into inner_cmd separately.
     CLAUDE_CODE_DISABLE_MOUSE OPENCODE_DISABLE_MOUSE CODING_AGENT_MOUSE
-    PI_CODING_AGENT_DIR PI_CODING_AGENT_SESSION_DIR PI_PROVIDER PI_MODEL
-    PI_OFFLINE PI_TELEMETRY PI_SKIP_VERSION_CHECK
+    PI_PROVIDER PI_MODEL
     TASK_ID
     PATH HOME USER SHELL TERM
   )
+
+  # The agent → proxy routing env — keep in step with ROUTING_ENV_VARS in
+  # lib/agents/proxy-routing.mjs (a test checks). A new session starts from the
+  # tmux SERVER's environment, which can still hold another launch's values (a
+  # stale task id header, an API key the claude wiring removed), so each var is
+  # passed when the launcher has it and removed with `env -u` when it does not:
+  # the agent sees exactly the launcher's routing, as it does inside tmux.
+  local routing_vars=(
+    ANTHROPIC_BASE_URL ANTHROPIC_CUSTOM_HEADERS ANTHROPIC_API_KEY ANTHROPIC_ADMIN_API_KEY ANTHROPIC_AUTH_TOKEN
+    COPILOT_PROVIDER_BASE_URL COPILOT_PROVIDER_TYPE COPILOT_PROVIDER_API_KEY COPILOT_MODEL COPILOT_AUTO_UPDATE
+    OPENCODE_CONFIG_CONTENT
+    PI_CODING_AGENT_DIR PI_CODING_AGENT_SESSION_DIR PI_OFFLINE PI_TELEMETRY PI_SKIP_VERSION_CHECK
+    CODING_PROJECT_ID
+  )
+  local unset_routing=""
+  for var in "${routing_vars[@]}"; do
+    if [ -n "${!var}" ]; then
+      env_vars+=("$var")
+    else
+      unset_routing="${unset_routing} -u ${var}"
+    fi
+  done
+  inner_cmd="env${unset_routing} ${inner_cmd}"
 
   for var in "${env_vars[@]}"; do
     if [ -n "${!var}" ]; then

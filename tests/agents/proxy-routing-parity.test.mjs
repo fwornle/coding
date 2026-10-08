@@ -89,9 +89,10 @@ function makeRow(name, row) {
     fs.mkdirSync(path.dirname(p), { recursive: true });
     fs.writeFileSync(p, content);
   }
-  for (const s of ['nohup', 'sleep']) {
-    fs.writeFileSync(path.join(shims, s), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
-  }
+  // `sleep` returns at once; `nohup` (copilot's adapter server) stays alive
+  // briefly so the hook's `kill -0` check always sees it running.
+  fs.writeFileSync(path.join(shims, 'sleep'), '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  fs.writeFileSync(path.join(shims, 'nohup'), '#!/bin/sh\nexec /bin/sleep 3\n', { mode: 0o755 });
   return { dir, repo, home, project, shims };
 }
 
@@ -141,7 +142,8 @@ configure_proxy_routing
     .split(fs.realpathSync(box.dir)).join('<box>')
     .split(String(up.address().port)).join('<up>')
     .split(String(garbage.address().port)).join('<garbage>')
-    .split(String(deadPort)).join('<dead>');
+    .split(String(deadPort)).join('<dead>')
+    .replace(/\(PID: \d+\)/g, '(PID: <pid>)');
   const [log, state = ''] = r.stdout.split('\n__STATE__\n');
   const files = {};
   for (const cfg of [path.join(box.repo, '.pi-agent'), path.join(box.home, '.pi', 'agent')]) {

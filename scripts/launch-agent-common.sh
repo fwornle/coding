@@ -27,6 +27,24 @@ set -e
 # shellcheck source=scripts/lib/port-pids.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib/port-pids.sh"
 
+# The agent → proxy wiring (lib/agents/proxy-routing.mjs). `_coding_wiring
+# pre-launch|route <agent>` runs one phase and evals the shell it prints:
+# `_agent_log` lines, unset/export, hook locals, and `exit 1` when the launch
+# must abort. Its inputs are exported to node only — some are plain shell
+# variables at this point (TARGET_PROJECT_DIR is exported later).
+_CODING_WIRING_JS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/lib/agents/proxy-routing.mjs"
+_coding_wiring() {
+  local _wiring
+  _wiring="$(
+    export CODING_REPO TARGET_PROJECT_DIR TASK_ID CODING_PROJECT_ID CODING_AGENT_SCOPE \
+      CODING_PROXY_ROUTE LLM_PROXY_PORT LLM_CLI_PROXY_PORT \
+      CODING_COPILOT_BAND COPILOT_AMBIENT_ROUTE COPILOT_MODEL \
+      CODING_OPENCODE_MODEL OPENCODE_ANTHROPIC_NATIVE QWEN_LAPTOP_API_BASE_URL
+    node "$_CODING_WIRING_JS" "$@"
+  )" || { _agent_log "🚫 agent → proxy wiring failed ($*) — launch aborted"; exit 1; }
+  eval "$_wiring"
+}
+
 # ============================================
 # Shared Functions
 # ============================================
@@ -550,15 +568,14 @@ _inject_knowledge_context() {
 # ============================================
 #
 # Route each coding agent's foreground LLM traffic through the coding LLM proxy on
-# :${LLM_PROXY_PORT:-12435} so its tokens land in token_usage and are measurable —
-# not just claude. Each agent needs a different redirect seam (all → the one proxy):
-#   claude    ANTHROPIC_BASE_URL  → proxy /v1/messages (Max-OAuth bearer forwarded)
-#   opencode  ANTHROPIC_BASE_URL  → same seam (opencode's AI-SDK anthropic provider
-#                                    honours it) for the anthropic path
-#   pi        self-routed by its models.json custom provider (rapid-proxy-pi →
-#                                    proxy /v1/chat/completions); TASK_ID binds it
-#   copilot   no base-URL override on the Copilot CLI (GitHub-enterprise OAuth) —
-#                                    not yet proxy-routable; flagged honestly
+# :${LLM_PROXY_PORT:-12435} so its tokens land in token_usage and are measurable.
+# Each agent has its own redirect seam (all → the one proxy):
+#   claude    ANTHROPIC_BASE_URL → /v1/messages (Max-OAuth bearer forwarded),
+#             ANTHROPIC_CUSTOM_HEADERS binds x-task-id / x-project
+#   opencode  ANTHROPIC_BASE_URL for its anthropic path; the rest of its routing
+#             is in OPENCODE_CONFIG_CONTENT (agent_pre_launch)
+#   pi        self-routed by the models.json provider agent_pre_launch writes
+#   copilot   BYOK: COPILOT_PROVIDER_BASE_URL=/v1/copilot[/p/..][/b/..][/t/..]
 #
 # HEALTH-GATED, FAIL-CLOSED (T1): agents launched via bin/coding MUST route
 # through the proxy. If the daemon is unreachable after a short retry window the
@@ -567,218 +584,11 @@ _inject_knowledge_context() {
 # policy; CODING_PROXY_ROUTE=0 remains the explicit direct-launch escape hatch.
 # Runs AFTER agent_pre_launch + _set_agent_env_vars so it has the final say on
 # the routing env.
+#
+# The rules live in lib/agents/proxy-routing.mjs (proxyRouting), shared with the
+# experiment runner; tests/agents/proxy-routing-parity.test.mjs pins them.
 configure_proxy_routing() {
-  # Opt-out safety valve: CODING_PROXY_ROUTE=0 launches the agent direct (unmeasured)
-  # without touching its env — use if the proxy is misbehaving in the hot path.
-  case "${CODING_PROXY_ROUTE:-1}" in
-    0|false|no|off)
-      _agent_log "ℹ️  CODING_PROXY_ROUTE=${CODING_PROXY_ROUTE} — proxy routing disabled; ${AGENT_NAME:-$AGENT} launches direct (unmeasured)."
-      return 0
-      ;;
-  esac
-
-  local port="${LLM_PROXY_PORT:-12435}"
-  local base="http://127.0.0.1:${port}"
-
-  # Retry briefly: the daemon is launchd/systemd-managed and may be mid-(re)start.
-  local _px_ok=""
-  local _px_try
-  for _px_try in 1 2 3 4 5; do
-    if curl -sf -o /dev/null --max-time 2 "${base}/health" 2>/dev/null; then
-      _px_ok=1
-      break
-    fi
-    sleep 2
-  done
-  if [ -z "$_px_ok" ]; then
-    _agent_log "🚫 LLM proxy unreachable at ${base} — ABORTING ${AGENT_NAME:-$AGENT} launch (fail-closed: no unmeasured direct fallback)."
-    case "$(uname -s)" in
-      Darwin) _agent_log "    Fix:      launchctl kickstart -k gui/\$(id -u)/com.coding.llm-cli-proxy   then relaunch." ;;
-      Linux)  _agent_log "    Fix:      systemctl --user restart llm-cli-proxy   (no unit: bash ${CODING_REPO:-<coding>}/scripts/llm-proxy-service.sh &)   then relaunch." ;;
-      *)      _agent_log "    Fix:      bash ${CODING_REPO:-<coding>}/scripts/llm-proxy-service.sh &   then relaunch." ;;
-    esac
-    _agent_log "    Override: CODING_PROXY_ROUTE=0 launches direct (unmeasured) — explicit opt-out only."
-    exit 1
-  fi
-
-  # Ask the proxy which model this agent's foreground conversation is routed to.
-  # The answer comes from rapid-llm-proxy config/llm-routing.yaml (`fg-chat/<agent>`),
-  # which is the same lookup the proxy itself performs on every request — so the
-  # launcher and the proxy cannot disagree about which model an agent is running.
-  #
-  # These used to be literals here (`claude-opus-4.8`, `claude-haiku-4-5`), which
-  # is how the launcher, the experiment harness and the proxy each ended up
-  # believing a different model was in use.
-  #
-  # Fail-soft: an empty result leaves the caller's own COPILOT_MODEL (or the
-  # agent's default) in place. The /health gate above already covers "proxy down";
-  # this guard is only for a config the proxy could not resolve, which it logs.
-  _resolve_routed_model() {
-    local agent="$1"
-    curl -sf --max-time 5 "${base}/api/llm/routing/resolve?job=fg-chat&agent=${agent}" 2>/dev/null \
-      | node -e '
-          let s = "";
-          process.stdin.on("data", (d) => { s += d; });
-          process.stdin.on("end", () => {
-            try {
-              // The HEAD of the chain — the provider the config routes to. The
-              // tail is the fallback order, which the proxy applies per request;
-              // the launcher only needs the model it starts the agent on.
-              const head = JSON.parse(s).chain?.[0];
-              if (head?.model) process.stdout.write(head.model);
-            } catch { /* unresolvable -> empty -> caller keeps its own default */ }
-          });
-        ' 2>/dev/null
-  }
-
-  case "${AGENT_NAME:-$AGENT}" in
-    claude)
-      # VERIFIED: Claude Code honours ANTHROPIC_BASE_URL and forwards its Max-OAuth
-      # bearer to it. Unset the API-key envs so OAuth is used — they take precedence
-      # over the subscription login and would bypass the measured (Max) path; the
-      # proxy passthrough re-injects the Max bearer when the caller sends none.
-      export ANTHROPIC_BASE_URL="${base}"
-      unset ANTHROPIC_API_KEY ANTHROPIC_ADMIN_API_KEY ANTHROPIC_AUTH_TOKEN
-      # Bind this launcher's measurement span to the proxy tap's Route-1 passthrough rows
-      # PER-REQUEST (newline-separated `Name: value` form). An empty TASK_ID sends a BLANK
-      # x-task-id and, per D-08 (no-inherit), the tap stamps task_id='' on those wire rows
-      # — there is NO ambient resolveLiveTaskId() fallback. The span binding is recovered
-      # later at reconcile time by the RECONCILE_GAP_FILL_SQL task_id backfill (CR-03), which
-      # stamps the span task_id onto a matched task_id='' wire row (span-scoped, not ambient).
-      # Header env format verified live in Plan 06's EARLY gate before the full run.
-      # x-project: which repo these tokens are for (token_usage.project).
-      export ANTHROPIC_CUSTOM_HEADERS="x-task-id: ${TASK_ID:-}
-x-project: ${CODING_PROJECT_ID:-}"
-      _agent_log "🔌 claude → proxy ${base}/v1/messages (Max-OAuth forwarded; token_usage agent='claude'; x-task-id=${TASK_ID:-<ambient>}; project=${CODING_PROJECT_ID:-<none>})"
-      ;;
-    opencode)
-      # BEST-EFFORT: opencode's AI-SDK anthropic provider should honour
-      # ANTHROPIC_BASE_URL for its anthropic path; the proxy forwards opencode's own
-      # credential (KEEP its ANTHROPIC_API_KEY — unsetting it would trip opencode's
-      # auth prompt). The VPN/copilot-enterprise path is unaffected (not anthropic).
-      # Validate end-to-end with a live opencode run — if unhonoured, opencode falls
-      # back to the direct endpoint (works, just unmeasured — never broken).
-      export ANTHROPIC_BASE_URL="${base}"
-      _agent_log "🔌 opencode → proxy ${base}/v1/messages (anthropic path; best-effort — validate live)"
-      ;;
-    pi)
-      # Self-routed in pi.sh's agent_pre_launch, but with a real per-request binding
-      # (the agent it replaced had none). pi's models.json provider carries
-      # `"x-task-id": "$TASK_ID"`, and pi interpolates that from its own process
-      # environment at config load, so exporting TASK_ID here is enough to bind
-      # every call this launch makes. Verified live: a run with TASK_ID set
-      # produced a token_usage row carrying exactly that id.
-      #
-      # An INTERACTIVE launch has no TASK_ID, and pi cannot express "no task" in a
-      # header value: its resolver has no default form and treats empty as missing,
-      # so a declared-but-unresolvable x-task-id aborts the provider outright. pi.sh
-      # therefore OMITS the header entirely in that case, which the proxy reads as
-      # the ambient span — the same unbound posture claude gets from its blank
-      # ANTHROPIC_CUSTOM_HEADERS just above.
-      #
-      # Nothing to export for the base URL: it is baked into models.json, which
-      # pi.sh rewrites each launch. Self-routed WITHOUT the ambient-bound
-      # consequence the previous agent had, which is why pi is absent
-      # from AMBIENT_BOUND_AGENTS in lib/experiments/experiment-runner.mjs.
-      _agent_log "🔌 pi → proxy ${base}/v1/chat/completions (models.json provider rapid-proxy-pi; x-agent=pi; x-task-id=${TASK_ID:-<ambient>})"
-      ;;
-    copilot)
-      # BYOK measurement seam (Phase-81 verified live). The Copilot CLI cannot set request headers,
-      # so its ONLY per-request binding seam is the task-scoped base-URL PATH (/v1/copilot/t/<task_id>,
-      # Plan 03); the CLI appends /chat/completions. The API key is a literal non-secret placeholder
-      # against the localhost no-auth proxy (T-82-05-01, accepted). This is the SINGLE measured home
-      # for launcher-driven copilot BYOK (copilot.sh agent_pre_launch delegates here, Plan 06 / D-03).
-      #
-      # BYOK for BOTH launch modes (ambient routing shipped 2026-07-19; supersedes the WR-02 unset):
-      #   - Measured span (TASK_ID set): task-scoped path /v1/copilot/t/<taskId> — per-request binding.
-      #   - Interactive (no TASK_ID): unbound /v1/copilot — the shim stamps agent='copilot' from the
-      #     path and resolves the task_id from the reconciler's ambient slot
-      #     (active-measurement.copilot.json, kept in sync by measurement-reconciler.mjs), so ambient
-      #     copilot sessions get wire token rows AND per-run context-breakdown capture under the SAME
-      #     session uuid the auto-measure run row uses.
-      # WR-02 (double-write) is closed two ways: the stop-adapter reconcile matches copadt transcript
-      # rows against wire rows (request-id + fuzzy), and auto-measure-foreground's copilot pass only
-      # inserts copadt aggregate rows when NO wire rows exist for the session (wire-presence guard).
-      # WR-05 (dead URL) is covered by the /health gate above — same accepted risk as claude/opencode.
-      # Opt-out: COPILOT_AMBIENT_ROUTE=0 restores the copadt-only interactive launch.
-      # CODING_COPILOT_BAND declares a complexity band for this whole copilot
-      # session. It exists because the Copilot CLI can declare one nowhere else:
-      # measured on the wire 2026-08-29, its BYOK body is exactly
-      # {model, stream, stream_options, tools} with only x-stainless-* headers —
-      # no reasoning_effort, and `effortLevel` in ~/.copilot/settings.json is not
-      # forwarded on this path. So `fg-chat/copilot` being `from-caller` had no
-      # caller, every turn fell to defaults.fg-chat (high), and no copilot work
-      # could ever reach the semantic offload while identical pi/opencode work
-      # could. The URL is copilot's only seam — it is already how task_id binds.
-      #
-      # SESSION-scoped, and that is the honest cost: the base URL is built once
-      # here. pi (--thinking) and opencode (--variant) declare per turn and
-      # remain strictly better. Unset = unchanged behaviour.
-      #
-      # This used to credit opencode with `x-complexity`. It never sent one: its
-      # rapid-proxy provider block has no `headers` key, and a provider-level
-      # header would be session-scoped anyway. The per-turn seam it actually has
-      # is `variants` — verified on a capture endpoint 2026-08-30, where
-      # `--variant cheap` put `reasoning_effort: "low"` on the wire and a bare
-      # run put no effort field at all. See config/agents/opencode.sh.
-      #
-      # Validated here as well as in the proxy so a typo fails at launch with a
-      # readable message, rather than becoming a URL the proxy declines to match.
-      local _copilot_band="${CODING_COPILOT_BAND:-}"
-      local _copilot_band_seg=""
-      # The project segment comes first (/p/<id>/b/<band>/t/<task>): copilot can
-      # send no x-project header, so the URL is the only place for it.
-      local _copilot_project_seg=""
-      [ -n "${CODING_PROJECT_ID:-}" ] && _copilot_project_seg="/p/${CODING_PROJECT_ID}"
-      if [ -n "$_copilot_band" ]; then
-        case "$_copilot_band" in
-          small|medium|high) _copilot_band_seg="/b/${_copilot_band}" ;;
-          *)
-            _agent_log "⚠️  CODING_COPILOT_BAND='${_copilot_band}' is not one of small|medium|high — ignoring it."
-            _copilot_band=""
-            ;;
-        esac
-      fi
-      if [ -n "${TASK_ID:-}" ]; then
-        export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot${_copilot_project_seg}${_copilot_band_seg}/t/${TASK_ID}"
-        export COPILOT_PROVIDER_TYPE="openai"
-        export COPILOT_PROVIDER_API_KEY="rapid-proxy-no-auth-placeholder"
-        # The model comes from the `fg-chat/copilot` route in rapid-llm-proxy
-        # config/llm-routing.yaml — the same lookup the proxy performs when it
-        # serves the request, so the launcher cannot announce one model while the
-        # proxy uses another. (Phase 88-01 centralised this in
-        # lib/experiments/agent-routing.mjs; the config file is now that one place,
-        # and it covers the proxy too, which the JS module never could.)
-        export COPILOT_MODEL="${COPILOT_MODEL:-$(_resolve_routed_model copilot)}"
-        export COPILOT_AUTO_UPDATE="false"
-        # COPILOT_PROVIDER_WIRE_MODEL is honoured if the caller pre-set it (wire name ≠ COPILOT_MODEL);
-        # left inherited rather than forced, since the launcher has no wire-name mapping.
-        _agent_log "🔌 copilot → proxy ${COPILOT_PROVIDER_BASE_URL} (BYOK openai; measured span; token_usage agent='copilot'; model=${COPILOT_MODEL})"
-      elif [ "${COPILOT_AMBIENT_ROUTE:-1}" != "0" ]; then
-        # Band-only form when there is no measured span. This is the one that
-        # actually runs day to day: an interactive `coding --copilot` has no
-        # TASK_ID.
-        export COPILOT_PROVIDER_BASE_URL="${base}/v1/copilot${_copilot_project_seg}${_copilot_band_seg}"
-        export COPILOT_PROVIDER_TYPE="openai"
-        export COPILOT_PROVIDER_API_KEY="rapid-proxy-no-auth-placeholder"
-        # Same route as the measured path above — an interactive copilot session and
-        # a measured one must not run different models by accident, which is what
-        # the two separate literals here (claude-haiku-4-5 vs claude-opus-4.8) caused.
-        # Note the old opus default could not have worked through this leg anyway:
-        # the proxy's copilot catalogue rejects every opus id with
-        # `400 The requested model is not supported` (re-probed 2026-08-15).
-        export COPILOT_MODEL="${COPILOT_MODEL:-$(_resolve_routed_model copilot)}"
-        export COPILOT_AUTO_UPDATE="false"
-        _agent_log "🔌 copilot → proxy ${COPILOT_PROVIDER_BASE_URL} (BYOK openai; AMBIENT — task_id from reconciler slot; model=${COPILOT_MODEL}; opt-out COPILOT_AMBIENT_ROUTE=0)"
-      else
-        unset COPILOT_PROVIDER_BASE_URL COPILOT_PROVIDER_TYPE COPILOT_PROVIDER_API_KEY
-        _agent_log "ℹ️  copilot: COPILOT_AMBIENT_ROUTE=0 — interactive launch stays copadt-only (unmeasured wire; no context capture)."
-      fi
-      ;;
-    *)
-      _agent_log "ℹ️  ${AGENT_NAME:-$AGENT}: no proxy-routing rule; launching as configured (traffic may be unmeasured)."
-      ;;
-  esac
+  _coding_wiring route "${AGENT_NAME:-$AGENT}"
 }
 
 # ============================================

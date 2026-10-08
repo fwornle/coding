@@ -65,7 +65,9 @@ const OPENCODE_SH = path.resolve(REPO_ROOT, 'config', 'agents', 'opencode.sh');
 function renderOpenCodeConfigContent(overrideEnv = {}) {
   // Minimal bash script: stub helper functions, source opencode.sh, invoke the hook,
   // then emit the result with printf (no trailing newline, unlike echo).
+  // launch-agent-common.sh provides _coding_wiring, which agent_pre_launch calls.
   const script = `
+source "${REPO_ROOT}/scripts/launch-agent-common.sh"
 _agent_log() { :; }
 validate_agent_connectivity() { return 0; }
 source "${OPENCODE_SH}"

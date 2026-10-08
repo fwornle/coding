@@ -252,16 +252,18 @@ describe('Hook wiring — claude (unified hook config)', () => {
 // test had to assert that generator existed. pi persists its own sessions, so
 // what matters instead is that the launcher PINS where they land.
 describe('Session capture — pi (native session JSONL)', () => {
+  // pi's launch wiring is lib/agents/proxy-routing.mjs (preLaunchWiring), run by pi.sh.
   it('the agent config pins the session directory rather than generating hooks', () => {
-    const src = readText('config/agents/pi.sh');
+    const src = readText('lib/agents/proxy-routing.mjs');
     expect(src).toMatch(/PI_CODING_AGENT_SESSION_DIR/);
     expect(src).toMatch(/pi-sessions/);
     // No hook generation, and nothing written into the user's config root.
     expect(src).not.toMatch(/hooks\.json/);
+    expect(readText('config/agents/pi.sh')).not.toMatch(/hooks\.json/);
   });
 
   it('the config dir is wrapper-scoped so a bare `pi` is unaffected', () => {
-    const src = readText('config/agents/pi.sh');
+    const src = readText('lib/agents/proxy-routing.mjs');
     expect(src).toMatch(/PI_CODING_AGENT_DIR/);
     expect(src).toMatch(/\.pi-agent/);
   });
@@ -277,30 +279,28 @@ describe('Session capture — pi (native session JSONL)', () => {
   // Executes the generator rather than grepping it: the bug was in WHICH BRANCH ran,
   // which a source grep for "x-task-id" passes either way.
   describe('models.json task binding', () => {
-    const generate = (env) => {
+    const generate = async (env) => {
       const dir = mkdtempSync(path.join(os.tmpdir(), 'pi-models-'));
-      execFileSync('bash', ['-c',
-        `_agent_log() { :; }; source "${path.join(REPO, 'config/agents/pi.sh')}"; ` +
-        `_pi_write_models_json "${dir}"`,
-      ], { cwd: REPO, env: { ...process.env, ...env }, encoding: 'utf8' });
+      const { writePiModelsJson } = await import('../../lib/agents/proxy-routing.mjs');
+      writePiModelsJson(dir, env);
       return JSON.parse(readFileSync(path.join(dir, 'models.json'), 'utf8'))
         .providers['rapid-proxy-pi'];
     };
 
-    it('omits x-task-id when there is no task, so interactive launches work', () => {
+    it('omits x-task-id when there is no task, so interactive launches work', async () => {
       const { TASK_ID: _drop, ...envWithoutTaskId } = process.env;
-      const provider = generate({ ...envWithoutTaskId, TASK_ID: undefined });
+      const provider = await generate({ ...envWithoutTaskId, TASK_ID: undefined });
       expect(provider.headers['x-agent']).toBe('pi');
       // Absent, NOT empty: pi treats an empty value as unresolvable too.
       expect(provider.headers).not.toHaveProperty('x-task-id');
     });
 
-    it('keeps the $TASK_ID reference when a measured run binds a cell', () => {
-      const provider = generate({ TASK_ID: 'exp-cell-42' });
+    it('keeps the $TASK_ID reference when a measured run binds a cell', async () => {
+      const provider = await generate({ TASK_ID: 'exp-cell-42' });
       expect(provider.headers['x-agent']).toBe('pi');
       // The literal reference, not the resolved value: ONE static file serves every
-      // cell because pi re-interpolates it per process (agent-routing.mjs sets TASK_ID
-      // per cell, and the harness does not rewrite this file).
+      // cell because pi re-interpolates it per process (the cell's TASK_ID is set per
+      // process by wireAgentEnv).
       expect(provider.headers['x-task-id']).toBe('$TASK_ID');
     });
   });

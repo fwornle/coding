@@ -427,7 +427,10 @@ test('runCell: opencode is spawned with proxy routing (ANTHROPIC_BASE_URL) + san
   assert.equal(env.LLM_PROXY_DATA_DIR, '/wt/.data', 'agent keeps sandbox data dir (isolation preserved)');
 });
 
-test('configureProxyRoutingEnv: opencode routes+keeps key; claude routes + x-task-id header (Phase 82); unreachable/opt-out→unrouted', async () => {
+test('configureProxyRoutingEnv: a cell gets the launcher wiring — opencode config + key kept; claude header + keys removed; unreachable → unrouted', async () => {
+  // Cells are wired by lib/agents/proxy-routing.mjs, the same rules an interactive
+  // `coding --<agent>` launch gets (pinned by tests/agents/proxy-routing-parity.test.mjs);
+  // the cell's composite task_id is TASK_ID, as the launcher passes it.
   const up = async () => ({ status: 'running' });
   const down = async () => ({ status: 'stopped', error: 'ECONNREFUSED' });
   const base = { ANTHROPIC_API_KEY: 'k', LLM_PROXY_DATA_DIR: '/wt/.data' };
@@ -435,49 +438,39 @@ test('configureProxyRoutingEnv: opencode routes+keeps key; claude routes + x-tas
   const oc = await configureProxyRoutingEnv('opencode', base, { port: 12435, probe: up, route: '1' });
   assert.equal(oc.ANTHROPIC_BASE_URL, 'http://127.0.0.1:12435');
   assert.equal(oc.ANTHROPIC_API_KEY, 'k', 'opencode keeps its own credential');
-  assert.ok(!('OPENCODE_CONFIG_CONTENT' in oc), 'no taskId → no provider splice (byte-identical to prior)');
+  const ocCfg = JSON.parse(oc.OPENCODE_CONFIG_CONTENT);
+  assert.equal(ocCfg.provider['github-copilot'].options.baseURL, 'http://127.0.0.1:12435/v1/opencode', 'ambient shim without a task');
+  assert.deepEqual(ocCfg.enabled_providers, ['rapid-proxy', 'github-copilot']);
+  assert.ok(!('plugin' in ocCfg), 'a cell has no CODING_REPO → no coding plugins in its config');
 
-  // Phase 84 (seams A+B): with a taskId, opencode gets per-request binding on BOTH wires via an
-  // OPENCODE_CONFIG_CONTENT provider splice — anthropic → /v1 + x-task-id/x-agent headers; openai/
-  // copilot → task-scoped path /v1/opencode/t/<taskId>. Kills the ambient-span capture leak.
   const ocT = await configureProxyRoutingEnv('opencode', base, { port: 12435, probe: up, route: '1', taskId: 't-1' });
-  assert.equal(ocT.ANTHROPIC_BASE_URL, 'http://127.0.0.1:12435', 'opencode still proxy-routed');
-  const ocCfg = JSON.parse(ocT.OPENCODE_CONFIG_CONTENT);
-  assert.equal(ocCfg.provider.anthropic.options.baseURL, 'http://127.0.0.1:12435/v1', 'seam A: anthropic wire → /v1');
-  assert.equal(ocCfg.provider.anthropic.options.headers['x-task-id'], 't-1', 'seam A: per-request task binding header');
-  assert.equal(ocCfg.provider.anthropic.options.headers['x-agent'], 'opencode', 'seam A: agent binding header');
-  assert.equal(ocCfg.provider.openai.options.baseURL, 'http://127.0.0.1:12435/v1/opencode/t/t-1', 'seam B: openai wire → task-scoped path');
-  assert.equal(ocCfg.provider['github-copilot'].options.baseURL, 'http://127.0.0.1:12435/v1/opencode/t/t-1', 'seam B: copilot wire → task-scoped path');
+  assert.equal(ocT.TASK_ID, 't-1');
+  assert.equal(JSON.parse(ocT.OPENCODE_CONFIG_CONTENT).provider['github-copilot'].options.baseURL,
+    'http://127.0.0.1:12435/v1/opencode/t/t-1', 'task-scoped shim path binds the cell');
 
-  // Phase 82 re-routes claude through the proxy: the former unroute workaround existed only
-  // because the tap dropped cache accounting (fixed Plan 02) and first-writer-wins dedup shadowed
-  // the richer cladpt transcript row (fixed Plan 04). The x-task-id header binds the tap's
-  // passthrough rows to THIS cell's span per-request (kills ambient-span leakage).
-  const cl = await configureProxyRoutingEnv('claude', base, { port: 12435, probe: up, route: '1', taskId: 't-1' });
+  // claude: x-task-id + x-project header; the API-key vars are removed so the Max OAuth path is
+  // measured (the passthrough re-injects the Max bearer).
+  const cl = await configureProxyRoutingEnv('claude', { ...base, CODING_PROJECT_ID: 'coding' }, { port: 12435, probe: up, route: '1', taskId: 't-1' });
   assert.equal(cl.ANTHROPIC_BASE_URL, 'http://127.0.0.1:12435', 'claude is proxy-routed (Phase 82)');
-  assert.equal(cl.ANTHROPIC_CUSTOM_HEADERS, 'x-task-id: t-1', 'claude carries the per-request task binding header');
-  assert.equal(cl.ANTHROPIC_API_KEY, 'k', 'claude keeps its own creds');
+  assert.equal(cl.ANTHROPIC_CUSTOM_HEADERS, 'x-task-id: t-1\nx-project: coding');
+  assert.ok(!('ANTHROPIC_API_KEY' in cl), 'claude cells run on the Max OAuth path, like the launcher');
 
   const clNoTask = await configureProxyRoutingEnv('claude', base, { port: 12435, probe: up, route: '1' });
-  assert.ok(!('ANTHROPIC_CUSTOM_HEADERS' in clNoTask), 'no taskId → no custom headers env');
+  assert.equal(clNoTask.ANTHROPIC_CUSTOM_HEADERS, 'x-task-id: \nx-project: ', 'blank header → neutral row, never the ambient span');
 
-  const unreachable = await configureProxyRoutingEnv('opencode', base, { port: 12435, probe: down, route: '1' });
-  assert.ok(!('ANTHROPIC_BASE_URL' in unreachable), 'proxy down → launched unrouted (fail-soft)');
+  const unreachable = await configureProxyRoutingEnv('opencode', base, { port: 12435, probe: down, route: '1', taskId: 't-1' });
+  assert.deepEqual(unreachable, base, 'proxy down → launched unrouted with its env untouched (fail-soft)');
 
   const optOut = await configureProxyRoutingEnv('opencode', base, { port: 12435, probe: up, route: '0' });
   assert.ok(!('ANTHROPIC_BASE_URL' in optOut), 'CODING_PROXY_ROUTE=0 → unrouted');
 });
 
-test('configureProxyRoutingEnv: copilot BYOK — task-scoped URL, all envs set, URL-encoding, proxy-down/opt-out fail-soft, no baseEnv mutation', async () => {
-  // Gap WIRE-07: copilot BYOK branch was untested. This test verifies every behavioural
-  // claim in the Plan-05 SUMMARY and aligns assertions to what the implementation
-  // actually does (switch case 'copilot' in lib/experiments/experiment-runner.mjs).
-
+test('configureProxyRoutingEnv: copilot BYOK — task-scoped URL, all envs set, proxy-down/opt-out, no baseEnv mutation', async () => {
   const up = async () => ({ status: 'running' });
   const down = async () => ({ status: 'stopped', error: 'ECONNREFUSED' });
-  const base = { ANTHROPIC_API_KEY: 'k', LLM_PROXY_DATA_DIR: '/wt/.data' };
+  const base = { ANTHROPIC_API_KEY: 'k', LLM_PROXY_DATA_DIR: '/wt/.data', COPILOT_PROVIDER_BASE_URL: 'http://stale/v1' };
 
-  // a. With taskId and model: task-scoped URL + all BYOK envs present.
+  // a. With taskId and model: task-scoped URL + all BYOK envs present; the cell's model wins.
   const cp = await configureProxyRoutingEnv('copilot', base, {
     port: 12435, probe: up, route: '1', taskId: 't-1', model: 'claude-haiku-4-5',
   });
@@ -487,33 +480,19 @@ test('configureProxyRoutingEnv: copilot BYOK — task-scoped URL, all envs set, 
   assert.equal(cp.COPILOT_MODEL, 'claude-haiku-4-5');
   assert.equal(cp.COPILOT_AUTO_UPDATE, 'false');
 
-  // b. Without taskId: falls back to unbound /v1/copilot path.
-  const cpNoTask = await configureProxyRoutingEnv('copilot', base, {
+  // b. Without taskId: the ambient /v1/copilot path; a project goes into the path.
+  const cpNoTask = await configureProxyRoutingEnv('copilot', { ...base, CODING_PROJECT_ID: 'coding' }, {
     port: 12435, probe: up, route: '1', model: 'claude-haiku-4-5',
   });
-  assert.equal(cpNoTask.COPILOT_PROVIDER_BASE_URL, 'http://127.0.0.1:12435/v1/copilot');
+  assert.equal(cpNoTask.COPILOT_PROVIDER_BASE_URL, 'http://127.0.0.1:12435/v1/copilot/p/coding');
 
-  // c. taskId containing '#' (ASCII 0x23) → encodeURIComponent encodes it as %23.
-  //    Path segment must carry the percent-encoded form so the proxy URL is valid.
-  const cpEncoded = await configureProxyRoutingEnv('copilot', base, {
-    port: 12435, probe: up, route: '1', taskId: 'task#42',
-  });
-  assert.equal(
-    cpEncoded.COPILOT_PROVIDER_BASE_URL,
-    'http://127.0.0.1:12435/v1/copilot/t/task%2342',
-    'taskId with # must arrive percent-encoded in the path segment',
-  );
-
-  // d. Proxy down (probe returns stopped) → NO COPILOT_PROVIDER_* envs (fail-soft).
+  // c. Proxy down → the cell's env untouched (the stale inherited URL is the caller's).
   const cpDown = await configureProxyRoutingEnv('copilot', base, {
     port: 12435, probe: down, route: '1', taskId: 't-1', model: 'claude-haiku-4-5',
   });
-  assert.ok(!('COPILOT_PROVIDER_BASE_URL' in cpDown), 'proxy down → no COPILOT_PROVIDER_BASE_URL');
-  assert.ok(!('COPILOT_PROVIDER_TYPE' in cpDown), 'proxy down → no COPILOT_PROVIDER_TYPE');
-  assert.ok(!('COPILOT_PROVIDER_API_KEY' in cpDown), 'proxy down → no COPILOT_PROVIDER_API_KEY');
-  assert.ok(!('COPILOT_AUTO_UPDATE' in cpDown), 'proxy down → no COPILOT_AUTO_UPDATE');
+  assert.deepEqual(cpDown, base);
 
-  // Opt-out (CODING_PROXY_ROUTE=0) → NO COPILOT_PROVIDER_* envs (fail-soft).
+  // d. Opt-out (CODING_PROXY_ROUTE=0) → inherited BYOK cleared, none set.
   const cpOptOut = await configureProxyRoutingEnv('copilot', base, {
     port: 12435, probe: up, route: '0', taskId: 't-1', model: 'claude-haiku-4-5',
   });
@@ -521,9 +500,28 @@ test('configureProxyRoutingEnv: copilot BYOK — task-scoped URL, all envs set, 
   assert.ok(!('COPILOT_PROVIDER_TYPE' in cpOptOut), 'CODING_PROXY_ROUTE=0 → no COPILOT_PROVIDER_TYPE');
 
   // e. baseEnv is not mutated — BYOK envs appear only on the returned copy.
-  assert.ok(!('COPILOT_PROVIDER_BASE_URL' in base), 'baseEnv not mutated: no COPILOT_PROVIDER_BASE_URL');
+  assert.equal(base.COPILOT_PROVIDER_BASE_URL, 'http://stale/v1', 'baseEnv not mutated');
   assert.ok(!('COPILOT_PROVIDER_TYPE' in base), 'baseEnv not mutated: no COPILOT_PROVIDER_TYPE');
   assert.ok(!('COPILOT_AUTO_UPDATE' in base), 'baseEnv not mutated: no COPILOT_AUTO_UPDATE');
+});
+
+test('configureProxyRoutingEnv: a pi cell writes its config into the cell sandbox, never ~/.pi or the repo', async () => {
+  const box = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-cell-'));
+  try {
+    const env = await configureProxyRoutingEnv('pi', { HOME: path.join(box, 'home'), ANTHROPIC_API_KEY: 'k' }, {
+      port: 12435, probe: async () => ({ status: 'running' }), route: '1', taskId: 't-pi',
+      targetProjectDir: path.join(box, 'wt'), piConfigDir: path.join(box, 'data', 'pi-agent'),
+    });
+    assert.equal(env.PI_CODING_AGENT_DIR, path.join(box, 'data', 'pi-agent'));
+    assert.equal(env.TASK_ID, 't-pi');
+    assert.ok(!('ANTHROPIC_API_KEY' in env));
+    const models = JSON.parse(fs.readFileSync(path.join(box, 'data', 'pi-agent', 'models.json'), 'utf8'));
+    assert.equal(models.providers['rapid-proxy-pi'].headers['x-task-id'], '$TASK_ID');
+    assert.ok(!fs.existsSync(path.join(box, 'home', '.pi')), 'the user\'s ~/.pi is never touched');
+    assert.ok(fs.existsSync(path.join(box, 'wt', '.observations', 'pi-sessions')));
+  } finally {
+    fs.rmSync(box, { recursive: true, force: true });
+  }
 });
 
 // ---------------------------------------------------------------------------

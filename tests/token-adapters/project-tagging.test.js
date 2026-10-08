@@ -23,7 +23,7 @@ const { buildCopilotTokenRows } = await import('../../lib/lsl/token/copilot-toke
 const { buildOpencodeTokenRows } = await import('../../lib/lsl/token/opencode-token-rows.mjs');
 const { aggregateByTaskId } = await import('../../lib/experiments/token-aggregate.mjs');
 const { summarizeProjects, writeProjectUsage, usageFileFor } = await import('../../lib/usage/project-usage.mjs');
-const { buildAgentRoutingEnv } = await import('../../lib/experiments/agent-routing.mjs');
+const { wireAgentEnv } = await import('../../lib/agents/proxy-routing.mjs');
 
 const SCHEMA = `CREATE TABLE token_usage (
   id INTEGER NOT NULL, timestamp TEXT NOT NULL, provider TEXT NOT NULL,
@@ -226,20 +226,23 @@ describe('per-repo usage export', () => {
 
 describe('experiment cells send the project like the launcher does', () => {
   const env = { CODING_PROJECT_ID: 'alpha' };
-  test('claude: x-project header next to x-task-id', () => {
-    expect(buildAgentRoutingEnv('claude', env, { taskId: 't1' }).ANTHROPIC_CUSTOM_HEADERS)
+  // The proxy reported up, so the wiring is deterministic on a machine running a real one.
+  const wire = async (agent, e, opts) =>
+    (await wireAgentEnv(agent, e, { port: 12435, probe: async () => true, tries: 1, retryDelayMs: 0, ...opts })).env;
+  test('claude: x-project header next to x-task-id', async () => {
+    expect((await wire('claude', env, { taskId: 't1' })).ANTHROPIC_CUSTOM_HEADERS)
       .toBe('x-task-id: t1\nx-project: alpha');
   });
-  test('copilot: /p/<id> before /t/<task>', () => {
-    expect(buildAgentRoutingEnv('copilot', env, { taskId: 't1' }).COPILOT_PROVIDER_BASE_URL)
+  test('copilot: /p/<id> before /t/<task>', async () => {
+    expect((await wire('copilot', env, { taskId: 't1', model: 'm' })).COPILOT_PROVIDER_BASE_URL)
       .toMatch(/\/v1\/copilot\/p\/alpha\/t\/t1$/);
   });
-  test('opencode: x-project on every spliced provider', () => {
-    const cfg = JSON.parse(buildAgentRoutingEnv('opencode', env, { taskId: 't1' }).OPENCODE_CONFIG_CONTENT);
+  test('opencode: x-project on every provider routed through the proxy', async () => {
+    const cfg = JSON.parse((await wire('opencode', env, { taskId: 't1' })).OPENCODE_CONFIG_CONTENT);
     for (const p of Object.values(cfg.provider)) expect(p.options.headers['x-project']).toBe('alpha');
   });
-  test('an unusable id is dropped, not sent', () => {
-    const out = buildAgentRoutingEnv('claude', { CODING_PROJECT_ID: '../x' }, { taskId: 't1' });
-    expect(out.ANTHROPIC_CUSTOM_HEADERS).toBe('x-task-id: t1');
+  test('an unusable id is dropped, not sent', async () => {
+    const out = await wire('claude', { CODING_PROJECT_ID: '../x' }, { taskId: 't1' });
+    expect(out.ANTHROPIC_CUSTOM_HEADERS).toBe('x-task-id: t1\nx-project: ');
   });
 });

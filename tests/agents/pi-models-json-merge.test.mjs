@@ -1,7 +1,7 @@
 // tests/agents/pi-models-json-merge.test.mjs
 //
-// _pi_write_models_json (config/agents/pi.sh) must MERGE into an existing
-// models.json rather than replace it.
+// writePiModelsJson (lib/agents/proxy-routing.mjs; run by config/agents/pi.sh's
+// agent_pre_launch) must MERGE into an existing models.json rather than replace it.
 //
 // Why this is a test and not a comment: under CODING_AGENT_SCOPE=global the
 // config dir IS the user's own ~/.pi/agent, so the writer's target is a file
@@ -12,7 +12,7 @@
 // was the only scope. Code and comment now agree; these tests are what keeps
 // them agreeing.
 //
-// The contract, mirroring _pi_merge_settings for settings.json:
+// The contract, mirroring writePiSettings for settings.json:
 //   a. We own `rapid-proxy-pi` and `qwen-laptop` outright and rewrite them every
 //      launch — the proxy port, the x-task-id header and the qwen base URL all
 //      move between launches, so a stale entry is worse than no entry.
@@ -20,11 +20,11 @@
 //   c. An absent or unparseable file is not an error: we start from {}.
 //   d. The scratch file the writer stages through is never left behind.
 //
-// Strategy: stub _agent_log, source pi.sh in a bash subprocess, call the writer
-// against a temp dir, read the JSON back. Same harness as
-// opencode-anthropic-native-splice.test.mjs, including --norc --noprofile — on
-// macOS /bin/bash sources ~/.bashrc even for `bash -c`, which is how a
-// developer's exported CODING_REPO leaks into an otherwise isolated env.
+// Strategy: call the writer against a temp dir and read the JSON back. The
+// installers further down are still bash: those source pi.sh in a subprocess
+// with --norc --noprofile — on macOS /bin/bash sources ~/.bashrc even for
+// `bash -c`, which is how a developer's exported CODING_REPO leaks into an
+// otherwise isolated env.
 //
 // Runner: node --test tests/agents/pi-models-json-merge.test.mjs
 
@@ -35,6 +35,7 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, readdirSyn
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { writePiModelsJson } from '../../lib/agents/proxy-routing.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
@@ -42,21 +43,9 @@ const PI_SH = path.resolve(REPO_ROOT, 'config', 'agents', 'pi.sh');
 
 const OURS = ['rapid-proxy-pi', 'qwen-laptop'];
 
-/** Run _pi_write_models_json against `cfgDir`. Returns the parsed models.json. */
+/** Run writePiModelsJson against `cfgDir`. Returns the parsed models.json. */
 function writeModels(cfgDir) {
-  const script = `
-_agent_log() { :; }
-source "${PI_SH}"
-_pi_write_models_json "${cfgDir}"
-`;
-  const result = spawnSync('bash', ['--norc', '--noprofile', '-c', script], {
-    encoding: 'utf8',
-    env: {
-      PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin',
-      HOME: process.env.HOME || '/tmp',
-    },
-  });
-  assert.equal(result.status, 0, `writer failed: ${result.stderr}`);
+  writePiModelsJson(cfgDir, {});
   return JSON.parse(readFileSync(path.join(cfgDir, 'models.json'), 'utf8'));
 }
 
