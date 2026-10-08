@@ -7,6 +7,7 @@
 //   GET  /api/token-usage/*, /api/context-breakdown, /api/context-turns   reads
 //   POST /sessions, DELETE /sessions/<token>, GET /sessions                wrapper sessions
 //   GET  /health, POST /stop
+//   GET  /, /assets/*, /api/experiments/runs[/<id>/…]   the UI (ui-api.mjs)
 //
 // Every `glass <agent>` run is a session with its own task id; its rows, context
 // turns and breakdown are keyed by it, and closing it archives the span and lets
@@ -33,6 +34,7 @@ import { sweepAgedCaptures } from '../measurement/context-turns-retention.mjs';
 import { captureForegroundTokens } from '../lsl/token/stop-adapter-registry.mjs';
 import { glassPaths, PKG_ROOT } from './home.mjs';
 import { createEgressFetch, upstreamProxy } from './egress.mjs';
+import { createUiApi } from './ui-api.mjs';
 
 export const VERSION = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version;
 
@@ -117,6 +119,11 @@ export async function startDaemon({
 
   // ── sessions ──
   const sessions = new Map(); // token → session
+  const publicSessions = () => [...sessions.values()].map(({ token, ...s }) => s);
+  const uiRead = createUiApi({
+    uiDir: path.join(PKG_ROOT, 'ui'), dataDir: p.data, tokenDb: () => tokenDb,
+    dbPath: resolveTokenDbPath(p.data), measurement, liveSessions: publicSessions,
+  });
   let lastActivity = Date.now();
   const touch = () => { lastActivity = Date.now(); };
 
@@ -217,7 +224,7 @@ export async function startDaemon({
         return json(res, 200, { taskId: s.taskId, token: s.token, caPath: intercept.caPath });
       }
       if (url === '/sessions' && req.method === 'GET') {
-        return json(res, 200, { sessions: [...sessions.values()].map(({ token, ...s }) => s) });
+        return json(res, 200, { sessions: publicSessions() });
       }
       if (url.startsWith('/sessions/') && req.method === 'DELETE') {
         const span = await closeSession(decodeURIComponent(url.slice('/sessions/'.length)));
@@ -236,6 +243,7 @@ export async function startDaemon({
         });
       }
       if (usageRead(req, res)) return undefined;
+      if (await uiRead(req, res)) return undefined;
       return json(res, 404, { error: `no route for ${req.method} ${url.split('?')[0]}` });
     } catch (err) {
       logErr(`${req.method} ${req.url}: ${err?.stack || err}`);

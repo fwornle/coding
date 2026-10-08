@@ -220,6 +220,78 @@ test('closing a session archives its span', async () => {
   assert.equal((await api('DELETE', `/sessions/${encodeURIComponent(s.token)}`)).status, 404);
 });
 
+test('UI reads: sessions as runs (live + closed), a session\'s timeline and context turns', async () => {
+  const s = await open('copilot');
+  await intercepted({ host: 'copilot-api.acme.ghe.com', token: s.token, route: '/v1/messages', body: { model: 'claude-sonnet-5.5', max_tokens: 8, messages: msgs } });
+  await settle();
+  let run = (await api('GET', '/api/experiments/runs')).body.rows.find((r) => r.task_id === s.taskId);
+  assert.equal(run.ended_at, null, 'a live session is a run without an end');
+  assert.equal(run.canonical_agent, 'copilot');
+  assert.equal(run.project, 'glass');
+  assert.equal(run.outcome.calls, 1);
+  assert.equal(run.outcome.inputTokens, 33);
+  assert.ok(run.canonical_model, 'dominant model of the session');
+  await api('DELETE', `/sessions/${encodeURIComponent(s.token)}`);
+  run = (await api('GET', '/api/experiments/runs')).body.rows.find((r) => r.task_id === s.taskId);
+  assert.ok(run.ended_at, 'closed: read back from the archived span');
+  assert.equal(run.outcome.calls, 1);
+  const tl = (await api('GET', `/api/experiments/runs/${s.taskId}/timeline`)).body;
+  assert.equal(tl.timeline.length, 1);
+  assert.equal(tl.timeline[0].input_tokens, 33);
+  assert.equal((await api('GET', `/api/experiments/runs/${s.taskId}/context-turns`)).body.contextTurns.length, 1);
+  assert.deepEqual((await api('GET', '/api/experiments/runs/no-such-task/context-turns')).body, { contextTurns: [] });
+  assert.equal((await api('GET', '/api/experiments/runs/..%2F..%2Fetc/timeline')).status, 400);
+});
+
+test('UI static: page, assets, client routes; no escape from the UI dir', async () => {
+  const { createUiApi } = await import('../lib/glass/ui-api.mjs');
+  const uiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-ui-'));
+  fs.mkdirSync(path.join(uiDir, 'assets'));
+  fs.writeFileSync(path.join(uiDir, 'index.html'), '<div id="root"></div>');
+  fs.writeFileSync(path.join(uiDir, 'assets', 'a.js'), 'x');
+  const handle = createUiApi({ uiDir, dataDir: uiDir, tokenDb: () => null, dbPath: '', measurement: {}, liveSessions: () => [] });
+  const srv = http.createServer(async (req, res) => { if (!(await handle(req, res))) { res.writeHead(404); res.end(); } });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const base = `http://127.0.0.1:${srv.address().port}`;
+  try {
+    const page = await fetch(`${base}/`);
+    assert.equal(page.headers.get('content-type'), 'text/html; charset=utf-8');
+    assert.match(await page.text(), /root/);
+    const js = await fetch(`${base}/assets/a.js`);
+    assert.match(js.headers.get('content-type'), /javascript/);
+    assert.match(js.headers.get('cache-control'), /immutable/);
+    assert.match(await (await fetch(`${base}/sessions`)).text(), /root/, 'a client route gets the page');
+    assert.equal((await fetch(`${base}/assets/missing.js`)).status, 404);
+    // Raw paths: fetch() would normalise the dots away before they reach the server.
+    const raw = (p) => new Promise((resolve, reject) => {
+      http.get({ host: '127.0.0.1', port: srv.address().port, path: p }, (r) => {
+        let body = '';
+        r.on('data', (d) => { body += d; });
+        r.on('end', () => resolve({ status: r.statusCode, body }));
+      }).on('error', reject);
+    });
+    fs.writeFileSync(path.join(path.dirname(uiDir), 'glass-ui-secret.txt'), 'SECRET');
+    for (const p of ['/../glass-ui-secret.txt', '/%2e%2e/glass-ui-secret.txt', '/assets/..%2f..%2fglass-ui-secret.txt']) {
+      const r = await raw(p);
+      assert.ok(!r.body.includes('SECRET'), `${p} escaped the UI dir`);
+    }
+    fs.rmSync(path.join(path.dirname(uiDir), 'glass-ui-secret.txt'), { force: true });
+    assert.deepEqual(await (await fetch(`${base}/api/experiments/runs`)).json(), { rows: [] });
+  } finally {
+    await new Promise((r) => srv.close(r));
+    fs.rmSync(uiDir, { recursive: true, force: true });
+  }
+});
+
+test('glass ui: one opener chain per platform, no shell', async () => {
+  const { openers } = await import('../lib/glass/open-url.mjs');
+  const u = 'http://127.0.0.1:12445/?a=1&b=2';
+  assert.deepEqual(openers(u, 'darwin', false), [['open', [u]]]);
+  assert.deepEqual(openers(u, 'win32', false)[0], ['cmd', ['/c', 'start', '""', 'http://127.0.0.1:12445/?a=1^&b=2']]);
+  assert.equal(openers(u, 'linux', true)[0][0], 'wslview');
+  assert.equal(openers(u, 'linux', false)[0][0], 'xdg-open');
+});
+
 test('an idle daemon exits by itself', async () => {
   const idleHome = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-idle-'));
   const d = await startDaemon({ home: idleHome, port: 0, fetch: stubFetch, idleMs: 100, tickMs: 25, log: () => {} });

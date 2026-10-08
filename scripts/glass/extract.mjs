@@ -9,9 +9,10 @@
 //   --node <path>   node binary for the build smoke (default: this one)
 //
 // Pipeline (glass/manifest.yaml drives every step): select → compile → rewrite →
-// overlay → provenance → verify (closed imports, computed sites accounted for, no
-// forbidden deps, builds: every module imports and the token DB round-trips with
-// no node_modules). The glass repo is generated, never hand-edited.
+// overlay → build (the UI bundle) → provenance → verify (closed imports, computed
+// sites accounted for, no forbidden deps, builds: every module imports and the
+// token DB round-trips with no node_modules). The glass repo is generated, never
+// hand-edited.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -48,6 +49,7 @@ export function loadManifest(file = DEFAULT_MANIFEST) {
     optional: m.optional || [],
     forbidden: { packages: m.forbidden?.packages || [], spawn: m.forbidden?.spawn || [] },
     overlay: m.overlay || null,
+    build: m.build || [],
     sources: Object.keys(m.sources || {}),
   };
 }
@@ -179,6 +181,33 @@ function overlay(manifest, out, manifestDir) {
   if (errors.length) throw new ExtractError(errors);
 }
 
+/**
+ * Browser bundles (Vite), built with the source checkout's own node_modules into
+ * `<out>/<to>`. Their output is for the browser: verify and the smoke skip it.
+ */
+function build(manifest, roots, out) {
+  const errors = [];
+  for (const step of manifest.build) {
+    const dir = path.join(roots[step.source] || '', step.dir);
+    const vite = path.join(dir, 'node_modules', 'vite', 'bin', 'vite.js');
+    if (!fs.existsSync(vite)) { errors.push(`build: ${step.source}:${step.dir} has no node_modules/vite — install its dependencies first`); continue; }
+    const dest = path.join(out, step.to);
+    const r = spawnSync(process.execPath, [vite, 'build', '--config', step.config, '--outDir', dest, '--emptyOutDir', '--logLevel', 'error'], {
+      cwd: dir, encoding: 'utf8', timeout: 600_000, env: { ...process.env, NODE_ENV: 'production', BROWSERSLIST_IGNORE_OLD_DATA: '1' },
+    });
+    if (r.status !== 0) { errors.push(`build: ${step.config} failed:\n${r.stdout || ''}${r.stderr || ''}`); continue; }
+    const page = path.join(dest, 'index.html');
+    if (!fs.existsSync(page)) { errors.push(`build: ${step.to}/index.html missing`); continue; }
+    for (const [, ref] of fs.readFileSync(page, 'utf8').matchAll(/(?:src|href)="\.\/([^"]+)"/g)) {
+      if (!fs.existsSync(path.join(dest, ref))) errors.push(`build: ${step.to}/index.html references ${ref}, which was not built`);
+    }
+  }
+  if (errors.length) throw new ExtractError(errors);
+}
+
+/** Paths under a build step's output — browser code, not node modules. */
+const builtPrefixes = (manifest) => manifest.build.map((b) => `${posix(b.to).replace(/\/+$/, '')}/`);
+
 function provenance(out, roots, manifestFile) {
   const sources = {};
   for (const [name, root] of Object.entries(roots)) sources[name] = gitInfo(root);
@@ -221,10 +250,11 @@ export function verify(out, manifest) {
     ? new RegExp(String.raw`\b(?:spawn|spawnSync|exec|execSync|execFile|execFileSync)\s*\(\s*(['"\x60])(?:${manifest.forbidden.spawn.join('|')})(?=[\s'"\x60])`, 'g')
     : null;
   let lines = 0;
+  const built = builtPrefixes(manifest);
 
   for (const rel of files) {
     if (rel.endsWith('.sh')) errors.push(`forbidden: shell script ${rel}`);
-    if (!JS_FILE.test(rel)) continue;
+    if (!JS_FILE.test(rel) || built.some((b) => rel.startsWith(b))) continue;
     const abs = path.join(out, rel);
     const src = fs.readFileSync(abs, 'utf8');
     lines += src.split('\n').length;
@@ -313,7 +343,7 @@ const NPM = process.platform === 'win32' ? 'npm.cmd' : 'npm';
  * run SMOKE there and the bin entry points with --version.
  * @returns {{ok: boolean, result: object|null, output: string}}
  */
-export function smoke(out, { node = process.execPath } = {}) {
+export function smoke(out, { node = process.execPath, skip = [] } = {}) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-smoke-'));
   try {
     const pkg = path.join(tmp, 'glass');
@@ -337,7 +367,8 @@ export function smoke(out, { node = process.execPath } = {}) {
       NODE_NO_WARNINGS: '1',
     };
     // Entry points run when imported — they are exercised with --version instead.
-    const files = listTree(pkg).filter((f) => JS_FILE.test(f) && !f.startsWith('bin/') && !f.startsWith('tests/') && !f.startsWith('node_modules/'));
+    const files = listTree(pkg).filter((f) => JS_FILE.test(f)
+      && !['bin/', 'tests/', 'node_modules/', ...skip].some((p) => f.startsWith(p)));
     const r = spawnSync(node, ['--input-type=module', '-e', SMOKE], {
       cwd: tmp, encoding: 'utf8', timeout: 60_000,
       env: { ...env, GLASS_SMOKE_PKG: pkg, GLASS_SMOKE_FILES: JSON.stringify(files) },
@@ -372,11 +403,12 @@ export function extract({ out, manifestFile = DEFAULT_MANIFEST, roots = defaultR
   compile(manifest, roots, out);
   rewrite(manifest, out);
   overlay(manifest, out, path.dirname(manifestFile));
+  build(manifest, roots, out);
   const prov = provenance(out, roots, manifestFile);
   const { errors, report } = verify(out, manifest);
   if (errors.length) throw new ExtractError(errors);
   if (!skipSmoke) {
-    const s = smoke(out, { node: smokeNode });
+    const s = smoke(out, { node: smokeNode, skip: builtPrefixes(manifest) });
     if (!s.ok) throw new ExtractError([`build smoke failed:\n${s.output}`]);
     report.smoke = s.result;
   }

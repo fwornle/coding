@@ -32,6 +32,8 @@ select:
       - scripts/measurement-reconciler.mjs
       - lib/measurement/foreground-sessions.mjs
       - lib/measurement/context-turns-retention.mjs
+      # the UI's per-session timeline read (lib/glass/ui-api.mjs)
+      - lib/experiments/timeline-read.mjs
       # status line fields
       - lib/statusline/context-gauge.cjs
       - lib/statusline/model-limits.cjs
@@ -123,3 +125,12 @@ forbidden:
   spawn: [bash, sh, zsh, tmux, python, python3]
 
 overlay: glass/overlay
+
+# Browser bundles, built with the source checkout's own node_modules (install the
+# dashboard's dependencies first). The reduced entry reuses the dashboard's
+# components; the daemon serves the output (lib/glass/ui-api.mjs).
+build:
+  - source: coding
+    dir: integrations/system-health-dashboard
+    config: glass-ui/vite.config.ts
+    to: ui

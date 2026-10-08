@@ -148,14 +148,28 @@ test('publish: remote URLs parse to gh host + repo, whatever the SSH user', () =
   assert.deepEqual(parseRemote('ssh://git@host:22/o/r.git'), { host: 'host', repo: 'o/r' });
 });
 
+test('build: a bundle step without the source\'s node_modules fails by name', () => {
+  failsWith(fixture({
+    files: { 'lib/a.mjs': 'export const a = 1;\n', 'ui-src/vite.config.ts': '' },
+    manifest: `${select('lib/a.mjs')}build:\n  - source: coding\n    dir: ui-src\n    config: vite.config.ts\n    to: ui\n`,
+  }), /build: coding:ui-src has no node_modules\/vite/);
+});
+
 test('real manifest: closed, builds with no node_modules, deterministic', (t) => {
   const roots = defaultRoots();
   if (!fs.existsSync(path.join(roots.proxy, 'proxy-bridge', 'measurement.mjs'))) {
     t.skip(`no rapid-llm-proxy checkout at ${roots.proxy}`);
     return;
   }
+  if (!fs.existsSync(path.join(roots.coding, 'integrations', 'system-health-dashboard', 'node_modules', 'vite'))) {
+    t.skip('dashboard dependencies not installed (the UI build needs them)');
+    return;
+  }
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-extract-real-'));
   const first = extract({ out: path.join(base, 'a'), roots });
+  assert.ok(first.provenance.files['ui/index.html'], 'the UI bundle is in the tree');
+  assert.ok(Object.keys(first.provenance.files).some((f) => /^ui\/assets\/index-.*\.js$/.test(f)));
+  assert.ok(!Object.keys(first.report.smoke.failed || {}).length);
   assert.equal(first.report.smoke.ok, true);
   assert.equal(first.report.smoke.total_calls, 2);
   extract({ out: path.join(base, 'b'), roots, skipSmoke: true });

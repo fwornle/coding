@@ -1,7 +1,7 @@
 // lib/glass/cli.mjs — the `glass` command.
 //
 //   glass <claude|copilot|opencode|pi> [--no-intercept] [agent args…]
-//   glass status | doctor | stop | uninstall [--yes] | daemon | --version | help
+//   glass ui | status | doctor | stop | uninstall [--yes] | daemon | --version | help
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline/promises';
@@ -12,6 +12,7 @@ import { AGENTS, sessionEnv } from './wiring.mjs';
 import { ensureDaemon, health, openSession, closeSession, listSessions, recentRows, stopDaemon } from './client.mjs';
 import { runAgent } from './spawn.mjs';
 import { upstreamProxy } from './egress.mjs';
+import { openUrl } from './open-url.mjs';
 
 const out = (line = '') => process.stdout.write(`${line}\n`);
 const err = (line) => process.stderr.write(`${line}\n`);
@@ -21,6 +22,7 @@ const MIN_COPILOT = [1, 0, 93]; // VS Code's bundled 1.0.81 asks the public host
 const HELP = `glass ${VERSION} — token measurement and context insight for coding agents
 
   glass claude|copilot|opencode|pi [--no-intercept] [args…]   run an agent, measured
+  glass ui           open the UI (Token Usage, Sessions + context) in the browser
   glass status       daemon, live sessions, latest rows
   glass doctor       agent binaries, CA, egress, daemon
   glass stop         stop the daemon (it also exits by itself when idle)
@@ -91,6 +93,19 @@ async function runMeasured(agent, argv) {
   return code;
 }
 
+async function ui() {
+  const home = glassHome();
+  const port = glassPort();
+  if (!(await ensureDaemon({ home, port, env: { ...process.env } }))) {
+    err(`glass: daemon not reachable on 127.0.0.1:${port} (log: ${path.join(glassPaths(home).logs, 'daemon.log')})`);
+    return 1;
+  }
+  const url = `http://127.0.0.1:${port}/`;
+  out(url);
+  if (!(await openUrl(url))) err('glass: no browser opener found — open the URL above yourself');
+  return 0;
+}
+
 async function status() {
   const port = glassPort();
   const h = await health(port);
@@ -156,6 +171,7 @@ export async function main(argv) {
   const [cmd, ...rest] = argv;
   if (AGENTS.includes(cmd)) return runMeasured(cmd, rest);
   switch (cmd) {
+    case 'ui': return ui();
     case 'status': return status();
     case 'doctor': return doctor();
     case 'stop': {
