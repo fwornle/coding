@@ -47,7 +47,7 @@ services:
       # Project paths (mapped via volumes)
       - TARGET_REPO_PATH=/workspace
       - CODING_ROOT=/coding
-      # CODING_REPO is what config-manager.js uses to find .constraint-monitor.yaml.
+      # CODING_REPO is what config-manager.js uses to find config/constraints/constraint-monitor.yaml.
       # Inside the container this is /coding (bind-mounted from the host repo).
       - CODING_REPO=/coding
       # Where this installation's DATA lives, as mounted below. The container is
@@ -223,7 +223,10 @@ services:
       # Canonical constraint config — single source of truth shared between
       # host hooks and the in-container dashboard. Without this, the dashboard
       # silently loaded a different (stale) constraint set than the host hooks.
-      - ${CODING_REPO:-.}/.constraint-monitor.yaml:/coding/.constraint-monitor.yaml:ro
+      # Mounted as a DIRECTORY: a single-file bind mount pins the old inode, so
+      # when the host replaces the file (git checkout) the container keeps
+      # reading a deleted copy and the monitor's health probe fails with ENOENT.
+      - ${CODING_REPO:-.}/config/constraints:/coding/config/constraints:ro
       # Violation history — both the host hook (writer) and the in-container
       # dashboard (reader) must see the same file so what's logged appears on
       # the dashboard.

@@ -9,7 +9,7 @@ The `constraints` CLI (`bin/constraints`) is the query and authoring surface for
 guardrails. It runs **in-process on the host**, reusing `ConstraintEngine` — the same code the
 `PreToolUse` / `UserPromptSubmit` hooks run — so it works even when `coding-services` is down.
 
-- **Rules:** `$CODING_REPO/.constraint-monitor.yaml` (single canonical file, no cwd-walking)
+- **Rules:** `$CODING_REPO/config/constraints/constraint-monitor.yaml` (single canonical file, no cwd-walking; its own directory so the container mounts the dir, not the file)
 - **Enforcement:** the hooks, not this CLI. This CLI *inspects*; the hooks *block*.
 
 ## When to use

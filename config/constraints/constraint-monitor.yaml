@@ -151,6 +151,7 @@ constraints:
   - '**/*.yaml'
   - '**/*.yml'
   - '**/.constraint-monitor.yaml'
+  - '**/constraint-monitor.yaml'
 - id: plantuml-file-location
   group: plantuml
   pattern: '!include.*\.puml'
@@ -300,6 +301,7 @@ constraints:
     parameter skill=''documentation-style'' to load proper workflow and standards'
   whitelist:
   - .constraint-monitor.yaml
+  - config/constraints/constraint-monitor.yaml
 - id: plantuml-modification-requires-skill
   group: plantuml
   pattern: '@startuml|!include.*\.puml'
@@ -320,6 +322,7 @@ constraints:
     and PNG generation standards'
   whitelist:
   - .constraint-monitor.yaml
+  - config/constraints/constraint-monitor.yaml
 - id: plantuml-png-outdated
   group: plantuml
   description: PlantUML PNG files must be regenerated after .puml modifications

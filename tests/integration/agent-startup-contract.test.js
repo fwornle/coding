@@ -13,7 +13,7 @@
  *   3. MCP servers            — exactly the expected set (graphify only;
  *                               semantic-analysis/constraint-monitor are now
  *                               CLIs, not MCP servers)
- *   4. Constraints            — .constraint-monitor.yaml parses, non-empty
+ *   4. Constraints            — config/constraints/constraint-monitor.yaml parses, non-empty
  *   5. Online learning        — observations → digests → insights pipeline has
  *                               data (export files; obs-api as a live soft-check)
  *
@@ -361,9 +361,9 @@ describe('MCP servers — expected set', () => {
 // ---------------------------------------------------------------------------
 // 4. Constraints
 // ---------------------------------------------------------------------------
-describe('Constraints — .constraint-monitor.yaml', () => {
+describe('Constraints — config/constraints/constraint-monitor.yaml', () => {
   it('parses as YAML and declares a non-empty constraint set', () => {
-    const cfg = yaml.load(readText('.constraint-monitor.yaml'));
+    const cfg = yaml.load(readText('config/constraints/constraint-monitor.yaml'));
     expect(cfg).toBeTruthy();
     expect(Array.isArray(cfg.constraints)).toBe(true);
     expect(cfg.constraints.length).toBeGreaterThan(0);

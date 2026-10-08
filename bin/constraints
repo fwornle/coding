@@ -20,7 +20,7 @@ fi
 require_feature constraints
 
 
-# config-manager.js resolves .constraint-monitor.yaml from CODING_REPO and
+# config-manager.js resolves config/constraints/constraint-monitor.yaml from CODING_REPO and
 # refuses to guess, so the repo root is resolved from this script's location
 # when the caller has not already exported it.
 if [[ -z "${CODING_REPO:-}" ]]; then
