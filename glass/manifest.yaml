@@ -1,0 +1,117 @@
+# glass/manifest.yaml — what scripts/glass/extract.mjs copies out of coding and
+# rapid-llm-proxy into the generated glass tree (see .planning/glass.md, G2).
+#
+# Every file is listed explicitly. verify fails when the import closure needs a
+# file that is not listed, so this list cannot silently go stale.
+
+sources:
+  coding: {}   # the checkout this manifest lives in
+  proxy: {}    # lib/proxy/proxy-paths.cjs proxyDir(): RAPID_LLM_PROXY_DIR or the _work sibling
+
+select:
+  - source: coding
+    files:
+      # agent → proxy wiring (G1 WP6)
+      - lib/agents/proxy-routing.mjs
+      # token rows for traffic that bypasses the proxy, and the writer
+      - lib/lsl/token/stop-adapter-registry.mjs
+      - lib/lsl/token/claude-token-rows.mjs
+      - lib/lsl/token/copilot-token-rows.mjs
+      - lib/lsl/token/opencode-token-rows.mjs
+      - lib/lsl/token/token-db.mjs
+      - lib/lsl/token/reconcile.mjs
+      - lib/lsl/token/task-id.mjs
+      - lib/lsl/token/project-of.mjs
+      - lib/lsl/adapters/claude-subagent-path.mjs
+      - lib/lsl/adapters/index.mjs
+      # project id of a cwd (project-of → repo-router → teams config; later seam cut)
+      - lib/attribution/repo-router.mjs
+      - lib/teams/config.cjs
+      - lib/features/vendor/js-yaml.cjs
+      # task binding for interactive sessions + capture retention
+      - scripts/measurement-reconciler.mjs
+      - lib/measurement/foreground-sessions.mjs
+      - lib/measurement/context-turns-retention.mjs
+      # status line fields
+      - lib/statusline/context-gauge.cjs
+      - lib/statusline/model-limits.cjs
+      - lib/statusline/clickable.cjs
+      - lib/statusline/visible-cell-width.cjs
+      # data home + proxy resolver
+      - lib/paths/index.mjs
+      - lib/paths/data-home.cjs
+      - lib/scope/resolve.cjs
+      - lib/proxy/proxy-paths.cjs
+      # raw-body redaction patterns (the daemon passes LLM_PROXY_REDACTION_CONFIG)
+      - config/redaction/redaction-patterns.json
+
+  - source: proxy
+    to: proxy
+    files:
+      - proxy-bridge/measurement.mjs
+      - proxy-bridge/context-capture.mjs
+      - proxy-bridge/context-turns.mjs
+      - proxy-bridge/turn-identity.mjs
+      - proxy-bridge/raw-bodies.mjs
+      - proxy-bridge/shim-tools.mjs
+      - proxy-bridge/db-open.cjs
+
+# TypeScript compiled with the proxy's own tsc and compilerOptions (no maps, no
+# declarations). The proxy's dist/ is never copied — it can be stale.
+compile:
+  - source: proxy
+    to: proxy/dist
+    rootDir: src
+    files:
+      - src/token-usage.ts
+      - src/measurement-span.ts
+      - src/usage-cache.ts
+      - src/background-process.ts
+
+# Literal replacements, each matched exactly `count` times (a mismatch fails: the
+# upstream line changed). Only defaults that the environment cannot set.
+rewrite:
+  - file: lib/proxy/proxy-paths.cjs
+    find: "path.resolve(CODING_CHECKOUT, '..', '_work', 'rapid-llm-proxy')"
+    replace: "path.resolve(CODING_CHECKOUT, 'proxy')"
+    count: 1
+  - file: lib/proxy/proxy-paths.cjs
+    find: "path.resolve(codingRepo(), '..', '_work', 'rapid-llm-proxy', 'dist')"
+    replace: "path.resolve(CODING_CHECKOUT, 'proxy', 'dist')"
+    count: 1
+  - file: lib/agents/proxy-routing.mjs
+    find: "'12435'"
+    replace: "'12445'"
+    count: 6
+
+# Non-literal import()/require() sites, per file, by count. Each either names the
+# files it reaches (they must be in the tree) or says why glass never reaches it.
+computed:
+  - file: lib/proxy/proxy-paths.cjs
+    sites: 1
+    targets: [proxy/proxy-bridge/db-open.cjs]
+  - file: lib/lsl/token/task-id.mjs
+    sites: 1
+    targets: [proxy/dist/measurement-span.js]
+  - file: scripts/measurement-reconciler.mjs
+    sites: 1
+    targets: [proxy/dist/measurement-span.js]
+  - file: lib/lsl/adapters/index.mjs
+    sites: 1
+    unreached: loadAdapter() loads LSL transcript adapters; glass only calls getAgentSearchPaths()
+
+# Bare packages a file may name although package.json does not depend on them:
+# guarded fallbacks that glass never takes.
+optional:
+  - file: proxy/proxy-bridge/db-open.cjs
+    package: better-sqlite3
+    reason: tried only when CODING_SQLITE_BACKEND is unset or 'better'; glass sets 'node'
+  - file: lib/proxy/proxy-paths.cjs
+    package: better-sqlite3
+    reason: fallback when proxy/proxy-bridge/db-open.cjs is absent; glass ships it
+
+forbidden:
+  packages: [better-sqlite3, km-core, level, classic-level, leveldown, '@modelcontextprotocol/sdk']
+  spawn: [bash, sh, zsh, tmux, python, python3]
+
+overlay: glass/overlay

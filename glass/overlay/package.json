@@ -1,0 +1,11 @@
+{
+  "name": "glass",
+  "version": "0.0.0",
+  "description": "Token measurement and context-window insight for coding agents",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "license": "UNLICENSED"
+}

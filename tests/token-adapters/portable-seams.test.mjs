@@ -22,6 +22,7 @@ import {
 import * as tree from '../../lib/lsl/adapters/claude-jsonl-tree.mjs';
 import { buildClaudeTokenRows } from '../../lib/lsl/token/claude-token-rows.mjs';
 import { projectOfCwd } from '../../lib/lsl/token/project-of.mjs';
+import { importClosure } from '../../scripts/glass/import-graph.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(__dirname, '..', '..');
@@ -67,27 +68,11 @@ test('claude builder: ctx.projectOf replaces the default cwd mapping', () => {
   assert.ok(rows.every((r) => r.project === 'injected'));
 });
 
-// Relative specifiers of static `import … from`, `export … from` and `import('…')`.
-function relativeImports(file) {
-  const src = fs.readFileSync(file, 'utf8');
-  const specs = [];
-  for (const re of [/(?:import|export)\s[^'"]*?from\s*['"](\.[^'"]+)['"]/g, /import\(\s*['"](\.[^'"]+)['"]\s*\)/g]) {
-    for (const m of src.matchAll(re)) specs.push(m[1]);
-  }
-  return specs.map((s) => path.resolve(path.dirname(file), s));
-}
-
 test('token row builders: import closure stays out of the LSL pipeline', () => {
   const roots = ['claude', 'copilot', 'opencode'].map((a) => path.join(REPO, 'lib/lsl/token', `${a}-token-rows.mjs`));
-  const seen = new Set();
-  const queue = [...roots];
-  while (queue.length) {
-    const f = queue.pop();
-    if (seen.has(f) || !fs.existsSync(f)) continue;
-    seen.add(f);
-    queue.push(...relativeImports(f));
-  }
-  const rel = [...seen].map((f) => path.relative(REPO, f));
+  const { files, missing } = importClosure(roots);
+  assert.deepEqual(missing, [], 'every relative import resolves');
+  const rel = files.map((f) => path.relative(REPO, f));
   const leaks = rel.filter((f) => f.startsWith(`src${path.sep}live-logging`) || f.endsWith(`scan-and-convert.mjs`));
   assert.deepEqual(leaks, [], `closure: ${rel.join(', ')}`);
 });

@@ -8,7 +8,7 @@ GitHub-hosted runners). `main` is empty — generated content only.
 
 Living plan. Update the phase status and the Session log at the end of every session.
 
-Status: **G1 in progress** — WP1–WP6 done (branch `glass-g1-seams` in coding + rapid-llm-proxy); cleanroom green; left for G1: merge. G0 done (IT-security sign-off for local TLS interception still pending).
+Status: **G2 in progress** — extractor built (branch `glass-g2-extractor` in coding); left for G2: first published PR into glass `main`, merge. G1 done and merged (coding `main` cae5aad4, proxy PR #42 → 34c78e5). G0 done (IT-security sign-off for local TLS interception still pending).
 
 ## Decisions (2026-10-08 — do not re-litigate)
 
@@ -24,6 +24,14 @@ Status: **G1 in progress** — WP1–WP6 done (branch `glass-g1-seams` in coding
    (see "Status line" below).
 6. **The proxy is the primary measurement path** (everything routed through it, full
    control); agent telemetry is secondary (cross-check + fallback for bypassing traffic).
+7. **Env names stay as they are** in the extracted code (`CODING_*`, `LLM_PROXY_*`); the G3
+   `glass` wrapper sets them (`CODING_DATA_HOME=~/.glass`, `LLM_PROXY_DATA_DIR`, port 12445,
+   `CODING_SQLITE_BACKEND=node`). Rewrite rules cover only defaults env cannot reach — the
+   generated files stay near byte-identical to coding, so drift is visible. (Supersedes the
+   `CODING_*`→`GLASS_*` rewrite in "The transformation script" below.)
+8. **Forbidden deps**: never in `package.json`; an import site only when the manifest lists
+   it as a guarded optional fallback with a reason (today: better-sqlite3 in `db-open.cjs`
+   and `proxy-paths.cjs`, never taken with `CODING_SQLITE_BACKEND=node`).
 
 ---
 
@@ -321,6 +329,34 @@ Findings during G1:
 - Worktree: coding tests that import the proxy by a static relative path (`tests/context-turns/*`, `tests/redaction/proxy-raw-body.test.mjs`) cannot run from `.claude/worktrees/glass-g1` — `../../../_work/…` resolves inside `.claude/worktrees/`.
 - Constraint `no-parallel-files` matches file PATHS: any `…lite.` name (e.g. `sqlite.cjs`) trips `lite[ ._-]`.
 
+## G2 progress (branch `glass-g2-extractor` in coding)
+
+| Piece | Where | State |
+|---|---|---|
+| Import scanner (comments/strings/regex-aware; static, `import()`, `require`, `createRequire(…)(…)`; computed sites reported) | `scripts/glass/import-graph.mjs` — also used by `tests/token-adapters/portable-seams.test.mjs` (one scanner; it now sees the `createRequire` edge) | done |
+| Manifest | `glass/manifest.yaml`: 26 coding files, 7 proxy files, 4 compiled TS files, 3 exact-count rewrites (proxy dir + dist → `<pkg>/proxy`, port 12435 → 12445), 4 computed sites, 2 optional sites | done |
+| Extractor | `scripts/glass/extract.mjs`: select → compile (proxy's own tsc + compilerOptions, no maps) → rewrite → overlay (must not shadow) → `EXTRACTED.json` → verify → build smoke; `--out` / `--check` (drift) / `--publish` (branch from origin/main + PR) | done |
+| Overlay | `glass/overlay/{package.json,README.md}` — `type: module`, `engines >=22.13`, no dependencies | done |
+| Tests | `tests/glass/extract.test.mjs`: scanner, every verify failure on fixtures, real manifest (closed, smoke, deterministic; skipped without the proxy checkout) | 10/10 |
+
+Result (coding cae5aad4 + proxy 34c78e5): **40 files, 15,288 JS lines**, imports closed, no
+forbidden deps; smoke with no `node_modules` imports all 36 modules and round-trips the token DB
+(proxy `logCall` + adapter `insertTokenRowDeduped` → `getSummary` = 2 calls / 25 tokens) on
+Node 25.8.1 **and 22.13.0**; two extractions identical.
+
+Findings during G2:
+- Run from a coding worktree with `RAPID_LLM_PROXY_DIR` set — `proxyDir()`'s sibling default
+  resolves inside `.claude/worktrees/` (the extractor reports the missing files by name).
+- Reported, not failed: `proxy/dist/token-usage.js` imports `child_process` — `currentWindow()`
+  shells out to `curl` for the health coordinator at import (`setImmediate`). G3: replace or gate.
+- Known bloat (closed, harmless): `project-of → repo-router → teams/config → vendored js-yaml`
+  (~4.5k lines) only for `projectIdFor`. Later seam cut.
+- `token-usage.ts` still guesses a sibling `coding` checkout for `live-logging-config.json`;
+  absent in glass → defaults. G3 sets `CODING_REPO`.
+- G3 needs, from the proxy: the `/v1/messages` forward without `resolveRoute`/keychain, a real
+  OpenAI-shim **passthrough** (today the shim is rewritten into `/api/complete` routing), and
+  the three `/api/token-usage/*` handlers moved out of `server.mjs` — next seam cuts.
+
 ## Session log
 
 - **2026-10-08** — proposal written; decisions taken (above); repo created
@@ -348,3 +384,4 @@ Findings during G1:
 - **2026-10-08 (G1 WP5)** — real-daemon characterisation harness (sandbox + TLS-terminating fake upstream, 16 scenarios, golden), then measurement moved out of `server.mjs` into `measurement.mjs` + `context-capture.mjs` with the golden unchanged on both SQLite backends. Next: WP6 wiring.
 - **2026-10-08 (G1 WP6)** — bash parity matrix, then the agent → proxy wiring in one Node module used by the launcher, experiment cells and kgbench; tmux routing-env gap fixed. Next: cleanroom run, then merge G1 (coding: merge main into the branch first; proxy: PR).
 - **2026-10-08 (G1 cleanroom)** — cleanroom green after fixing the proxy start script's machine-specific paths. Next: merge G1.
+- **2026-10-08 (G2)** — G1 merged (coding main cae5aad4, proxy 34c78e5). Extractor, manifest, shared import scanner and tests built in worktree `glass-g2`; first extraction green (40 files, closed, smoke on Node 22.13 + 25). Decisions 7 (env names kept) and 8 (forbidden-dep allowlist). Next: publish the first generated PR into glass `main`, merge G2.
