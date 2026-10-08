@@ -8,7 +8,7 @@ GitHub-hosted runners). `main` is empty — generated content only.
 
 Living plan. Update the phase status and the Session log at the end of every session.
 
-Status: **G2 done** — extractor merged into coding `main`; first generated tree is glass `main` (PR #1 → 322b3f2, from coding@3ccc8a6 + proxy@34c78e5, Wiz green). Next: G3 (daemon + CLI). G1 done and merged (coding `main` cae5aad4, proxy PR #42 → 34c78e5). G0 done (IT-security sign-off for local TLS interception still pending).
+Status: **G3 in progress** — daemon + CLI built and measured for real on macOS (claude, copilot, opencode); pi proven through interception, its token row waits on a pi login. Branches: `glass-g3-forward` (proxy), `glass-g3-daemon` (coding). Left: pi row, proxy PR, merge, publish glass PR #2. G2 done (glass PR #1 → 322b3f2). G1 done and merged (coding `main` cae5aad4, proxy PR #42 → 34c78e5). G0 done (IT-security sign-off for local TLS interception still pending).
 
 ## Decisions (2026-10-08 — do not re-litigate)
 
@@ -29,6 +29,12 @@ Status: **G2 done** — extractor merged into coding `main`; first generated tre
    `CODING_SQLITE_BACKEND=node`). Rewrite rules cover only defaults env cannot reach — the
    generated files stay near byte-identical to coding, so drift is visible. (Supersedes the
    `CODING_*`→`GLASS_*` rewrite in "The transformation script" below.)
+9. **Capture (G3)**: claude via `ANTHROPIC_BASE_URL` into the shared Anthropic forward (no
+   interception); copilot / opencode / pi via `HTTPS_PROXY` into the same port, which decrypts
+   only model hosts with a persistent glass CA (option A). `--no-intercept` per run while the
+   IT-security sign-off is open. Every agent keeps its own login, catalogue and routing.
+10. **Daemon unreachable (G3)**: one warning line, the agent runs unmeasured — glass never
+   blocks the user's agent.
 8. **Forbidden deps**: never in `package.json`; an import site only when the manifest lists
    it as a guarded optional fallback with a reason (today: better-sqlite3 in `db-open.cjs`
    and `proxy-paths.cjs`, never taken with `CODING_SQLITE_BACKEND=node`).
@@ -362,6 +368,37 @@ Findings during G2:
   OpenAI-shim **passthrough** (today the shim is rewritten into `/api/complete` routing), and
   the three `/api/token-usage/*` handlers moved out of `server.mjs` — next seam cuts.
 
+## G3 progress (branches `glass-g3-forward` in rapid-llm-proxy, `glass-g3-daemon` in coding)
+
+| WP | Content | Commits | State |
+|---|---|---|---|
+| WP1 | Golden +5 scenarios (`?beta` query, 501 refusal, 3 token-usage reads), then `anthropic-forward.mjs` (forward + tap; routeGuard / keychain token / egress injected), `usage-api.mjs` (+ `getCost` in token-usage.ts), `model-canonical.mjs` out of server.mjs | proxy 3663254, bfaf380 | done — golden (22) equal on both backends; proxy suite 479/479 |
+| WP2 | `openai-passthrough.mjs` (chat + Responses, verbatim, real SSE, `include_usage` only when missing), `createOpenAIUsageTap` + `recordOpenAITap`, `parseResponsesUsage`; `/api/complete` capture shares the writer | proxy 5966ba3 | done — 7 tests, golden unchanged |
+| WP3 | `intercept.mjs`: CONNECT on the daemon's own server, persistent CA (node-forge certs, native keygen), session binding from Proxy-Authorization, blind tunnel for other hosts | proxy afdb6e9 | done — 5 tests |
+| — | `HEALTH_COORDINATOR_URL=off` (no curl); Anthropic tap takes provider/subscription from the caller | proxy 0f531c3, 1cbed96 | done |
+| WP4/5 | `glass/overlay`: `bin/glass.mjs`, `lib/glass/{daemon,cli,client,wiring,spawn,egress,home}.mjs`, tests, CI workflow | coding f6838f70 + CI | done — 10 overlay tests in the generated tree (Node 25 + 22.13) |
+| WP6 | manifest (+7 shared proxy modules), overlay deps `undici` + `node-forge`, smoke installs deps (`--ignore-scripts`) + runs `bin --version` | coding f6838f70 | done — 56 files, 17,435 JS lines, closed |
+
+Real runs through glass (macOS, chained through proxydetox :3128, each agent's own login):
+- claude 2.x → glass → api.anthropic.com: `claude-opus-5-5` in 2 / out 4 / cache-write 44,284, task-bound, context turn.
+- copilot 1.0.93 → intercept → copilot-api.bmw.ghe.com `/v1/messages`: `claude-sonnet-5.5` in 4 / out 4 /
+  cache-write 28,377 — **equal to its OTel `chat` span** (input 28,381 = 4 + 28,377).
+- opencode 1.15.13 `github-copilot/claude-haiku-4.5` → intercept: 27,893 in / 5 out, plus its hidden
+  `gpt-5-mini` title call (532 / 78) — both task-bound.
+- pi 0.84.2 → intercept → api.openai.com: TLS trusted, forwarded, real upstream answer (401 for a dummy
+  key → no row, correct). A token row needs a pi login (pi has no provider of its own on this machine).
+
+Findings during G3:
+- **Binding spike**: copilot 1.0.93, opencode 1.15.13 and pi 0.84.2 all send `Proxy-Authorization`
+  from `HTTPS_PROXY` credentials on every CONNECT → per-session binding, concurrent sessions safe.
+- **Double count avoided**: opencode's file adapter assumes `github-copilot` bypasses the proxy (true in
+  coding); under interception it does not, so adapters run only for claude (request-id dedup) and
+  `--no-intercept` sessions.
+- coding bug (not fixed): `config/live-logging-config.json` `session_duration: 3600000` is ms, but
+  `token-usage.ts` reads minutes → the coordinator-less LSL window is `0000-0000`. Glass is unaffected
+  (no such config → 60 min default).
+- `--no-intercept`, status line, `glass ui`, Windows verification: G4 / G5.
+
 ## Session log
 
 - **2026-10-08** — proposal written; decisions taken (above); repo created
@@ -391,3 +428,4 @@ Findings during G2:
 - **2026-10-08 (G1 cleanroom)** — cleanroom green after fixing the proxy start script's machine-specific paths. Next: merge G1.
 - **2026-10-08 (G2)** — G1 merged (coding main cae5aad4, proxy 34c78e5). Extractor, manifest, shared import scanner and tests built in worktree `glass-g2`; first extraction green (40 files, closed, smoke on Node 22.13 + 25). Decisions 7 (env names kept) and 8 (forbidden-dep allowlist). Next: publish the first generated PR into glass `main`, merge G2.
 - **2026-10-08 (G2 done)** — coding main 3ccc8a69 (+ 58a77d83 gh `--repo` fix); glass PR #1 merged (322b3f2): 40 generated files on `main`. Next: G3.
+- **2026-10-08 (G3)** — binding spike (all three intercepted agents send Proxy-Authorization); proxy seam cuts (anthropic-forward, usage-api, model-canonical) under an extended golden; OpenAI measuring passthrough; intercept module; glass daemon + CLI in the overlay; real claude / copilot / opencode runs measured through glass. Next: pi login for its row, proxy PR, merge coding, publish glass PR #2.

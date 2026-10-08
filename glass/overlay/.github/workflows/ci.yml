@@ -1,0 +1,26 @@
+# Generated repository — this workflow comes from coding/glass/overlay.
+# Daemon, interception and CLI tests on every platform glass installs on
+# natively (AIMAAD has no macOS runners; macOS is checked locally).
+name: glass tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['22.13.0', '22.x']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm install --omit=dev --ignore-scripts --no-audit --no-fund
+      - run: node --test "tests/**/*.test.mjs"
