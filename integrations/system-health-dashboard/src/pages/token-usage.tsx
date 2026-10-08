@@ -459,7 +459,20 @@ function TreemapTooltip({ active, payload }: { active?: boolean; payload?: Array
   )
 }
 
-export function TokenUsagePage() {
+export type TokenUsageTab = 'overview' | 'evolution' | 'cost' | 'recent' | 'routing'
+const ALL_TABS: TokenUsageTab[] = ['overview', 'evolution', 'cost', 'recent', 'routing']
+
+/**
+ * proxyBase: where the token-usage reads live — '' for same-origin (glass's daemon
+ * serves the page itself). tabs / settings: glass shows a subset (no Cost, no
+ * routing — it routes nothing).
+ */
+export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settings = true }: {
+  proxyBase?: string
+  tabs?: TokenUsageTab[]
+  settings?: boolean
+} = {}) {
+  const has = (tab: TokenUsageTab) => tabs.includes(tab)
   const [summary, setSummary] = useState<TokenSummary | null>(null)
   const [recent, setRecent] = useState<RecentCall[]>([])
   const [loading, setLoading] = useState(true)
@@ -505,8 +518,8 @@ export function TokenUsagePage() {
     setError(null)
     try {
       const [sumRes, recRes] = await Promise.all([
-        fetch(`${PROXY_BASE}/api/token-usage/summary?hours=${encodeURIComponent(hoursWindow)}&scope=${scopeParam}`),
-        fetch(`${PROXY_BASE}/api/token-usage/recent?limit=50`)
+        fetch(`${proxyBase}/api/token-usage/summary?hours=${encodeURIComponent(hoursWindow)}&scope=${scopeParam}`),
+        fetch(`${proxyBase}/api/token-usage/recent?limit=50`)
       ])
       if (!sumRes.ok || !recRes.ok) throw new Error(`HTTP ${sumRes.status}/${recRes.status}`)
       const sumData = await sumRes.json()
@@ -514,11 +527,11 @@ export function TokenUsagePage() {
       setSummary(sumData)
       setRecent(recData.data || [])
     } catch (err) {
-      setError('Failed to load token usage. Check that the LLM proxy is running on port 12435.')
+      setError(`Failed to load token usage. Check that the LLM proxy is running at ${proxyBase || window.location.origin}.`)
     } finally {
       setLoading(false)
     }
-  }, [hoursWindow, scopeParam])
+  }, [hoursWindow, scopeParam, proxyBase])
 
   useEffect(() => {
     fetchData()
@@ -745,15 +758,17 @@ export function TokenUsagePage() {
               ))}
             </SelectContent>
           </Select>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setSettingsOpen(true)}
-            title="Provider/model routing per service"
-          >
-            <Settings className="h-4 w-4 mr-2" />
-            Settings
-          </Button>
+          {settings && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSettingsOpen(true)}
+              title="Provider/model routing per service"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -767,12 +782,14 @@ export function TokenUsagePage() {
         </div>
       </div>
 
-      <TokenUsageSettingsDialog
-        open={settingsOpen}
-        onOpenChange={setSettingsOpen}
-        proxyBase={PROXY_BASE}
-        hours={Number(hoursWindow) || 24}
-      />
+      {settings && (
+        <TokenUsageSettingsDialog
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
+          proxyBase={proxyBase}
+          hours={Number(hoursWindow) || 24}
+        />
+      )}
 
       {/* Summary Cards */}
       <div className="grid grid-cols-4 gap-4">
@@ -856,13 +873,13 @@ export function TokenUsagePage() {
       </div>
 
       {/* Main content */}
-      <Tabs defaultValue="overview">
+      <Tabs defaultValue={tabs[0]}>
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="evolution">Evolution</TabsTrigger>
-          <TabsTrigger value="cost">Cost</TabsTrigger>
-          <TabsTrigger value="recent">Recent Calls</TabsTrigger>
-          <TabsTrigger value="routing">Routing</TabsTrigger>
+          {has('overview') && <TabsTrigger value="overview">Overview</TabsTrigger>}
+          {has('evolution') && <TabsTrigger value="evolution">Evolution</TabsTrigger>}
+          {has('cost') && <TabsTrigger value="cost">Cost</TabsTrigger>}
+          {has('recent') && <TabsTrigger value="recent">Recent Calls</TabsTrigger>}
+          {has('routing') && <TabsTrigger value="routing">Routing</TabsTrigger>}
         </TabsList>
 
         {/* Overview Tab - Treemap + Provider pie */}
@@ -1248,16 +1265,20 @@ export function TokenUsagePage() {
         </TabsContent>
 
         {/* Cost Tab - €/$ cost, budgets, burn-rate, optimization controls */}
-        <TabsContent value="cost">
-          <CostTab proxyBase={PROXY_BASE} />
-        </TabsContent>
+        {has('cost') && (
+          <TabsContent value="cost">
+            <CostTab proxyBase={proxyBase} />
+          </TabsContent>
+        )}
 
         {/* Routing Tab — configuration AND observed behaviour, read-only.
             Editing stays in the Settings dialog: this is where you find out what
             the system is doing, that is where you change it. */}
-        <TabsContent value="routing" className="mt-4">
-          <TokenUsageRoutingTab proxyBase={PROXY_BASE} hours={hoursWindow} />
-        </TabsContent>
+        {has('routing') && (
+          <TabsContent value="routing" className="mt-4">
+            <TokenUsageRoutingTab proxyBase={proxyBase} hours={hoursWindow} />
+          </TabsContent>
+        )}
 
         {/* Recent Calls Tab */}
         <TabsContent value="recent" className="mt-4">

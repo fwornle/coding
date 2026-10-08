@@ -479,7 +479,18 @@ function StatCard({ label, value, color }: { label: string; value: string; color
  * services are PARALLEL clients of the proxy — the bg services are NOT downstream
  * of the chat's request; they call the LLM backend on their own, through the same
  * metering proxy. Corrected per operator feedback. */
-function TopologyStrip({ agent }: { agent: string }) {
+// The boxes of the topology strip after the agent's own: who else talks through the
+// metering seam (null: nobody), the seam, and where the cache lives. Coding's by
+// default; glass passes its daemon (glass-ui/sessions.tsx).
+export interface TopologyBox { title: string; lines: string[]; tag: string }
+export interface Topology { background: TopologyBox | null; seam: TopologyBox; backend: TopologyBox }
+export const CODING_TOPOLOGY: Topology = {
+  background: { title: 'Docker background services', lines: ['ETM · obs-api · constraint', 'consolidators — use proxy in parallel'], tag: 'proxy client' },
+  seam: { title: 'rapid-llm-proxy', lines: [':12435 · /api/complete', 'meters EVERY call (fg + bg)'], tag: 'single metering seam' },
+  backend: { title: 'backend LLM', lines: ['Anthropic / gateway', 'matches prefix → cache_read'], tag: 'cache lives HERE' },
+}
+
+function TopologyStrip({ agent, topology }: { agent: string; topology: Topology }) {
   const Box = ({ title, lines, accent, tag }: { title: string; lines: string[]; accent?: string; tag?: string }) => (
     <div className="relative w-full rounded-md border bg-background p-2.5 text-center" style={accent ? { borderColor: accent } : undefined}>
       {tag && (
@@ -499,15 +510,15 @@ function TopologyStrip({ agent }: { agent: string }) {
       {/* Two parallel proxy CLIENTS, stacked. */}
       <div className="flex w-[34%] flex-col justify-center gap-1.5">
         <Box title={`${agent || 'agent'} — foreground chat`} lines={['assembles the FULL', 'context every turn']} accent={C_INPUT} tag="proxy client" />
-        <Box title="Docker background services" lines={['ETM · obs-api · constraint', 'consolidators — use proxy in parallel']} accent="#64748b" tag="proxy client" />
+        {topology.background && <Box {...topology.background} accent="#64748b" />}
       </div>
       <Arrow />
       <div className="flex w-[30%] items-stretch">
-        <Box title="rapid-llm-proxy" lines={[':12435 · /api/complete', 'meters EVERY call (fg + bg)']} accent={C_WRITE} tag="single metering seam" />
+        <Box {...topology.seam} accent={C_WRITE} />
       </div>
       <Arrow />
       <div className="flex w-[30%] items-stretch">
-        <Box title="backend LLM" lines={['Anthropic / gateway', 'matches prefix → cache_read']} accent={C_READ} tag="cache lives HERE" />
+        <Box {...topology.backend} accent={C_READ} />
       </div>
     </div>
   )
@@ -1425,7 +1436,7 @@ function CategoryDetailModal({
   )
 }
 
-export function ContextCacheExplainer() {
+export function ContextCacheExplainer({ topology = CODING_TOPOLOGY }: { topology?: Topology } = {}) {
   const dispatch = useAppDispatch()
   const taskId = useAppSelector(selectExplainTaskId)
   const run = useAppSelector(selectExplainRun)
@@ -1634,7 +1645,7 @@ export function ContextCacheExplainer() {
         </DialogHeader>
 
         {/* 1. Topology (static, real) */}
-        <TopologyStrip agent={agent} />
+        <TopologyStrip agent={agent} topology={topology} />
 
         {/* Headline verdict — data-driven */}
         <div

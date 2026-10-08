@@ -18,6 +18,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "glass-ui/**/*.ts", "glass-ui/**/*.tsx"],
+  "exclude": ["node_modules", "dist", "glass-ui/vite.config.ts"]
 }
