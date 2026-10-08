@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { scanSource } from '../../scripts/glass/import-graph.mjs';
-import { extract, defaultRoots, diffTrees, ExtractError } from '../../scripts/glass/extract.mjs';
+import { extract, defaultRoots, diffTrees, parseRemote, ExtractError } from '../../scripts/glass/extract.mjs';
 
 test('scanner: static, dynamic, require and createRequire edges; computed sites', () => {
   const src = [
@@ -139,6 +139,13 @@ test('overlay: a file that would shadow a selected file fails', () => {
     overlay: { 'package.json': '{}', 'lib/a.mjs': 'export const parallel = 1;\n' },
   });
   failsWith(root, /overlay: lib\/a\.mjs would shadow a selected file/);
+});
+
+test('publish: remote URLs parse to gh host + repo, whatever the SSH user', () => {
+  assert.deepEqual(parseRemote('bmw@bmw.ghe.com:AIMAAD/glass.git'), { host: 'bmw.ghe.com', repo: 'AIMAAD/glass' });
+  assert.deepEqual(parseRemote('git@github.com:fwornle/coding.git'), { host: 'github.com', repo: 'fwornle/coding' });
+  assert.deepEqual(parseRemote('https://bmw.ghe.com/AIMAAD/glass'), { host: 'bmw.ghe.com', repo: 'AIMAAD/glass' });
+  assert.deepEqual(parseRemote('ssh://git@host:22/o/r.git'), { host: 'host', repo: 'o/r' });
 });
 
 test('real manifest: closed, builds with no node_modules, deterministic', (t) => {
