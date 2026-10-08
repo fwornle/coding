@@ -8,7 +8,7 @@ GitHub-hosted runners). `main` is empty — generated content only.
 
 Living plan. Update the phase status and the Session log at the end of every session.
 
-Status: **G0 in progress.**
+Status: **G0 done (pending IT-security sign-off for local TLS interception); next G1.**
 
 ## Decisions (2026-10-08 — do not re-litigate)
 
@@ -242,10 +242,24 @@ same gap hits OpenCode's `github-copilot` provider (it bypasses the proxy today)
       (a multi-word prompt splits) — use cross-spawn-style escaping; (3) copilot rejects classic
       `ghp_` tokens client-side; (4) stored logins flow through the proxy even with dummy env keys
       — captured traffic is sensitive by default.
-- [ ] S7 one measured copilot call, proxy vs OTel (`spike/copilot-measure.mjs` on
-      `g0-s6-opencode-trust`). 2026-10-08 run: blocked — copilot's stored bmw.ghe.com login is
-      invalid (`no authenticated GitHub host available`, models 401), with and without the proxy.
-      Needs `copilot` → `/login` (user), then `node spike/copilot-measure.mjs`.
+- [x] S7 one measured copilot call, proxy vs OTel (`spike/copilot-measure.mjs`, macOS, chained
+      through :3128, user's own bmw.ghe.com login, no BYOK): **works with Copilot CLI 1.0.93** (npm
+      `@github/copilot`). The call goes to `copilot-api.bmw.ghe.com/v1/messages` (Anthropic wire,
+      `claude-sonnet-5.5`) and is decrypted with full usage; OTel `chat` span agrees **exactly**
+      (33,203 in / 4 out, cache 16,457 write + 16,742 read on both sides). Context composition from
+      both: request 91 KB, 26 tools, system 51 KB, tool definitions 41 KB.
+      - The "expired login" / public-host 401 of S1 + S8 is **VS Code's bundled CLI 1.0.81**
+        (`github.copilot-chat/copilotCli` shim, first on PATH): it asks `api.githubcopilot.com/models`
+        although `copilot_internal/user` returns `endpoints.api = https://copilot-api.bmw.ghe.com`.
+        1.0.93 honours the endpoint. → `glass doctor` must report the resolved copilot binary and
+        version and warn below 1.0.93; `GH_HOST` does not fix 1.0.81.
+      - Normalisation for G1/G3: Anthropic-wire `input_tokens` excludes cache write/read
+        (total = input + cache_creation + cache_read); OpenAI-wire `prompt_tokens` includes cached;
+        OTel `invoke_agent` rolls up its `chat` spans — count `chat` spans only.
+
+**G0 verdict:** every agent has a measured call through the proxy (opencode + its github-copilot
+provider S8, claude S3/S6, pi S5/S6, copilot S7) with its context composition, on macOS, Linux and
+Windows (S6). Remaining gate before G1: IT-security sign-off for local TLS interception.
 
 ## Phases
 
@@ -300,3 +314,6 @@ one package, zero native deps.
 - **2026-10-08 (S6 done, S7)** — S6 green on ubuntu + windows (CI) and macOS (local, chained);
   copilot + pi added to the trust check. S7 script written; blocked on copilot `/login`.
   Repo still has no `main` (default = `g0-s6-windows`) — user to create it.
+- **2026-10-08 (S7 done)** — after `/login`: copilot measured through the proxy, exact match with
+  OTel. The 401 was VS Code's bundled copilot CLI 1.0.81 using the public host; 1.0.93 fine.
+  G0 complete except the IT-security sign-off. Next: G1 (seams in coding).
