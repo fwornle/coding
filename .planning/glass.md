@@ -8,7 +8,7 @@ GitHub-hosted runners). `main` is empty — generated content only.
 
 Living plan. Update the phase status and the Session log at the end of every session.
 
-Status: **G0 done (pending IT-security sign-off for local TLS interception); next G1.**
+Status: **G1 in progress** — WP1–WP4 done (branch `glass-g1-seams` in coding + rapid-llm-proxy); next WP5, WP6. G0 done (IT-security sign-off for local TLS interception still pending).
 
 ## Decisions (2026-10-08 — do not re-litigate)
 
@@ -296,6 +296,24 @@ one package, zero native deps.
 - Whether AIMAAD's hosted runners include `windows-latest` and `macos-latest` (seen so far:
   `ubuntu-latest` in AIMAAD/knowledge-management) — answered by run 304427957.
 
+## G1 progress (branch `glass-g1-seams` in coding and rapid-llm-proxy; plan: work packages WP1–WP6)
+
+| WP | Content | Commits | State |
+|---|---|---|---|
+| WP1 | Portable token-row builders: `claude-subagent-path.mjs` (either separator), `parseCopilot` gate removed, `path.isAbsolute`/root test, injectable `ctx.projectOf`; import-closure test | coding 1bad04a5 | done |
+| WP2 | SQLite adapter `proxy-bridge/db-open.cjs` (better-sqlite3 or node:sqlite via `CODING_SQLITE_BACKEND`; keeps 5 s busy timeout, savepoint transactions, better-sqlite3 error codes); token-usage.ts + 5 coding callers use it | proxy c10fac5, coding 0694d87e | done — suites green on both backends |
+| WP3 | No `/Users/Q284340` fallbacks in the proxy; redaction config injectable (`LLM_PROXY_REDACTION_CONFIG`), no cross-repo require; retention sweeper is `lib/measurement/context-turns-retention.mjs` | proxy 70b0a88, coding 9ccafe7d, 6bb1ed5b | done |
+| WP4 | `lib/proxy/proxy-paths.cjs`: one resolver for the sibling proxy (dist dir, db-open); falls back to coding's better-sqlite3 without the proxy (hosted CI) | coding 0694d87e | done |
+| WP5 | Measurement code out of `server.mjs` (task binding per endpoint, usage glue) | — | next: needs a characterisation harness that boots the real daemon against a fake upstream (upstreams are hard-coded `https://api.anthropic.com…`; route via `HTTPS_PROXY` to an intercepting fake built from the S6 spike — the same harness then tests G3's daemon) |
+| WP6 | Agent wiring in Node (bash parity matrix first) | — | open |
+
+Findings during G1:
+- **Retention bug (fixed, 6bb1ed5b, user-approved):** the sweeper defaulted to `<CODING_REPO>/.data`; the proxy writes to `proxyDataDir()` and the launchd job sets no `LLM_PROXY_DATA_DIR` → nothing was ever swept (3.4 GB, 5,371 task dirs, 56 captures past 14 days).
+- Not unified: `resolveDataDir()` across server/token-usage/measurement-span — their defaults genuinely differ (`<coding>/.data` vs `<cwd>/.data`); glass always sets `LLM_PROXY_DATA_DIR`.
+- `@types/node` bump unnecessary — TS never imports `node:sqlite` (types live in `db-open.d.cts`).
+- tmux env allowlist (`tmux-session-wrapper.sh:353-378`) omits `ANTHROPIC_BASE_URL`, `ANTHROPIC_CUSTOM_HEADERS`, `COPILOT_PROVIDER_*`, `CODING_PROJECT_ID` — reported for a decision in WP6, not changed.
+- Constraint `no-parallel-files` matches file PATHS: any `…lite.` name (e.g. `sqlite.cjs`) trips `lite[ ._-]`.
+
 ## Session log
 
 - **2026-10-08** — proposal written; decisions taken (above); repo created
@@ -319,3 +337,4 @@ one package, zero native deps.
 - **2026-10-08 (S7 done)** — after `/login`: copilot measured through the proxy, exact match with
   OTel. The 401 was VS Code's bundled copilot CLI 1.0.81 using the public host; 1.0.93 fine.
   G0 complete except the IT-security sign-off. Next: G1 (seams in coding).
+- **2026-10-08 (G1 WP1–WP4)** — portable builders, SQLite adapter (both backends green), proxy resolver, no machine-specific paths, redaction injectable, retention ported + its data-dir bug fixed. Next: WP5 harness + extraction, WP6 wiring.
