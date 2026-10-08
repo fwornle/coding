@@ -29,16 +29,16 @@ Status: **G3 in progress** — daemon + CLI built and measured for real on macOS
    `CODING_SQLITE_BACKEND=node`). Rewrite rules cover only defaults env cannot reach — the
    generated files stay near byte-identical to coding, so drift is visible. (Supersedes the
    `CODING_*`→`GLASS_*` rewrite in "The transformation script" below.)
+8. **Forbidden deps**: never in `package.json`; an import site only when the manifest lists
+   it as a guarded optional fallback with a reason (today: better-sqlite3 in `db-open.cjs`
+   and `proxy-paths.cjs`, never taken with `CODING_SQLITE_BACKEND=node`).
+
 9. **Capture (G3)**: claude via `ANTHROPIC_BASE_URL` into the shared Anthropic forward (no
    interception); copilot / opencode / pi via `HTTPS_PROXY` into the same port, which decrypts
    only model hosts with a persistent glass CA (option A). `--no-intercept` per run while the
    IT-security sign-off is open. Every agent keeps its own login, catalogue and routing.
 10. **Daemon unreachable (G3)**: one warning line, the agent runs unmeasured — glass never
    blocks the user's agent.
-8. **Forbidden deps**: never in `package.json`; an import site only when the manifest lists
-   it as a guarded optional fallback with a reason (today: better-sqlite3 in `db-open.cjs`
-   and `proxy-paths.cjs`, never taken with `CODING_SQLITE_BACKEND=node`).
-
 ---
 
 ## What was asked (condensed)
