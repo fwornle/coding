@@ -2,8 +2,9 @@
 
 Token measurement + context-window insight for coding agents (GitHub Copilot CLI,
 OpenCode, pi, Claude Code) as a compact standalone product, derived from `coding`
-by a transformation script. Repo: **https://bmw.ghe.com/Frank-Woernle/glass**
-(private, created 2026-10-08, empty — generated content only).
+by a transformation script. Repo: **https://bmw.ghe.com/AIMAAD/glass** (private; created
+2026-10-08 as `Frank-Woernle/glass`, transferred to the AIMAAD org the same day for its
+GitHub-hosted runners). `main` is empty — generated content only.
 
 Living plan. Update the phase status and the Session log at the end of every session.
 
@@ -11,7 +12,11 @@ Status: **G0 in progress.**
 
 ## Decisions (2026-10-08 — do not re-litigate)
 
-1. Repo: personal, `Frank-Woernle/glass` on bmw.ghe.com.
+1. Repo: `AIMAAD/glass` on bmw.ghe.com (was personal; moved for CI runners).
+   AIMAAD's org ruleset 1164412 applies to **every branch**: changes only through a pull
+   request, and three required checks (Wiz IaC / Secret / Vulnerability Scanner). Creating a
+   branch is exempt from the checks; updating one is not. So the extractor's publish step
+   (G2) pushes a fresh branch and opens a PR into `main` — never a direct push.
 2. Glass-only files live in coding (`glass/overlay/`); the glass repo is generated.
 3. Distribution: npm tarball attached to a GHE release.
 4. v1 UI: Token Usage + context explainer; Cost later.
@@ -226,8 +231,16 @@ same gap hits OpenCode's `github-copilot` provider (it bypasses the proxy today)
 
   **Verdict: option A is technically viable** for both Copilot paths. Remaining gate:
   IT-security sign-off for a local TLS-intercepting proxy.
-- [ ] S6 Windows native (CI on the glass repo, windows-latest): `node:sqlite`, proxy + OTLP
-      receiver, spawn of the 4 agent CLIs (`.cmd` shims), OSC 8 status line.
+- [ ] S6 Windows native: `node:sqlite`, spawn of the 4 agent CLIs (`.cmd` shims, with/without
+      shell), CA trust through the intercepting proxy (opencode, claude). Spike ready on branch
+      `g0-s6-windows` of the glass repo (`spike/db.mjs`, `spike/agents.mjs`, pure-JS CA via
+      node-forge; chained through the machine's corporate proxy via `GLASS_UPSTREAM_PROXY` /
+      `HTTPS_PROXY`; workflow `.github/workflows/s6-platform-spike.yml`). Local run behind
+      proxydetox: all four agents spawn with and without a shell; opencode (`models.dev` 200) and
+      claude (`api.anthropic.com` 401/200) both trust the pure-JS CA, no TLS errors.
+      As a personal repo the run never started (hosted runners disabled, run 304329072). Moved to
+      AIMAAD; the rules block updating `g0-s6-windows`, so the spike runs from the new branch
+      `g0-s6-platform` (run 304427957).
 - [ ] S7 copilot OTel against GitHub directly (needs a fresh `copilot /login` — user).
 
 ## Phases
@@ -262,6 +275,8 @@ one package, zero native deps.
 
 - Copilot through the proxy: option A, B or C (see G0) — after S8.
 - IT-security sign-off if option A (local TLS interception) is chosen.
+- Whether AIMAAD's hosted runners include `windows-latest` and `macos-latest` (seen so far:
+  `ubuntu-latest` in AIMAAD/knowledge-management) — answered by run 304427957.
 
 ## Session log
 
@@ -274,3 +289,7 @@ one package, zero native deps.
   (options A/B/C). S8: option A works for OpenCode's github-copilot provider (usage + full body,
   plus a hidden title call) and copilot CLI trusts the CA; copilot's 401 is a public-vs-GHE host
   issue. Next: IT-security question, S7 (copilot host fix + one measured call), S6 Windows CI.
+- **2026-10-08 (S6)** — platform spike pushed to `g0-s6-windows`; the run never started: hosted
+  runners disabled on bmw.ghe.com for this repo. Plan committed + pushed (270ebacb).
+  Spike gained corporate-proxy chaining (verified locally). Repo transferred to `AIMAAD/glass`;
+  AIMAAD's ruleset (PR-only, 3 Wiz checks, every branch) → spike re-pushed as `g0-s6-platform`.
