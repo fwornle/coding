@@ -117,7 +117,7 @@ A separate `SemanticValidator` previously called an LLM (anthropic/claude-haiku,
 
 `checkConstraintsDirectly` used to catch any engine error and return zero violations ("fail open"). That hid bugs like the config split-brain. It now re-throws so the wrapper hook prints the error to stderr where Claude can see it.
 
-**File**: `${CODING_REPO}/.constraint-monitor.yaml`
+**File**: `${CODING_REPO}/config/constraints/constraint-monitor.yaml`
 
 ```yaml
 - id: no-hardcoded-secrets

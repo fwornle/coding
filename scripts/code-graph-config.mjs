@@ -16,7 +16,7 @@
  *
  * stdout is this program's return value (callers capture it), which is why it writes
  * with console.log rather than the Logger — see the no-console-log whitelist note in
- * .constraint-monitor.yaml.
+ * config/constraints/constraint-monitor.yaml.
  */
 
 import {
