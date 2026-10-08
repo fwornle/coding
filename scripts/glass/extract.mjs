@@ -304,8 +304,13 @@ emit({ ok, imported: JSON.parse(process.env.GLASS_SMOKE_FILES).length, node: pro
 process.exit(ok ? 0 : 1);
 `;
 
+/** npm, as a command this platform can spawn. */
+const NPM = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+
 /**
- * Copy the tree somewhere with no node_modules above it and run SMOKE there.
+ * Copy the tree somewhere with no node_modules above it, install the declared
+ * runtime dependencies the way `npm i -g` would (no scripts, no dev deps), then
+ * run SMOKE there and the bin entry points with --version.
  * @returns {{ok: boolean, result: object|null, output: string}}
  */
 export function smoke(out, { node = process.execPath } = {}) {
@@ -314,29 +319,40 @@ export function smoke(out, { node = process.execPath } = {}) {
     const pkg = path.join(tmp, 'glass');
     fs.cpSync(out, pkg, { recursive: true });
     for (const d of ['home', 'data']) fs.mkdirSync(path.join(tmp, d));
-    const files = listTree(pkg).filter((f) => JS_FILE.test(f));
+    const manifest = JSON.parse(fs.readFileSync(path.join(pkg, 'package.json'), 'utf8'));
+    if (Object.keys(manifest.dependencies || {}).length) {
+      const i = spawnSync(NPM, ['install', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund', '--no-package-lock'], {
+        cwd: pkg, encoding: 'utf8', timeout: 300_000, shell: process.platform === 'win32',
+      });
+      if (i.status !== 0) return { ok: false, result: null, output: `npm install failed:\n${i.stdout || ''}${i.stderr || ''}` };
+    }
+    const env = {
+      PATH: process.env.PATH,
+      HOME: path.join(tmp, 'home'),
+      USERPROFILE: path.join(tmp, 'home'),
+      CODING_SQLITE_BACKEND: 'node',
+      LLM_PROXY_DATA_DIR: path.join(tmp, 'data'),
+      CODING_DATA_HOME: path.join(tmp, 'data'),
+      HEALTH_COORDINATOR_URL: 'off',
+      NODE_NO_WARNINGS: '1',
+    };
+    // Entry points run when imported — they are exercised with --version instead.
+    const files = listTree(pkg).filter((f) => JS_FILE.test(f) && !f.startsWith('bin/') && !f.startsWith('tests/') && !f.startsWith('node_modules/'));
     const r = spawnSync(node, ['--input-type=module', '-e', SMOKE], {
-      cwd: tmp,
-      encoding: 'utf8',
-      timeout: 60_000,
-      env: {
-        PATH: process.env.PATH,
-        HOME: path.join(tmp, 'home'),
-        USERPROFILE: path.join(tmp, 'home'),
-        CODING_SQLITE_BACKEND: 'node',
-        LLM_PROXY_DATA_DIR: path.join(tmp, 'data'),
-        CODING_DATA_HOME: path.join(tmp, 'data'),
-        HEALTH_COORDINATOR_URL: 'http://127.0.0.1:9',
-        NODE_NO_WARNINGS: '1',
-        GLASS_SMOKE_PKG: pkg,
-        GLASS_SMOKE_FILES: JSON.stringify(files),
-      },
+      cwd: tmp, encoding: 'utf8', timeout: 60_000,
+      env: { ...env, GLASS_SMOKE_PKG: pkg, GLASS_SMOKE_FILES: JSON.stringify(files) },
     });
-    const output = `${r.stdout || ''}${r.stderr || ''}`;
+    let output = `${r.stdout || ''}${r.stderr || ''}`;
     const last = (r.stdout || '').trim().split('\n').pop();
     let result = null;
     try { result = JSON.parse(last); } catch { /* not JSON */ }
-    return { ok: r.status === 0 && result?.ok === true, result, output };
+    let ok = r.status === 0 && result?.ok === true;
+    for (const bin of Object.values(manifest.bin || {})) {
+      const b = spawnSync(node, [path.join(pkg, bin), '--version'], { cwd: tmp, encoding: 'utf8', timeout: 30_000, env });
+      if (b.status !== 0) { ok = false; output += `\n${bin} --version failed:\n${b.stdout || ''}${b.stderr || ''}`; }
+      else if (result) (result.bins ||= {})[bin] = b.stdout.trim();
+    }
+    return { ok, result, output };
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

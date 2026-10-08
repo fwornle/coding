@@ -49,6 +49,14 @@ select:
     to: proxy
     files:
       - proxy-bridge/measurement.mjs
+      # forwarding + reads shared with server.mjs (G3 WP1–WP3)
+      - proxy-bridge/anthropic-forward.mjs
+      - proxy-bridge/anthropic-headers.mjs
+      - proxy-bridge/openai-passthrough.mjs
+      - proxy-bridge/usage-api.mjs
+      - proxy-bridge/intercept.mjs
+      - proxy-bridge/no-proxy.mjs
+      - proxy-bridge/model-canonical.mjs
       - proxy-bridge/context-capture.mjs
       - proxy-bridge/context-turns.mjs
       - proxy-bridge/turn-identity.mjs

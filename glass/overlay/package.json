@@ -7,5 +7,15 @@
   "engines": {
     "node": ">=22.13"
   },
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "bin": {
+    "glass": "bin/glass.mjs"
+  },
+  "dependencies": {
+    "node-forge": "^1.4.0",
+    "undici": "^8.1.0"
+  },
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.mjs\""
+  }
 }
