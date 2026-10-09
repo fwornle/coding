@@ -8,7 +8,7 @@ GitHub-hosted runners). `main` is empty — generated content only.
 
 Living plan. Update the phase status and the Session log at the end of every session.
 
-Status: **G6 done (one item open)** — v0.1.2 is the latest release (tag at c0f0f52 = glass PR #7, from coding 51d2d91 + proxy 6170f5d; proxy PR #45 merged as 21ef373): main's tests green on all 4 cells incl. the provenance drift check, release job's install check green, the downloaded asset re-checked on macOS. Open: a colleague installs on their own machine (ideally Windows) from the README. **G5 done** — v0.1.1 is the latest release (tag at e58dfc6 = glass PR #6, from coding 8242f7b + proxy b90d48d): main's tests green on all 4 cells incl. the Windows uninstall, release job's install check green, the downloaded asset re-checked on macOS. v0.1.0 (828d204) has the Windows uninstall race. Next: G6 (README for colleagues, CI drift check). **G4 published** — glass `main` = PR #4 → bbafb6f (from coding@45070e2 + proxy@7440525; 70 files incl. the built UI); CI green on ubuntu + windows × Node 22.13.0 / 22.x, 3 Wiz checks pass. Next: G5 (packaging + platform CI); pi row still waits on a pi login. **G3 published** — glass `main` = PR #2 → 63d224a (from coding@0154fa8 + proxy@7440525, proxy PR #43); CI green on ubuntu + windows (Node 22.13 / 22.x). Real runs on macOS measured for claude, copilot, opencode; pi proven through interception — its token row still waits on a pi login. Next: pi row, then G4 (UI + status line). G1 done and merged (coding `main` cae5aad4, proxy PR #42 → 34c78e5). G0 done (IT-security sign-off for local TLS interception still pending).
+Status: **G6 done (one item open)** — v0.1.2 is the latest release (tag at c0f0f52 = glass PR #7, from coding 51d2d91 + proxy 6170f5d; proxy PR #45 merged as 21ef373): main's tests green on all 4 cells incl. the provenance drift check, release job's install check green, the downloaded asset re-checked on macOS. pi row recorded (exact match with pi's own count). Open: a colleague installs on their own machine (ideally Windows) from the README. **G5 done** — v0.1.1 is the latest release (tag at e58dfc6 = glass PR #6, from coding 8242f7b + proxy b90d48d): main's tests green on all 4 cells incl. the Windows uninstall, release job's install check green, the downloaded asset re-checked on macOS. v0.1.0 (828d204) has the Windows uninstall race. Next: G6 (README for colleagues, CI drift check). **G4 published** — glass `main` = PR #4 → bbafb6f (from coding@45070e2 + proxy@7440525; 70 files incl. the built UI); CI green on ubuntu + windows × Node 22.13.0 / 22.x, 3 Wiz checks pass. Next: G5 (packaging + platform CI); pi row still waits on a pi login. **G3 published** — glass `main` = PR #2 → 63d224a (from coding@0154fa8 + proxy@7440525, proxy PR #43); CI green on ubuntu + windows (Node 22.13 / 22.x). Real runs on macOS measured for claude, copilot, opencode; pi proven through interception — its token row still waits on a pi login. Next: pi row, then G4 (UI + status line). G1 done and merged (coding `main` cae5aad4, proxy PR #42 → 34c78e5). G0 done (IT-security sign-off for local TLS interception still pending).
 
 ## Decisions (2026-10-08 — do not re-litigate)
 
@@ -387,6 +387,10 @@ Real runs through glass (macOS, chained through proxydetox :3128, each agent's o
   `gpt-5-mini` title call (532 / 78) — both task-bound.
 - pi 0.84.2 → intercept → api.openai.com: TLS trusted, forwarded, real upstream answer (401 for a dummy
   key → no row, correct). A token row needs a pi login (pi has no provider of its own on this machine).
+- **pi row (2026-10-09, v0.1.2 release tarball):** pi `/login` GitHub Copilot on bmw.ghe.com, then
+  `glass pi --model github-copilot/claude-haiku-4.5 -p …` → intercept → copilot-api.bmw.ghe.com `/v1/messages`:
+  in 2,823 / out 43, task-bound, context turn (system 5,479 B, tools 2,757 B, user 91 B) — **equal to pi's own
+  usage event** (`--mode json`: input 2823, output 43). All four agents now measured through glass.
 
 Findings during G3:
 - **Binding spike**: copilot 1.0.93, opencode 1.15.13 and pi 0.84.2 all send `Proxy-Authorization`
@@ -477,6 +481,7 @@ Findings during G6:
 - A true "colleague" test (other person, other machine, Windows) is still open — the walk-through above used this Mac.
 
 ## Session log
+- **2026-10-09 (pi row)** — pi logged in (Copilot, bmw.ghe.com; first attempt hit a 429 from a Copilot-side endpoint after device approval, retry fine); measured through the released v0.1.2: exact match with pi's own usage. Remaining: colleague install, IT-security sign-off.
 - **2026-10-09 (G6 released)** — coding main 763b9856 (glass-g6-handover); proxy #45 and glass #7 merged → v0.1.2 released and verified (CI 4/4 with drift check, release job, macOS on the asset). Remaining: colleague install; then pi row, IT-security sign-off.
 - **2026-10-09 (G6)** — README for colleagues, provenance drift check, breakdown retention; capture-redaction bug found while writing the privacy notes and fixed in the proxy (PR #45). Next: merge #45 → coding glass-g6-handover → glass PR (0.1.2), check v0.1.2, a colleague installs.
 - **2026-10-09 (G5 done)** — coding main ea0e5b84 (glass-g5-packaging merged; local stale-dist fix rebased on top as 9555491a); glass PR #6 merged → v0.1.1 released and verified (CI 4/4, release job, macOS on the asset). Next: G6.
