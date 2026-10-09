@@ -1,6 +1,6 @@
 {
   "name": "glass",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Token measurement and context-window insight for coding agents",
   "private": true,
   "type": "module",
@@ -11,11 +11,25 @@
   "bin": {
     "glass": "bin/glass.mjs"
   },
+  "files": [
+    "bin",
+    "lib",
+    "proxy",
+    "config",
+    "scripts",
+    "ui",
+    "EXTRACTED.json"
+  ],
   "dependencies": {
     "node-forge": "^1.4.0",
     "undici": "^8.1.0"
   },
+  "bundleDependencies": [
+    "node-forge",
+    "undici"
+  ],
   "scripts": {
-    "test": "node --test \"tests/**/*.test.mjs\""
+    "test": "node --test \"tests/**/*.test.mjs\"",
+    "install-check": "node tests/install-check.mjs"
   }
 }
