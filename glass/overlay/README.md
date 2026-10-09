@@ -1,5 +1,7 @@
 # glass
 
+> 📖 **Documentation: [aimaad-glass.pages.bmw.ghe.com](https://aimaad-glass.pages.bmw.ghe.com/)** — what glass does, with screenshots, architecture and reference.
+
 Token measurement and context-window insight for coding agents — GitHub Copilot CLI,
 OpenCode, pi and Claude Code. Put `glass` in front of the agent; it records every model
 call's tokens (input, output, cache read / write) and what filled the context window

@@ -1,0 +1,85 @@
+# Generated repository — this workflow comes from coding/glass/overlay.
+# The documentation site (MkDocs Material, docs/ + mkdocs.yml):
+#   - a pull request that touches the docs builds the site with --strict (a check);
+#   - a push to main that touches the docs builds and publishes it to GitHub Pages
+#     (https://aimaad-glass.pages.bmw.ghe.com/, visible to the organization).
+# Pages accepts deployments from main only, so a pull request checks and the merge publishes.
+name: glass docs
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - ".github/workflows/docs.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # A merge is one push, but its commit can carry many files; decide from the actual diff
+  # (as coding's deploy-docs gate does) rather than a paths filter on push.
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      docs-changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "push" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          BASE="${{ github.event.before }}"
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] \
+             || ! git rev-parse --verify --quiet "$BASE^{commit}" >/dev/null; then
+            BASE="HEAD~1"
+          fi
+          if git diff --name-only "$BASE" HEAD | grep -qE '^(docs/|mkdocs\.yml$|\.github/workflows/docs\.yml$)'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"; echo "docs changed — building"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"; echo "no docs change — skipping"
+          fi
+
+  build:
+    needs: gate
+    if: needs.gate.outputs.docs-changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      # MkDocs 2.0 drops the plugin and theme system this site uses.
+      - run: pip install "mkdocs<2" mkdocs-material mkdocs-minify-plugin
+      - run: mkdocs build --strict
+      - if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./site
+
+  deploy:
+    needs: [gate, build]
+    if: needs.gate.outputs.docs-changed == 'true' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

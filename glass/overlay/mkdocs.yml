@@ -1,0 +1,94 @@
+site_name: glass
+site_description: Token measurement and context-window insight for coding agents
+site_url: https://aimaad-glass.pages.bmw.ghe.com/
+repo_url: https://bmw.ghe.com/AIMAAD/glass
+repo_name: AIMAAD/glass
+
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    # Syncs the chosen tier (Quick / Deep Dive) across pages by label text and keeps it.
+    - content.tabs.link
+
+plugins:
+  - search
+  - minify:
+      minify_html: true
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  # The Deep Dive tier of a page is a partial under docs/_tiers/, included by its shell
+  # page. check_paths: a mistyped include fails the build instead of publishing an empty tab.
+  - pymdownx.snippets:
+      base_path: [docs]
+      check_paths: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+# Tier partials are included into their page; PlantUML sources are rendered to images/.
+exclude_docs: |
+  _tiers/
+  puml/
+
+# A link to a missing #heading is INFO by default; --strict must fail on it.
+validation:
+  anchors: warn
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Using glass:
+    - Token Usage: token-usage.md
+    - Context Window: context-window.md
+    - Comparing Runs (A/B): comparing-runs.md
+    - Status Line: status-line.md
+  - How It Works:
+    - Architecture: architecture.md
+    - Privacy & Data: privacy.md
+  - Reference:
+    - Commands & Configuration: reference.md
+    - Troubleshooting: troubleshooting.md
+    - Development & Releases: development.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://bmw.ghe.com/AIMAAD/glass

@@ -1,0 +1,48 @@
+@startuml glass-architecture
+!include _standard-style.puml
+top to bottom direction
+title glass — components on one developer machine
+
+package "Your terminal" {
+  component "glass <agent> [args]" as cli <<cli>>
+  component "claude" as claude <<agent>>
+  component "copilot / opencode / pi" as others <<agent>>
+  component "status line\n(tmux bar · Claude statusLine · glass watch)" as status <<cli>>
+}
+
+package "glass daemon — 127.0.0.1:12445" {
+  component "Anthropic forward\n(/v1/messages)" as fwd <<core>>
+  component "Interception\n(CONNECT, model hosts only)" as icpt <<core>>
+  component "Measurement\n(usage tap, context capture, redaction)" as meas <<core>>
+  component "Read API + UI server\n(/api/*, static ui/)" as api <<api>>
+  component "Retention timer\n(captures > 7 days)" as ret <<util>>
+}
+
+database "<U+007E>/.glass" as home <<storage>> {
+  component "token-usage.db" as db <<storage>>
+  component "context captures" as caps <<storage>>
+  component "ca/ (glass CA)" as ca <<storage>>
+}
+
+component "Corporate proxy\n(HTTPS_PROXY)" as corp <<infra>>
+component "Model hosts\napi.anthropic.com · copilot-api.*.ghe.com\napi.githubcopilot.com · api.openai.com" as hosts <<external>>
+component "Browser: glass ui" as browser <<api>>
+
+cli CONTROL_LINE claude : ANTHROPIC_BASE_URL
+cli CONTROL_LINE others : HTTPS_PROXY + NODE_EXTRA_CA_CERTS
+claude SYNC_LINE fwd : HTTP on 127.0.0.1
+others SYNC_LINE icpt : CONNECT + TLS (glass leaf cert)
+fwd DATA_LINE meas
+icpt DATA_LINE meas
+meas DATA_LINE db
+meas DATA_LINE caps
+icpt OPTIONAL_LINE ca : signs leaves
+fwd SYNC_LINE corp
+icpt SYNC_LINE corp
+corp SYNC_LINE hosts : verified TLS
+api DATA_LINE db
+api DATA_LINE caps
+browser SYNC_LINE api
+status SYNC_LINE api : /api/statusline
+ret OPTIONAL_LINE caps
+@enduml
