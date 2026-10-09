@@ -93,6 +93,8 @@ test('tmux: configureStatus on a real server — options set, clicks bound, user
   const saved = { TMUX: process.env.TMUX, TMUX_PANE: process.env.TMUX_PANE };
   process.env.TMUX = `${sock},${pid},0`;
   process.env.TMUX_PANE = t('display-message', '-p', '-t', 'mine', '#{pane_id}').stdout.trim();
+  // tmux's own default differs by version (3.4: select-window, 3.6: switch-client).
+  const before = t('list-keys', '-T', 'root', 'MouseDown1Status').stdout.replace(/^bind-key\s+(?:-r\s+)?-T\s+root\s+MouseDown1Status\s+/, '').trim();
   try {
     const restore = configureStatus({ taskId: 'glass-claude-x', port: 12999, env: {}, tmpDir: path.dirname(sock) });
     const opt = (o) => t('show-options', '-v', '-t', 'mine', o).stdout.trim();
@@ -102,7 +104,7 @@ test('tmux: configureStatus on a real server — options set, clicks bound, user
     assert.equal(opt('mouse'), 'on');
     const keys = t('list-keys', '-T', 'root', 'MouseDown1Status').stdout;
     assert.match(keys, /--src glass-tmux/);
-    assert.match(keys, /switch-client -t =/, 'the previous binding is the fallback');
+    assert.ok(keys.includes(`{ ${before} }`), `the previous binding (${before}) is the fallback`);
     configureStatus({ taskId: 'glass-claude-y', port: 12999, env: {}, tmpDir: path.dirname(sock) })();
     assert.equal(t('list-keys', '-T', 'root', 'MouseDown1Status').stdout.match(/--src glass-tmux/g).length, 1, 'bound once');
     restore();
