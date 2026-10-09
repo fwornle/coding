@@ -96,6 +96,47 @@ function makeRow(name, row) {
   return { dir, repo, home, project, shims };
 }
 
+// `declare -p` prints a multi-line value differently per bash version: 3.2
+// (macOS) emits "a\nb" with a literal newline, 5.x (CI) emits $'a\nb' on one
+// line. Both carry the same value, so env is compared as parsed values — the
+// golden (recorded on macOS) stays the authority, read through the same parser.
+function canonicalEnv(lines) {
+  const text = lines.join('\n');
+  const out = [];
+  const head = /^(?:unset (\S+)|declare -(\S+) ([A-Za-z_][A-Za-z0-9_]*)(=)?)/;
+  let i = 0;
+  while (i < text.length) {
+    if (text[i] === '\n') { i += 1; continue; }
+    const m = head.exec(text.slice(i));
+    if (!m) throw new Error(`unparseable declare -p output at: ${text.slice(i, i + 60)}`);
+    i += m[0].length;
+    if (m[1]) { out.push(`unset ${m[1]}`); continue; }
+    // Exported but never assigned: 5.x prints `declare -x N`, 3.2 prints N="".
+    if (!m[4]) { out.push(`declare -${m[2]} ${m[3]}=""`); continue; }
+    let value = '';
+    if (text.startsWith("$'", i)) {
+      const esc = { n: '\n', t: '\t', r: '\r', '\\': '\\', "'": "'", '"': '"' };
+      for (i += 2; text[i] !== "'"; i += 1) {
+        if (text[i] === '\\') { i += 1; value += esc[text[i]] ?? `\\${text[i]}`; } else value += text[i];
+      }
+    } else {
+      for (i += 1; text[i] !== '"'; i += 1) {
+        if (text[i] === '\\' && '"\\$`'.includes(text[i + 1])) i += 1;
+        value += text[i];
+      }
+    }
+    i += 1;
+    out.push(`declare -${m[2]} ${m[3]}=${JSON.stringify(value)}`);
+  }
+  return out;
+}
+
+// The fail-closed abort prints a per-OS restart hint (launchctl / systemctl /
+// plain script) chosen from process.platform; the golden was recorded on macOS.
+// That one line is masked here and each OS's hint is pinned by its own test in
+// proxy-routing-shell.test.mjs.
+const maskPlatformHint = (lines) => lines.map((l) => (/^\[\w+\]\s+Fix:\s/.test(l) ? l.replace(/Fix:.*/, 'Fix: <platform restart hint>') : l));
+
 async function runRow(name, row) {
   const box = makeRow(name, row);
   const agent = row.agent;
@@ -226,6 +267,9 @@ test('agent → proxy wiring matches the recorded bash behaviour', async () => {
     return;
   }
   const golden = JSON.parse(fs.readFileSync(GOLDEN, 'utf8'));
-  for (const [i, o] of observed.entries()) assert.deepEqual(o, golden[i], `row: ${o.row}`);
+  for (const [i, o] of observed.entries()) {
+    const g = golden[i] && { ...golden[i], env: canonicalEnv(golden[i].env), log: maskPlatformHint(golden[i].log) };
+    assert.deepEqual({ ...o, env: canonicalEnv(o.env), log: maskPlatformHint(o.log) }, g, `row: ${o.row}`);
+  }
   assert.equal(observed.length, golden.length);
 });
