@@ -8,7 +8,7 @@ GitHub-hosted runners). `main` is empty — generated content only.
 
 Living plan. Update the phase status and the Session log at the end of every session.
 
-Status: **G4 UI done** (branch `glass-g4-ui`, not merged; status line WP6 next). **G3 published** — glass `main` = PR #2 → 63d224a (from coding@0154fa8 + proxy@7440525, proxy PR #43); CI green on ubuntu + windows (Node 22.13 / 22.x). Real runs on macOS measured for claude, copilot, opencode; pi proven through interception — its token row still waits on a pi login. Next: pi row, then G4 (UI + status line). G1 done and merged (coding `main` cae5aad4, proxy PR #42 → 34c78e5). G0 done (IT-security sign-off for local TLS interception still pending).
+Status: **G4 done** (branch `glass-g4-ui`, not merged: UI + status line; next merge coding, publish glass PR #3). **G3 published** — glass `main` = PR #2 → 63d224a (from coding@0154fa8 + proxy@7440525, proxy PR #43); CI green on ubuntu + windows (Node 22.13 / 22.x). Real runs on macOS measured for claude, copilot, opencode; pi proven through interception — its token row still waits on a pi login. Next: pi row, then G4 (UI + status line). G1 done and merged (coding `main` cae5aad4, proxy PR #42 → 34c78e5). G0 done (IT-security sign-off for local TLS interception still pending).
 
 ## Decisions (2026-10-08 — do not re-litigate)
 
@@ -423,7 +423,19 @@ serves the read shapes those components already fetch, so they run unchanged.
 | WP4 | manifest `build:` step (Vite with the dashboard's node_modules → `ui/`; verify + smoke skip browser code; index.html refs checked) | done — 67 files, 18,033 JS lines, closed; extract tests 12/12; two extractions identical |
 | WP5 | Real `glass claude` + `glass copilot` through the generated tree (port 12446, scratchpad home), gsd-browser on every page | done — Token Usage: 2 calls / 83.9K = the two rows; Recent Calls: both rows; Sessions: both runs, copilot timeline (cache-write 33,243), turn modal, explainer: claude 135.5 KB (tools 67.2 KB, history 61.4 KB, 50% cached), copilot 88.6 KB (system 50.0 KB, tools 38.4 KB) |
 
+| WP6 | `lib/glass/statusline.mjs` (daemon facts + tmux / ansi / plain renders + ctx / net reports), `/api/statusline`, `lib/glass/tmux.mjs` (own session via argv `new-session -d` + attach, exit code through a file; inside a user's tmux: session options set and restored; one MouseDown1Status binding for `g:*` ranges that falls through to the previous binding), `glass statusline / click / report / watch`, claude without tmux → `--settings` statusLine (temp file, removed after), UI deep link `#/sessions?task=&explain=1`; coding seam `CODING_MODEL_LIMITS_CACHE` (model-limits cached into the package dir); `tmux` off the forbidden-spawn list (optional, decision 5) | done — 21/21 tree tests on Node 25.8.1 + 22.13.0 (incl. configureStatus on a real tmux server); live, interactive, in an isolated tmux server: claude and copilot sessions with the bar updating (claude ↑92.7K, copilot ctx 4% ↑36.9K), ctx popup over the pane, exit → session closed + span archived + exit file gone; claude `--no-tmux`: Claude Code renders glass's line with OSC 8 links (ctx 9%), settings file removed on exit; deep link opens the explainer (gsd-browser) |
+
 Findings during G4:
+- **Gauge anchor**: the latest context turn is often a side call — Claude Code's title / summary request on the
+  SAME model (no tools, ~1.2K), copilot's `gpt-4o-mini` call — which dropped the gauge to ~0%. The gauge uses
+  the latest turn that carries tool definitions (the agent's main loop), else the latest.
+- Copilot's TUI ignores an Enter injected with `send-keys` into its own pane; through the attached client it
+  works. Only matters for scripted tests.
+- Not verified: the click itself with a real mouse (the binding, its `#{m:g:*,…}` match and `glass click` were
+  each exercised; tmux cannot synthesise a status-line click), `glass click g:health / g:tok` (they open the
+  browser — the opener chain is unit-tested), Windows / WSL (G5 CI).
+- jest ignores `.claude/worktrees/` (G1 finding) — the model-limits seam was checked directly (default path
+  unchanged); coding's gauge suite runs after the merge.
 - The reused pages carry coding vocabulary glass has no use for: process names `token-adapter-<agent>`, the
   Knowledge / Infrastructure lanes and "Development narrative" in the timeline (`/api/observations`,
   `/api/digests` 404 → rejected quietly). Harmless; trim if users find it confusing.
@@ -461,5 +473,6 @@ Findings during G4:
 - **2026-10-08 (G2)** — G1 merged (coding main cae5aad4, proxy 34c78e5). Extractor, manifest, shared import scanner and tests built in worktree `glass-g2`; first extraction green (40 files, closed, smoke on Node 22.13 + 25). Decisions 7 (env names kept) and 8 (forbidden-dep allowlist). Next: publish the first generated PR into glass `main`, merge G2.
 - **2026-10-08 (G2 done)** — coding main 3ccc8a69 (+ 58a77d83 gh `--repo` fix); glass PR #1 merged (322b3f2): 40 generated files on `main`. Next: G3.
 - **2026-10-08 (G3)** — binding spike (all three intercepted agents send Proxy-Authorization); proxy seam cuts (anthropic-forward, usage-api, model-canonical) under an extended golden; OpenAI measuring passthrough; intercept module; glass daemon + CLI in the overlay; real claude / copilot / opencode runs measured through glass. Next: pi login for its row, proxy PR, merge coding, publish glass PR #2.
+- **2026-10-09 (G4 status line)** — WP6: status line from the daemon's own measurement, tmux session per run with clickable fields, Claude Code statusLine without tmux, `glass watch`; verified live with claude + copilot. Next: merge G4 into coding, publish glass PR #3, then G5 (packaging + platform CI).
 - **2026-10-08 (G4 UI)** — reduced UI from the dashboard's own components (three seams in coding), daemon serves it + the run reads, extractor builds it; verified live with gsd-browser on real claude + copilot rows. Next: WP6 status line, then merge (coding) + publish glass PR #3.
 - **2026-10-08 (G3 published)** — proxy PR #43 merged (7440525); coding main 0154fa83; glass PR #2 merged (63d224a, 57 files): Wiz IaC + Secret pass (Vulnerability Scanner "skipping" on both PRs, not blocking), glass tests pass on ubuntu + windows × Node 22.13.0 / 22.x. Live proxy checkout `_work/rapid-llm-proxy` left on 34c78e5 — pulling it needs `npm run build` (usage-api imports `getCost` from dist) before the proxy restarts.
