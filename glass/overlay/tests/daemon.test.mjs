@@ -402,6 +402,20 @@ test('CLI: a measured claude run through a lazily started daemon, then status an
   fs.rmSync(cliHome, { recursive: true, force: true });
 });
 
+test('CLI: uninstall returns only after the daemon process has exited, then removes the home', { skip: process.platform === 'win32' && 'POSIX stand-in agent' }, async () => {
+  // Windows refuses to delete the token DB and the daemon log while the daemon
+  // still holds them — answering /stop is not enough (G5, windows CI).
+  const cliHome = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-cli-'));
+  const port = await freePort();
+  const env = { GLASS_HOME: cliHome, GLASS_PORT: String(port), GLASS_CLAUDE_BIN: fakeAgent(cliHome), ANTHROPIC_BASE_URL: `http://127.0.0.1:${upPort}` };
+  assert.equal((await runCli(['claude', '--call', 'x'], env)).code, 0);
+  const { pid } = await (await fetch(`http://127.0.0.1:${port}/health`)).json();
+  const un = await runCli(['uninstall', '--yes'], env);
+  assert.equal(un.code, 0, un.stderr);
+  assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, 'daemon still running when uninstall returned');
+  assert.equal(fs.existsSync(cliHome), false);
+});
+
 test('CLI: daemon unreachable → one warning, the agent runs unwired', { skip: process.platform === 'win32' && 'POSIX stand-in agent' }, async () => {
   const cliHome = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-cli-'));
   const squatter = http.createServer((req, res) => { res.writeHead(404); res.end(); });

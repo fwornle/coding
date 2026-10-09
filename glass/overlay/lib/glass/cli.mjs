@@ -279,7 +279,7 @@ async function doctor() {
 
 async function uninstall(argv) {
   const home = glassHome();
-  await stopDaemon(glassPort());
+  await stopDaemon(glassPort(), { waitMs: 10_000 });
   if (!fs.existsSync(home)) { out(`nothing to remove (${home} does not exist)`); return 0; }
   if (!argv.includes('--yes')) {
     const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
@@ -287,7 +287,8 @@ async function uninstall(argv) {
     rl.close();
     if (!/^y(es)?$/i.test(answer.trim())) { out('kept'); return 1; }
   }
-  fs.rmSync(home, { recursive: true, force: true });
+  // Retries: on Windows an antivirus scan or a just-exited process can hold a file briefly.
+  fs.rmSync(home, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
   out(`removed ${home} — remove the package with: npm rm -g glass`);
   return 0;
 }

@@ -77,8 +77,18 @@ export async function recentRows(port, limit = 5) {
   return r.ok ? r.data.data : null;
 }
 
-export async function stopDaemon(port) {
+const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (err) { return err.code === 'EPERM'; } };
+
+/**
+ * Ask the daemon to stop. With `waitMs`, also wait until its process has exited:
+ * until then it holds the token DB and its log open, which Windows will not delete.
+ * @returns {Promise<boolean>} whether a daemon answered
+ */
+export async function stopDaemon(port, { waitMs = 0 } = {}) {
+  const pid = waitMs ? (await health(port))?.pid : null;
   const r = await call(port, 'POST', '/stop');
+  const deadline = Date.now() + waitMs;
+  while (r.ok && pid && alive(pid) && Date.now() < deadline) await new Promise((res) => setTimeout(res, 100));
   return r.ok;
 }
 
