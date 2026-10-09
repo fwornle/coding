@@ -1,6 +1,8 @@
 # Generated repository — this workflow comes from coding/glass/overlay.
 # Daemon, interception and CLI tests on every platform glass installs on
-# natively (AIMAAD has no macOS runners; macOS is checked locally).
+# natively (AIMAAD has no macOS runners; macOS is checked locally), then the
+# install check: pack → npm install -g (offline) → one measured run per agent →
+# uninstall → HOME unchanged.
 name: glass tests
 
 on:
@@ -24,3 +26,4 @@ jobs:
           node-version: ${{ matrix.node }}
       - run: npm install --omit=dev --ignore-scripts --no-audit --no-fund
       - run: node --test "tests/**/*.test.mjs"
+      - run: node tests/install-check.mjs
