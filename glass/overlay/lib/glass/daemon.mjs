@@ -285,7 +285,11 @@ export async function startDaemon({
 
   const sweep = () => {
     try {
-      const r = sweepAgedCaptures({ measurementsDir: path.join(p.data, 'measurements'), retentionDays, log });
+      const r = sweepAgedCaptures({
+        measurementsDir: path.join(p.data, 'measurements'),
+        breakdownsDir: path.join(p.data, 'llm-proxy', 'context-breakdown'),
+        retentionDays, log,
+      });
       if (r.removed) log(`retention: removed ${r.removed} of ${r.checked} captures older than ${retentionDays} days`);
     } catch (err) {
       logErr(`retention sweep: ${err.message}`);
