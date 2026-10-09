@@ -8,7 +8,7 @@ GitHub-hosted runners). `main` is empty — generated content only.
 
 Living plan. Update the phase status and the Session log at the end of every session.
 
-Status: **G4 published** — glass `main` = PR #4 → bbafb6f (from coding@45070e2 + proxy@7440525; 70 files incl. the built UI); CI green on ubuntu + windows × Node 22.13.0 / 22.x, 3 Wiz checks pass. Next: G5 (packaging + platform CI); pi row still waits on a pi login. **G3 published** — glass `main` = PR #2 → 63d224a (from coding@0154fa8 + proxy@7440525, proxy PR #43); CI green on ubuntu + windows (Node 22.13 / 22.x). Real runs on macOS measured for claude, copilot, opencode; pi proven through interception — its token row still waits on a pi login. Next: pi row, then G4 (UI + status line). G1 done and merged (coding `main` cae5aad4, proxy PR #42 → 34c78e5). G0 done (IT-security sign-off for local TLS interception still pending).
+Status: **G5 built, awaiting merges** — glass PR #5 (from coding `glass-g5-packaging` 1ee6c91d + proxy PR #44 5ba8d35): all 7 checks green, the install check passing on ubuntu + windows × Node 22.13.0 / 22.x and locally on macOS (Node 25.8.1 + 22.13.0). To merge: proxy PR #44, coding branch, glass PR #5 — the release workflow then publishes v0.1.0 (not yet exercised). **G4 published** — glass `main` = PR #4 → bbafb6f (from coding@45070e2 + proxy@7440525; 70 files incl. the built UI); CI green on ubuntu + windows × Node 22.13.0 / 22.x, 3 Wiz checks pass. Next: G5 (packaging + platform CI); pi row still waits on a pi login. **G3 published** — glass `main` = PR #2 → 63d224a (from coding@0154fa8 + proxy@7440525, proxy PR #43); CI green on ubuntu + windows (Node 22.13 / 22.x). Real runs on macOS measured for claude, copilot, opencode; pi proven through interception — its token row still waits on a pi login. Next: pi row, then G4 (UI + status line). G1 done and merged (coding `main` cae5aad4, proxy PR #42 → 34c78e5). G0 done (IT-security sign-off for local TLS interception still pending).
 
 ## Decisions (2026-10-08 — do not re-litigate)
 
@@ -443,7 +443,24 @@ Findings during G4:
 - The explainer verdict counts cache reads only: a single-turn session that only WROTE the cache reads
   "does not reuse a prompt cache" — true, but terse.
 
+## G5 progress (branch `glass-g5-packaging` in coding, `glass-g5-ca-identity` in rapid-llm-proxy)
+
+| Piece | Result |
+|---|---|
+| Tarball | overlay `package.json` 0.1.0: `files` (bin, lib, proxy, config, scripts, ui, EXTRACTED.json — no tests / CI), undici + node-forge as `bundleDependencies` → `npm i -g --offline ./glass-0.1.0.tgz` needs no registry; 1.4 MB, 340 files |
+| Install check | `tests/install-check.mjs` (overlay): pack → global offline install into a sandbox (own HOME with its AppData / XDG dirs, prefix, npm cache, temp) → `glass doctor` → one `glass <agent> --no-tmux` per agent with a stand-in sending that agent's wire shape (claude: base URL; copilot `copilot-api.bmw.ghe.com/v1/messages`, opencode `api.githubcopilot.com/chat/completions`, pi `api.openai.com/v1/responses`: CONNECT + Proxy-Authorization + TLS against NODE_EXTRA_CA_CERTS) → upstream is a stand-in corporate proxy (glass chains through HTTPS_PROXY; it terminates TLS with its own CA) → token row per run bound to its task → `glass uninstall --yes` + `npm rm -g` → HOME byte-identical, temp empty, prefix clean |
+| CI | `ci.yml` runs the install check after the tests (ubuntu + windows × 22.13.0 / 22.x); `release.yml`: on main, a version without a release → pack, install check on the tarball, `gh release create v<version>` with the tarball |
+| README | install (`gh release download` + `npm install -g`) / uninstall |
+| Real agents | tarball installed into a scratch prefix: real `glass claude` (opus, cache-write 57,077) and `glass copilot` (in 4 / cache-write 28,457 / out 4 = copilot's own "↑ 28.5k (28.5k written) ↓ 4") |
+
+Findings during G5:
+- **CA identity bug (fixed, proxy PR #44):** every interception CA had the subject `glass local interception CA` and no key ids. glass bundles the user's prior NODE_EXTRA_CA_CERTS with its CA; with another such CA ahead of it (coding's proxy, a second glass home), OpenSSL 3.0 (Node 22) checked the leaf against the wrong one → "certificate signature failure" for every intercepted agent. Node 25 (OpenSSL 3.5) tolerated it. Now: random suffix on the subject, SKI on the CA, AKI on leaves; regression test fails without the fix.
+- npm 11 writes Node's compile cache into TMPDIR (`node-compile-cache`) — npm's trace, not glass's; the check gives npm its own temp dir. npm's cache (`~/.npm`) is likewise npm's and kept outside the checked HOME.
+- `https.request` with `agent: false` ignores `createConnection` and dials the host itself — the first stand-in reached the real APIs directly (this Mac has direct egress). Only a test-side bug, but a reminder that "200 from upstream" needs the upstream to be the stub (the check asserts the stub saw every call).
+- Not covered: WSL (no runner; Linux path = ubuntu), macOS in CI (no AIMAAD runners — local runs only), the release workflow itself (runs on the first merge to main), pi with a real login.
+
 ## Session log
+- **2026-10-09 (G5)** — tarball with bundled deps, install check (install → 4 agents measured → uninstall → HOME unchanged), CI + release workflow, README; CA identity bug found on Node 22.13 and fixed in the proxy (PR #44). Glass PR #5 green on all 7 checks. Merges left to the user (auto-mode blocks merging without review). Next: merge proxy #44 → coding branch → glass #5, check the v0.1.0 release, then G6.
 
 - **2026-10-08** — proposal written; decisions taken (above); repo created
   (`Frank-Woernle/glass`, private, empty). G0: S1 copilot OTel works (per-call tokens + full
