@@ -76,4 +76,34 @@ say "proxy=$PROXY_DIR data=$LLM_PROXY_DATA_DIR port=$LLM_PROXY_PORT — logging 
 
 exec >>"$LLM_PROXY_DATA_DIR/llm-proxy/logs/stdout.log" 2>>"$LLM_PROXY_DATA_DIR/llm-proxy/logs/stderr.log"
 cd "$PROXY_DIR" || exit 1
+
+# A dist/ that exists can still be STALE: a pull lands new src/*.ts plus bridge code
+# that imports the new exports, and nobody runs the build. The running proxy keeps the
+# old modules in memory, so nothing breaks until the next restart. Then every launch
+# dies on "does not provide an export named …" and KeepAlive respawns it in a loop,
+# taking every session behind the proxy down with it. So rebuild here when any
+# compiler input is newer than the last build.
+#
+# The reference is dist/.build-stamp, touched after each build this script runs.
+# Without one (a manual `npm run build`), the newest dist/*.js serves, since tsc
+# without `incremental` rewrites every output on each build.
+BUILD_STAMP="dist/.build-stamp"
+if [[ -f "$BUILD_STAMP" ]]; then
+    BUILD_REF="$BUILD_STAMP"
+else
+    BUILD_REF="$(ls -t dist/*.js 2>/dev/null | head -1)"
+fi
+if [[ -z "$BUILD_REF" ]] \
+    || [[ -n "$(find src tsconfig.json package.json -newer "$BUILD_REF" \( -name '*.ts' -o -name '*.json' \) ! -name '*.test.ts' -print -quit 2>/dev/null)" ]]; then
+    say "dist/ is older than src/ — rebuilding before start"
+    if npm run build; then
+        touch "$BUILD_STAMP"
+        say "rebuild ok"
+    else
+        # tsc still emits on type errors, so the fresh output may well run. Starting
+        # beats exiting: an exit only buys a respawn loop that rebuilds every 10s.
+        say "WARNING: rebuild failed — starting anyway; fix the build in $PROXY_DIR"
+    fi
+fi
+
 exec /bin/bash "$LAUNCHER"
