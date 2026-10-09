@@ -8,6 +8,7 @@
 //   POST /sessions, DELETE /sessions/<token>, GET /sessions                wrapper sessions
 //   GET  /health, POST /stop
 //   GET  /, /assets/*, /api/experiments/runs[/<id>/…]   the UI (ui-api.mjs)
+//   GET  /api/statusline[?task_id=]   status-line facts of a live session (statusline.mjs)
 //
 // Every `glass <agent>` run is a session with its own task id; its rows, context
 // turns and breakdown are keyed by it, and closing it archives the span and lets
@@ -35,6 +36,7 @@ import { captureForegroundTokens } from '../lsl/token/stop-adapter-registry.mjs'
 import { glassPaths, PKG_ROOT } from './home.mjs';
 import { createEgressFetch, upstreamProxy } from './egress.mjs';
 import { createUiApi } from './ui-api.mjs';
+import { statuslineData } from './statusline.mjs';
 
 export const VERSION = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version;
 
@@ -229,6 +231,17 @@ export async function startDaemon({
       if (url.startsWith('/sessions/') && req.method === 'DELETE') {
         const span = await closeSession(decodeURIComponent(url.slice('/sessions/'.length)));
         return span ? json(res, 200, span) : json(res, 404, { error: 'no such session' });
+      }
+      if (req.method === 'GET' && (url === '/api/statusline' || url.startsWith('/api/statusline?'))) {
+        // The named session, else the newest live one (`glass watch` with no --task).
+        const want = new URL(url, 'http://localhost').searchParams.get('task_id');
+        const live = [...sessions.values()].sort((a, b) => b.started_at.localeCompare(a.started_at));
+        const s = want ? live.find((x) => x.taskId === want) : live[0];
+        if (!s) return json(res, 404, { error: want ? `no live session ${want}` : 'no live session' });
+        return json(res, 200, {
+          ...statuslineData({ session: s, db: tokenDb?.db, measurement, egress: upstreamProxy(process.env, port), glass: VERSION }),
+          ca_path: intercept.caPath,
+        });
       }
       if (url === '/stop' && req.method === 'POST') {
         json(res, 200, { stopping: true });

@@ -1,4 +1,5 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '@/store'
 import {
   fetchRuns,
@@ -41,18 +42,34 @@ const fmtDuration = (from?: string | null, to?: string | null) => {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${m % 60} min`
 }
 
-/** Every `glass <agent>` run: one row each, newest first; a row opens its timeline. */
+/**
+ * Every `glass <agent>` run: one row each, newest first; a row opens its timeline.
+ * `?task=<id>` selects a session and `&explain=1` opens its context explainer —
+ * the status line's links (lib/glass/statusline.mjs uiLinks).
+ */
 export function SessionsPage() {
   const dispatch = useAppDispatch()
   const runs = useAppSelector((s) => s.performance.runs) as Run[]
   const loading = useAppSelector((s) => s.performance.runsLoading)
   const selected = useAppSelector(selectSelectedTaskId)
+  const [params] = useSearchParams()
+  const linked = useRef<string | null>(null)
 
   useEffect(() => {
     dispatch(fetchRuns())
     const t = setInterval(() => dispatch(fetchRuns()), POLL_MS)
     return () => clearInterval(t)
   }, [dispatch])
+
+  // Apply the deep link once, after the linked session is in the list (the
+  // explainer reads the run's window from it).
+  useEffect(() => {
+    const task = params.get('task')
+    if (!task || linked.current === task || !runs.some((r) => r.task_id === task)) return
+    linked.current = task
+    dispatch(setSelectedTaskId(task))
+    if (params.get('explain') === '1') dispatch(setExplainTaskId(task))
+  }, [params, runs, dispatch])
 
   return (
     <div className="p-6 space-y-6">

@@ -81,3 +81,19 @@ export async function stopDaemon(port) {
   const r = await call(port, 'POST', '/stop');
   return r.ok;
 }
+
+/**
+ * Status-line facts of a live session (the newest one without `taskId`).
+ * @returns {Promise<{ state: 'ok'|'none'|'down', data: object|null }>}
+ */
+export async function statusline(port, taskId) {
+  const q = taskId ? `?task_id=${encodeURIComponent(taskId)}` : '';
+  const r = await call(port, 'GET', `/api/statusline${q}`, null, 1500);
+  if (r.ok) return { state: 'ok', data: r.data };
+  return { state: r.status === 404 ? 'none' : 'down', data: null };
+}
+
+export async function contextTurns(port, taskId) {
+  const r = await call(port, 'GET', `/api/context-turns?task_id=${encodeURIComponent(taskId)}`);
+  return r.ok ? r.data.contextTurns || [] : [];
+}

@@ -243,6 +243,25 @@ test('UI reads: sessions as runs (live + closed), a session\'s timeline and cont
   assert.equal((await api('GET', '/api/experiments/runs/..%2F..%2Fetc/timeline')).status, 400);
 });
 
+test('status line: facts of a live session — tokens, the last turn against the model window', async () => {
+  const s = await open('copilot');
+  assert.equal((await api('GET', `/api/statusline?task_id=${s.taskId}`)).body.ctx, null, 'no turn yet');
+  await intercepted({ host: 'copilot-api.acme.ghe.com', token: s.token, route: '/v1/messages', body: { model: 'claude-sonnet-5.5', max_tokens: 8, messages: msgs } });
+  await settle();
+  const d = (await api('GET', `/api/statusline?task_id=${s.taskId}`)).body;
+  assert.equal(d.agent, 'copilot');
+  assert.equal(d.tokens.calls, 1);
+  assert.equal(d.tokens.prompt, d.tokens.input + d.tokens.cache_read + d.tokens.cache_write);
+  assert.equal(d.ctx.turns, 1);
+  assert.equal(d.ctx.used, d.tokens.prompt, 'one turn: the gauge is that turn\'s prompt');
+  assert.ok(d.ctx.window > 0 && d.ctx.pct > 0);
+  assert.equal(d.egress, 'direct');
+  assert.ok(d.ca_path.endsWith('.pem'));
+  assert.equal((await api('GET', '/api/statusline')).body.task_id, s.taskId, 'no task: the newest live session');
+  await api('DELETE', `/sessions/${encodeURIComponent(s.token)}`);
+  assert.equal((await api('GET', `/api/statusline?task_id=${s.taskId}`)).status, 404, 'closed sessions have no status line');
+});
+
 test('UI static: page, assets, client routes; no escape from the UI dir', async () => {
   const { createUiApi } = await import('../lib/glass/ui-api.mjs');
   const uiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-ui-'));
@@ -366,7 +385,12 @@ test('CLI: a measured claude run through a lazily started daemon, then status an
   const seen = JSON.parse(run.stdout.trim().split('\n').pop());
   assert.equal(seen.base, `http://127.0.0.1:${port}`);
   assert.match(seen.task, /^glass-claude-/);
-  assert.deepEqual(seen.args, ['--call', 'two words']);
+  // No terminal → no tmux: claude gets glass as its own statusLine, for this run only.
+  assert.equal(seen.args[0], '--settings');
+  assert.deepEqual(seen.args.slice(2), ['--call', 'two words']);
+  assert.equal(fs.existsSync(seen.args[1]), false, 'the settings file is removed after the run');
+  const plain = await runCli(['claude', '--call', 'x'], { ...env, GLASS_NO_STATUSLINE: '1' });
+  assert.deepEqual(JSON.parse(plain.stdout.trim().split('\n').pop()).args, ['--call', 'x']);
   const status = await runCli(['status'], env);
   assert.match(status.stdout, /glass daemon: running/);
   assert.match(status.stdout, new RegExp(seen.task));

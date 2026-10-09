@@ -31,6 +31,7 @@ export function glassPaths(home) {
     data: path.join(home, 'data'),
     ca: path.join(home, 'ca'),
     logs: path.join(home, 'logs'),
+    run: path.join(home, 'run'),
     lock: path.join(home, 'daemon.json'),
     config: path.join(home, 'config.json'),
   };
@@ -46,5 +47,8 @@ export function daemonEnv(home) {
     CODING_SQLITE_BACKEND: 'node',
     LLM_PROXY_REDACTION_CONFIG: path.join(PKG_ROOT, 'config', 'redaction', 'redaction-patterns.json'),
     HEALTH_COORDINATOR_URL: 'off',
+    // model-limits caches its window table under CODING_REPO/.logs by default —
+    // the installed package here.
+    CODING_MODEL_LIMITS_CACHE: path.join(p.logs, 'model-context-limits.json'),
   };
 }

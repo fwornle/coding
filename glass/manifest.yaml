@@ -122,7 +122,9 @@ optional:
 
 forbidden:
   packages: [better-sqlite3, km-core, level, classic-level, leveldown, '@modelcontextprotocol/sdk']
-  spawn: [bash, sh, zsh, tmux, python, python3]
+  # tmux is not here: it is optional (decision 5) — lib/glass/tmux.mjs drives it when
+  # it is on PATH and never needs it; nothing installs it.
+  spawn: [bash, sh, zsh, python, python3]
 
 overlay: glass/overlay
 
