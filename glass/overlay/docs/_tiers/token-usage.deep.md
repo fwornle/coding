@@ -63,5 +63,5 @@ you are billed on. Checked against each agent's own report:
 
 | Agent | glass | Agent's own report |
 |---|---|---|
-| copilot | in 4 · cache write 28,457 · out 4 | "↑ 28.5k (28.5k written) • ↓ 4" |
+| copilot | prompt 57,868 (cache read 28,572 · written 29,290) · out 438 | "↑ 57.9k (28.6k cached, 29.3k written) • ↓ 438" |
 | pi | in 2,823 · out 43 | `--mode json` usage: input 2823, output 43 |

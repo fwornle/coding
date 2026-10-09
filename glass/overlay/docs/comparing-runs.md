@@ -16,7 +16,7 @@ each cost and how it used its context.
     Then `glass ui` → **Sessions**: both runs side by side — calls, tokens, model — and
     **Context** on each row for the window and cache comparison.
 
-    ![Three agents, one task](images/ui-sessions.png)
+    ![Four agents, one task](images/ui-sessions.png)
 
     glass has no automated experiment runner; you start the runs, glass measures them.
 

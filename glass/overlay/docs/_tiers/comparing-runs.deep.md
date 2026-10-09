@@ -16,11 +16,13 @@ Anything you can vary between two `glass <agent>` runs:
 2. **Run each variant** through glass, one after the other.
 3. **Compare in Sessions** — one row per run:
 
-    ![Sessions, three agents on one task](images/ui-sessions.png)
+    ![Sessions, four agents on one task](images/ui-sessions.png)
 
-    Above: the same task with Claude Code, OpenCode and pi. Claude Code used 2 calls but
-    116K tokens, OpenCode 4 calls and 88K, pi 2 calls and 6.8K — mostly a difference in
-    how much context (system prompt, tool definitions) each agent sends.
+    Above, four rows ran the same task: Claude Code (10:02) used 2 calls and 116K tokens,
+    OpenCode (10:03) 4 calls and 88K, pi (10:03) 2 calls and 6.8K, copilot (19:09) 2
+    calls and 58K — mostly a difference in how much context (system prompt, tool
+    definitions) each agent sends. The 10:09 and 10:11 rows are interactive Claude Code
+    sessions with other prompts.
 
 4. **Compare the windows** — **Context** on each row:
 
