@@ -81,6 +81,9 @@ before(async () => {
     let body = '';
     for await (const c of req) body += c;
     upSeen.push({ method: req.method, url: req.url, headers: req.headers, body });
+    // A routing upstream (an LLM proxy as an opencode provider) names the account
+    // that answered; an x-test-answered request header asks this fake to be one.
+    if (req.headers['x-test-answered']) res.setHeader('x-llm-provider', req.headers['x-test-answered']);
     respond(req, body, res);
   });
   await new Promise((r) => upstream.listen(0, '127.0.0.1', r));
@@ -240,6 +243,18 @@ test('opencode relay: a plain-HTTP provider is forwarded to its own URL and meas
   assert.equal((await relay('rapid-proxy', '/chat/completions', {}, 'not-a-session')).status, 404);
   assert.equal((await relay('bad', '/chat/completions', {})).status, 404, 'https providers are intercepted, never relayed');
   assert.equal((await api('GET', '/sessions')).body.sessions.find((x) => x.taskId === s.taskId).relays, undefined);
+});
+
+test('opencode relay to an LLM proxy: the row names the account that answered, not the proxy', async () => {
+  const base = `http://127.0.0.1:${upPort}/v1`;
+  const s = await open('opencode', { relays: { 'rapid-proxy': base } });
+  const relay = (route, answered, body) => fetch(`${daemon.url}/relay/${encodeURIComponent(s.token)}/rapid-proxy${route}`, {
+    method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer placeholder', 'x-test-answered': answered }, body: JSON.stringify(body),
+  });
+  await (await relay('/chat/completions', 'gh-copilot', { model: 'claude-sonnet-5', stream: true, messages: msgs })).text();
+  await (await relay('/messages', 'claude-code-max', { model: 'claude-sonnet-5', max_tokens: 8, messages: msgs })).text();
+  const rows = await eventually(() => rowsFor(s.taskId), (r) => r.length === 2);
+  assert.deepEqual(rows.map((r) => r.provider).sort(), ['claude-code-max', 'gh-copilot']);
 });
 
 // A daemon of its own: these depend on exactly which sessions are live.
