@@ -16,7 +16,11 @@
 //
 // Every `glass <agent>` run is a session with its own task id; its rows, context
 // turns and breakdown are keyed by it, and closing it archives the span and lets
-// the file adapters fill what the proxy could not see. No routing, no providers:
+// the file adapters fill what the proxy could not see. Live sessions are kept in
+// run/sessions.json: a daemon that stops (an update, `glass stop`) leaves the
+// running ones there, and the next daemon re-adopts every one whose `glass
+// <agent>` process still runs — its agent keeps the same token, task and status
+// line across the restart. No routing, no providers:
 // each call goes where the agent sent it, with the agent's own credentials.
 //
 // The caller (bin/glass.mjs) sets daemonEnv() on process.env BEFORE importing this
@@ -41,6 +45,7 @@ import { glassPaths, PKG_ROOT } from './home.mjs';
 import { createEgressFetch, upstreamProxy } from './egress.mjs';
 import { createUiApi } from './ui-api.mjs';
 import { statuslineData } from './statusline.mjs';
+import { createNetworkMonitor } from './network.mjs';
 
 export const VERSION = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version;
 
@@ -117,11 +122,12 @@ export function relaysOf(raw) {
  * @param {number} [o.idleMs]          exit after this long with no session and no request
  * @param {number} [o.retentionDays]
  * @param {(line: string) => void} [o.log]
+ * @param {object} [o.network]         network monitor (default: coding's probes, see network.mjs)
  * @returns {Promise<{ port: number, url: string, caPath: string, close: () => Promise<void>, closed: Promise<void> }>}
  */
 export async function startDaemon({
   home, port, fetch, idleMs = 30 * 60_000, tickMs = 60_000, retentionDays = 7,
-  log = (l) => process.stdout.write(`${new Date().toISOString()} ${l}\n`),
+  log = (l) => process.stdout.write(`${new Date().toISOString()} ${l}\n`), network,
 }) {
   const p = glassPaths(home);
   for (const d of [p.data, p.ca, p.logs]) fs.mkdirSync(d, { recursive: true });
@@ -143,11 +149,28 @@ export async function startDaemon({
 
   // ── sessions ──
   const sessions = new Map(); // token → session
+  const sessionsFile = path.join(p.run, 'sessions.json');
+  const alive = (pid) => {
+    if (!pid) return false;
+    try { process.kill(pid, 0); return true; } catch (err) { return err.code === 'EPERM'; }
+  };
+  // Owner-only: the file holds the sessions' proxy credentials.
+  function saveSessions() {
+    try {
+      fs.mkdirSync(p.run, { recursive: true });
+      fs.writeFileSync(sessionsFile, `${JSON.stringify([...sessions.values()], null, 2)}\n`, { mode: 0o600 });
+    } catch (err) {
+      logErr(`sessions save: ${err.message}`);
+    }
+  }
   const publicSessions = () => [...sessions.values()].map(({ token, relays, ...s }) => s);
   const uiRead = createUiApi({
     uiDir: path.join(PKG_ROOT, 'ui'), dataDir: p.data, tokenDb: () => tokenDb,
     dbPath: resolveTokenDbPath(p.data), measurement, liveSessions: publicSessions,
   });
+  // [N:… P:…]: probed only while a session is live (nothing else reads it).
+  const netMonitor = network || createNetworkMonitor({ log });
+  netMonitor.start({ active: () => sessions.size > 0 });
   let lastActivity = Date.now();
   const touch = () => { lastActivity = Date.now(); };
 
@@ -161,6 +184,8 @@ export async function startDaemon({
       pid: Number(body.pid) || null, started_at: new Date().toISOString(), relays: relaysOf(body.relays),
     };
     sessions.set(token, s);
+    saveSessions();
+    netMonitor.tick(); // the first status line should not wait a whole interval
     log(`session open ${taskId} (${agent}${s.intercept ? '' : ', no intercept'})`);
     return s;
   }
@@ -169,6 +194,7 @@ export async function startDaemon({
     const s = sessions.get(token);
     if (!s) return null;
     sessions.delete(token);
+    saveSessions();
     const span = {
       task_id: s.taskId, agent: s.agent, started_at: s.started_at, ended_at: new Date().toISOString(),
       meta: { source: 'glass', cwd: s.cwd, project: s.project, intercept: s.intercept },
@@ -201,9 +227,11 @@ export async function startDaemon({
   }
 
   // The session an intercepted request belongs to: its Proxy-Authorization token,
-  // else — for a client that sent none — the only live intercepting session.
+  // else — for a client that sent none — the only live intercepting session. A
+  // token this daemon does not know is never guessed: filed under the only live
+  // session, an orphaned agent's calls would count as another agent's.
   function sessionForBinding(binding) {
-    if (binding && sessions.has(binding)) return sessions.get(binding);
+    if (binding) return sessions.get(binding) || null;
     const live = [...sessions.values()].filter((s) => s.intercept && s.agent !== 'claude');
     return live.length === 1 ? live[0] : null;
   }
@@ -284,7 +312,7 @@ export async function startDaemon({
         const s = want ? live.find((x) => x.taskId === want) : live[0];
         if (!s) return json(res, 404, { error: want ? `no live session ${want}` : 'no live session' });
         return json(res, 200, {
-          ...statuslineData({ session: s, db: tokenDb?.db, measurement, egress: upstreamProxy(process.env, port), glass: VERSION }),
+          ...statuslineData({ session: s, db: tokenDb?.db, measurement, egress: upstreamProxy(process.env, port), network: netMonitor.facts(), glass: VERSION }),
           ca_path: intercept.caPath,
         });
       }
@@ -327,6 +355,19 @@ export async function startDaemon({
   });
   const boundPort = server.address().port;
   fs.writeFileSync(p.lock, `${JSON.stringify({ pid: process.pid, port: boundPort, glass: VERSION, started_at: new Date().toISOString() }, null, 2)}\n`);
+
+  // Re-adopt the previous daemon's sessions — only now, with the port won, so a
+  // daemon that loses the race never touches the running one's sessions. Those
+  // whose agent has exited meanwhile are closed (span archived, adapters run).
+  let previous = [];
+  try { previous = JSON.parse(fs.readFileSync(sessionsFile, 'utf8')); } catch { /* none */ }
+  for (const s of Array.isArray(previous) ? previous : []) {
+    if (s && typeof s.token === 'string' && typeof s.taskId === 'string') sessions.set(s.token, { ...s, relays: s.relays || {} });
+  }
+  let ended = 0;
+  for (const s of [...sessions.values()]) if (!alive(s.pid)) { await closeSession(s.token); ended++; }
+  if (sessions.size || ended) log(`re-adopted ${sessions.size} live session(s) from the previous daemon, closed ${ended} that had ended`);
+  if (sessions.size) netMonitor.tick(); // their status lines should not wait a whole interval
   log(`glass ${VERSION} daemon on 127.0.0.1:${boundPort} (data ${p.data}, CA ${intercept.caPath})`);
 
   const sweep = () => {
@@ -344,6 +385,9 @@ export async function startDaemon({
   sweep();
   const sweepTimer = setInterval(sweep, 3_600_000);
   const idleTimer = setInterval(() => {
+    // A `glass <agent>` that was killed never closes its session: reap it, or
+    // the daemon would never go idle.
+    for (const s of [...sessions.values()]) if (s.pid && !alive(s.pid)) closeSession(s.token);
     if (sessions.size === 0 && Date.now() - lastActivity > idleMs) shutdown(`idle for ${Math.round(idleMs / 60_000)} min`);
   }, tickMs);
   sweepTimer.unref();
@@ -354,7 +398,9 @@ export async function startDaemon({
     log(`shutting down: ${reason}`);
     clearInterval(sweepTimer);
     clearInterval(idleTimer);
-    for (const token of [...sessions.keys()]) await closeSession(token);
+    netMonitor.stop();
+    // Sessions whose agent still runs stay in sessions.json for the next daemon.
+    for (const s of [...sessions.values()]) if (!alive(s.pid)) await closeSession(s.token);
     intercept.close();
     server.closeAllConnections?.();
     await new Promise((r) => server.close(() => r()));

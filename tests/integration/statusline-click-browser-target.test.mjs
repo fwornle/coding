@@ -1,5 +1,6 @@
 /**
- * bin/statusline-click must drive the browser the USER is looking at.
+ * bin/statusline-click must drive the browser the USER is looking at. Its macOS
+ * branch is lib/statusline/browser-tab.mjs (shared with glass).
  *
  * Apple Events are addressed by bundle id. An automation browser (gsd-browser,
  * Playwright, Puppeteer) is the SAME bundle as the user's Chrome, separated only
@@ -28,13 +29,10 @@ import { fileURLToPath } from 'node:url';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const CLICK = path.join(REPO, 'bin/statusline-click');
 const src = fs.readFileSync(CLICK, 'utf-8');
+const { AUTOMATION_CHROME_PATTERN, openOrFocusTab } = await import('../../lib/statusline/browser-tab.mjs');
 
-/** The pattern the script hands pgrep, lifted from the source so the two cannot drift. */
-function detectionPattern() {
-  const m = src.match(/pgrep -f '([^']+)'/);
-  assert.ok(m, 'automation-browser detection pattern not found in bin/statusline-click');
-  return m[1];
-}
+/** The pattern the module hands pgrep. */
+const detectionPattern = () => AUTOMATION_CHROME_PATTERN;
 
 const USER_CHROME =
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --site-per-process --restart';
@@ -68,14 +66,41 @@ test('a Chrome helper/renderer process is not mistaken for a browser instance', 
   assert.equal(matches(detectionPattern(), RENDERER), false);
 });
 
+// The macOS paths, against recorded commands (no browser opens).
+function recordMac({ automation = false, chrome = true, osaStatus = 0, osaOut = 'reused idx=2 active=2 wins=1' } = {}) {
+  const calls = [];
+  const spawnSync = (cmd, args) => {
+    calls.push([cmd, ...args]);
+    if (cmd === 'pgrep') return { status: automation ? 0 : 1 };
+    if (cmd === 'osascript') return { status: osaStatus, stdout: osaOut, stderr: '' };
+    return { status: 0 };
+  };
+  const verdict = openOrFocusTab('http://localhost:3032/#llm', 'http://localhost:3032/', { spawnSync, exists: () => chrome });
+  return { calls, verdict };
+}
+
 test('when an automation browser is up the click goes through LaunchServices, not AppleScript', () => {
-  const guard = src.indexOf('if automation_chrome_running; then');
-  const osa = src.indexOf('osascript - "$url"');
-  assert.ok(guard > 0, 'automation guard missing');
-  assert.ok(osa > guard, 'osascript reuse runs before the automation guard — wrong browser again');
-  const branch = src.slice(guard, osa);
-  assert.match(branch, /open "\$url"/, 'the guarded branch must fall back to LaunchServices open');
-  assert.match(branch, /return/, 'the guarded branch must return before reaching the AppleScript');
+  const { calls, verdict } = recordMac({ automation: true });
+  assert.equal(verdict, 'launchservices (automation chrome up)');
+  assert.deepEqual(calls.at(-1), ['open', 'http://localhost:3032/#llm']);
+  assert.ok(!calls.some(([c]) => c === 'osascript'), 'osascript ran with an automation browser up — wrong browser again');
+});
+
+test('otherwise the tab-reuse script runs with url and prefix, then Chrome is raised without a url', () => {
+  const { calls, verdict } = recordMac();
+  assert.equal(verdict, 'reused idx=2 active=2 wins=1');
+  assert.deepEqual(calls.find(([c]) => c === 'osascript'), ['osascript', '-', 'http://localhost:3032/#llm', 'http://localhost:3032/']);
+  assert.deepEqual(calls.at(-1), ['open', '-a', 'Google Chrome'], 'a reused tab must not get a second, new tab');
+});
+
+test('a refused or failing AppleScript still gets the user their page', () => {
+  const { calls, verdict } = recordMac({ osaStatus: 1, osaOut: 'not authorized' });
+  assert.match(verdict, /^osascript failed: not authorized/);
+  assert.deepEqual(calls.at(-1), ['open', '-a', 'Google Chrome', 'http://localhost:3032/#llm']);
+});
+
+test('the click script hands macOS to the shared module', () => {
+  assert.match(src, /node "\$CODING_REPO\/lib\/statusline\/browser-tab\.mjs" "\$url" "\$prefix"/);
 });
 
 // ---- platform reach -------------------------------------------------------

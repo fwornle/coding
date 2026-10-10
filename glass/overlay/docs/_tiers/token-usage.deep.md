@@ -29,7 +29,9 @@ cheaply.
 
 ![Token Usage evolution](images/ui-token-usage-evolution.png)
 
-Tokens over time in buckets, stacked by agent. Switch between *Stacked* and lines,
+Tokens over time in buckets — above, an hour and a half of agents stacked by model, with
+the tooltip on one bucket, and below it the top consumers of the window (calls, tokens,
+latency, share). Switch between *Stacked* and lines,
 linear and log scale, and grouping by process, model, provider, or input / output / cache. Click a legend entry to hide it;
 drag the brush below the chart to zoom into a time window.
 

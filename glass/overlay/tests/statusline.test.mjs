@@ -10,19 +10,20 @@ import { spawnSync } from 'node:child_process';
 
 const { renderStatusline, renderReport, uiLinks, TAGS } = await import('../lib/glass/statusline.mjs');
 const { clickBinding, tmuxWanted, innerEnv, configureStatus } = await import('../lib/glass/tmux.mjs');
-const { claudeStatusSettings } = await import('../lib/glass/cli.mjs');
+const { claudeStatusSettings, isTerminalReport } = await import('../lib/glass/cli.mjs');
 
 const D = {
   glass: '0.0.0', task_id: 'glass-claude-1', agent: 'claude', intercept: true, last_at: '2026-10-09T08:00:00Z',
   ctx: { used: 51_000, window: 1_000_000, pct: 5.1, model: 'claude-opus-5-5', turns: 2 },
   tokens: { calls: 2, prompt: 51_300, input: 300, output: 1_200, cache_read: 25_000, cache_write: 26_000, cache_pct: 49 },
   egress: 'proxy', egress_url: 'http://127.0.0.1:3128',
+  network: { location: 'corporate', proxy_running: true, proxy_functional: true, proxy_enabled_by_user: true },
 };
 const strip = (s) => s.replace(/#\[[^\]]*\]/g, '').replace(/\x1b\][^\x1b]*\x1b\\/g, '').replace(/\x1b\[[0-9;]*m/g, '');
 
 test('plain, tmux and ansi carry the same fields', () => {
   const plain = renderStatusline(D, { format: 'plain', port: 12445 });
-  assert.match(plain, /^\[glass ●\] \[ctx .*5%\] \[↑51\.3K ↓1\.2K ⚡49%\] \[N:proxy\]$/);
+  assert.match(plain, /^\[glass ●\] \[ctx .*5%\] \[↑51\.3K ↓1\.2K ⚡49%\] \[N:CN P:ON\]$/);
   const tmux = renderStatusline(D, { format: 'tmux', port: 12445 });
   for (const tag of Object.values(TAGS)) assert.ok(tmux.includes(`#[range=user|${tag}]`), tag);
   assert.equal(strip(tmux), plain);
@@ -42,7 +43,10 @@ test('the gauge follows the conversation, not side calls', async () => {
 });
 
 test('no turn yet, --no-intercept, daemon down', () => {
-  assert.match(renderStatusline({ ...D, ctx: null, intercept: false }, { port: 1 }), /\[ctx —\].*\[N:proxy ¬tap\]/);
+  assert.match(renderStatusline({ ...D, ctx: null, intercept: false }, { port: 1 }), /\[ctx —\].*\[N:CN P:ON ¬tap\]/);
+  assert.match(renderStatusline({ ...D, network: { location: 'unknown' } }, { port: 1 }), /\[N:\?\? P:OFF\]$/, 'not probed yet: coding\'s unknown');
+  const { network, ...older } = D;
+  assert.match(renderStatusline(older, { port: 1 }), /\[N:proxy\]$/, 'a daemon from before the badge: its egress, not a false P:OFF');
   assert.equal(renderStatusline(null, { port: 1 }), '[glass ✗ down]');
 });
 
@@ -55,7 +59,11 @@ test('reports: context make-up of the last turn; network', () => {
   assert.match(ctx, /System Instructions\s+2\.9 KB .* 75%/);
   assert.doesNotMatch(ctx, /Retrieved Knowledge/, 'empty categories are left out');
   assert.match(ctx, /  2  m\s+13 prompt/);
-  assert.match(renderReport(TAGS.net, { d: D, port: 12445, caPath: '/h/ca.pem' }), /egress: via http:\/\/127\.0\.0\.1:3128[\s\S]*CA: \/h\/ca\.pem/);
+  const net = renderReport(TAGS.net, { d: D, port: 12445, caPath: '/h/ca.pem' });
+  assert.match(net, /network: N:CN — corporate network \(on-site\)\nlocal proxy :3128: forwarding · px toggle on → P:ON/);
+  assert.match(net, /egress \(glass daemon\): via http:\/\/127\.0\.0\.1:3128[\s\S]*CA: \/h\/ca\.pem/);
+  const broken = renderReport(TAGS.net, { d: { ...D, network: { location: 'vpn', proxy_running: true, proxy_functional: false } }, port: 1 });
+  assert.match(broken, /listening, not forwarding · px toggle off → P:OFF\n  ! on the corporate network without a working local proxy/);
 });
 
 test('claude without tmux: a --settings file with glass as statusLine', () => {
@@ -89,6 +97,7 @@ test('tmux: configureStatus on a real server — options set, clicks bound, user
   const t = (...a) => spawnSync('tmux', ['-S', sock, ...a], { encoding: 'utf8' });
   t('new-session', '-d', '-s', 'mine', '-x', '120', '-y', '20');
   t('set-option', '-t', 'mine', 'status-right', 'MINE');
+  t('set-option', '-t', 'mine', 'status-style', 'bg=green,fg=black');
   const pid = t('display-message', '-p', '-t', 'mine', '#{pid}').stdout.trim();
   const saved = { TMUX: process.env.TMUX, TMUX_PANE: process.env.TMUX_PANE };
   process.env.TMUX = `${sock},${pid},0`;
@@ -102,6 +111,7 @@ test('tmux: configureStatus on a real server — options set, clicks bound, user
     assert.equal(opt('@glass_port'), '12999');
     assert.match(opt('status-right'), /statusline --format tmux --port 12999 --task '#\{@glass_task\}'/);
     assert.equal(opt('mouse'), 'on');
+    assert.equal(opt('status-style'), 'bg=default,fg=default', 'the terminal\'s colours, as in coding');
     const keys = t('list-keys', '-T', 'root', 'MouseDown1Status').stdout;
     assert.match(keys, /--src glass-tmux/);
     assert.ok(keys.includes(`{ ${before} }`), `the previous binding (${before}) is the fallback`);
@@ -109,10 +119,51 @@ test('tmux: configureStatus on a real server — options set, clicks bound, user
     assert.equal(t('list-keys', '-T', 'root', 'MouseDown1Status').stdout.match(/--src glass-tmux/g).length, 1, 'bound once');
     restore();
     assert.equal(opt('status-right'), 'MINE', 'the user\'s session gets its own options back');
+    assert.equal(opt('status-style'), 'bg=green,fg=black');
     assert.equal(t('show-options', '-q', '-v', '-t', 'mine', '@glass_task').stdout.trim(), '');
   } finally {
     Object.assign(process.env, saved);
     for (const [k, v] of Object.entries(saved)) if (v === undefined) delete process.env[k];
+    t('kill-server');
+    fs.rmSync(path.dirname(sock), { recursive: true, force: true });
+  }
+});
+
+test('report popup: terminal reports are not a key press', () => {
+  assert.equal(isTerminalReport('\x1b[?997;1n'), true, 'colour-scheme report (xterm.js via tmux, on popup open)');
+  assert.equal(isTerminalReport('\x1b[?997;2n\x1b[I'), true, 'report + focus in');
+  assert.equal(isTerminalReport('\x1b[?1;2c'), true, 'device attributes');
+  assert.equal(isTerminalReport('\x1b[<0;120;40m'), true, 'SGR mouse release');
+  assert.equal(isTerminalReport(Buffer.from([0x1b, 0x5b, 0x4d, 0x20, 0x30, 0x30])), true, 'X10 mouse');
+  assert.equal(isTerminalReport('\x1b]11;rgb:1e1e/1e1e/1e1e\x1b\\'), true, 'OSC 11 reply');
+  assert.equal(isTerminalReport('q'), false, 'a key');
+  assert.equal(isTerminalReport('\r'), false, 'Enter');
+  assert.equal(isTerminalReport('\x1b'), false, 'Escape');
+  assert.equal(isTerminalReport('\x1b[A'), false, 'an arrow key');
+  assert.equal(isTerminalReport('\x1b[?997;1nq'), false, 'a key after a report');
+});
+
+test('report popup on a real pty: held open through a colour-scheme report, closed by a key', { skip: (!hasTmux || process.platform === 'win32') && 'no tmux' }, async () => {
+  // The popup is `display-popup -E … glass report … --hold`: it closes when the
+  // report exits. In VS Code's terminal the first input it got was \e[?997;1n,
+  // so it flashed and closed. A pane is the same pty input path, without a client.
+  const sock = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'glass-hold-')), 's');
+  const t = (...a) => spawnSync('tmux', ['-S', sock, '-f', '/dev/null', ...a], { encoding: 'utf8' });
+  const bin = path.join(import.meta.dirname, '..', 'bin', 'glass.mjs');
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const pane = () => t('list-panes', '-t', 'h', '-F', '#{pane_dead}').stdout.trim();
+  const until = async (ok, ms = 5000) => { for (const end = Date.now() + ms; Date.now() < end && !ok(); ) await sleep(50); return ok(); };
+  try {
+    t('new-session', '-d', '-s', 'h', '-x', '80', '-y', '20', '--', process.execPath, bin, 'report', 'net', '--port', '9', '--hold');
+    t('set-option', '-t', 'h', 'remain-on-exit', 'on');
+    assert.ok(await until(() => t('capture-pane', '-p', '-t', 'h').stdout.includes('[press any key]')), 'the report waits for a key');
+    const hex = (s) => [...Buffer.from(s, 'latin1')].map((b) => b.toString(16).padStart(2, '0'));
+    t('send-keys', '-t', 'h', '-H', ...hex('\x1b[?997;1n\x1b[I\x1b[<0;10;5m'));
+    await sleep(700);
+    assert.equal(pane(), '0', 'still open after the terminal reports');
+    t('send-keys', '-t', 'h', 'q');
+    assert.ok(await until(() => pane() === '1'), 'a key closes it');
+  } finally {
     t('kill-server');
     fs.rmSync(path.dirname(sock), { recursive: true, force: true });
   }

@@ -27,7 +27,7 @@ restores it afterwards.
 | health | `glass ●` | The daemon answers. `glass ✗ down` when it does not. |
 | context | `ctx ▋ 9%` | Prompt size of the session's latest main-loop turn (fresh + cache read + cache write) as a share of the model's context window. Side calls (titles, summaries) are skipped so the gauge does not drop to zero. |
 | tokens | `↑258.6K ↓233 ⚡66%` | Tokens sent (prompt) and received (output) in this session; ⚡ is the share of the latest prompt served from cache. |
-| network | `N:proxy` | Where the daemon's upstream traffic goes: `direct`, or via your corporate `proxy`. `¬tap` when the run uses `--no-intercept`. |
+| network | `N:CN P:ON` | The same badge as coding's status line, from the same probes. **N** — where the machine is: `CN` (corporate network, on-site), `VPN`, `OPEN` (home / public), `??` (not probed yet). **P** — the local proxy (proxydetox on `:3128`): `ON` (forwarding, `px` toggle on), `AUTO` (forwarding, toggle off), `OFF` (not listening or not forwarding). Click for the details and the daemon's own egress. `¬tap` when the run uses `--no-intercept`. |
 
 ## Clicks
 

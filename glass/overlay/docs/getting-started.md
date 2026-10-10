@@ -20,6 +20,8 @@ Install glass from the release tarball, check the setup, run your first measured
     Then run an agent through glass — `glass claude`, `glass copilot`, `glass opencode`,
     `glass pi` — and open `glass ui`.
 
+    **Update:** `glass update` (`--check` only reports a newer release).
+
     **Remove it again:** `glass uninstall` then `npm rm -g glass`.
 
 === "📚 Deep Dive (full)"

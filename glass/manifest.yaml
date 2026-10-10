@@ -34,10 +34,16 @@ select:
       - lib/measurement/context-turns-retention.mjs
       # the UI's per-session timeline read (lib/glass/ui-api.mjs)
       - lib/experiments/timeline-read.mjs
+      # status line [N:… P:…] — coding's network probes, verdict and hysteresis
+      - lib/network/location-probe.mjs
+      - lib/network/location-hysteresis.mjs
+      - lib/network/network-change-watcher.mjs
       # status line fields
       - lib/statusline/context-gauge.cjs
       - lib/statusline/model-limits.cjs
       - lib/statusline/clickable.cjs
+      # status-line clicks on macOS: focus an open tab before opening a new one
+      - lib/statusline/browser-tab.mjs
       - lib/statusline/visible-cell-width.cjs
       # data home + proxy resolver
       - lib/paths/index.mjs
@@ -82,7 +88,7 @@ compile:
 # upstream line changed). Only defaults that the environment cannot set.
 rewrite:
   - file: lib/proxy/proxy-paths.cjs
-    find: "path.resolve(CODING_CHECKOUT, '..', '_work', 'rapid-llm-proxy')"
+    find: "path.resolve((codingMain ??= mainCheckout(CODING_CHECKOUT)), '..', '_work', 'rapid-llm-proxy')"
     replace: "path.resolve(CODING_CHECKOUT, 'proxy')"
     count: 1
   - file: lib/proxy/proxy-paths.cjs

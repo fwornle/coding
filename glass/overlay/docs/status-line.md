@@ -6,7 +6,7 @@ Context gauge and session tokens, live, in the terminal you work in.
 
     ## Four fields
 
-    `[glass ●] [ctx ▋ 9%] [↑258.6K ↓233 ⚡66%] [N:proxy]`
+    `[glass ●] [ctx ▋ 9%] [↑258.6K ↓233 ⚡66%] [N:CN P:ON]`
 
     | Field | Shows | Click |
     |---|---|---|

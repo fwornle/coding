@@ -18,6 +18,8 @@ How many tokens your agents used — totals, trends and every single call.
 
     ![Token Usage overview](images/ui-token-usage-overview.png)
 
+    ![Token Usage evolution](images/ui-token-usage-evolution.png)
+
     Use the time range (top right) to look further back. **Next:** what filled those
     tokens — [Context Window](context-window.md).
 

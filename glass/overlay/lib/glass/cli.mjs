@@ -19,6 +19,7 @@ import { coexistWarnings, opencodeHttpProviders } from './coexist.mjs';
 import { openUrl } from './open-url.mjs';
 import { renderStatusline, renderReport, uiLinks, TAGS } from './statusline.mjs';
 import { tmuxWanted, launchInTmux, configureStatus, popup, selfCommand } from './tmux.mjs';
+import { update } from './update.mjs';
 
 const out = (line = '') => process.stdout.write(`${line}\n`);
 const err = (line) => process.stderr.write(`${line}\n`);
@@ -31,7 +32,9 @@ const HELP = `glass ${VERSION} — token measurement and context insight for cod
   glass ui           open the UI (Token Usage, Sessions + context) in the browser
   glass status       daemon, live sessions, latest rows
   glass doctor       agent binaries, CA, egress, daemon, other local proxies
-  glass stop         stop the daemon (it also exits by itself when idle)
+  glass stop         stop the daemon; running sessions carry on with the next one
+                     (it also exits by itself when idle)
+  glass update       install the latest release (needs gh; --check only reports)
   glass uninstall    stop the daemon and delete ${glassHome()} (asks first; --yes skips)
   glass watch        a live status line for the newest session (--task <id> for another)
 
@@ -96,6 +99,35 @@ export function claudeStatusSettings(file, { port, taskId }) {
   return file;
 }
 
+// From this version on a stopping daemon leaves its live sessions for the next
+// one to re-adopt (daemon.mjs), so replacing it costs no session.
+const KEEPS_SESSIONS = [0, 1, 6];
+
+/** Whether a daemon can be replaced now: it has no live session, or keeps them across a restart. */
+function replaceable(h) {
+  const v = /^(\d+)\.(\d+)\.(\d+)/.exec(h.glass || '')?.slice(1, 4).map(Number);
+  return !h.sessions || Boolean(v && older(v, KEEPS_SESSIONS) >= 0);
+}
+
+/**
+ * A daemon of this glass version. One of another version left running after an
+ * update is replaced — at once when it keeps its sessions across a restart (or
+ * has none); an older one with live sessions keeps serving them, and this run
+ * joins it with a warning.
+ */
+export async function daemonFor({ home, port, env, version = VERSION, warn = err }) {
+  let h = await ensureDaemon({ home, port, env });
+  if (h && h.glass !== version) {
+    if (replaceable(h)) {
+      await stopDaemon(port, { waitMs: 10_000 });
+      h = await ensureDaemon({ home, port, env });
+    } else {
+      warn(`glass: the running daemon is glass ${h.glass}, this is ${version} — it keeps serving its ${h.sessions} live session(s) and this one; after they end, glass stop starts ${version} next time`);
+    }
+  }
+  return h;
+}
+
 async function runMeasured(agent, argv) {
   const intercept = !argv.includes('--no-intercept');
   const args = argv.filter((a) => a !== '--no-intercept' && a !== '--no-tmux');
@@ -117,7 +149,7 @@ async function runMeasured(agent, argv) {
   const relays = agent === 'opencode' && intercept
     ? Object.fromEntries(Object.entries(opencodeHttpProviders(baseEnv)).filter(([, url]) => !url.startsWith(`http://127.0.0.1:${port}/relay/`)))
     : {};
-  const up = await ensureDaemon({ home, port, env: baseEnv });
+  const up = await daemonFor({ home, port, env: baseEnv });
   const session = up ? await openSession(port, {
     agent, intercept, cwd: process.cwd(), project: projectOf(process.cwd()), pid: process.pid, relays,
   }) : null;
@@ -161,14 +193,33 @@ async function statuslineCmd(argv) {
   return 0;
 }
 
-async function waitForKey() {
-  if (!process.stdin.isTTY) return;
-  process.stdout.write('\n[press any key]');
-  process.stdin.setRawMode(true);
-  process.stdin.resume();
-  await new Promise((r) => process.stdin.once('data', r));
-  process.stdin.setRawMode(false);
-  process.stdin.pause();
+// What a terminal sends on its own, not a key: status reports (CSI ? … n|c|y, e.g.
+// tmux passing on a colour-scheme change, \e[?997;1n, the moment a popup opens in an
+// xterm.js terminal), focus in/out, mouse events, OSC and DCS replies.
+const TERMINAL_REPORT = /\x1b\[\?[\d;]*\$?[ncy]|\x1b\[[IO]|\x1b\[<[\d;]*[Mm]|\x1b\[M[\s\S]{3}|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1bP[\s\S]*?\x1b\\/g;
+
+/** Whether input is only terminal reports — no key the user pressed. */
+export function isTerminalReport(data) {
+  const s = Buffer.isBuffer(data) ? data.toString('latin1') : String(data);
+  return s.length > 0 && s.replace(TERMINAL_REPORT, '') === '';
+}
+
+/** Hold a popup open until a real key; terminal reports arriving meanwhile are skipped. */
+export async function waitForKey(input = process.stdin, output = process.stdout) {
+  if (!input.isTTY) return;
+  output.write('\n[press any key]');
+  input.setRawMode(true);
+  input.resume();
+  await new Promise((resolve) => {
+    const onData = (data) => {
+      if (isTerminalReport(data)) return;
+      input.off('data', onData);
+      resolve();
+    };
+    input.on('data', onData);
+  });
+  input.setRawMode(false);
+  input.pause();
 }
 
 async function report(argv) {
@@ -188,8 +239,11 @@ async function click(argv) {
   const port = Number(opt(argv, '--port')) || glassPort();
   const task = opt(argv, '--task') || undefined;
   const links = uiLinks(port, task);
-  if (tag === TAGS.health) return (await openUrl(links.root)) ? 0 : 1;
-  if (tag === TAGS.tok) return (await openUrl(links.session)) ? 0 : 1;
+  // Any open glass UI tab is re-used and navigated (macOS), as coding's
+  // dashboards are: the origin is the reuse prefix.
+  const origin = links.root;
+  if (tag === TAGS.health) return (await openUrl(links.root, origin)) ? 0 : 1;
+  if (tag === TAGS.tok) return (await openUrl(links.session, origin)) ? 0 : 1;
   if (tag === TAGS.ctx || tag === TAGS.net) {
     const which = tag === TAGS.ctx ? 'ctx' : 'net';
     const shown = popup({
@@ -197,7 +251,7 @@ async function click(argv) {
       title: which === 'ctx' ? 'glass · context window' : 'glass · network',
       argv: [...selfCommand(), 'report', which, '--port', String(port), ...(task ? ['--task', task] : []), '--hold'],
     });
-    if (!shown && which === 'ctx') return (await openUrl(links.explain)) ? 0 : 1;
+    if (!shown && which === 'ctx') return (await openUrl(links.explain, origin)) ? 0 : 1;
     return shown ? 0 : 1;
   }
   err(`glass click: unknown field ${tag}`);
@@ -227,13 +281,13 @@ async function watch(argv) {
 async function ui() {
   const home = glassHome();
   const port = glassPort();
-  if (!(await ensureDaemon({ home, port, env: { ...process.env } }))) {
+  if (!(await daemonFor({ home, port, env: { ...process.env } }))) {
     err(`glass: daemon not reachable on 127.0.0.1:${port} (log: ${path.join(glassPaths(home).logs, 'daemon.log')})`);
     return 1;
   }
   const url = `http://127.0.0.1:${port}/`;
   out(url);
-  if (!(await openUrl(url))) err('glass: no browser opener found — open the URL above yourself');
+  if (!(await openUrl(url, url))) err('glass: no browser opener found — open the URL above yourself');
   return 0;
 }
 
@@ -245,6 +299,7 @@ async function status() {
     return 0;
   }
   out(`glass daemon: running — glass ${h.glass}, pid ${h.pid}, 127.0.0.1:${h.port}, data ${h.data}`);
+  if (h.glass !== VERSION) out(`  ! this glass is ${VERSION} — the daemon is replaced once it has no live session (glass stop)`);
   const sessions = (await listSessions(port)) || [];
   out(`live sessions: ${sessions.length}`);
   for (const s of sessions) out(`  ${s.taskId}  ${s.agent}${s.intercept ? '' : ' (no intercept)'}  ${s.project}  since ${s.started_at}`);
@@ -279,12 +334,34 @@ async function doctor() {
     out(line);
   }
   const h = await health(port);
-  out(`daemon: ${h ? `running, pid ${h.pid}, ${h.sessions} session(s)` : 'not running (starts with the first glass <agent>)'}`);
+  out(`daemon: ${h ? `running, glass ${h.glass}, pid ${h.pid}, ${h.sessions} session(s)` : 'not running (starts with the first glass <agent>)'}`);
+  if (h && h.glass !== VERSION) out(`  ! daemon is glass ${h.glass}, this is ${VERSION} — it is replaced once it has no live session (glass stop)`);
   // Warnings, not problems: glass still runs, it just measures less (or twice).
   const warnings = coexistWarnings({ port });
   if (warnings.length) out('warnings (glass runs, but measures less or twice):');
   for (const w of warnings) out(`  ! ${w}`);
   return problems ? 1 : 0;
+}
+
+/**
+ * After an update the running daemon is the old glass: replace it when that costs no
+ * session. With live sessions the new one starts at once — running agents send their
+ * traffic through it, and it re-adopts their sessions; without any, the next
+ * `glass <agent>` starts it.
+ */
+export async function replaceAfterUpdate({ latest, home = glassHome(), port = glassPort(), env = process.env, say = out }) {
+  const h = await health(port);
+  if (!h) { say(`the next glass <agent> starts glass ${latest}`); return null; }
+  if (!replaceable(h)) {
+    say(`the glass ${h.glass} daemon keeps serving its ${h.sessions} live session(s); after they end, glass stop — the next glass <agent> then starts ${latest}`);
+    return h;
+  }
+  await stopDaemon(port, { waitMs: 10_000 });
+  if (!h.sessions) { say(`stopped the glass ${h.glass} daemon; the next glass <agent> starts ${latest}`); return null; }
+  const n = await ensureDaemon({ home, port, env });
+  say(n ? `replaced the glass ${h.glass} daemon with glass ${n.glass}; its ${h.sessions} live session(s) carry on`
+    : `stopped the glass ${h.glass} daemon, but glass ${latest} did not start — glass doctor`);
+  return n;
 }
 
 async function uninstall(argv) {
@@ -305,6 +382,8 @@ async function uninstall(argv) {
 
 export async function main(argv) {
   const [cmd, ...rest] = argv;
+  // A reader that went away (`glass status | head`) ends the output, not with a crash.
+  process.stdout.on('error', (e) => { if (e.code === 'EPIPE') process.exit(0); });
   if (AGENTS.includes(cmd)) return runMeasured(cmd, rest);
   switch (cmd) {
     case 'ui': return ui();
@@ -319,6 +398,7 @@ export async function main(argv) {
       out(stopped ? 'glass daemon stopping' : 'glass daemon was not running');
       return 0;
     }
+    case 'update': return update({ version: VERSION, out, err, check: rest.includes('--check'), afterInstall: (latest) => replaceAfterUpdate({ latest }) });
     case 'uninstall': return uninstall(rest);
     case '--version': case '-v': out(VERSION); return 0;
     case undefined: case 'help': case '--help': case '-h': out(HELP); return 0;

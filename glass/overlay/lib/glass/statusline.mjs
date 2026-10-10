@@ -1,13 +1,14 @@
 // lib/glass/statusline.mjs — the status line: what the daemon knows about one
 // session, and how that renders.
 //
-//   [glass ●] [ctx ██▌░░░  34%] [↑51.3K ↓1.2K ⚡50%] [N:direct]
+//   [glass ●] [ctx ██▌░░░  34%] [↑51.3K ↓1.2K ⚡50%] [N:CN P:ON]
 //
 // Fields (glass decision 5, the "Status line" table in .planning/glass.md):
 //   g:health  daemon up                      click → the UI
 //   g:ctx     last measured turn / window    click → context report (tmux popup)
 //   g:tok     session tokens, cache share    click → the session in the UI
-//   g:net     egress, interception           click → egress report (tmux popup)
+//   g:net     network location, local proxy  click → network report (tmux popup)
+//             — coding's [N:… P:…], from the same probes (network.mjs)
 //
 // The context gauge is the proxy's own measurement of the conversation's latest
 // turn (fresh + cache read + cache write = the prompt that went out), so it reads
@@ -19,6 +20,7 @@
 import clickable from '../statusline/clickable.cjs';
 import gauge from '../statusline/context-gauge.cjs';
 
+import { networkBadge } from '../network/location-probe.mjs';
 import { totalsByTask } from './ui-api.mjs';
 
 export const TAGS = Object.freeze({ health: 'g:health', ctx: 'g:ctx', tok: 'g:tok', net: 'g:net' });
@@ -50,8 +52,9 @@ export function conversationTurn(turns) {
  * @param {object|null} o.db        token DB handle (.db of initTokenDb)
  * @param {{ readContextTurns: Function }} o.measurement
  * @param {string} o.egress         upstream proxy URL, '' when direct
+ * @param {object} [o.network]      network facts (network.mjs facts())
  */
-export function statuslineData({ session, db, measurement, egress, glass }) {
+export function statuslineData({ session, db, measurement, egress, network = null, glass }) {
   const taskId = session.taskId;
   const t = totalsByTask(db, [taskId]).get(taskId);
   let turns = [];
@@ -79,6 +82,11 @@ export function statuslineData({ session, db, measurement, egress, glass }) {
     },
     egress: egress ? 'proxy' : 'direct',
     egress_url: egress ? egress.replace(/\/\/[^@/]*@/, '//') : '',
+    network: network && {
+      location: network.location, proxy_running: network.proxy_running,
+      proxy_functional: network.proxy_functional, proxy_enabled_by_user: network.proxy_enabled_by_user,
+      last_probe_end: network.last_probe_end,
+    },
   };
 }
 
@@ -140,7 +148,10 @@ export function renderStatusline(d, { format = 'plain', port }) {
   const cache = t.cache_pct == null ? '' : ` ⚡${t.cache_pct}%`;
   parts.push(field(TAGS.tok, `↑${fmtTokens(t.prompt)} ↓${fmtTokens(t.output)}${cache}`, links.session));
 
-  parts.push(field(TAGS.net, `N:${d.egress}${d.intercept === false ? ' ¬tap' : ''}`, null));
+  // A daemon from before the badge (left running across an update) sends no
+  // network facts: show what it does know, never a made-up ?? / OFF.
+  const net = d.network ? networkBadge(d.network).text : `N:${d.egress}`;
+  parts.push(field(TAGS.net, `${net}${d.intercept === false ? ' ¬tap' : ''}`, null));
   return parts.join(' ');
 }
 
@@ -152,7 +163,13 @@ export function renderReport(tag, { d, turns = [], port, caPath = '' }) {
     lines.push(`glass ${d.glass} · daemon 127.0.0.1:${port}`);
     lines.push(`session ${d.task_id} (${d.agent})`);
     lines.push(`capture: ${d.agent === 'claude' ? 'ANTHROPIC_BASE_URL → daemon' : d.intercept ? 'HTTPS_PROXY → daemon, model hosts decrypted' : '--no-intercept: not measured by the proxy'}`);
-    lines.push(`egress: ${d.egress === 'proxy' ? `via ${d.egress_url}` : 'direct'}`);
+    const n = d.network || {};
+    const b = networkBadge(d.network);
+    const where = { CN: 'corporate network (on-site)', VPN: 'corporate VPN', OPEN: 'open internet', '??': 'not probed yet' }[b.n] || n.location;
+    lines.push(`network: N:${b.n} — ${where}`);
+    lines.push(`local proxy :3128: ${!n.proxy_running ? 'not listening' : n.proxy_functional ? 'forwarding' : 'listening, not forwarding'} · px toggle ${n.proxy_enabled_by_user ? 'on' : 'off'} → P:${b.p}`);
+    if (b.warn) lines.push('  ! on the corporate network without a working local proxy: external hosts are unreachable');
+    lines.push(`egress (glass daemon): ${d.egress === 'proxy' ? `via ${d.egress_url}` : 'direct'}`);
     if (caPath) lines.push(`interception CA: ${caPath}`);
     lines.push(`last measured call: ${d.last_at || '—'}`);
     return lines.join('\n');
