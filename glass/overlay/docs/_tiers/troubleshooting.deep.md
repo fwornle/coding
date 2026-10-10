@@ -36,7 +36,7 @@ model hosts are unreachable.
 
 ## pi's GitHub Copilot login fails with 429
 
-pi's `/login` → GitHub Copilot asks for your GitHub Enterprise domain (`bmw.ghe.com`). A
+pi's `/login` → GitHub Copilot asks for your GitHub Enterprise domain (`<tenant>.ghe.com`). A
 `429 Too Many Requests` after approving the device code comes from a Copilot rate limit
 on your account; wait 10–15 minutes and log in again.
 

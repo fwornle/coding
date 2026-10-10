@@ -42,7 +42,7 @@ This eliminates the classic SQLite-on-Docker-Desktop-Mac corruption pattern wher
 | **Consolidation CLI** | `scripts/consolidate-observations.js` | Legacy stand-alone CLI/daemon. The dashboard's `POST /api/consolidation/run` no longer spawns it — consolidation runs in-process inside the obs-api server |
 | **Health API (dashboard)** | `integrations/system-health-dashboard/server.js` | Container service (port 3033). Now a **thin HTTP forwarder** to the host obs-api for all observation/digest/insight/retrieve/consolidation calls |
 | **Dashboard UI** | `integrations/system-health-dashboard/src/pages/` | Browsable views: observations, digests, insights |
-| **LLM Proxy Bridge** | [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) | Routes summarization to subscription providers (port 12435) |
+| **LLM Proxy Bridge** | [`@rapid/llm-proxy`](https://github.com/fwornle/rapid-llm-proxy) | Routes summarization to subscription providers (port 12435) |
 
 ## Observation Pipeline
 

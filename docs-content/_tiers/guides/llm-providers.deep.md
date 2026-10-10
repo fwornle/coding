@@ -294,7 +294,7 @@ curl -X POST http://localhost:12434/v1/models/pull \
 
 ## Unified LLM Layer
 
-All LLM requests route through the [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) unified layer, which provides:
+All LLM requests route through the [`@rapid/llm-proxy`](https://github.com/fwornle/rapid-llm-proxy) unified layer, which provides:
 
 - **14 providers**: 2 subscription (Copilot via direct HTTP, Claude Code via CLI), 5 cloud API, 2 local, 1 mock, plus proxy and OpenAI-compatible
 - **Copilot-first parallelized routing**: Copilot scales with concurrency (0.77s @10 parallel), always tried first
@@ -306,7 +306,7 @@ All LLM requests route through the [`@rapid/llm-proxy`](https://bmw.ghe.com/adpn
 
 **Cost Savings**: Subscription-first routing pushes most UKB/LSL analysis through Copilot/Claude max subscriptions before any paid API call, eliminating the per-token spend on those flows entirely.
 
-See [`@rapid/llm-proxy` Architecture](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy/tree/main/docs/architecture.md) and [LLM Architecture](../architecture/llm-architecture.md) for complete details.
+See [`@rapid/llm-proxy` Architecture](https://github.com/fwornle/rapid-llm-proxy/tree/main/docs/architecture.md) and [LLM Architecture](../architecture/llm-architecture.md) for complete details.
 
 ## Tier-Based Routing
 

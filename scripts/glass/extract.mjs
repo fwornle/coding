@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // scripts/glass/extract.mjs — generate the glass tree from coding + rapid-llm-proxy.
 //
+//   --target bmw|public is required (glass/manifest.yaml targets:) with each of:
 //   node scripts/glass/extract.mjs --out <dir>              extract + verify into an empty dir
 //   node scripts/glass/extract.mjs --check <glass checkout> extract to a temp dir, diff (exit 1 on drift)
-//   node scripts/glass/extract.mjs --publish <glass checkout>
+//   node scripts/glass/extract.mjs --publish <glass checkout or remote URL>
 //        extract, then commit on a fresh branch from origin/main (in a temporary clone
 //        of that checkout's origin — the checkout itself is untouched), push, open a PR
 //   --node <path>   node binary for the build smoke (default: this one)
@@ -51,6 +52,23 @@ export function loadManifest(file = DEFAULT_MANIFEST) {
     overlay: m.overlay || null,
     build: m.build || [],
     sources: Object.keys(m.sources || {}),
+    targets: m.targets || {},
+  };
+}
+
+/**
+ * One target of the manifest: where its tree is published, an overlay of its own,
+ * rewrites applied after both overlays, and the deny scan its tree must pass.
+ */
+export function targetOf(manifest, name) {
+  const names = Object.keys(manifest.targets);
+  if (!names.length) return null;
+  if (!name) throw new ExtractError([`--target is required: ${names.join(' | ')}`]);
+  const t = manifest.targets[name];
+  if (!t) throw new ExtractError([`unknown target "${name}": ${names.join(' | ')}`]);
+  return {
+    name, remote: t.remote, overlay: t.overlay || null, rewrite: t.rewrite || [],
+    deny: (t.deny || []).map((d) => new RegExp(d, 'i')), allow: t.allow || [],
   };
 }
 
@@ -151,9 +169,9 @@ function compile(manifest, roots, out) {
   }
 }
 
-function rewrite(manifest, out) {
+function rewrite(rules, out) {
   const errors = [];
-  for (const rule of manifest.rewrite) {
+  for (const rule of rules) {
     const file = path.join(out, rule.file);
     if (!fs.existsSync(file)) { errors.push(`rewrite: ${rule.file} is not in the tree`); continue; }
     const src = fs.readFileSync(file, 'utf8');
@@ -167,9 +185,9 @@ function rewrite(manifest, out) {
   if (errors.length) throw new ExtractError(errors);
 }
 
-function overlay(manifest, out, manifestDir) {
-  if (!manifest.overlay) return;
-  const dir = path.resolve(manifestDir, '..', manifest.overlay);
+function overlay(from, out, manifestDir) {
+  if (!from) return;
+  const dir = path.resolve(manifestDir, '..', from);
   const errors = [];
   for (const rel of listTree(dir)) {
     if (fs.existsSync(path.join(out, rel))) {
@@ -208,13 +226,35 @@ function build(manifest, roots, out) {
 /** Paths under a build step's output — browser code, not node modules. */
 const builtPrefixes = (manifest) => manifest.build.map((b) => `${posix(b.to).replace(/\/+$/, '')}/`);
 
-function provenance(out, roots, manifestFile) {
+/**
+ * Every text file of the tree against the target's deny patterns (case-insensitive),
+ * minus its allowlist ({file, pattern}). Returns the hits.
+ */
+export function denyScan(out, target) {
+  if (!target?.deny.length) return [];
+  const hits = [];
+  for (const rel of listTree(out)) {
+    const buf = fs.readFileSync(path.join(out, rel));
+    if (buf.subarray(0, 8000).includes(0)) continue; // binary
+    buf.toString('utf8').split('\n').forEach((line, i) => {
+      for (const re of target.deny) {
+        if (!re.test(line)) continue;
+        if (target.allow.some((a) => a.file === rel && new RegExp(a.pattern, 'i').test(line))) continue;
+        hits.push(`deny: ${rel}:${i + 1} matches ${re}: ${line.trim().slice(0, 120)}`);
+      }
+    });
+  }
+  return hits;
+}
+
+function provenance(out, roots, manifestFile, target) {
   const sources = {};
   for (const [name, root] of Object.entries(roots)) sources[name] = gitInfo(root);
   const files = {};
   for (const rel of listTree(out)) files[rel] = sha256(fs.readFileSync(path.join(out, rel)));
   const doc = {
     generator: 'coding/scripts/glass/extract.mjs',
+    ...(target ? { target: target.name } : {}),
     sources,
     manifest: sha256(fs.readFileSync(manifestFile)),
     files,
@@ -394,18 +434,24 @@ export function smoke(out, { node = process.execPath, skip = [] } = {}) {
  * @returns {{provenance: object, report: object}}
  * @throws {ExtractError} on any failed step
  */
-export function extract({ out, manifestFile = DEFAULT_MANIFEST, roots = defaultRoots(), smokeNode, skipSmoke = false } = {}) {
+export function extract({ out, manifestFile = DEFAULT_MANIFEST, roots = defaultRoots(), smokeNode, skipSmoke = false, target: targetName } = {}) {
   if (fs.existsSync(out) && fs.readdirSync(out).length) throw new ExtractError([`--out ${out} is not empty`]);
-  fs.mkdirSync(out, { recursive: true });
   const manifest = loadManifest(manifestFile);
+  const target = targetOf(manifest, targetName);
+  fs.mkdirSync(out, { recursive: true });
   for (const s of manifest.sources) if (!roots[s]) throw new ExtractError([`no root for source "${s}"`]);
   select(manifest, roots, out);
   compile(manifest, roots, out);
-  rewrite(manifest, out);
-  overlay(manifest, out, path.dirname(manifestFile));
+  rewrite(manifest.rewrite, out);
+  overlay(manifest.overlay, out, path.dirname(manifestFile));
+  if (target) {
+    overlay(target.overlay, out, path.dirname(manifestFile));
+    rewrite(target.rewrite, out);
+  }
   build(manifest, roots, out);
-  const prov = provenance(out, roots, manifestFile);
+  const prov = provenance(out, roots, manifestFile, target);
   const { errors, report } = verify(out, manifest);
+  errors.push(...denyScan(out, target));
   if (errors.length) throw new ExtractError(errors);
   if (!skipSmoke) {
     const s = smoke(out, { node: smokeNode, skip: builtPrefixes(manifest) });
@@ -443,15 +489,28 @@ export function parseRemote(url) {
 }
 
 /**
+ * A tree goes only to its own target's repository: never a BMW tree to the public
+ * repository, or the other way round. Throws when `remote` is not `target.remote`.
+ */
+export function checkTargetRemote(remote, target) {
+  if (!target) return;
+  const r = parseRemote(remote);
+  if (!r || `${r.host}/${r.repo}` !== target.remote) {
+    throw new ExtractError([`publish: target ${target.name} publishes to ${target.remote}, not ${r ? `${r.host}/${r.repo}` : remote}`]);
+  }
+}
+
+/**
  * Commit the tree on a fresh branch from origin/main and open a PR — in a temporary
  * clone of the glass remote, so the user's own glass checkout is never touched.
  * @param {string} target a glass checkout (its origin is used) or a remote URL
  */
-function publish(target, tree, prov) {
+function publish(target, tree, prov, t) {
   for (const [name, s] of Object.entries(prov.sources)) {
     if (!s.sha || s.dirty) throw new ExtractError([`publish: source ${name} is ${s.sha ? 'dirty' : 'not a git checkout'} — commit first`]);
   }
   const remote = fs.existsSync(target) ? git(target, ['remote', 'get-url', 'origin']) : target;
+  checkTargetRemote(remote, t);
   const short = (s) => s.slice(0, 7);
   const subject = `extracted from coding@${short(prov.sources.coding.sha)}, rapid-llm-proxy@${short(prov.sources.proxy.sha)}`;
   const branch = `extract/${short(prov.sources.coding.sha)}-${short(prov.sources.proxy.sha)}`;
@@ -482,7 +541,7 @@ function parseArgs(argv) {
   const a = {};
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
-    if (['--out', '--check', '--publish', '--node', '--manifest'].includes(k)) a[k.slice(2)] = argv[++i];
+    if (['--out', '--check', '--publish', '--node', '--manifest', '--target'].includes(k)) a[k.slice(2)] = argv[++i];
     else throw new Error(`unknown argument ${k}`);
   }
   return a;
@@ -492,13 +551,13 @@ function main() {
   const args = parseArgs(process.argv.slice(2));
   const manifestFile = args.manifest ? path.resolve(args.manifest) : DEFAULT_MANIFEST;
   if ([args.out, args.check, args.publish].filter(Boolean).length !== 1) {
-    process.stderr.write('usage: extract.mjs --out <dir> | --check <glass checkout> | --publish <glass checkout> [--node <bin>]\n');
+    process.stderr.write('usage: extract.mjs --target <name> --out <dir> | --check <glass checkout> | --publish <glass checkout|remote URL> [--node <bin>]\n');
     process.exit(2);
   }
   const tmp = args.out ? null : fs.mkdtempSync(path.join(os.tmpdir(), 'glass-extract-'));
   const out = args.out ? path.resolve(args.out) : path.join(tmp, 'tree');
   try {
-    const { provenance: prov, report } = extract({ out, manifestFile, smokeNode: args.node });
+    const { provenance: prov, report } = extract({ out, manifestFile, smokeNode: args.node, target: args.target });
     for (const [name, s] of Object.entries(prov.sources)) say(`source ${name}: ${s.sha}${s.dirty ? ' (dirty)' : ''}`);
     say(`tree: ${report.files} files, ${report.jsLines} JS lines — imports closed, no forbidden deps`);
     say(`smoke: ${JSON.stringify(report.smoke)}`);
@@ -516,7 +575,9 @@ function main() {
       }
     }
     if (args.publish) {
-      const r = publish(path.resolve(args.publish), out, prov);
+      const target = targetOf(loadManifest(manifestFile), args.target);
+      const dest = fs.existsSync(args.publish) ? path.resolve(args.publish) : args.publish;
+      const r = publish(dest, out, prov, target);
       say(r.unchanged ? `no changes against origin/main (${r.branch})` : `published ${r.branch}: ${r.pr}`);
     }
   } catch (err) {

@@ -1,4 +1,4 @@
-> **Extracted to standalone package**: The LLM layer is now provided by [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy). The local `src/llm-proxy/llm-proxy.mjs` is a thin wrapper that delegates to the package.
+> **Extracted to standalone package**: The LLM layer is now provided by [`@rapid/llm-proxy`](https://github.com/fwornle/rapid-llm-proxy). The local `src/llm-proxy/llm-proxy.mjs` is a thin wrapper that delegates to the package.
 
 ## Overview
 
@@ -304,12 +304,12 @@ Ensure the health check endpoint uses `localhost:12435` (not `host.docker.intern
 
 ## Full Documentation
 
-See the [`@rapid/llm-proxy` package documentation](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy/tree/main/docs) for:
+See the [`@rapid/llm-proxy` package documentation](https://github.com/fwornle/rapid-llm-proxy/tree/main/docs) for:
 
-- [Architecture](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy/tree/main/docs/architecture.md) — provider stack, tier routing, circuit breaker
-- [Providers](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy/tree/main/docs/providers.md) — per-provider setup and auth
-- [Proxy Bridge](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy/tree/main/docs/proxy-bridge.md) — Docker bridge details
-- [Configuration](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy/tree/main/docs/configuration.md) — YAML config reference
+- [Architecture](https://github.com/fwornle/rapid-llm-proxy/tree/main/docs/architecture.md) — provider stack, tier routing, circuit breaker
+- [Providers](https://github.com/fwornle/rapid-llm-proxy/tree/main/docs/providers.md) — per-provider setup and auth
+- [Proxy Bridge](https://github.com/fwornle/rapid-llm-proxy/tree/main/docs/proxy-bridge.md) — Docker bridge details
+- [Configuration](https://github.com/fwornle/rapid-llm-proxy/tree/main/docs/configuration.md) — YAML config reference
 
 ---
 

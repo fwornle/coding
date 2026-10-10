@@ -30,7 +30,7 @@ const AGENTS = ['claude', 'copilot', 'opencode', 'pi'];
 // The host and wire each stand-in uses — the ones the real agents were measured on (G3).
 const WIRE = {
   claude: { path: '/v1/messages' },
-  copilot: { host: 'copilot-api.bmw.ghe.com', path: '/v1/messages' },
+  copilot: { host: 'copilot-api.acme.ghe.com', path: '/v1/messages' },
   opencode: { host: 'api.githubcopilot.com', path: '/chat/completions' },
   pi: { host: 'api.openai.com', path: '/v1/responses' },
 };

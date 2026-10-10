@@ -9,7 +9,7 @@ extraction.
 
     1. Change the code in `coding` (or `rapid-llm-proxy`), including these docs
        (`glass/overlay/docs/` in coding).
-    2. `node scripts/glass/extract.mjs --publish <glass checkout>` opens a pull request in
+    2. `node scripts/glass/extract.mjs --target bmw --publish <glass checkout>` opens a pull request in
        AIMAAD/glass.
     3. CI runs: tests, install check, provenance, docs build, Wiz scans.
     4. Merge → a new `package.json` version publishes a release; changed docs publish

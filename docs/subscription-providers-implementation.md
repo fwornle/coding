@@ -1,6 +1,6 @@
 # Subscription-Based LLM Providers Implementation
 
-> **Note:** The LLM provider layer has been extracted into the standalone [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) package. This document describes the provider behavior; the canonical source code now lives in that repo.
+> **Note:** The LLM provider layer has been extracted into the standalone [`@rapid/llm-proxy`](https://github.com/fwornle/rapid-llm-proxy) package. This document describes the provider behavior; the canonical source code now lives in that repo.
 
 ## Status: Direct HTTP / CLI Rewrite Complete
 
@@ -205,7 +205,7 @@ providers:
 
 ## Files
 
-> All provider source code now lives in the [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) package.
+> All provider source code now lives in the [`@rapid/llm-proxy`](https://github.com/fwornle/rapid-llm-proxy) package.
 
 ### Provider Files (in @rapid/llm-proxy)
 1. `src/providers/copilot-provider.ts` — Direct HTTP to Copilot API

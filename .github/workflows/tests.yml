@@ -23,7 +23,7 @@ name: tests
 #      ../../dist/embedding/embedding-service.js".
 #
 # Suites that cannot run on a hosted runner (macOS-only tooling, a live obs-api,
-# gitignored local run artifacts, the sibling _work/rapid-llm-proxy repo) are
+# gitignored local run artifacts) are
 # skipped via CI_SKIPPED in scripts/lib/test-inventory.mjs. Each entry carries the
 # reason it was verified against, and every run prints the list, so a skip stays
 # visible rather than looking like a test that does not exist.
@@ -108,6 +108,18 @@ jobs:
           npm run build || echo "tsc reported type errors — emit continues (no noEmitOnError)"
           test -f dist/embedding/embedding-service.js \
             || { echo "BUILD DID NOT EMIT — dist/embedding/embedding-service.js missing"; exit 1; }
+
+      # ── the LLM proxy: a sibling repo, public ──────────────────────────────
+      # lib/proxy/proxy-paths.cjs resolves <parent>/_work/rapid-llm-proxy, and the
+      # context-turns, redaction, experiments and backfill suites import it (or its
+      # dist/). Cloned and built where a developer checkout has it.
+      - name: Clone and build the LLM proxy (sibling repo)
+        run: |
+          set -euo pipefail
+          dir="$(cd .. && pwd)/_work/rapid-llm-proxy"
+          git clone --quiet --depth 1 https://github.com/fwornle/rapid-llm-proxy.git "$dir"
+          (cd "$dir" && npm ci --no-audit --no-fund && npm run build)
+          test -f "$dir/dist/token-usage.js" || { echo "proxy build did not emit dist/token-usage.js"; exit 1; }
 
       # The LAST setup step, and the gate the test steps hang off. Every setup
       # step above is unconditional, so if any one of them fails the rest are

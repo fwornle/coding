@@ -12,7 +12,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import { scanSource } from '../../scripts/glass/import-graph.mjs';
-import { extract, defaultRoots, diffTrees, parseRemote, ExtractError } from '../../scripts/glass/extract.mjs';
+import { extract, defaultRoots, diffTrees, parseRemote, checkTargetRemote, ExtractError } from '../../scripts/glass/extract.mjs';
 
 test('scanner: static, dynamic, require and createRequire edges; computed sites', () => {
   const src = [
@@ -42,8 +42,8 @@ test('scanner: comments, strings and regex literals are not edges', () => {
   assert.deepEqual(scanSource(src).map((r) => r.spec), ['./real.mjs']);
 });
 
-/** A one-source fixture repo: files + glass/manifest.yaml + glass/overlay. */
-function fixture({ files, manifest, overlay = { 'package.json': '{"name":"glass","type":"module"}' } }) {
+/** A one-source fixture repo: files + glass/manifest.yaml + glass/overlay (+ glass/targets/<t>). */
+function fixture({ files, manifest, overlay = { 'package.json': '{"name":"glass","type":"module"}' }, targets = {} }) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-extract-fx-'));
   for (const [rel, body] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
@@ -53,17 +53,24 @@ function fixture({ files, manifest, overlay = { 'package.json': '{"name":"glass"
     fs.mkdirSync(path.join(root, 'glass', 'overlay', path.dirname(rel)), { recursive: true });
     fs.writeFileSync(path.join(root, 'glass', 'overlay', rel), body);
   }
+  for (const [t, tree] of Object.entries(targets)) {
+    for (const [rel, body] of Object.entries(tree)) {
+      fs.mkdirSync(path.join(root, 'glass', 'targets', t, path.dirname(rel)), { recursive: true });
+      fs.writeFileSync(path.join(root, 'glass', 'targets', t, rel), body);
+    }
+  }
   fs.writeFileSync(path.join(root, 'glass', 'manifest.yaml'), manifest);
   return root;
 }
 
-function run(root) {
+function run(root, target) {
   const out = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'glass-extract-out-')), 'tree');
-  return extract({ out, manifestFile: path.join(root, 'glass', 'manifest.yaml'), roots: { coding: root }, skipSmoke: true });
+  const r = extract({ out, manifestFile: path.join(root, 'glass', 'manifest.yaml'), roots: { coding: root }, skipSmoke: true, target });
+  return { ...r, out };
 }
 
-function failsWith(root, pattern) {
-  assert.throws(() => run(root), (err) => {
+function failsWith(root, pattern, target) {
+  assert.throws(() => run(root, target), (err) => {
     assert.ok(err instanceof ExtractError, err.stack);
     assert.ok(err.errors.some((e) => pattern.test(e)), err.message);
     return true;
@@ -141,6 +148,56 @@ test('overlay: a file that would shadow a selected file fails', () => {
   failsWith(root, /overlay: lib\/a\.mjs would shadow a selected file/);
 });
 
+// ── targets: one source, a BMW tree and a public tree ──────────────────────────
+
+const targets = (pub) => `targets:\n  bmw:\n    remote: bmw.example/org/glass\n  public:\n    remote: github.com/someone/glass\n    overlay: glass/targets/public\n${pub}`;
+
+test('targets: --target is required, and must be one the manifest names', () => {
+  const root = fixture({ files: { 'lib/a.mjs': 'export {};\n' }, manifest: select('lib/a.mjs') + targets('') });
+  failsWith(root, /--target is required: bmw \| public/);
+  failsWith(root, /unknown target "staging": bmw \| public/, 'staging');
+  const { provenance } = run(root, 'bmw');
+  assert.equal(provenance.target, 'bmw');
+});
+
+test('targets: the target overlay adds files and its rewrites run after both overlays', () => {
+  const root = fixture({
+    files: { 'lib/a.mjs': 'export {};\n' },
+    manifest: select('lib/a.mjs') + targets('    rewrite:\n      - file: README.md\n        find: "ORG/glass"\n        replace: "someone/glass"\n        count: 1\n'),
+    overlay: { 'package.json': '{}', 'README.md': 'see ORG/glass\n' },
+    targets: { public: { LICENSE: 'MIT\n' } },
+  });
+  const { out } = run(root, 'public');
+  assert.equal(fs.readFileSync(path.join(out, 'README.md'), 'utf8'), 'see someone/glass\n', 'a rewrite edits an overlay file');
+  assert.equal(fs.readFileSync(path.join(out, 'LICENSE'), 'utf8'), 'MIT\n');
+  assert.equal(fs.existsSync(path.join(run(root, 'bmw').out, 'LICENSE')), false, 'the bmw tree has no public-only file');
+});
+
+test('targets: a target file that the neutral overlay also has is a parallel copy and fails', () => {
+  failsWith(fixture({
+    files: { 'lib/a.mjs': 'export {};\n' },
+    manifest: select('lib/a.mjs') + targets(''),
+    overlay: { 'package.json': '{}', 'README.md': 'x\n' },
+    targets: { public: { 'README.md': 'y\n' } },
+  }), /overlay: README\.md would shadow a selected file/, 'public');
+});
+
+test('targets: the deny scan fails on a corporate string, the allowlist lets one through', () => {
+  const files = { 'lib/a.mjs': '// call acme-corp.internal for help\nexport const names = "Acme|Globex";\n' };
+  const deny = (allow) => targets(`    deny: ['acme']\n${allow}`);
+  failsWith(fixture({ files, manifest: select('lib/a.mjs') + deny('') }), /deny: lib\/a\.mjs:1 matches \/acme\/i/, 'public');
+  failsWith(fixture({ files, manifest: select('lib/a.mjs') + deny('    allow:\n      - file: lib/a.mjs\n        pattern: \'Acme\\|Globex\'\n') }), /deny: lib\/a\.mjs:1 /, 'public');
+  assert.doesNotThrow(() => run(fixture({ files: { 'lib/a.mjs': 'export const names = "Acme|Globex";\n' }, manifest: select('lib/a.mjs') + deny('    allow:\n      - file: lib/a.mjs\n        pattern: \'Acme\\|Globex\'\n') }), 'public'));
+  assert.doesNotThrow(() => run(fixture({ files, manifest: select('lib/a.mjs') + deny('') }), 'bmw'), 'the bmw target has no deny list');
+});
+
+test('targets: a tree is published only to its own target\'s repository', () => {
+  const t = { name: 'public', remote: 'github.com/someone/glass' };
+  assert.doesNotThrow(() => checkTargetRemote('git@github.com:someone/glass.git', t));
+  assert.doesNotThrow(() => checkTargetRemote('https://github.com/someone/glass', t));
+  assert.throws(() => checkTargetRemote('https://bmw.example/org/glass.git', t), /target public publishes to github\.com\/someone\/glass, not bmw\.example\/org\/glass/);
+});
+
 test('publish: remote URLs parse to gh host + repo, whatever the SSH user', () => {
   assert.deepEqual(parseRemote('bmw@bmw.ghe.com:AIMAAD/glass.git'), { host: 'bmw.ghe.com', repo: 'AIMAAD/glass' });
   assert.deepEqual(parseRemote('git@github.com:fwornle/coding.git'), { host: 'github.com', repo: 'fwornle/coding' });
@@ -166,13 +223,28 @@ test('real manifest: closed, builds with no node_modules, deterministic', (t) =>
     return;
   }
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-extract-real-'));
-  const first = extract({ out: path.join(base, 'a'), roots });
+  const first = extract({ out: path.join(base, 'a'), roots, target: 'bmw' });
   assert.ok(first.provenance.files['ui/index.html'], 'the UI bundle is in the tree');
   assert.ok(Object.keys(first.provenance.files).some((f) => /^ui\/assets\/index-.*\.js$/.test(f)));
   assert.ok(!Object.keys(first.report.smoke.failed || {}).length);
   assert.equal(first.report.smoke.ok, true);
   assert.equal(first.report.smoke.total_calls, 2);
-  extract({ out: path.join(base, 'b'), roots, skipSmoke: true });
+  extract({ out: path.join(base, 'b'), roots, skipSmoke: true, target: 'bmw' });
   assert.equal(diffTrees(path.join(base, 'a'), path.join(base, 'b')).equal, true);
   for (const f of Object.keys(first.provenance.files)) assert.ok(!f.endsWith('.sh'), f);
+});
+
+test('real manifest, public target: passes its deny scan and differs from bmw only where it should', (t) => {
+  const roots = defaultRoots();
+  if (!fs.existsSync(path.join(roots.proxy, 'proxy-bridge', 'measurement.mjs'))
+    || !fs.existsSync(path.join(roots.coding, 'integrations', 'system-health-dashboard', 'node_modules', 'vite'))) {
+    t.skip('needs the rapid-llm-proxy checkout and the dashboard dependencies');
+    return;
+  }
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-extract-pub-'));
+  const pub = extract({ out: path.join(base, 'pub'), roots, skipSmoke: true, target: 'public' });
+  assert.equal(pub.provenance.target, 'public');
+  const update = fs.readFileSync(path.join(base, 'pub', 'lib', 'glass', 'update.mjs'), 'utf8');
+  assert.match(update, /RELEASE_REPO = 'github\.com\/fwornle\/glass'/);
+  assert.ok(fs.existsSync(path.join(base, 'pub', 'LICENSE')));
 });

@@ -126,8 +126,10 @@ interactively asks again, with your current tier as the default; `coding-feature
 <tier>` or the dashboard's **Features** tab change it without reinstalling.
 
 Every tier needs the LLM proxy, which is cloned from
-`bmw.ghe.com/adpnext-apps/rapid-llm-proxy`: without read access to that repo the
-install stops and says so (set `RAPID_LLM_PROXY_REPO` to use another location).
+[github.com/fwornle/rapid-llm-proxy](https://github.com/fwornle/rapid-llm-proxy) (inside
+the corporate network, from the internal repository, which adds the corporate gateway
+provider). Set `RAPID_LLM_PROXY_REPO` to use another location; an existing checkout is
+used as it is.
 Details: [Feature modularity](./architecture/features.md).
 
 **Note**: The repository uses git submodules for integration components (memory-visualizer, semantic-analysis, constraint-monitor, graphify). The `--recurse-submodules` flag ensures all submodules are initialized during clone.

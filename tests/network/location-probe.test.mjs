@@ -79,6 +79,7 @@ describe('probes', () => {
     const dig = (out, err) => (file, args, opts, cb) => cb(err || null, out);
     assert.equal(await probePacResolves({ execFile: dig('10.1.2.3\n') }), true);
     assert.equal(await probePacResolves({ execFile: dig('') , lookup: async () => ({ address: '1.1.1.1' }) }), false, 'dig ran: its answer stands');
+    assert.equal(await probePacResolves({ host: '', execFile: () => assert.fail('no dig'), lookup: () => assert.fail('no lookup') }), false, 'no corporate host configured: nothing is probed');
     const noDig = Object.assign(new Error('missing'), { code: 'ENOENT' });
     assert.equal(await probePacResolves({ execFile: dig('', noDig), lookup: async () => ({ address: '10.1.2.3' }) }), true);
     assert.equal(await probePacResolves({ execFile: dig('', noDig), lookup: async () => { throw new Error('NXDOMAIN'); } }), false);

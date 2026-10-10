@@ -90,7 +90,7 @@ The system is built on **self-contained integration components**, each with its 
 
 **Standalone LLM abstraction with 14 providers, tier-based routing, and proxy bridge**
 
-- **External dependency:** [`rapid-llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) — shared with OKB
+- **External dependency:** [`rapid-llm-proxy`](https://github.com/fwornle/rapid-llm-proxy) — shared with OKB
 - Copilot: Direct HTTP POST to Copilot API (~2s, OAuth from `auth.json`)
 - Claude Code: CLI shell-out `claude -p --output-format json` (~12s)
 - Cloud API fallbacks: Groq, Anthropic, OpenAI, Gemini, GitHub Models
@@ -102,7 +102,7 @@ The system is built on **self-contained integration components**, each with its 
 
 **Why**: A single provider-agnostic LLM layer shared across projects. Subscription providers (Copilot, Claude Max) run at zero per-token cost; paid APIs serve as fallback. Copilot scales with parallelism — 0.77s effective per call at 10 concurrent requests.
 
-**Documentation:** [rapid-llm-proxy repo](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) · [Provider Configuration](provider-configuration.md)
+**Documentation:** [rapid-llm-proxy repo](https://github.com/fwornle/rapid-llm-proxy) · [Provider Configuration](provider-configuration.md)
 
 ### VSCode CoPilot Integration
 

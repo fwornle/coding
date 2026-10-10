@@ -10,7 +10,8 @@
 | overlay | glass-only files from `coding/glass/overlay/`: CLI, daemon, tests, README, these docs, CI workflows |
 | build | The reduced UI, built once into `ui/` |
 | verify | Imports closed, no forbidden dependency, a smoke run on the Node floor |
-| publish | A fresh branch `extract/<coding>-<proxy>` and a pull request into `main` |
+| target | `--target <name>` (one per repository): a target's own files, its rewrites (repository, docs site, license), and a scan that fails on any corporate name left in the public tree |
+| publish | A fresh branch `extract/<coding>-<proxy>` and a pull request into `main` — only to the target's own repository |
 
 The proxy checkout is `RAPID_LLM_PROXY_DIR`, else `_work/rapid-llm-proxy` next to the
 `coding` checkout. Run from a linked git worktree of `coding` (for example

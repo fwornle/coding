@@ -74,7 +74,7 @@ MCP servers and tools that extend the coding infrastructure.
 
     ---
 
-    HTTP bridge exposing [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) to Docker containers.
+    HTTP bridge exposing [`@rapid/llm-proxy`](https://github.com/fwornle/rapid-llm-proxy) to Docker containers.
 
     - Direct HTTP to Copilot API, CLI for Claude Code
     - Zero-cost subscription routing

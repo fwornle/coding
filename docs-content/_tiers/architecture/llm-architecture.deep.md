@@ -18,12 +18,12 @@
 
 ## Overview
 
-The [`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy) unified LLM layer consolidates three previously separate LLM abstractions into a single, comprehensive library that provides intelligent routing, resilience, and cost optimization across its provider implementations (12 concrete ones under `src/providers/`), including **subscription-based providers** that eliminate per-token API costs. It is maintained as a **standalone package** shared with OKB and other projects.
+The [`@rapid/llm-proxy`](https://github.com/fwornle/rapid-llm-proxy) unified LLM layer consolidates three previously separate LLM abstractions into a single, comprehensive library that provides intelligent routing, resilience, and cost optimization across its provider implementations (12 concrete ones under `src/providers/`), including **subscription-based providers** that eliminate per-token API costs. It is maintained as a **standalone package** shared with OKB and other projects.
 
 **Why it was created:**
 - **Before**: 3 separate LLM abstractions (Semantic Analysis, Unified Inference Engine, Semantic Validator)
 - **Problem**: Code duplication, inconsistent provider handling, no shared caching or resilience
-- **After**: Single unified layer ([`@rapid/llm-proxy`](https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy)) with shared infrastructure, tier-based routing, circuit breaker, and LRU cache
+- **After**: Single unified layer ([`@rapid/llm-proxy`](https://github.com/fwornle/rapid-llm-proxy)) with shared infrastructure, tier-based routing, circuit breaker, and LRU cache
 
 **Key Features:**
 - **Parallelized copilot-first routing** *(library path)* — Copilot scales well with parallelism (0.77s effective per call at 10 concurrent). The runtime bridge does not order providers globally: its `defaults.background` is `claude-code-max` and each route names its own provider

@@ -36,7 +36,6 @@ export const PROVIDER_COLORS: Record<string, string> = {
   'anthropic-api': '#be185d',    // metered Anthropic key — deliberately distinct from Max
   'groq': '#7c3aed',
   'openai': '#059669',
-  'gaia': '#64748b',
   'qwen-local': '#0891b2',       // on-prem V100 cluster — unmetered
   'qwen-laptop': '#c026d3',      // llama.cpp on this machine — unmetered
 }
@@ -111,7 +110,6 @@ export const PROVIDER_ACCOUNT_LABEL: Record<string, string> = {
   'qwen-laptop': 'This laptop',
   'groq': 'Groq',
   'openai': 'OpenAI',
-  'gaia': 'Gaia',
 }
 
 export function accountLabel(provider: string | null | undefined): string {

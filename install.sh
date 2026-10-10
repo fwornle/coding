@@ -2848,7 +2848,11 @@ setup_llm_cli_proxy() {
     # scripts/llm-proxy-service.sh all resolve <parent>/_work/rapid-llm-proxy, so a
     # checkout anywhere else needs RAPID_LLM_PROXY_DIR set for every one of them.
     local proxy_dir="${RAPID_LLM_PROXY_DIR:-$(cd "$CODING_REPO/.." && pwd)/_work/rapid-llm-proxy}"
-    local proxy_repo="${RAPID_LLM_PROXY_REPO:-https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy.git}"
+    # The public repo for everyone; inside the corporate network the internal one,
+    # which also carries the corporate gateway provider. RAPID_LLM_PROXY_REPO wins.
+    local proxy_repo_default="https://github.com/fwornle/rapid-llm-proxy.git"
+    [[ "${INSIDE_CN:-false}" == "true" ]] && proxy_repo_default="https://bmw.ghe.com/adpnext-apps/rapid-llm-proxy.git"
+    local proxy_repo="${RAPID_LLM_PROXY_REPO:-$proxy_repo_default}"
     local has_cli=false
 
     info "Setting up LLM CLI Proxy (optional)..."
@@ -2969,9 +2973,9 @@ setup_llm_cli_proxy() {
         mkdir -p "$(dirname "$proxy_dir")"
         if ! run_with_timeout 300 git clone --quiet "$proxy_repo" "$proxy_dir" >>"$INSTALL_LOG" 2>&1; then
             llm_proxy_unavailable "could not clone $proxy_repo" \
-                "This needs READ access to $proxy_repo — on bmw.ghe.com that means a" \
-                "GHE account that can see the repo, with git credentials for HTTPS." \
-                "Or clone it to $proxy_dir yourself (or set RAPID_LLM_PROXY_REPO)."
+                "This needs READ access to $proxy_repo, with git credentials for HTTPS" \
+                "if it is not public. Or clone it to $proxy_dir yourself, or point" \
+                "RAPID_LLM_PROXY_REPO at https://github.com/fwornle/rapid-llm-proxy.git."
             return 0
         fi
     else

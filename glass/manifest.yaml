@@ -142,3 +142,147 @@ build:
     dir: integrations/system-health-dashboard
     config: glass-ui/vite.config.ts
     to: ui
+
+# Where a tree goes, and what makes it that tree. extract.mjs --target <name> is
+# required; --publish refuses a remote that is not the target's. A target's overlay
+# adds files the neutral overlay does not have (a shared path would be a parallel
+# copy); its rewrites run after both overlays; its deny scan must find nothing.
+targets:
+  bmw:
+    remote: bmw.ghe.com/AIMAAD/glass
+    overlay: glass/targets/bmw
+  public:
+    remote: github.com/fwornle/glass
+    overlay: glass/targets/public
+    rewrite:
+      - file: README.md
+        find: "- Read access to [AIMAAD/glass](https://bmw.ghe.com/AIMAAD/glass) on bmw.ghe.com.\n"
+        replace: ""
+        count: 1
+      - file: README.md
+        find: "[aimaad-glass.pages.bmw.ghe.com](https://aimaad-glass.pages.bmw.ghe.com/)"
+        replace: "[fwornle.github.io/glass](https://fwornle.github.io/glass/)"
+        count: 1
+      - file: README.md
+        find: "once: `gh auth login --hostname bmw.ghe.com`"
+        replace: "once: `gh auth login`"
+        count: 1
+      - file: README.md
+        find: "--repo bmw.ghe.com/AIMAAD/glass"
+        replace: "--repo fwornle/glass"
+        count: 1
+      - file: README.md
+        find: "https://bmw.ghe.com/AIMAAD/glass"
+        replace: "https://github.com/fwornle/glass"
+        count: 1
+      - file: mkdocs.yml
+        find: "site_url: https://aimaad-glass.pages.bmw.ghe.com/"
+        replace: "site_url: https://fwornle.github.io/glass/"
+        count: 1
+      - file: mkdocs.yml
+        find: "repo_name: AIMAAD/glass"
+        replace: "repo_name: fwornle/glass"
+        count: 1
+      - file: mkdocs.yml
+        find: "https://bmw.ghe.com/AIMAAD/glass"
+        replace: "https://github.com/fwornle/glass"
+        count: 2
+      - file: package.json
+        find: "\"license\": \"UNLICENSED\""
+        replace: "\"license\": \"MIT\""
+        count: 1
+      - file: lib/glass/update.mjs
+        find: "'bmw.ghe.com/AIMAAD/glass'"
+        replace: "'github.com/fwornle/glass'"
+        count: 1
+      - file: lib/glass/update.mjs
+        find: "(the repository is private to the enterprise host, so an\n * anonymous download is refused)"
+        replace: "(it reads the\n * release list from the GitHub API)"
+        count: 1
+      - file: .github/workflows/ci.yml
+        find: "(AIMAAD has no macOS runners; macOS is checked locally)"
+        replace: "(Linux, macOS and Windows)"
+        count: 1
+      - file: .github/workflows/ci.yml
+        find: "        os: [ubuntu-latest, windows-latest]"
+        replace: "        os: [ubuntu-latest, macos-latest, windows-latest]"
+        count: 1
+      - file: .github/workflows/docs.yml
+        find: "(https://aimaad-glass.pages.bmw.ghe.com/, visible to the organization)."
+        replace: "(https://fwornle.github.io/glass/)."
+        count: 1
+      - file: docs/overview.md
+        find: "--repo bmw.ghe.com/AIMAAD/glass"
+        replace: "--repo fwornle/glass"
+        count: 1
+      - file: docs/getting-started.md
+        find: "    Needs Node.js ≥ 22.13 and read access to\n    [AIMAAD/glass](https://bmw.ghe.com/AIMAAD/glass).\n"
+        replace: "    Needs Node.js ≥ 22.13.\n"
+        count: 1
+      - file: docs/getting-started.md
+        find: "--repo bmw.ghe.com/AIMAAD/glass"
+        replace: "--repo fwornle/glass"
+        count: 1
+      - file: docs/development.md
+        find: "docs build, Wiz scans."
+        replace: "docs build."
+        count: 1
+      - file: docs/development.md
+        find: "       AIMAAD/glass."
+        replace: "       fwornle/glass."
+        count: 1
+      - file: docs/_tiers/getting-started.deep.md
+        find: "- **Read access** to [AIMAAD/glass](https://bmw.ghe.com/AIMAAD/glass) on bmw.ghe.com.\n"
+        replace: ""
+        count: 1
+      - file: docs/_tiers/getting-started.deep.md
+        find: "once: `gh auth login --hostname bmw.ghe.com`"
+        replace: "once: `gh auth login`"
+        count: 1
+      - file: docs/_tiers/getting-started.deep.md
+        find: "logged in to `bmw.ghe.com`"
+        replace: "logged in to GitHub"
+        count: 1
+      - file: docs/_tiers/getting-started.deep.md
+        find: "--repo bmw.ghe.com/AIMAAD/glass"
+        replace: "--repo fwornle/glass"
+        count: 1
+      - file: docs/_tiers/getting-started.deep.md
+        find: "https://bmw.ghe.com/AIMAAD/glass"
+        replace: "https://github.com/fwornle/glass"
+        count: 1
+      - file: docs/_tiers/development.deep.md
+        find: "| Wiz | IaC, Secret and Vulnerability scans (required by the AIMAAD org) |\n"
+        replace: ""
+        count: 1
+      - file: docs/_tiers/development.deep.md
+        find: "— Ubuntu and Windows, Node"
+        replace: "— Ubuntu, macOS and Windows, Node"
+        count: 1
+      - file: docs/_tiers/development.deep.md
+        find: "[aimaad-glass.pages.bmw.ghe.com](https://aimaad-glass.pages.bmw.ghe.com/)"
+        replace: "[fwornle.github.io/glass](https://fwornle.github.io/glass/)"
+        count: 1
+      - file: lib/network/location-probe.mjs
+        find: "process.env.HEALTH_PAC_HOST || 'muc.proxy-pac.bmwgroup.net'"
+        replace: "process.env.HEALTH_PAC_HOST || ''"
+        count: 1
+      - file: docs/development.md
+        find: "--target bmw --publish"
+        replace: "--target public --publish"
+        count: 1
+    deny:
+      - 'bmw'
+      - 'aimaad'
+      - 'adpnext'
+      - 'EF-4\d\d'
+      - '\b10\.143\.'
+      - '160\.50'
+      - 'proxy\.muc'
+      - '\bgaia\b'
+      - 'Q284340'
+      - '\bwiz\b'
+    allow:
+      # a list of company names the redaction step masks — generic, not a BMW reference
+      - file: config/redaction/redaction-patterns.json
+        pattern: 'BMW\|Mercedes\|Audi'

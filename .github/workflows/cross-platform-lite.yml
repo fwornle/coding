@@ -421,8 +421,8 @@ jobs:
       # The default tier (harness) owns two host daemons that need nothing
       # private: the health coordinator and the prompt judge. Both must be
       # systemd user units, enabled and running — not merely written. The proxy
-      # and the learning tiers need private repos and are proven by
-      # tests/cleanroom/services.sh instead.
+      # (now cloned from its public repo by ./install.sh --ci) and the learning
+      # tiers, which need private repos, are proven by tests/cleanroom/services.sh.
       - name: Host daemons are systemd user units, and running
         run: |
           set -e
