@@ -1,6 +1,6 @@
 {
   "name": "glass",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Token measurement and context-window insight for coding agents",
   "private": true,
   "type": "module",
