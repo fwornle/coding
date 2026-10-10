@@ -34,6 +34,10 @@ select:
       - lib/measurement/context-turns-retention.mjs
       # the UI's per-session timeline read (lib/glass/ui-api.mjs)
       - lib/experiments/timeline-read.mjs
+      # status line [N:… P:…] — coding's network probes, verdict and hysteresis
+      - lib/network/location-probe.mjs
+      - lib/network/location-hysteresis.mjs
+      - lib/network/network-change-watcher.mjs
       # status line fields
       - lib/statusline/context-gauge.cjs
       - lib/statusline/model-limits.cjs

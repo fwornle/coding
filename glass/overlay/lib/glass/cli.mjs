@@ -96,6 +96,24 @@ export function claudeStatusSettings(file, { port, taskId }) {
   return file;
 }
 
+/**
+ * A daemon of this glass version. An older (or newer) one left running after an
+ * update is replaced when it has no live session; with sessions it keeps serving
+ * them, and this run joins it with a warning.
+ */
+export async function daemonFor({ home, port, env, version = VERSION, warn = err }) {
+  let h = await ensureDaemon({ home, port, env });
+  if (h && h.glass !== version) {
+    if (!h.sessions) {
+      await stopDaemon(port, { waitMs: 10_000 });
+      h = await ensureDaemon({ home, port, env });
+    } else {
+      warn(`glass: the running daemon is glass ${h.glass}, this is ${version} — it keeps serving its ${h.sessions} live session(s) and this one; after they end, glass stop starts ${version} next time`);
+    }
+  }
+  return h;
+}
+
 async function runMeasured(agent, argv) {
   const intercept = !argv.includes('--no-intercept');
   const args = argv.filter((a) => a !== '--no-intercept' && a !== '--no-tmux');
@@ -117,7 +135,7 @@ async function runMeasured(agent, argv) {
   const relays = agent === 'opencode' && intercept
     ? Object.fromEntries(Object.entries(opencodeHttpProviders(baseEnv)).filter(([, url]) => !url.startsWith(`http://127.0.0.1:${port}/relay/`)))
     : {};
-  const up = await ensureDaemon({ home, port, env: baseEnv });
+  const up = await daemonFor({ home, port, env: baseEnv });
   const session = up ? await openSession(port, {
     agent, intercept, cwd: process.cwd(), project: projectOf(process.cwd()), pid: process.pid, relays,
   }) : null;
@@ -227,7 +245,7 @@ async function watch(argv) {
 async function ui() {
   const home = glassHome();
   const port = glassPort();
-  if (!(await ensureDaemon({ home, port, env: { ...process.env } }))) {
+  if (!(await daemonFor({ home, port, env: { ...process.env } }))) {
     err(`glass: daemon not reachable on 127.0.0.1:${port} (log: ${path.join(glassPaths(home).logs, 'daemon.log')})`);
     return 1;
   }
@@ -245,6 +263,7 @@ async function status() {
     return 0;
   }
   out(`glass daemon: running — glass ${h.glass}, pid ${h.pid}, 127.0.0.1:${h.port}, data ${h.data}`);
+  if (h.glass !== VERSION) out(`  ! this glass is ${VERSION} — the daemon is replaced once it has no live session (glass stop)`);
   const sessions = (await listSessions(port)) || [];
   out(`live sessions: ${sessions.length}`);
   for (const s of sessions) out(`  ${s.taskId}  ${s.agent}${s.intercept ? '' : ' (no intercept)'}  ${s.project}  since ${s.started_at}`);
@@ -279,7 +298,8 @@ async function doctor() {
     out(line);
   }
   const h = await health(port);
-  out(`daemon: ${h ? `running, pid ${h.pid}, ${h.sessions} session(s)` : 'not running (starts with the first glass <agent>)'}`);
+  out(`daemon: ${h ? `running, glass ${h.glass}, pid ${h.pid}, ${h.sessions} session(s)` : 'not running (starts with the first glass <agent>)'}`);
+  if (h && h.glass !== VERSION) out(`  ! daemon is glass ${h.glass}, this is ${VERSION} — it is replaced once it has no live session (glass stop)`);
   // Warnings, not problems: glass still runs, it just measures less (or twice).
   const warnings = coexistWarnings({ port });
   if (warnings.length) out('warnings (glass runs, but measures less or twice):');
@@ -305,6 +325,8 @@ async function uninstall(argv) {
 
 export async function main(argv) {
   const [cmd, ...rest] = argv;
+  // A reader that went away (`glass status | head`) ends the output, not with a crash.
+  process.stdout.on('error', (e) => { if (e.code === 'EPIPE') process.exit(0); });
   if (AGENTS.includes(cmd)) return runMeasured(cmd, rest);
   switch (cmd) {
     case 'ui': return ui();

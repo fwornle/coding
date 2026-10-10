@@ -29,7 +29,10 @@ glass: daemon not reachable on 127.0.0.1:12445 — running claude unmeasured (lo
 
 The daemon reaches the model hosts through `HTTPS_PROXY` / `NO_PROXY` from the
 environment `glass` was started in. `glass doctor` shows the egress proxy it will use, and
-the status line shows `N:proxy` or `N:direct`.
+the network report (click the status line's `N:… P:…` field, or `glass report net`) shows
+it next to the network location and the local proxy's state. `N:CN` or `N:VPN` with
+`P:OFF` means you are on the corporate network without a working local proxy: external
+model hosts are unreachable.
 
 ## pi's GitHub Copilot login fails with 429
 

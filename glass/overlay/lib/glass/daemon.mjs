@@ -41,6 +41,7 @@ import { glassPaths, PKG_ROOT } from './home.mjs';
 import { createEgressFetch, upstreamProxy } from './egress.mjs';
 import { createUiApi } from './ui-api.mjs';
 import { statuslineData } from './statusline.mjs';
+import { createNetworkMonitor } from './network.mjs';
 
 export const VERSION = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version;
 
@@ -117,11 +118,12 @@ export function relaysOf(raw) {
  * @param {number} [o.idleMs]          exit after this long with no session and no request
  * @param {number} [o.retentionDays]
  * @param {(line: string) => void} [o.log]
+ * @param {object} [o.network]         network monitor (default: coding's probes, see network.mjs)
  * @returns {Promise<{ port: number, url: string, caPath: string, close: () => Promise<void>, closed: Promise<void> }>}
  */
 export async function startDaemon({
   home, port, fetch, idleMs = 30 * 60_000, tickMs = 60_000, retentionDays = 7,
-  log = (l) => process.stdout.write(`${new Date().toISOString()} ${l}\n`),
+  log = (l) => process.stdout.write(`${new Date().toISOString()} ${l}\n`), network,
 }) {
   const p = glassPaths(home);
   for (const d of [p.data, p.ca, p.logs]) fs.mkdirSync(d, { recursive: true });
@@ -148,6 +150,9 @@ export async function startDaemon({
     uiDir: path.join(PKG_ROOT, 'ui'), dataDir: p.data, tokenDb: () => tokenDb,
     dbPath: resolveTokenDbPath(p.data), measurement, liveSessions: publicSessions,
   });
+  // [N:… P:…]: probed only while a session is live (nothing else reads it).
+  const netMonitor = network || createNetworkMonitor({ log });
+  netMonitor.start({ active: () => sessions.size > 0 });
   let lastActivity = Date.now();
   const touch = () => { lastActivity = Date.now(); };
 
@@ -161,6 +166,7 @@ export async function startDaemon({
       pid: Number(body.pid) || null, started_at: new Date().toISOString(), relays: relaysOf(body.relays),
     };
     sessions.set(token, s);
+    netMonitor.tick(); // the first status line should not wait a whole interval
     log(`session open ${taskId} (${agent}${s.intercept ? '' : ', no intercept'})`);
     return s;
   }
@@ -284,7 +290,7 @@ export async function startDaemon({
         const s = want ? live.find((x) => x.taskId === want) : live[0];
         if (!s) return json(res, 404, { error: want ? `no live session ${want}` : 'no live session' });
         return json(res, 200, {
-          ...statuslineData({ session: s, db: tokenDb?.db, measurement, egress: upstreamProxy(process.env, port), glass: VERSION }),
+          ...statuslineData({ session: s, db: tokenDb?.db, measurement, egress: upstreamProxy(process.env, port), network: netMonitor.facts(), glass: VERSION }),
           ca_path: intercept.caPath,
         });
       }
@@ -354,6 +360,7 @@ export async function startDaemon({
     log(`shutting down: ${reason}`);
     clearInterval(sweepTimer);
     clearInterval(idleTimer);
+    netMonitor.stop();
     for (const token of [...sessions.keys()]) await closeSession(token);
     intercept.close();
     server.closeAllConnections?.();

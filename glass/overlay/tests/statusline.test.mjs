@@ -17,12 +17,13 @@ const D = {
   ctx: { used: 51_000, window: 1_000_000, pct: 5.1, model: 'claude-opus-5-5', turns: 2 },
   tokens: { calls: 2, prompt: 51_300, input: 300, output: 1_200, cache_read: 25_000, cache_write: 26_000, cache_pct: 49 },
   egress: 'proxy', egress_url: 'http://127.0.0.1:3128',
+  network: { location: 'corporate', proxy_running: true, proxy_functional: true, proxy_enabled_by_user: true },
 };
 const strip = (s) => s.replace(/#\[[^\]]*\]/g, '').replace(/\x1b\][^\x1b]*\x1b\\/g, '').replace(/\x1b\[[0-9;]*m/g, '');
 
 test('plain, tmux and ansi carry the same fields', () => {
   const plain = renderStatusline(D, { format: 'plain', port: 12445 });
-  assert.match(plain, /^\[glass ●\] \[ctx .*5%\] \[↑51\.3K ↓1\.2K ⚡49%\] \[N:proxy\]$/);
+  assert.match(plain, /^\[glass ●\] \[ctx .*5%\] \[↑51\.3K ↓1\.2K ⚡49%\] \[N:CN P:ON\]$/);
   const tmux = renderStatusline(D, { format: 'tmux', port: 12445 });
   for (const tag of Object.values(TAGS)) assert.ok(tmux.includes(`#[range=user|${tag}]`), tag);
   assert.equal(strip(tmux), plain);
@@ -42,7 +43,8 @@ test('the gauge follows the conversation, not side calls', async () => {
 });
 
 test('no turn yet, --no-intercept, daemon down', () => {
-  assert.match(renderStatusline({ ...D, ctx: null, intercept: false }, { port: 1 }), /\[ctx —\].*\[N:proxy ¬tap\]/);
+  assert.match(renderStatusline({ ...D, ctx: null, intercept: false }, { port: 1 }), /\[ctx —\].*\[N:CN P:ON ¬tap\]/);
+  assert.match(renderStatusline({ ...D, network: null }, { port: 1 }), /\[N:\?\? P:OFF\]$/, 'not probed yet: coding\'s unknown');
   assert.equal(renderStatusline(null, { port: 1 }), '[glass ✗ down]');
 });
 
@@ -55,7 +57,11 @@ test('reports: context make-up of the last turn; network', () => {
   assert.match(ctx, /System Instructions\s+2\.9 KB .* 75%/);
   assert.doesNotMatch(ctx, /Retrieved Knowledge/, 'empty categories are left out');
   assert.match(ctx, /  2  m\s+13 prompt/);
-  assert.match(renderReport(TAGS.net, { d: D, port: 12445, caPath: '/h/ca.pem' }), /egress: via http:\/\/127\.0\.0\.1:3128[\s\S]*CA: \/h\/ca\.pem/);
+  const net = renderReport(TAGS.net, { d: D, port: 12445, caPath: '/h/ca.pem' });
+  assert.match(net, /network: N:CN — corporate network \(on-site\)\nlocal proxy :3128: forwarding · px toggle on → P:ON/);
+  assert.match(net, /egress \(glass daemon\): via http:\/\/127\.0\.0\.1:3128[\s\S]*CA: \/h\/ca\.pem/);
+  const broken = renderReport(TAGS.net, { d: { ...D, network: { location: 'vpn', proxy_running: true, proxy_functional: false } }, port: 1 });
+  assert.match(broken, /listening, not forwarding · px toggle off → P:OFF\n  ! on the corporate network without a working local proxy/);
 });
 
 test('claude without tmux: a --settings file with glass as statusLine', () => {

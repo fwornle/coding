@@ -34,6 +34,9 @@ const ANTHROPIC_SSE = sse([
 ], true);
 const CHAT_USAGE = { prompt_tokens: 120, completion_tokens: 5, prompt_tokens_details: { cached_tokens: 100 } };
 
+// Network facts without probing this machine (network.mjs is tested on its own).
+const stubNetwork = { facts: () => ({ location: 'vpn', proxy_running: true, proxy_functional: true, proxy_enabled_by_user: false }), tick: () => {}, start: () => {}, stop: () => {} };
+
 let upstream; let upPort; let daemon; const upSeen = []; let reqSeq = 0;
 
 function respond(req, body, res) {
@@ -82,7 +85,7 @@ before(async () => {
   });
   await new Promise((r) => upstream.listen(0, '127.0.0.1', r));
   upPort = upstream.address().port;
-  daemon = await startDaemon({ home, port: 0, fetch: stubFetch, log: () => {} });
+  daemon = await startDaemon({ home, port: 0, fetch: stubFetch, log: () => {}, network: stubNetwork });
 });
 
 after(async () => {
@@ -278,6 +281,7 @@ test('status line: facts of a live session — tokens, the last turn against the
   assert.equal(d.ctx.used, d.tokens.prompt, 'one turn: the gauge is that turn\'s prompt');
   assert.ok(d.ctx.window > 0 && d.ctx.pct > 0);
   assert.equal(d.egress, 'direct');
+  assert.equal(d.network.location, 'vpn', 'the network monitor\'s facts');
   assert.ok(d.ca_path.endsWith('.pem'));
   assert.equal((await api('GET', '/api/statusline')).body.task_id, s.taskId, 'no task: the newest live session');
   await api('DELETE', `/sessions/${encodeURIComponent(s.token)}`);
@@ -335,7 +339,7 @@ test('glass ui: one opener chain per platform, no shell', async () => {
 
 test('an idle daemon exits by itself', async () => {
   const idleHome = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-idle-'));
-  const d = await startDaemon({ home: idleHome, port: 0, fetch: stubFetch, idleMs: 100, tickMs: 25, log: () => {} });
+  const d = await startDaemon({ home: idleHome, port: 0, fetch: stubFetch, idleMs: 100, tickMs: 25, log: () => {}, network: stubNetwork });
   assert.ok(fs.existsSync(path.join(idleHome, 'daemon.json')));
   await d.closed;
   assert.equal(fs.existsSync(path.join(idleHome, 'daemon.json')), false, 'lock removed on exit');
@@ -381,6 +385,54 @@ test('wiring: claude keeps the user\'s keys and gateway; intercepted agents get 
 });
 
 // ── the CLI, out of process ──────────────────────────────────────────────────
+
+// A daemon left over from another glass version: /health and /stop only.
+async function oldDaemon(sessions) {
+  const seen = [];
+  const srv = http.createServer((req, res) => {
+    seen.push(req.url);
+    res.writeHead(200, { 'content-type': 'application/json' });
+    if (req.url === '/stop') { res.end('{"stopping":true}'); setImmediate(() => { srv.close(); srv.closeAllConnections(); }); return; }
+    res.end(JSON.stringify({ ok: true, glass: '0.0.1', pid: 2 ** 22 + 7, port: srv.address().port, sessions }));
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  return { port: srv.address().port, seen, close: () => new Promise((r) => { srv.close(() => r()); srv.closeAllConnections(); }) };
+}
+
+test('version check: an older daemon with live sessions is joined, with one warning', async () => {
+  const { daemonFor } = await import('../lib/glass/cli.mjs');
+  const old = await oldDaemon(2);
+  const warnings = [];
+  const h = await daemonFor({ home, port: old.port, env: {}, version: '9.9.9', warn: (l) => warnings.push(l) });
+  assert.equal(h.glass, '0.0.1');
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /running daemon is glass 0\.0\.1, this is 9\.9\.9 — it keeps serving its 2 live session/);
+  assert.ok(!old.seen.includes('/stop'), 'a daemon with sessions is never stopped');
+  await old.close();
+});
+
+test('version check: an older daemon without sessions is replaced by this version', { skip: process.platform === 'win32' && 'spawns a detached daemon' }, async () => {
+  const { daemonFor } = await import('../lib/glass/cli.mjs');
+  const { stopDaemon } = await import('../lib/glass/client.mjs');
+  const cliHome = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-ver-'));
+  const old = await oldDaemon(0);
+  const version = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
+  const h = await daemonFor({ home: cliHome, port: old.port, env: { PATH: process.env.PATH, HOME: home }, version, warn: () => assert.fail('no warning') });
+  assert.ok(old.seen.includes('/stop'));
+  assert.equal(h?.glass, version);
+  await stopDaemon(old.port, { waitMs: 10_000 });
+  fs.rmSync(cliHome, { recursive: true, force: true });
+});
+
+test('CLI: a reader that goes away (glass status | head) ends glass quietly', async () => {
+  const child = spawn(process.execPath, [BIN, 'status'], { env: { PATH: process.env.PATH, HOME: home, GLASS_PORT: String(await freePort()) } });
+  child.stdout.destroy();
+  let stderr = '';
+  child.stderr.on('data', (d) => { stderr += d; });
+  const code = await new Promise((r) => child.on('exit', r));
+  assert.equal(code, 0, stderr);
+  assert.doesNotMatch(stderr, /EPIPE/);
+});
 
 function runCli(args, env) {
   return new Promise((resolve) => {
