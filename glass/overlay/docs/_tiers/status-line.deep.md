@@ -38,6 +38,12 @@ restores it afterwards.
 | tokens | opens this session in the UI | link to the session |
 | network | popup with the egress report | — |
 
+**Which browser tab opens.** On macOS with Chrome, a click re-uses an open glass tab:
+it is focused, and navigated only when it shows another page. Everywhere else —
+other browsers, Linux, Windows (Edge included) — every click opens a new tab. Without
+tmux the links are plain terminal hyperlinks the terminal hands to the default
+browser, and glass has no way to reach a tab that is already open.
+
 The context report as it appears in the popup:
 
 ![Context report](images/terminal-report-ctx.png)

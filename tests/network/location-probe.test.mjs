@@ -9,7 +9,7 @@ import { EventEmitter } from 'node:events';
 
 import {
   classifyLocation, observeLocation, networkBadge, countFunctionalFailures, publishedFunctional,
-  readProxyEnabledByUser, probePacResolves, probeVpnConnected, FUNCTIONAL_FAIL_THRESHOLD,
+  readProxyEnabledByUser, probePacResolves, probeProxyFunctional, probeVpnConnected, FUNCTIONAL_FAIL_THRESHOLD,
 } from '../../lib/network/location-probe.mjs';
 
 describe('classifyLocation', () => {
@@ -83,6 +83,13 @@ describe('probes', () => {
     const noDig = Object.assign(new Error('missing'), { code: 'ENOENT' });
     assert.equal(await probePacResolves({ execFile: dig('', noDig), lookup: async () => ({ address: '10.1.2.3' }) }), true);
     assert.equal(await probePacResolves({ execFile: dig('', noDig), lookup: async () => { throw new Error('NXDOMAIN'); } }), false);
+  });
+  it('console probes start hidden: no window flashes from the console-less daemon on Windows', async () => {
+    const seen = [];
+    const spy = (out) => (file, args, opts, cb) => { seen.push([file, opts.windowsHide]); cb(null, out); };
+    await probePacResolves({ execFile: spy('10.1.2.3\n') });
+    await probeProxyFunctional({ execFile: spy('200') });
+    assert.deepEqual(seen, [['dig', true], ['curl', true]]);
   });
   it('VPN CLI: "state: Connected" on stdout; no CLI for the platform → false', async () => {
     const fake = (text) => () => {
