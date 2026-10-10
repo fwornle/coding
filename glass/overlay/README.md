@@ -133,6 +133,10 @@ home directory must be byte-identical to before).
 - **An agent reports a certificate error:** run it with `--no-intercept` to confirm,
   then send the daemon log to the maintainers. If you already set `NODE_EXTRA_CA_CERTS`,
   glass adds its CA to yours for that run.
+- **Next to another local LLM proxy** (coding, for instance): start glass from a
+  terminal that tool's launcher did not set up, and if opencode / pi default to that
+  proxy, add `--model <provider>/<model>` with one of the agent's own providers.
+  `glass doctor` warns about both.
 - **No rows for copilot:** check `copilot --version` (≥ 1.0.93) and that `which copilot`
   (`where copilot` on Windows) is the npm CLI, not VS Code's bundled one.
 

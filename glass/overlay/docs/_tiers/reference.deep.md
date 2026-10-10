@@ -5,7 +5,7 @@
 | `glass <agent> [--no-intercept] [--no-tmux] [args…]` | Run `claude`, `copilot`, `opencode` or `pi`, measured. All other arguments go to the agent unchanged. Returns the agent's exit code. |
 | `glass ui` | Open the UI (Token Usage, Sessions) in the browser |
 | `glass status` | Daemon state, live sessions, the latest recorded calls |
-| `glass doctor` | Node version, data home, CA, egress proxy, each agent's path and version, daemon state. Exit code 1 when something needs fixing |
+| `glass doctor` | Node version, data home, CA, egress proxy, each agent's path and version, daemon state, and warnings when another local LLM proxy or tmux session overlaps with glass. Exit code 1 when something needs fixing |
 | `glass watch [--task <id>]` | A live one-line status bar for the newest session, or the given one |
 | `glass statusline [--format plain\|ansi\|tmux] [--task <id>]` | Print the status line once |
 | `glass report ctx\|net [--task <id>]` | The context or network report (what a status-line click shows) |

@@ -15,6 +15,7 @@ import {
 } from './client.mjs';
 import { runAgent } from './spawn.mjs';
 import { upstreamProxy } from './egress.mjs';
+import { coexistWarnings } from './coexist.mjs';
 import { openUrl } from './open-url.mjs';
 import { renderStatusline, renderReport, uiLinks, TAGS } from './statusline.mjs';
 import { tmuxWanted, launchInTmux, configureStatus, popup, selfCommand } from './tmux.mjs';
@@ -29,7 +30,7 @@ const HELP = `glass ${VERSION} — token measurement and context insight for cod
   glass claude|copilot|opencode|pi [--no-intercept] [--no-tmux] [args…]   run an agent, measured
   glass ui           open the UI (Token Usage, Sessions + context) in the browser
   glass status       daemon, live sessions, latest rows
-  glass doctor       agent binaries, CA, egress, daemon
+  glass doctor       agent binaries, CA, egress, daemon, other local proxies
   glass stop         stop the daemon (it also exits by itself when idle)
   glass uninstall    stop the daemon and delete ${glassHome()} (asks first; --yes skips)
   glass watch        a live status line for the newest session (--task <id> for another)
@@ -274,6 +275,10 @@ async function doctor() {
   }
   const h = await health(port);
   out(`daemon: ${h ? `running, pid ${h.pid}, ${h.sessions} session(s)` : 'not running (starts with the first glass <agent>)'}`);
+  // Warnings, not problems: glass still runs, it just measures less (or twice).
+  const warnings = coexistWarnings({ port });
+  if (warnings.length) out('warnings (glass runs, but measures less or twice):');
+  for (const w of warnings) out(`  ! ${w}`);
   return problems ? 1 : 0;
 }
 

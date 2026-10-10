@@ -37,6 +37,41 @@ pi's `/login` → GitHub Copilot asks for your GitHub Enterprise domain (`bmw.gh
 `429 Too Many Requests` after approving the device code comes from a Copilot rate limit
 on your account; wait 10–15 minutes and log in again.
 
+## glass next to another local LLM proxy
+
+Some tools (coding, for example) run their own LLM proxy on your machine and point the
+agents at it. glass works next to them, but in three places the two overlap. `glass
+doctor` warns about each one under *warnings*; the warnings do not stop glass, and the
+exit code stays 0.
+
+**claude started from the other tool's terminal.** Its launcher sets
+`ANTHROPIC_BASE_URL` to its proxy (coding: `http://127.0.0.1:12435`). glass treats an
+existing base URL as the upstream, so each call goes claude → glass → the other proxy →
+Anthropic and both tools record it. Each count is right, but the two cannot be added up,
+and the other tool files the call under glass's session id. Start glass from a terminal
+the other tool's launcher did not set up.
+
+**opencode or pi default to the other proxy.** If the default model's provider has a
+plain-HTTP base URL on your machine (coding sets `rapid-proxy/…` in
+`~/.config/opencode/opencode.json` and `rapid-proxy-pi` in `~/.pi/agent/settings.json`),
+that traffic never passes through glass: glass decrypts only HTTPS model hosts. Pick one
+of the agent's own providers for the run:
+
+```sh
+glass opencode --model github-copilot/claude-haiku-4.5
+glass pi --model github-copilot/claude-haiku-4.5
+```
+
+On a machine without such a proxy, the agent's default is one of its own providers and
+`glass opencode` / `glass pi` measure it without any `--model`.
+
+**tmux.** Started inside an existing tmux session, glass shows its status bar on that
+session for the run and restores yours when the agent exits. `--no-tmux`, or a separate
+terminal, leaves your bar alone.
+
+The simplest setup: the other tool's sessions as usual, glass in a separate terminal
+window that its launcher did not start.
+
 ## Start from scratch
 
 ```sh
