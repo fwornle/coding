@@ -103,6 +103,14 @@ const api = async (method, route, body) => {
 const recent = async () => (await api('GET', '/api/token-usage/recent?limit=50&scope=both')).body.data;
 const rowsFor = async (taskId) => (await recent()).filter((r) => r.task_id === taskId);
 const settle = () => new Promise((r) => setTimeout(r, 150));
+// A write the daemon finishes after the response: poll for it rather than trust one
+// fixed sleep, which a slow runner (Windows CI) outlasts.
+async function eventually(read, ok, ms = 5000) {
+  const end = Date.now() + ms;
+  let v = await read();
+  while (!ok(v) && Date.now() < end) { await new Promise((r) => setTimeout(r, 50)); v = await read(); }
+  return v;
+}
 
 // An intercepted HTTPS request: CONNECT with the session token, TLS verified against glass's CA.
 function intercepted({ host, token, method = 'POST', route, body }) {
@@ -163,7 +171,7 @@ test('claude via the base URL: forwarded, row + context turn under the session t
   assert.equal(row.input_tokens, 12);
   assert.equal(row.output_tokens, 9);
   assert.equal(row.cache_read_tokens, 300);
-  const turns = (await api('GET', `/api/context-turns?task_id=${s.taskId}`)).body.contextTurns;
+  const turns = await eventually(async () => (await api('GET', `/api/context-turns?task_id=${s.taskId}`)).body.contextTurns, (t) => t.length > 0);
   assert.equal(turns.length, 1);
 });
 
