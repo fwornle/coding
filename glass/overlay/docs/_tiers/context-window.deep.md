@@ -57,8 +57,8 @@ on the next:
 
 ## The same in the terminal
 
-Clicking `[ctx]` in the [status line](status-line.md) — or `glass report ctx` — prints the
-context report of the live session:
+Clicking `[ctx]` in the [status line](status-line.md) opens this explainer for the live
+session. `glass report ctx` prints the same breakdown in the terminal:
 
 ![Context report](images/terminal-report-ctx.png)
 

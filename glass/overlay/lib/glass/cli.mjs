@@ -246,29 +246,37 @@ async function report(argv) {
   return 0;
 }
 
-/** A status-line click (tmux run-shell): open the UI, or a report in a popup. */
+/**
+ * What a tmux status-line click does: open a UI page (the same page the field
+ * links to without tmux, so a click lands in the same place everywhere), or —
+ * the network field — the egress report in a popup, its page when no popup shows.
+ */
+export function clickTarget(tag, links) {
+  if (tag === TAGS.health) return { open: links.root };
+  if (tag === TAGS.tok) return { open: links.session };
+  if (tag === TAGS.ctx) return { open: links.explain };
+  if (tag === TAGS.net) return { popup: 'net', fallback: links.network };
+  return null;
+}
+
+/** A status-line click (tmux run-shell). */
 async function click(argv) {
   const tag = argv[0];
   const port = Number(opt(argv, '--port')) || glassPort();
   const task = opt(argv, '--task') || undefined;
   const links = uiLinks(port, task);
+  const target = clickTarget(tag, links);
+  if (!target) { err(`glass click: unknown field ${tag}`); return 2; }
   // Any open glass UI tab is re-used and navigated (macOS), as coding's
   // dashboards are: the origin is the reuse prefix.
   const origin = links.root;
-  if (tag === TAGS.health) return (await openUrl(links.root, origin)) ? 0 : 1;
-  if (tag === TAGS.tok) return (await openUrl(links.session, origin)) ? 0 : 1;
-  if (tag === TAGS.ctx || tag === TAGS.net) {
-    const which = tag === TAGS.ctx ? 'ctx' : 'net';
-    const shown = popup({
-      client: opt(argv, '--client'), pane: opt(argv, '--pane'),
-      title: which === 'ctx' ? 'glass · context window' : 'glass · network',
-      argv: [...selfCommand(), 'report', which, '--port', String(port), ...(task ? ['--task', task] : []), '--hold'],
-    });
-    if (!shown && which === 'ctx') return (await openUrl(links.explain, origin)) ? 0 : 1;
-    return shown ? 0 : 1;
-  }
-  err(`glass click: unknown field ${tag}`);
-  return 2;
+  if (target.open) return (await openUrl(target.open, origin)) ? 0 : 1;
+  const shown = popup({
+    client: opt(argv, '--client'), pane: opt(argv, '--pane'), title: 'glass · network',
+    argv: [...selfCommand(), 'report', target.popup, '--port', String(port), ...(task ? ['--task', task] : []), '--hold'],
+  });
+  if (shown) return 0;
+  return (await openUrl(target.fallback, origin)) ? 0 : 1;
 }
 
 /** A live one-line status bar in this terminal (no tmux: a split pane next to the agent). */

@@ -10,7 +10,7 @@ import { spawnSync } from 'node:child_process';
 
 const { renderStatusline, renderReport, uiLinks, TAGS } = await import('../lib/glass/statusline.mjs');
 const { clickBinding, tmuxWanted, innerEnv, configureStatus } = await import('../lib/glass/tmux.mjs');
-const { claudeStatusSettings, isTerminalReport, watchHint } = await import('../lib/glass/cli.mjs');
+const { claudeStatusSettings, isTerminalReport, watchHint, clickTarget } = await import('../lib/glass/cli.mjs');
 
 const D = {
   glass: '0.0.0', task_id: 'glass-claude-1', agent: 'claude', intercept: true, last_at: '2026-10-09T08:00:00Z',
@@ -74,6 +74,15 @@ test('claude without tmux: a --settings file with glass as statusLine', () => {
   assert.equal(statusLine.type, 'command');
   assert.match(statusLine.command, /^".+" ".+glass\.mjs" statusline --format ansi --port 12445 --task glass-claude-1$/);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('tmux clicks land where the links do: ctx → the explainer, network → a popup', () => {
+  const links = uiLinks(12445, D.task_id);
+  assert.deepEqual(clickTarget(TAGS.ctx, links), { open: links.explain });
+  assert.deepEqual(clickTarget(TAGS.tok, links), { open: links.session });
+  assert.deepEqual(clickTarget(TAGS.health, links), { open: links.root });
+  assert.deepEqual(clickTarget(TAGS.net, links), { popup: 'net', fallback: links.network });
+  assert.equal(clickTarget('nope', links), null);
 });
 
 test('no tmux bar: every agent but Claude Code is pointed at glass watch', () => {

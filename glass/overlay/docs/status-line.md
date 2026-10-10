@@ -11,7 +11,7 @@ Context gauge and session tokens, live, in the terminal you work in.
     | Field | Shows | Click |
     |---|---|---|
     | `glass ●` | daemon running (✗ = down) | opens the UI |
-    | `ctx` | latest turn's size vs. the model's window | context report |
+    | `ctx` | latest turn's size vs. the model's window | context explainer in the UI |
     | `↑ ↓ ⚡` | session tokens sent / received, cache share | the session in the UI |
     | `N:` | egress: `direct` or via `proxy` | network report |
 

@@ -37,13 +37,12 @@ restores it afterwards.
 | Field | tmux click | In Claude Code / `glass watch` |
 |---|---|---|
 | health | opens the UI | link to the UI |
-| context | popup with the context report | link to the context explainer |
+| context | opens the context explainer in the UI | link to the context explainer |
 | tokens | opens this session in the UI | link to the session |
 | network | popup with the egress report | link to the same report, as a page |
 
-A terminal hyperlink can only open a URL, so without tmux each field opens a page:
-the context explainer in the UI stands in for the context popup, and the daemon's
-`/report/net` page for the network popup.
+A terminal hyperlink can only open a URL, so without tmux each field opens a page;
+for the network field that is the daemon's `/report/net` page, the popup's report.
 
 **Which browser tab opens.** On macOS with Chrome, a click re-uses an open glass tab:
 it is focused, and navigated only when it shows another page. Everywhere else —
@@ -51,11 +50,11 @@ other browsers, Linux, Windows (Edge included) — every click opens a new tab. 
 tmux the links are plain terminal hyperlinks the terminal hands to the default
 browser, and glass has no way to reach a tab that is already open.
 
-The context report as it appears in the popup:
+The context report as a terminal report, `glass report ctx`:
 
 ![Context report](images/terminal-report-ctx.png)
 
-The same reports are available on the command line: `glass report ctx`, `glass report net`.
+Both reports are available on the command line: `glass report ctx`, `glass report net`.
 
 ## Refresh
 
