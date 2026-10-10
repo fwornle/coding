@@ -41,6 +41,11 @@ import { createRotatingLogger } from '../lib/utils/log-rotator.js';
 import { decideProxydetoxHeal, neededProbes } from '../lib/network/proxydetox-heal-decision.mjs';
 import { startNetworkChangeWatcher, networkChangeRecent } from '../lib/network/network-change-watcher.mjs';
 import { settleLocation, OPEN_DEMOTION_CONFIRM_TICKS } from '../lib/network/location-hysteresis.mjs';
+import {
+  REACHABILITY_HOST, PAC_HOST, FUNCTIONAL_FAIL_THRESHOLD,
+  probePortListening, readProxyEnabledByUser, probeProxyFunctional, countFunctionalFailures,
+  publishedFunctional, probeVpnConnected, probePacResolves, probePacOnSite, classifyLocation,
+} from '../lib/network/location-probe.mjs';
 import { settleModeFlip, classifyNetClass } from '../lib/network/proxy-mode-flip.mjs';
 import { decidePostKickstartRecovery } from '../lib/network/post-kickstart-recovery.mjs';
 import { loadFeatures, FeatureConfigError, loadProfiles, profileAliases, configPaths } from '../lib/features/index.mjs';
@@ -3116,19 +3121,10 @@ function refreshLslStaleness() {
 const NETWORK_PROBE_INTERVAL_MS = 15_000;
 
 
-// Reachability probe target. MUST be reachable from every network we run on,
-// including the CN corporate network where GitHub is throttled/blocked by the
-// GFW. `captive.apple.com` is a tiny fixed "Success" page served from Apple's
-// globally-distributed CDN (reachable in mainland China), the de-facto standard
-// captive-portal check — fast, unauthenticated, and returns HTTP 200. Do NOT
-// use api.github.com here: it produces false "Internet Unreachable" errors in CN.
-const REACHABILITY_HOST = process.env.HEALTH_REACHABILITY_HOST || 'captive.apple.com';
-// The corporate host used to ask "is proxydetox still forwarding?" as opposed to
-// "can it reach the internet?" — the distinction the heal decision turns on.
-// Deliberately the SAME host the corporate-network detection below already dials
-// (dig at :2521, TCP latency at :2534): one name for one fact, so the two cannot
-// drift into disagreeing about which host means "corporate".
-const PAC_HOST = process.env.HEALTH_PAC_HOST || 'muc.proxy-pac.bmwgroup.net';
+// REACHABILITY_HOST (reachable from every network, CN included) and PAC_HOST
+// (the one name that means "corporate": its DNS, its latency, and the heal
+// decision's proxied corporate probe) come from lib/network/location-probe.mjs,
+// shared with glass's status line.
 
 // Sleep/wake detection: if time between ticks exceeds 3x TICK_MS, we likely woke from sleep
 let lastTickTimestamp = Date.now();
@@ -3166,24 +3162,14 @@ async function pollNetworkStatus() {
   // ── P: Proxy status (independent of N) ──────────────────────────────────
    const proxyEnvSet = !!(process.env.http_proxy || process.env.https_proxy ||
                          process.env.HTTP_PROXY || process.env.HTTPS_PROXY);
-   const portListening = await new Promise(resolve => {
-     const sock = net.connect({ host: '127.0.0.1', port: 3128, timeout: 2000 });
-     sock.once('connect', () => { sock.destroy(); resolve(true); });
-     sock.once('error', () => resolve(false));
-     sock.once('timeout', () => { sock.destroy(); resolve(false); });
-   });
+   const portListening = await probePortListening();
 
    // P: "Is proxy enabled?" — determined by user intent (the persistent toggle in ~/.bash_profile
    // written by ~/proxy.sh aka `px`). proxydetox is a launchctl daemon that's always running,
    // so port 3128 alone doesn't indicate intent. The bash_profile line is the ground truth:
    //   "http_proxy=..."  → enabled (user ran `px` to enable)
    //   "#http_proxy=..." → disabled (user ran `px` to disable)
-   let proxyEnabledByUser = false;
-   try {
-     const bashProfile = fs.readFileSync(path.join(os.homedir(), '.bash_profile'), 'utf8');
-     // If uncommented http_proxy= line exists, user enabled proxy
-     proxyEnabledByUser = /^http_proxy=/m.test(bashProfile);
-   } catch { /* file missing — treat as disabled */ }
+   const proxyEnabledByUser = readProxyEnabledByUser();
 
     // Auto-heal: detect and fix two failure modes:
     //   1. Port dead (stale socket after sleep/wake) — portListening=false
@@ -3200,22 +3186,7 @@ async function pollNetworkStatus() {
     // still reported (proxy_enabled_by_user) but no longer gates health.
     {
       // Functional probe: actually try to proxy a request (not just TCP connect)
-      if (portListening) {
-        try {
-          // Async (non-blocking) — execSync here froze the coordinator's event
-          // loop for up to 8s per poll, causing /health/state to time out
-          // (verifier STEP 2 failure + status-line getCoordinatorState timeout).
-          const { stdout } = await execFileAsync('curl', [
-            '-s', '--connect-timeout', '3', '--max-time', '5',
-            '-x', 'http://127.0.0.1:3128',
-            '-o', '/dev/null', '-w', '%{http_code}',
-            `https://${REACHABILITY_HOST}`
-          ], { timeout: 8000 });
-          proxyFunctional = stdout.trim() === '200';
-        } catch {
-          proxyFunctional = false;
-        }
-      }
+      if (portListening) proxyFunctional = await probeProxyFunctional();
 
       // ── Hysteresis / debounce (2026-07-17) ────────────────────────────────
       // A single transient curl failure (proxy busy, network jitter, in-flight
@@ -3227,20 +3198,15 @@ async function pollNetworkStatus() {
       //
       // A dead port (TCP connect refused) is a HARD, unambiguous signal —
       // proxydetox is genuinely not listening — so it is NOT debounced.
-      const FUNCTIONAL_FAIL_THRESHOLD = 3;
+      // (FUNCTIONAL_FAIL_THRESHOLD and the counting rule: lib/network/location-probe.mjs.)
       // Floor on how often a proxydetox heal may restart the LLM proxy. Restarting
       // it drops every in-flight request and leaves :12435 refusing connections for
       // ~10s, so it must stay a rare corrective action rather than something that
       // can ride a repeating heal loop.
       const LLM_PROXY_RESTART_MIN_INTERVAL_MS = 10 * 60 * 1000;
-      if (portListening) {
-        if (proxyFunctional) {
-          netState.consecutive_functional_failures = 0;
-        } else {
-          netState.consecutive_functional_failures =
-            (netState.consecutive_functional_failures || 0) + 1;
-        }
-      }
+      netState.consecutive_functional_failures = countFunctionalFailures({
+        raw: proxyFunctional, portListening, failures: netState.consecutive_functional_failures,
+      });
       functionalFailConfirmed =
         (netState.consecutive_functional_failures || 0) >= FUNCTIONAL_FAIL_THRESHOLD;
 
@@ -3402,11 +3368,10 @@ async function pollNetworkStatus() {
     // Debounced functional badge: a live probe pass reports true immediately;
     // a raw miss holds the previous value until FUNCTIONAL_FAIL_THRESHOLD
     // consecutive misses confirm the outage. Prevents single-blip P:OFF flaps.
-    if (proxyFunctional) {
-      netState.proxy_functional = true;
-    } else if (functionalFailConfirmed || !effectivePortListening) {
-      netState.proxy_functional = false;
-    } // else: hold prior netState.proxy_functional (transient blip within debounce window)
+    netState.proxy_functional = publishedFunctional({
+      raw: proxyFunctional, confirmed: functionalFailConfirmed, portListening: effectivePortListening,
+      previous: netState.proxy_functional,
+    });
     netState.proxy_port_listening = effectivePortListening;  // raw: is proxydetox daemon alive?
     netState.proxy_env_set = proxyEnvSet;           // track separately for debugging
     netState.proxy_enabled_by_user = proxyEnabledByUser;  // the persistent toggle
@@ -3417,64 +3382,21 @@ async function pollNetworkStatus() {
   //   2. BMW PAC DNS resolution + latency — distinguishes corporate vs open
   //   3. utun interface presence — fallback VPN indicator
 
-  // Signal 1: Cisco VPN state (most reliable)
-  // Note: the vpn CLI drops into an interactive VPN> prompt after output,
-  // so we must close stdin and use kill-on-timeout to avoid hanging.
-  const vpnConnected = await new Promise(resolve => {
-    const vpnBin = '/opt/cisco/secureclient/bin/vpn';
-    let stdout = '';
-    const child = spawn(vpnBin, ['state'], { stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000 });
-    child.stdout.on('data', chunk => { stdout += chunk; });
-    child.on('close', () => resolve(/state:\s*Connected/i.test(stdout)));
-    child.on('error', () => resolve(false));
-    setTimeout(() => { try { child.kill(); } catch {} }, 3000);
-  });
-
-  // Signal 2: BMW PAC DNS resolution (indicates corporate network reachability)
-  // IMPORTANT: Use execSync('dig') instead of dns.Resolver — Node's dns module
-  // caches the system DNS servers from process startup and never re-reads them.
-  // If the coordinator starts on a hotspot (public DNS), it will NEVER resolve
-  // internal BMW hostnames even after switching to office LAN (corporate DNS).
-  // 'dig' spawns a fresh process that uses the OS's current DNS configuration.
-  const pacResolved = await (async () => {
-    try {
-      // +tries=2, not 1: this single lookup decides the whole location verdict,
-      // and a lost UDP packet is not evidence of anything. One retry costs at
-      // most another 2s on a tick that runs every 15s, and stops the commonest
-      // transient from ever reaching the decision. The exec timeout below is
-      // raised to match (2 tries x 2s + slack) — leaving it at 4000 would have
-      // capped the second try before dig could use it.
-      const { stdout: result } = await execFileAsync('dig', ['+short', '+timeout=2', '+tries=2', 'muc.proxy-pac.bmwgroup.net', 'A'], { timeout: 6000, encoding: 'utf8' });
-      return /\d+\.\d+\.\d+\.\d+/.test(result.trim());
-    } catch {
-      return false;
-    }
-  })();
-
-  // Signal 3 (used only when PAC resolves): latency distinguishes physical CN vs VPN
+  // Signal 1: Cisco VPN state (most reliable). Signal 2: the PAC host resolves
+  // (corporate DNS; dig, not Node's cached resolver). Signal 3, only when PAC
+  // resolves and the CLI said nothing: TCP latency separates on-site from VPN.
+  // Probes and the verdict rule: lib/network/location-probe.mjs.
+  const vpnConnected = await probeVpnConnected();
+  const pacResolved = await probePacResolves();
   let onPhysicalCN = false;
   if (pacResolved && !vpnConnected) {
-    // Only measure latency if VPN CLI didn't already tell us
-    onPhysicalCN = await new Promise(resolve => {
-      const start = Date.now();
-      const sock = net.connect({ host: 'muc.proxy-pac.bmwgroup.net', port: 80, timeout: 2000 });
-      sock.once('connect', () => { const ms = Date.now() - start; log(`network: PAC TCP latency=${ms}ms (threshold=100ms)`, 'DEBUG'); sock.destroy(); resolve(ms < 100); });
-      sock.once('error', () => resolve(false));
-      sock.once('timeout', () => { sock.destroy(); resolve(false); });
+    onPhysicalCN = await probePacOnSite({
+      onLatency: (ms) => log(`network: PAC TCP latency=${ms}ms (threshold=100ms)`, 'DEBUG'),
     });
   }
 
   // Determine location from signals (N is NEVER influenced by proxy/port state)
-  let observedLocation;
-  if (vpnConnected) {
-    observedLocation = 'vpn';           // Cisco says connected — definitive
-  } else if (pacResolved && onPhysicalCN) {
-    observedLocation = 'corporate';     // PAC resolves + low latency = on-site
-  } else if (pacResolved) {
-    observedLocation = 'vpn';           // PAC resolves + high latency = VPN (CLI missed?)
-  } else {
-    observedLocation = 'open';          // no corporate access whatsoever
-  }
+  const observedLocation = classifyLocation({ vpnConnected, pacResolved, onPhysicalCN });
 
   // Publish the SETTLED verdict, not the raw one — one lost DNS packet must not
   // read as "left the building". Rules and rationale in

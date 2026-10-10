@@ -18,6 +18,7 @@ import { UKBProcessManager } from './ukb-process-manager.js';
 // gauge has exactly one implementation instead of the duplicate-and-keep-in-sync
 // arrangement that LIFECYCLE_ICONS and _lastContentTimestampMs live with.
 import contextGauge from '../lib/statusline/context-gauge.cjs';
+import { networkBadge } from '../lib/network/location-probe.mjs';
 import paneCacheKey from '../lib/statusline/pane-cache-key.cjs';
 import featureGate from '../lib/statusline/feature-gate.cjs';
 import { visibleCellWidth } from '../lib/statusline/visible-cell-width.cjs';
@@ -2579,21 +2580,13 @@ class CombinedStatusLine {
     //   AUTO — daemon up+functional, px toggle off (adaptive/direct-fallback;
     //          pinned sessions still routed — today's normal off-CN state)
     //   OFF  — daemon down or not functional (the only genuinely broken state)
+    // Labels and the warn rule: lib/network/location-probe.mjs networkBadge(),
+    // shared with glass's status line.
     if (f.health) {
-      const loc = network?.location || 'unknown';
-      const locMap = { corporate: 'CN', vpn: 'VPN', open: 'OPEN', home: 'OPEN', unknown: '??' };
-      const locLabel = locMap[loc] || loc.toUpperCase().slice(0, 4);
-
-      const daemonUp = network?.proxy_running && network?.proxy_functional;
-      const pxLabel = !daemonUp ? 'OFF'
-        : network?.proxy_enabled_by_user ? 'ON'
-        : 'AUTO';
-
-      parts.push(`[N:${locLabel} P:${pxLabel}]`);
-      if ((network?.location === 'corporate' || network?.location === 'vpn') && !daemonUp) {
-        // On CN/VPN without a working local proxy — external APIs unreachable
-        if (overallColor === 'green') overallColor = 'yellow';
-      }
+      const badge = networkBadge(network);
+      parts.push(`[${badge.text}]`);
+      // On CN/VPN without a working local proxy — external APIs unreachable
+      if (badge.warn && overallColor === 'green') overallColor = 'yellow';
     }
 
     // Prompt classifier: how many turns it has moved to a cheaper band since
