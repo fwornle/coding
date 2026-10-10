@@ -193,14 +193,33 @@ async function statuslineCmd(argv) {
   return 0;
 }
 
-async function waitForKey() {
-  if (!process.stdin.isTTY) return;
-  process.stdout.write('\n[press any key]');
-  process.stdin.setRawMode(true);
-  process.stdin.resume();
-  await new Promise((r) => process.stdin.once('data', r));
-  process.stdin.setRawMode(false);
-  process.stdin.pause();
+// What a terminal sends on its own, not a key: status reports (CSI ? … n|c|y, e.g.
+// tmux passing on a colour-scheme change, \e[?997;1n, the moment a popup opens in an
+// xterm.js terminal), focus in/out, mouse events, OSC and DCS replies.
+const TERMINAL_REPORT = /\x1b\[\?[\d;]*\$?[ncy]|\x1b\[[IO]|\x1b\[<[\d;]*[Mm]|\x1b\[M[\s\S]{3}|\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)|\x1bP[\s\S]*?\x1b\\/g;
+
+/** Whether input is only terminal reports — no key the user pressed. */
+export function isTerminalReport(data) {
+  const s = Buffer.isBuffer(data) ? data.toString('latin1') : String(data);
+  return s.length > 0 && s.replace(TERMINAL_REPORT, '') === '';
+}
+
+/** Hold a popup open until a real key; terminal reports arriving meanwhile are skipped. */
+export async function waitForKey(input = process.stdin, output = process.stdout) {
+  if (!input.isTTY) return;
+  output.write('\n[press any key]');
+  input.setRawMode(true);
+  input.resume();
+  await new Promise((resolve) => {
+    const onData = (data) => {
+      if (isTerminalReport(data)) return;
+      input.off('data', onData);
+      resolve();
+    };
+    input.on('data', onData);
+  });
+  input.setRawMode(false);
+  input.pause();
 }
 
 async function report(argv) {

@@ -10,7 +10,7 @@ import { spawnSync } from 'node:child_process';
 
 const { renderStatusline, renderReport, uiLinks, TAGS } = await import('../lib/glass/statusline.mjs');
 const { clickBinding, tmuxWanted, innerEnv, configureStatus } = await import('../lib/glass/tmux.mjs');
-const { claudeStatusSettings } = await import('../lib/glass/cli.mjs');
+const { claudeStatusSettings, isTerminalReport } = await import('../lib/glass/cli.mjs');
 
 const D = {
   glass: '0.0.0', task_id: 'glass-claude-1', agent: 'claude', intercept: true, last_at: '2026-10-09T08:00:00Z',
@@ -124,6 +124,46 @@ test('tmux: configureStatus on a real server — options set, clicks bound, user
   } finally {
     Object.assign(process.env, saved);
     for (const [k, v] of Object.entries(saved)) if (v === undefined) delete process.env[k];
+    t('kill-server');
+    fs.rmSync(path.dirname(sock), { recursive: true, force: true });
+  }
+});
+
+test('report popup: terminal reports are not a key press', () => {
+  assert.equal(isTerminalReport('\x1b[?997;1n'), true, 'colour-scheme report (xterm.js via tmux, on popup open)');
+  assert.equal(isTerminalReport('\x1b[?997;2n\x1b[I'), true, 'report + focus in');
+  assert.equal(isTerminalReport('\x1b[?1;2c'), true, 'device attributes');
+  assert.equal(isTerminalReport('\x1b[<0;120;40m'), true, 'SGR mouse release');
+  assert.equal(isTerminalReport(Buffer.from([0x1b, 0x5b, 0x4d, 0x20, 0x30, 0x30])), true, 'X10 mouse');
+  assert.equal(isTerminalReport('\x1b]11;rgb:1e1e/1e1e/1e1e\x1b\\'), true, 'OSC 11 reply');
+  assert.equal(isTerminalReport('q'), false, 'a key');
+  assert.equal(isTerminalReport('\r'), false, 'Enter');
+  assert.equal(isTerminalReport('\x1b'), false, 'Escape');
+  assert.equal(isTerminalReport('\x1b[A'), false, 'an arrow key');
+  assert.equal(isTerminalReport('\x1b[?997;1nq'), false, 'a key after a report');
+});
+
+test('report popup on a real pty: held open through a colour-scheme report, closed by a key', { skip: (!hasTmux || process.platform === 'win32') && 'no tmux' }, async () => {
+  // The popup is `display-popup -E … glass report … --hold`: it closes when the
+  // report exits. In VS Code's terminal the first input it got was \e[?997;1n,
+  // so it flashed and closed. A pane is the same pty input path, without a client.
+  const sock = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'glass-hold-')), 's');
+  const t = (...a) => spawnSync('tmux', ['-S', sock, '-f', '/dev/null', ...a], { encoding: 'utf8' });
+  const bin = path.join(import.meta.dirname, '..', 'bin', 'glass.mjs');
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const pane = () => t('list-panes', '-t', 'h', '-F', '#{pane_dead}').stdout.trim();
+  const until = async (ok, ms = 5000) => { for (const end = Date.now() + ms; Date.now() < end && !ok(); ) await sleep(50); return ok(); };
+  try {
+    t('new-session', '-d', '-s', 'h', '-x', '80', '-y', '20', '--', process.execPath, bin, 'report', 'net', '--port', '9', '--hold');
+    t('set-option', '-t', 'h', 'remain-on-exit', 'on');
+    assert.ok(await until(() => t('capture-pane', '-p', '-t', 'h').stdout.includes('[press any key]')), 'the report waits for a key');
+    const hex = (s) => [...Buffer.from(s, 'latin1')].map((b) => b.toString(16).padStart(2, '0'));
+    t('send-keys', '-t', 'h', '-H', ...hex('\x1b[?997;1n\x1b[I\x1b[<0;10;5m'));
+    await sleep(700);
+    assert.equal(pane(), '0', 'still open after the terminal reports');
+    t('send-keys', '-t', 'h', 'q');
+    assert.ok(await until(() => pane() === '1'), 'a key closes it');
+  } finally {
     t('kill-server');
     fs.rmSync(path.dirname(sock), { recursive: true, force: true });
   }
