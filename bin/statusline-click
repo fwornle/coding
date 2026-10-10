@@ -75,42 +75,9 @@ if [ -n "$pane_session" ] && [ -r "$CODING_REPO/.data/agent-sessions/$pane_sessi
   pane_project="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("projectPath",""))' "$map" 2>/dev/null || echo "")"
 fi
 
-# Chrome by name rather than `open <url>`: the dashboards keep per-origin state
-# (auth, tab position) that only lines up if they always land in the same
-# browser, whatever the OS default happens to be that week.
-#
-# REUSES AN EXISTING TAB. A status line is clicked often, and `open` would leave
-# a fresh duplicate tab behind every single time. The AppleScript below looks for
-# a tab whose URL starts with $2 — the ORIGIN for the dashboards, so any tab
-# already showing one is re-used and merely navigated to the route being asked
-# for (that is what selects the sub-tab), and the full repo URL for a project
-# bubble, so two different repos still get a tab each. A tab already sitting on
-# the exact target is focused WITHOUT being reloaded, which keeps its scroll
-# position and any filter the user had set.
-# Is an AUTOMATION Chrome running — gsd-browser, Playwright, Puppeteer?
-#
-# This decides whether the tab-reuse script below can be trusted at all, and it
-# is not a detail. Apple Events are addressed by BUNDLE ID, and an automation
-# browser is the same bundle as the user's, distinguished only by its own
-# --user-data-dir. When one is running it answers `tell application "Google
-# Chrome"` FIRST, so the reuse script drives the automation profile instead of
-# the browser on the user's screen — it finds a tab, navigates it, reports
-# success, and the user sees nothing change. That is not hypothetical: it is
-# what shipped, and what made the fault so hard to see, because verifying the
-# fix by asking AppleScript what happened asks the WRONG browser both times.
-#
-# Raising the user's Chrome first does not help — Apple Events do not follow
-# frontmost-ness (measured). LaunchServices `open` does route to the user's
-# default-profile instance, so that is the safe path whenever an automation
-# browser is up.
-#
-# The test is "any Chrome with an explicit --user-data-dir", not "gsd-browser"
-# specifically: every automation runner sets one and the user's own never does,
-# so this covers Playwright and Puppeteer too. Erring toward "automation is
-# running" costs only a duplicate tab; erring the other way loses the click.
-automation_chrome_running() {
-  pgrep -f 'Google Chrome\.app/Contents/MacOS/Google Chrome.*--user-data-dir=' >/dev/null 2>&1
-}
+# macOS opens in the user's Chrome and REUSES an existing tab — the tab-reuse
+# AppleScript, the automation-browser guard and the separate raise live in
+# lib/statusline/browser-tab.mjs, shared with glass's status line.
 
 # Which platform's opener applies. STATUSLINE_CLICK_PLATFORM overrides it so the
 # suite can exercise every branch from one machine — without that seam the Linux
@@ -178,84 +145,16 @@ open_url() {
       note "statusline: unknown platform '$(uname -s)' — cannot open $url"; return ;;
   esac
 
-  if [ ! -d "/Applications/Google Chrome.app" ]; then open "$url" >/dev/null 2>&1; return; fi
-
-  if automation_chrome_running; then
-    # Correctness over tidiness: a new tab in the RIGHT browser beats a reused
-    # tab in one the user cannot see. `open` both routes and raises.
-    click_log "$(date -u +%Y-%m-%dT%H:%M:%SZ)   open_url url=$url via=launchservices (automation chrome up)"
-    open "$url" >/dev/null 2>&1
-    return
-  fi
-
-  # A first run prompts for permission to control Chrome; a refusal (or a
-  # scripting error of any kind) must still get the user their page, so every
-  # failure path falls through to a plain open.
-  # stdout is DISCARDED, not just stderr. osascript prints the handler's return
-  # value ("reused" / "new-tab"), and tmux's run-shell renders ANY output from
-  # the command in a view the user then has to dismiss with ESC — so a
-  # successful click would interrupt the very session it was meant to serve.
-  # The return values are kept because they are useful when debugging this by
-  # hand; they are simply not allowed to reach tmux.
-  # The AppleScript's verdict is CAPTURED, not discarded. It is the only place
-  # that knows which of the three paths ran and which tab it picked, and a click
-  # that lands on the wrong tab looks identical from outside to one that worked.
-  # It still must not reach tmux's stdout (run-shell renders any output in a
-  # view the user has to dismiss with ESC), so it goes to the same log.
-  local verdict
-  verdict="$(osascript - "$url" "$prefix" 2>&1 <<'AS'
-on run argv
-  set targetURL to item 1 of argv
-  set matchPrefix to item 2 of argv
-  tell application "Google Chrome"
-    if (count of windows) is 0 then
-      make new window
-      set URL of active tab of front window to targetURL
-      activate
-      return "new-window"
-    end if
-    repeat with w in windows
-      set idx to 0
-      repeat with t in tabs of w
-        set idx to idx + 1
-        if (URL of t as string) starts with matchPrefix then
-          if (URL of t as string) is not targetURL then set URL of t to targetURL
-          set active tab index of w to idx
-          set index of w to 1
-          activate
-          return "reused idx=" & idx & " active=" & (active tab index of w) & " wins=" & (count of windows)
-        end if
-      end repeat
-    end repeat
-    tell front window to make new tab with properties {URL:targetURL}
-    activate
-    return "new-tab"
-  end tell
-end run
-AS
-)"
-  local rc=$?
+  # The verdict (which path ran, which tab it picked) is CAPTURED for the log:
+  # a click that lands on the wrong tab looks identical from outside to one
+  # that worked. It must not reach tmux's stdout — run-shell renders any
+  # output in a view the user has to dismiss with ESC.
+  local verdict rc
+  verdict="$(node "$CODING_REPO/lib/statusline/browser-tab.mjs" "$url" "$prefix" 2>&1)"
+  rc=$?
   click_log "$(date -u +%Y-%m-%dT%H:%M:%SZ)   open_url url=$url rc=$rc verdict=${verdict//$'\n'/ }"
-
-  # RAISING CHROME IS A SEPARATE STEP, and it is not optional.
-  #
-  # `activate` inside the AppleScript above is not enough. Issued from the tmux
-  # SERVER process it routinely loses macOS's focus-stealing check, and the
-  # result is the worst possible failure mode: the tab really is re-used and
-  # navigated, so nothing is broken and nothing is logged, but the window stays
-  # behind the terminal and the click reads as a dead no-op. That is the
-  # regression the tab-reuse rewrite introduced — the `open` call it replaced
-  # was raising the window as a side effect of going through LaunchServices.
-  #
-  # `open -a` with NO url is that same LaunchServices activation on its own: it
-  # wins focus where `activate` does not, and opens no tab, so it composes with
-  # the reuse above instead of undoing it. On the AppleScript failure path the
-  # url comes with it, since there is then no tab to raise.
-  if [ "$rc" -eq 0 ]; then
-    open -a "Google Chrome" >/dev/null 2>&1
-  else
-    open -a "Google Chrome" "$url" >/dev/null 2>&1
-  fi
+  # node missing or the module failing to load: the user still gets the page.
+  if [ "$rc" -ne 0 ]; then open "$url" >/dev/null 2>&1; fi
 }
 
 # Show a report in a popup over the clicked pane. Held open until a keypress —
