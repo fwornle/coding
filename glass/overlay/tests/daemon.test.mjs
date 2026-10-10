@@ -22,7 +22,7 @@ const { daemonEnv } = await import('../lib/glass/home.mjs');
 Object.assign(process.env, daemonEnv(home));
 for (const k of ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy']) delete process.env[k];
 const { startDaemon } = await import('../lib/glass/daemon.mjs');
-const { sessionEnv, withHeaders } = await import('../lib/glass/wiring.mjs');
+const { sessionEnv, withHeaders, opencodeRelayContent } = await import('../lib/glass/wiring.mjs');
 const { cmdQuote } = await import('../lib/glass/spawn.mjs');
 
 const sse = (events, named) => events.map((e) => (named ? `event: ${e.type}\n` : '') + `data: ${typeof e === 'string' ? e : JSON.stringify(e)}\n\n`).join('');
@@ -209,6 +209,28 @@ test('pi via interception: chat JSON; a non-model path is forwarded but never ta
   assert.equal(rows[0].provider, 'openai');
 });
 
+test('opencode relay: a plain-HTTP provider is forwarded to its own URL and measured; only with the session token', async () => {
+  const base = `http://127.0.0.1:${upPort}/v1`;
+  const s = await open('opencode', { relays: { 'rapid-proxy': base, bad: 'https://example.com/v1', 'a/b': base } });
+  const relay = (id, route, body, token = s.token) => fetch(`${daemon.url}/relay/${encodeURIComponent(token)}/${id}${route}`, {
+    method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer placeholder' }, body: JSON.stringify(body),
+  });
+  const chat = await relay('rapid-proxy', '/chat/completions', { model: 'claude-sonnet-5', stream: true, messages: msgs });
+  assert.match(await chat.text(), /\[DONE\]/);
+  assert.equal(upSeen.at(-1).url, '/v1/chat/completions', 'the provider\'s own path, then the request\'s');
+  assert.equal(upSeen.at(-1).headers.authorization, 'Bearer placeholder', 'the agent\'s credential is forwarded');
+  const msg = await relay('rapid-proxy', '/messages', { model: 'claude-sonnet-5', max_tokens: 8, messages: msgs });
+  assert.equal(msg.status, 200);
+  assert.equal(upSeen.at(-1).url, '/v1/messages');
+  await settle();
+  const rows = await rowsFor(s.taskId);
+  assert.equal(rows.length, 2);
+  assert.ok(rows.every((r) => r.agent === 'opencode' && r.provider === 'rapid-proxy'));
+  assert.equal((await relay('rapid-proxy', '/chat/completions', {}, 'not-a-session')).status, 404);
+  assert.equal((await relay('bad', '/chat/completions', {})).status, 404, 'https providers are intercepted, never relayed');
+  assert.equal((await api('GET', '/sessions')).body.sessions.find((x) => x.taskId === s.taskId).relays, undefined);
+});
+
 test('closing a session archives its span', async () => {
   const s = await open('copilot');
   const closed = await api('DELETE', `/sessions/${encodeURIComponent(s.token)}`);
@@ -318,6 +340,19 @@ test('an idle daemon exits by itself', async () => {
   await d.closed;
   assert.equal(fs.existsSync(path.join(idleHome, 'daemon.json')), false, 'lock removed on exit');
   fs.rmSync(idleHome, { recursive: true, force: true });
+});
+
+test('wiring: opencode relays plain-HTTP providers through OPENCODE_CONFIG_CONTENT, keeping what was there', () => {
+  const prior = JSON.stringify({ model: 'rapid-proxy/x', provider: { 'rapid-proxy': { options: { headers: { 'x-project': 'p' } } } } });
+  const cfg = JSON.parse(opencodeRelayContent(prior, ['rapid-proxy'], { port: 12445, token: 't/k' }));
+  assert.equal(cfg.model, 'rapid-proxy/x');
+  assert.deepEqual(cfg.provider['rapid-proxy'].options, { headers: { 'x-project': 'p' }, baseURL: 'http://127.0.0.1:12445/relay/t%2Fk/rapid-proxy' });
+  const ca = path.join(home, 'ca', 'ca.pem');
+  const { env, note } = sessionEnv('opencode', {}, { port: 12445, taskId: 'T', token: 'tok', caPath: ca, project: 'p', relays: { local: 'http://127.0.0.1:8081/v1' } });
+  assert.equal(JSON.parse(env.OPENCODE_CONFIG_CONTENT).provider.local.options.baseURL, 'http://127.0.0.1:12445/relay/tok/local');
+  assert.match(note, /relaying local/);
+  assert.equal(sessionEnv('opencode', {}, { port: 12445, taskId: 'T', token: 'tok', caPath: ca, project: 'p' }).env.OPENCODE_CONFIG_CONTENT, undefined);
+  assert.equal(sessionEnv('pi', {}, { port: 12445, taskId: 'T', token: 'tok', caPath: ca, project: 'p', relays: { local: 'http://x' } }).env.OPENCODE_CONFIG_CONTENT, undefined);
 });
 
 test('wiring: claude keeps the user\'s keys and gateway; intercepted agents get the proxy + CA', () => {

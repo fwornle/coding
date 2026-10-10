@@ -1,5 +1,7 @@
 # glass
 
+> 📖 **Documentation: [aimaad-glass.pages.bmw.ghe.com](https://aimaad-glass.pages.bmw.ghe.com/)** — what glass does, with screenshots, architecture and reference.
+
 Token measurement and context-window insight for coding agents — GitHub Copilot CLI,
 OpenCode, pi and Claude Code. Put `glass` in front of the agent; it records every model
 call's tokens (input, output, cache read / write) and what filled the context window
@@ -79,6 +81,9 @@ iTerm2 and VS Code); for the other agents run `glass watch` in a split pane
   decrypts only the model hosts (`copilot-api.*.ghe.com`, `api.githubcopilot.com`,
   `api.*.githubcopilot.com`, `api.openai.com`, `api.anthropic.com`), records the usage,
   and forwards the call unchanged. Every other connection is tunnelled untouched.
+- **opencode providers on plain HTTP** (a local model server, another tool's proxy) never
+  go through `HTTPS_PROXY`; for the run, glass points them at the daemon, which forwards
+  each call to the original URL and records it.
 - All of this is set **for that one run only**, through environment variables: no agent
   configuration, shell profile or system setting is changed.
 - glass's CA is created on first use in `~/.glass/ca` and is **never added to any system
@@ -131,6 +136,11 @@ home directory must be byte-identical to before).
 - **An agent reports a certificate error:** run it with `--no-intercept` to confirm,
   then send the daemon log to the maintainers. If you already set `NODE_EXTRA_CA_CERTS`,
   glass adds its CA to yours for that run.
+- **Next to another local LLM proxy** (coding, for instance): start glass from a
+  terminal that tool's launcher did not set up. opencode providers on plain HTTP are
+  relayed through glass and measured; if pi defaults to that proxy, add
+  `--model <provider>/<model>` with one of pi's own providers. `glass doctor` warns
+  about each.
 - **No rows for copilot:** check `copilot --version` (≥ 1.0.93) and that `which copilot`
   (`where copilot` on Windows) is the npm CLI, not VS Code's bundled one.
 

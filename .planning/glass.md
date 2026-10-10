@@ -480,7 +480,19 @@ Findings during G6:
 - `glass doctor` runs `copilot --version`, which unpacks copilot's package into its own cache (`~/Library/Caches/copilot`) — copilot's data, not glass's, but a write a doctor run causes.
 - A true "colleague" test (other person, other machine, Windows) is still open — the walk-through above used this Mac.
 
+## Docs site (branch `glass-docs` in coding)
+
+MkDocs Material site at https://aimaad-glass.pages.bmw.ghe.com/ (GitHub Pages enabled 2026-10-09, build type
+workflow, private to the org). Source in `glass/overlay/`: `mkdocs.yml`, `docs/*.md` (two tiers per page: ⚡ Quick
+inline, 📚 Deep Dive from `docs/_tiers/`, labels as in coding), `docs/puml/` → `docs/images/` (architecture,
+interception sequence, release pipeline; `_standard-style.puml`), Mermaid inline. Screenshots from real sessions on a
+neutral demo project (claude, opencode, pi; copilot had lost its login), terminal views rendered from captured tmux
+panes and real command output, paths anonymised. `docs.yml`: PR touching docs → `mkdocs build --strict`; push to main
+with a docs change → build + deploy (Pages accepts main only). README starts with the site link. "A/B experiments": glass
+has no experiment runner — documented as manual run comparison (Comparing Runs page).
+
 ## Session log
+- **2026-10-09 (docs site)** — MkDocs site with screenshots, PlantUML + Mermaid diagrams, two tiers per page; Pages enabled; docs workflow; strict build green locally, 23/23 tree tests, install check green. Next: merge coding glass-docs, merge the glass PR → first publish.
 - **2026-10-09 (pi row)** — pi logged in (Copilot, bmw.ghe.com; first attempt hit a 429 from a Copilot-side endpoint after device approval, retry fine); measured through the released v0.1.2: exact match with pi's own usage. Remaining: colleague install, IT-security sign-off.
 - **2026-10-09 (G6 released)** — coding main 763b9856 (glass-g6-handover); proxy #45 and glass #7 merged → v0.1.2 released and verified (CI 4/4 with drift check, release job, macOS on the asset). Remaining: colleague install; then pi row, IT-security sign-off.
 - **2026-10-09 (G6)** — README for colleagues, provenance drift check, breakdown retention; capture-redaction bug found while writing the privacy notes and fixed in the proxy (PR #45). Next: merge #45 → coding glass-g6-handover → glass PR (0.1.2), check v0.1.2, a colleague installs.

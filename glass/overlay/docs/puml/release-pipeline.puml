@@ -1,0 +1,22 @@
+@startuml release-pipeline
+!include _standard-style.puml
+top to bottom direction
+title How glass is built, released and documented
+
+component "coding repository\n(glass/manifest.yaml, glass/overlay/)" as coding <<core>>
+component "rapid-llm-proxy repository\n(measurement, interception)" as proxy <<core>>
+component "scripts/glass/extract.mjs\nselect · compile · rewrite · overlay · build UI · verify" as extract <<util>>
+component "Pull request in AIMAAD/glass\n(branch extract/<coding>-<proxy>)" as pr <<infra>>
+component "CI on the PR\ntests · install check · provenance · docs build\nWiz IaC / Secret / Vulnerability" as ci <<infra>>
+component "main" as main <<storage>>
+component "GHE release v<version>\nglass-<version>.tgz" as rel <<storage>>
+component "Docs site\naimaad-glass.pages.bmw.ghe.com" as site <<api>>
+
+coding DATA_LINE extract
+proxy DATA_LINE extract
+extract CONTROL_LINE pr : publish step
+pr SYNC_LINE ci
+ci CONTROL_LINE main : merge when green
+main ASYNC_LINE rel : release.yml (new version only)
+main ASYNC_LINE site : docs.yml (docs changed)
+@enduml

@@ -9,6 +9,10 @@
 //   opencode, names the session on every CONNECT), NODE_EXTRA_CA_CERTS → glass's CA
 //   pi        (plus any CA bundle the user already had). Each keeps its own login,
 //             model catalogue and routing; the daemon decrypts only model hosts.
+//   opencode  also: providers with a plain-HTTP base URL (a local model server,
+//             another tool's proxy) never pass HTTPS_PROXY, so OPENCODE_CONFIG_CONTENT
+//             points each at the daemon's /relay/<token>/<provider>, which forwards
+//             to the original URL. opencode merges it over its own config.
 //
 // --no-intercept leaves copilot / opencode / pi unwired: unmeasured by the proxy.
 import fs from 'node:fs';
@@ -48,9 +52,10 @@ export function withHeaders(existing, headers) {
  * @param {string} s.project
  * @param {boolean} [s.intercept=true]
  * @param {string} [s.bundleDir] where a combined CA bundle may be written
+ * @param {Record<string, string>} [s.relays]  opencode: provider id → plain-HTTP base URL
  * @returns {{ env: Record<string, string>, wired: boolean, note: string }}
  */
-export function sessionEnv(agent, baseEnv, { port, taskId, token, caPath, project, intercept = true, bundleDir }) {
+export function sessionEnv(agent, baseEnv, { port, taskId, token, caPath, project, intercept = true, bundleDir, relays = {} }) {
   const env = { ...baseEnv, GLASS_TASK_ID: taskId };
   const base = `http://127.0.0.1:${port}`;
 
@@ -80,5 +85,20 @@ export function sessionEnv(agent, baseEnv, { port, taskId, token, caPath, projec
   } else {
     env.NODE_EXTRA_CA_CERTS = caPath;
   }
-  return { env, wired: true, note: `${agent} → glass (intercepting model hosts)` };
+  const relayed = agent === 'opencode' ? Object.keys(relays) : [];
+  if (relayed.length) env.OPENCODE_CONFIG_CONTENT = opencodeRelayContent(baseEnv.OPENCODE_CONFIG_CONTENT, relayed, { port, token });
+  return { env, wired: true, note: `${agent} → glass (intercepting model hosts${relayed.length ? `; relaying ${relayed.join(', ')}` : ''})` };
+}
+
+/** OPENCODE_CONFIG_CONTENT with each relayed provider's baseURL on the daemon, the rest kept. */
+export function opencodeRelayContent(existing, providerIds, { port, token }) {
+  let cfg = {};
+  try { cfg = existing ? JSON.parse(existing) : {}; } catch { cfg = {}; }
+  if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) cfg = {};
+  const provider = { ...cfg.provider };
+  for (const id of providerIds) {
+    const baseURL = `http://127.0.0.1:${port}/relay/${encodeURIComponent(token)}/${encodeURIComponent(id)}`;
+    provider[id] = { ...provider[id], options: { ...provider[id]?.options, baseURL } };
+  }
+  return JSON.stringify({ ...cfg, provider });
 }

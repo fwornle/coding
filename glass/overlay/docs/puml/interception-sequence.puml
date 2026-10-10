@@ -1,0 +1,28 @@
+@startuml interception-sequence
+!include _standard-style.puml
+title One measured copilot call through glass
+
+actor User as user
+participant "glass CLI" as cli
+participant "glass daemon" as d
+participant "copilot" as agent
+participant "Corporate proxy" as corp
+participant "copilot-api.<org>.ghe.com" as host
+database "<U+007E>/.glass" as home
+
+user -> cli : glass copilot -p "…"
+cli -> d : ensure daemon (start if needed)
+cli -> d : POST /sessions → task id + session token
+cli -> agent : start with HTTPS_PROXY=http://glass:<token>@127.0.0.1:12445\nNODE_EXTRA_CA_CERTS=<U+007E>/.glass/ca/ca.pem
+agent -> d : CONNECT copilot-api.<org>.ghe.com:443\nProxy-Authorization: <token>
+d --> agent : 200, TLS with a leaf cert signed by the glass CA
+agent -> d : POST /v1/messages (decrypted inside the daemon)
+d -> corp : CONNECT copilot-api.<org>.ghe.com:443
+corp -> host : tunnel
+d -> host : same request, new TLS connection (verified)
+host --> d : response (streamed)
+d --> agent : response, unchanged
+d -> home : token row + redacted context turn,\nbound to the session's task id
+agent --> cli : exit
+cli -> d : DELETE /sessions/<token>
+@enduml

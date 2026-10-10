@@ -4,6 +4,10 @@
 //   CONNECT host:443        copilot / opencode / pi via HTTPS_PROXY → model hosts are
 //                           decrypted and measured (Anthropic or OpenAI wire), the
 //                           rest is tunnelled
+//   ANY  /relay/<token>/<provider>/…   opencode providers with a plain-HTTP base URL
+//                           (a local model server or another tool's proxy), which
+//                           HTTPS_PROXY never sees: forwarded to the URL the session
+//                           registered for that provider, and measured
 //   GET  /api/token-usage/*, /api/context-breakdown, /api/context-turns   reads
 //   POST /sessions, DELETE /sessions/<token>, GET /sessions                wrapper sessions
 //   GET  /health, POST /stop
@@ -87,6 +91,23 @@ function safeUpstream(raw) {
 }
 
 /**
+ * A session's relays: provider id → its plain-HTTP base URL split into origin and
+ * path. Only http: URLs — anything HTTPS reaches the daemon through interception.
+ */
+export function relaysOf(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const [id, url] of Object.entries(raw)) {
+    try {
+      const u = new URL(String(url));
+      if (u.protocol !== 'http:' || !/^[\w.@:+~-]+$/.test(id)) continue;
+      out[id] = { origin: u.origin, path: u.pathname.replace(/\/+$/, ''), loopback: ['127.0.0.1', 'localhost', '[::1]'].includes(u.hostname) };
+    } catch { /* skip */ }
+  }
+  return out;
+}
+
+/**
  * Start the daemon.
  *
  * @param {object} o
@@ -106,6 +127,7 @@ export async function startDaemon({
   for (const d of [p.data, p.ca, p.logs]) fs.mkdirSync(d, { recursive: true });
   const logErr = (l) => log(`ERROR ${l}`);
   const egress = fetch || createEgressFetch(process.env, port);
+  const direct = fetch || createEgressFetch({}, port); // a relay to loopback never takes the corporate proxy
   const config = readConfig(p.config);
 
   const tokenDb = initTokenDb(p.data);
@@ -121,7 +143,7 @@ export async function startDaemon({
 
   // ── sessions ──
   const sessions = new Map(); // token → session
-  const publicSessions = () => [...sessions.values()].map(({ token, ...s }) => s);
+  const publicSessions = () => [...sessions.values()].map(({ token, relays, ...s }) => s);
   const uiRead = createUiApi({
     uiDir: path.join(PKG_ROOT, 'ui'), dataDir: p.data, tokenDb: () => tokenDb,
     dbPath: resolveTokenDbPath(p.data), measurement, liveSessions: publicSessions,
@@ -136,7 +158,7 @@ export async function startDaemon({
     const s = {
       token, taskId, agent, intercept: body.intercept !== false,
       cwd: typeof body.cwd === 'string' ? body.cwd : '', project: typeof body.project === 'string' ? body.project : '',
-      pid: Number(body.pid) || null, started_at: new Date().toISOString(),
+      pid: Number(body.pid) || null, started_at: new Date().toISOString(), relays: relaysOf(body.relays),
     };
     sessions.set(token, s);
     log(`session open ${taskId} (${agent}${s.intercept ? '' : ', no intercept'})`);
@@ -208,6 +230,29 @@ export async function startDaemon({
     return forwardPlain(req, res, { fetch: egress, upstreamBase, logErr });
   }
 
+  // /relay/<token>/<provider><rest> → <provider's base URL><rest>, measured like an
+  // intercepted call. The token keeps it from being an open forwarder.
+  async function onRelay(req, res) {
+    const m = /^\/relay\/([^/]+)\/([^/?]+)(.*)$/.exec(req.url || '');
+    const s = m && sessions.get(decodeURIComponent(m[1]));
+    const relay = s && s.relays[decodeURIComponent(m[2])];
+    if (!relay) return json(res, 404, { error: 'no such relay' });
+    const provider = decodeURIComponent(m[2]);
+    req.url = `${relay.path}${m[3]}` || '/';
+    const upstreamBase = relay.origin;
+    const via = relay.loopback ? direct : egress;
+    const pathOnly = req.url.split('?')[0];
+    if (req.method === 'POST' && pathOnly.endsWith('/messages')) {
+      return handleAnthropicMessages(req, res, {
+        measurement, fetch: via, upstreamBase, agent: s.agent, provider, subscription: '',
+        bindTaskId: () => s.taskId, logErr,
+      });
+    }
+    return handleOpenAIPassthrough(req, res, {
+      measurement, fetch: via, upstreamBase, provider, agent: s.agent, taskId: s.taskId, project: s.project, logErr,
+    });
+  }
+
   let shuttingDown = false;
   let resolveClosed;
   const closed = new Promise((r) => { resolveClosed = r; });
@@ -255,6 +300,7 @@ export async function startDaemon({
           measurement, fetch: egress, upstreamBase, provider: 'anthropic', subscription: '', logErr,
         });
       }
+      if (url.startsWith('/relay/')) return onRelay(req, res);
       if (usageRead(req, res)) return undefined;
       if (await uiRead(req, res)) return undefined;
       return json(res, 404, { error: `no route for ${req.method} ${url.split('?')[0]}` });
