@@ -8,7 +8,7 @@ hide:
 <div class="glass-overview" id="glass-overview" role="region" aria-label="Glass overview presentation" markdown="1">
 
 <div class="overview-toolbar" hidden>
-  <span class="overview-label">glass / in six slides</span>
+  <span class="overview-label">glass / in seven slides</span>
   <span class="overview-counter" role="status" aria-live="polite" aria-atomic="true"></span>
   <button type="button" data-fullscreen>Fullscreen</button>
 </div>
@@ -156,7 +156,37 @@ Find the biggest token consumer before changing your setup. Token totals are not
 </p>
 </section>
 
-<section class="overview-slide" id="slide-5" aria-labelledby="overview-context" markdown="1">
+<section class="overview-slide" id="slide-5" aria-labelledby="overview-evolution" markdown="1">
+<div class="overview-copy" markdown="1">
+
+<p class="overview-kicker">Question 1 / When did the tokens go?</p>
+
+## Then follow usage over time {#overview-evolution}
+
+Open the **Evolution** tab in **Token Usage**.
+
+The chart splits the time range into short buckets, **stacked by model, agent or
+provider**. Hover a bucket for its numbers.
+
+Below the chart, **Top Consumers** ranks the models of the time range by tokens,
+with their calls and latency.
+
+Drag the brush under the chart to zoom into one stretch of work.
+
+</div>
+<figure class="overview-figure" markdown="1">
+
+[![Token Usage Evolution: ninety minutes of sessions in 2-minute buckets stacked by model, a tooltip on one bucket, and the Top Consumers table below.](images/ui-token-usage-evolution.png)](images/ui-token-usage-evolution.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+
+<figcaption>Example runs on one machine, not a benchmark. Each peak is a session; the table shows each model's share of the time range.</figcaption>
+</figure>
+<p class="overview-takeaway" markdown="1">
+Spot the spike, then open the session behind it in **Sessions**.
+[Explore Token Usage](token-usage.md)
+</p>
+</section>
+
+<section class="overview-slide" id="slide-6" aria-labelledby="overview-context" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Question 2 / Why is the context so large?</p>
@@ -187,7 +217,7 @@ Don't assume your last prompt filled the window. Look at the whole context.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-6" aria-labelledby="overview-compare" markdown="1">
+<section class="overview-slide" id="slide-7" aria-labelledby="overview-compare" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Question 3 / Which setup fits my task?</p>
