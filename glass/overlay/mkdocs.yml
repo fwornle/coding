@@ -6,6 +6,11 @@ repo_name: AIMAAD/glass
 
 docs_dir: docs
 
+extra_css:
+  - assets/overview.css
+extra_javascript:
+  - assets/overview.js
+
 theme:
   name: material
   palette:
@@ -74,6 +79,7 @@ validation:
 
 nav:
   - Home: index.md
+  - Overview: overview.md
   - Getting Started: getting-started.md
   - Using glass:
     - Token Usage: token-usage.md

@@ -1,0 +1,23 @@
+@startuml glass-measurement-flow
+!include _standard-style.puml
+top to bottom direction
+skinparam defaultFontSize 20
+skinparam componentFontSize 20
+skinparam packageFontSize 20
+skinparam arrowFontSize 16
+skinparam nodesep 40
+skinparam ranksep 40
+skinparam shadowing false
+skinparam componentStyle rectangle
+hide stereotype
+
+rectangle "On your machine" {
+  component "Your usual coding agent\nStarted with glass <agent>" as agent <<agent>>
+  component "glass\nLocal meter" as meter <<core>>
+  component "Local measurements\nStatus line + browser dashboards" as results <<storage>>
+  agent SYNC_LINE meter : model calls
+  meter DATA_LINE results : record usage + context
+}
+component "Your usual model provider\nSame login and model" as provider <<external>>
+meter SYNC_LINE provider : forward calls / receive answers
+@enduml
