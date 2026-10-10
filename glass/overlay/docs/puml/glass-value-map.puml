@@ -1,0 +1,23 @@
+@startuml glass-value-map
+!include _standard-style.puml
+top to bottom direction
+skinparam defaultFontSize 20
+skinparam componentFontSize 20
+skinparam arrowFontSize 16
+skinparam nodesep 35
+skinparam ranksep 45
+skinparam shadowing false
+skinparam componentStyle rectangle
+hide stereotype
+
+component "Your coding session" as session <<agent>>
+component "glass\nMeasure without changing your workflow" as meter <<core>>
+component "Token Usage\nWhere did the tokens go?" as usage <<api>>
+component "Context Window\nWhat filled the window?" as context <<api>>
+component "Run Comparisons\nWhat changed between runs?" as compare <<api>>
+
+session DATA_LINE meter
+meter DATA_LINE usage
+meter DATA_LINE context
+meter DATA_LINE compare
+@enduml
