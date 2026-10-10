@@ -105,6 +105,17 @@ export const CI_SKIPPED = new Map([
     'needs a live obs-api on :12436 ("A obs-api at http://localhost:12436/... unreachable")'],
   ['tests/integration/kgbench-publish-guard.test.js',
     'reads .data/kgbench/runs/*/results.jsonl — gitignored local run artifacts, absent on a fresh checkout'],
+  // These four ran once the sibling proxy was built in CI, and then every cell came
+  // back 'skipped': runMatrix preflights the agent ("[agent-headless] preflight
+  // claude: unreachable → skip"), and a hosted runner has no logged-in claude CLI.
+  ['tests/experiments/experiment-runner.integration.test.mjs',
+    'runMatrix preflights a reachable claude agent; none on the runner, so every cell is skipped'],
+  ['tests/experiments/avenue-fork-thread.test.mjs',
+    'same claude-agent preflight: the cell never reaches measurement-start'],
+  ['tests/experiments/experiment-runner.test.mjs',
+    'same claude-agent preflight: runMatrix never emits the measurement-start argv'],
+  ['tests/experiments/variant-override.test.mjs',
+    'same claude-agent preflight: the overridden cell never runs'],
 ]);
 
 /** True when running under CI, where {@link CI_SKIPPED} applies. */
