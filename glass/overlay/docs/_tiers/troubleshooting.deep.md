@@ -51,19 +51,25 @@ Anthropic and both tools record it. Each count is right, but the two cannot be a
 and the other tool files the call under glass's session id. Start glass from a terminal
 the other tool's launcher did not set up.
 
-**opencode or pi default to the other proxy.** If the default model's provider has a
-plain-HTTP base URL on your machine (coding sets `rapid-proxy/…` in
-`~/.config/opencode/opencode.json` and `rapid-proxy-pi` in `~/.pi/agent/settings.json`),
-that traffic never passes through glass: glass decrypts only HTTPS model hosts. Pick one
-of the agent's own providers for the run:
+**opencode or pi default to the other proxy.** coding, for example, sets `rapid-proxy/…`
+in `~/.config/opencode/opencode.json` and `rapid-proxy-pi` in `~/.pi/agent/settings.json`,
+both plain HTTP on `localhost:12435`. Plain-HTTP traffic never passes `HTTPS_PROXY`, so
+glass treats the two agents differently:
+
+- **opencode is measured anyway.** For the run, `glass opencode` points every provider
+  with a plain-HTTP base URL at the daemon (through `OPENCODE_CONFIG_CONTENT`, your
+  config file is not changed). The daemon forwards each call to the original URL and
+  records it. If that URL is another tool's proxy, it records the call too: both counts
+  are right, but do not add them up.
+- **pi is not measured** while its default provider is plain HTTP. Pick one of pi's own
+  providers for the run:
 
 ```sh
-glass opencode --model github-copilot/claude-haiku-4.5
 glass pi --model github-copilot/claude-haiku-4.5
 ```
 
-On a machine without such a proxy, the agent's default is one of its own providers and
-`glass opencode` / `glass pi` measure it without any `--model`.
+On a machine without such a proxy, the agents' defaults are their own providers and
+`glass opencode` / `glass pi` measure them without any option.
 
 **tmux.** Started inside an existing tmux session, glass shows its status bar on that
 session for the run and restores yours when the agent exits. `--no-tmux`, or a separate

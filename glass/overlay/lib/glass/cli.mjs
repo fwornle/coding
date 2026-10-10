@@ -15,7 +15,7 @@ import {
 } from './client.mjs';
 import { runAgent } from './spawn.mjs';
 import { upstreamProxy } from './egress.mjs';
-import { coexistWarnings } from './coexist.mjs';
+import { coexistWarnings, opencodeHttpProviders } from './coexist.mjs';
 import { openUrl } from './open-url.mjs';
 import { renderStatusline, renderReport, uiLinks, TAGS } from './statusline.mjs';
 import { tmuxWanted, launchInTmux, configureStatus, popup, selfCommand } from './tmux.mjs';
@@ -112,16 +112,21 @@ async function runMeasured(agent, argv) {
     if (code !== null) return code;
   }
 
+  // opencode providers on plain HTTP never reach HTTPS_PROXY: the daemon relays them.
+  // A provider already on this daemon (a nested glass run) is left as it is.
+  const relays = agent === 'opencode' && intercept
+    ? Object.fromEntries(Object.entries(opencodeHttpProviders(baseEnv)).filter(([, url]) => !url.startsWith(`http://127.0.0.1:${port}/relay/`)))
+    : {};
   const up = await ensureDaemon({ home, port, env: baseEnv });
   const session = up ? await openSession(port, {
-    agent, intercept, cwd: process.cwd(), project: projectOf(process.cwd()), pid: process.pid,
+    agent, intercept, cwd: process.cwd(), project: projectOf(process.cwd()), pid: process.pid, relays,
   }) : null;
   if (!session) {
     err(`glass: daemon not reachable on 127.0.0.1:${port} — running ${agent} unmeasured (log: ${path.join(glassPaths(home).logs, 'daemon.log')})`);
     return runAgent(bin, args, baseEnv);
   }
   const { env, note } = sessionEnv(agent, baseEnv, {
-    port, taskId: session.taskId, token: session.token, caPath: session.caPath, project: projectOf(process.cwd()), intercept,
+    port, taskId: session.taskId, token: session.token, caPath: session.caPath, project: projectOf(process.cwd()), intercept, relays,
   });
   if (process.env.GLASS_VERBOSE) err(`glass: ${session.taskId} — ${note}`);
 

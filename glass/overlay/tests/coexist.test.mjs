@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const { coexistWarnings, opencodeDefault, piDefault, parseLoose } = await import('../lib/glass/coexist.mjs');
+const { coexistWarnings, opencodeDefault, opencodeHttpProviders, piDefault, parseLoose } = await import('../lib/glass/coexist.mjs');
 
 const PORT = 12445;
 
@@ -36,10 +36,10 @@ test('claude: a loopback base URL that is not glass is flagged; glass itself and
   assert.deepEqual(coexistWarnings({ env: { ANTHROPIC_BASE_URL: 'https://gateway.example.com' }, home, port: PORT }), []);
 });
 
-test('opencode: a plain-HTTP default provider is flagged, an HTTPS or built-in one is not', () => {
+test('opencode: a plain-HTTP default provider is flagged as relayed, an HTTPS or built-in one is not', () => {
   const [w] = coexistWarnings({ env: {}, home: fakeHome({ '.config/opencode/opencode.json': RAPID_OPENCODE }), port: PORT });
   assert.match(w, /^opencode: default provider rapid-proxy \(rapid-proxy\/claude-sonnet-5\) is plain HTTP at http:\/\/localhost:12435\/v1/);
-  assert.match(w, /glass opencode --model <provider>\/<model>/);
+  assert.match(w, /glass opencode relays and measures it/);
   const builtin = fakeHome({ '.config/opencode/opencode.json': { model: 'github-copilot/claude-haiku-4.5' } });
   assert.deepEqual(coexistWarnings({ env: {}, home: builtin, port: PORT }), []);
 });
@@ -51,6 +51,17 @@ test('opencode: OPENCODE_CONFIG_CONTENT overrides the global model, as opencode 
   assert.deepEqual(coexistWarnings({ env, home, port: PORT }), []);
   const back = { OPENCODE_CONFIG_CONTENT: JSON.stringify(RAPID_OPENCODE) };
   assert.equal(opencodeDefault(back, fakeHome({})).baseURL, 'http://localhost:12435/v1');
+});
+
+test('opencode: every plain-HTTP provider is relayed, from every config layer; HTTPS ones are not', () => {
+  const home = fakeHome({ '.config/opencode/opencode.json': {
+    ...RAPID_OPENCODE,
+    provider: { ...RAPID_OPENCODE.provider, qwen: { options: { baseURL: 'http://127.0.0.1:8081/v1' } }, gw: { options: { baseURL: 'https://gw.example.com/v1' } } },
+  } });
+  const env = { OPENCODE_CONFIG_CONTENT: JSON.stringify({ provider: { 'github-copilot': { options: { baseURL: 'http://127.0.0.1:12435/v1/opencode' } } } }) };
+  assert.deepEqual(opencodeHttpProviders(env, home), {
+    'rapid-proxy': 'http://localhost:12435/v1', qwen: 'http://127.0.0.1:8081/v1', 'github-copilot': 'http://127.0.0.1:12435/v1/opencode',
+  });
 });
 
 test('opencode: JSONC config (comments, trailing commas) is read', () => {
