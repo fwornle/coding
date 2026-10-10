@@ -44,7 +44,9 @@ test('the gauge follows the conversation, not side calls', async () => {
 
 test('no turn yet, --no-intercept, daemon down', () => {
   assert.match(renderStatusline({ ...D, ctx: null, intercept: false }, { port: 1 }), /\[ctx —\].*\[N:CN P:ON ¬tap\]/);
-  assert.match(renderStatusline({ ...D, network: null }, { port: 1 }), /\[N:\?\? P:OFF\]$/, 'not probed yet: coding\'s unknown');
+  assert.match(renderStatusline({ ...D, network: { location: 'unknown' } }, { port: 1 }), /\[N:\?\? P:OFF\]$/, 'not probed yet: coding\'s unknown');
+  const { network, ...older } = D;
+  assert.match(renderStatusline(older, { port: 1 }), /\[N:proxy\]$/, 'a daemon from before the badge: its egress, not a false P:OFF');
   assert.equal(renderStatusline(null, { port: 1 }), '[glass ✗ down]');
 });
 
@@ -95,6 +97,7 @@ test('tmux: configureStatus on a real server — options set, clicks bound, user
   const t = (...a) => spawnSync('tmux', ['-S', sock, ...a], { encoding: 'utf8' });
   t('new-session', '-d', '-s', 'mine', '-x', '120', '-y', '20');
   t('set-option', '-t', 'mine', 'status-right', 'MINE');
+  t('set-option', '-t', 'mine', 'status-style', 'bg=green,fg=black');
   const pid = t('display-message', '-p', '-t', 'mine', '#{pid}').stdout.trim();
   const saved = { TMUX: process.env.TMUX, TMUX_PANE: process.env.TMUX_PANE };
   process.env.TMUX = `${sock},${pid},0`;
@@ -108,6 +111,7 @@ test('tmux: configureStatus on a real server — options set, clicks bound, user
     assert.equal(opt('@glass_port'), '12999');
     assert.match(opt('status-right'), /statusline --format tmux --port 12999 --task '#\{@glass_task\}'/);
     assert.equal(opt('mouse'), 'on');
+    assert.equal(opt('status-style'), 'bg=default,fg=default', 'the terminal\'s colours, as in coding');
     const keys = t('list-keys', '-T', 'root', 'MouseDown1Status').stdout;
     assert.match(keys, /--src glass-tmux/);
     assert.ok(keys.includes(`{ ${before} }`), `the previous binding (${before}) is the fallback`);
@@ -115,6 +119,7 @@ test('tmux: configureStatus on a real server — options set, clicks bound, user
     assert.equal(t('list-keys', '-T', 'root', 'MouseDown1Status').stdout.match(/--src glass-tmux/g).length, 1, 'bound once');
     restore();
     assert.equal(opt('status-right'), 'MINE', 'the user\'s session gets its own options back');
+    assert.equal(opt('status-style'), 'bg=green,fg=black');
     assert.equal(t('show-options', '-q', '-v', '-t', 'mine', '@glass_task').stdout.trim(), '');
   } finally {
     Object.assign(process.env, saved);

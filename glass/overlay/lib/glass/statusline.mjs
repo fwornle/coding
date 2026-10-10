@@ -148,7 +148,10 @@ export function renderStatusline(d, { format = 'plain', port }) {
   const cache = t.cache_pct == null ? '' : ` ⚡${t.cache_pct}%`;
   parts.push(field(TAGS.tok, `↑${fmtTokens(t.prompt)} ↓${fmtTokens(t.output)}${cache}`, links.session));
 
-  parts.push(field(TAGS.net, `${networkBadge(d.network).text}${d.intercept === false ? ' ¬tap' : ''}`, null));
+  // A daemon from before the badge (left running across an update) sends no
+  // network facts: show what it does know, never a made-up ?? / OFF.
+  const net = d.network ? networkBadge(d.network).text : `N:${d.egress}`;
+  parts.push(field(TAGS.net, `${net}${d.intercept === false ? ' ¬tap' : ''}`, null));
   return parts.join(' ');
 }
 

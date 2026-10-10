@@ -24,7 +24,7 @@ import { spawnSync } from 'node:child_process';
 
 import { PKG_ROOT } from './home.mjs';
 
-const SESSION_OPTIONS = ['status', 'status-interval', 'status-right', 'status-right-length', 'mouse', '@glass_task', '@glass_port'];
+const SESSION_OPTIONS = ['status', 'status-interval', 'status-style', 'status-right', 'status-right-length', 'mouse', '@glass_task', '@glass_port'];
 // Marks glass's binding in list-keys output (coding's binding names bin/statusline-click).
 const MARK = '--src glass-tmux';
 
@@ -138,6 +138,9 @@ export function configureStatus({ taskId, port, env = process.env, tmpDir = os.t
   set('status', 'on');
   set('status-interval', '5');
   set('status-right-length', '120');
+  // The terminal's own colours, as coding's session wrapper sets them — not the
+  // global status-style (tmux's default, and many configs, paint it green).
+  set('status-style', 'bg=default,fg=default');
   set('status-right', statusCommand(port));
   set('mouse', 'on');
   bindClicks(tmpDir);
