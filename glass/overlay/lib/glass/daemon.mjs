@@ -44,7 +44,7 @@ import { captureForegroundTokens } from '../lsl/token/stop-adapter-registry.mjs'
 import { glassPaths, PKG_ROOT } from './home.mjs';
 import { createEgressFetch, upstreamProxy } from './egress.mjs';
 import { createUiApi } from './ui-api.mjs';
-import { statuslineData } from './statusline.mjs';
+import { statuslineData, renderReport, TAGS } from './statusline.mjs';
 import { createNetworkMonitor } from './network.mjs';
 
 export const VERSION = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version;
@@ -164,6 +164,11 @@ export async function startDaemon({
     }
   }
   const publicSessions = () => [...sessions.values()].map(({ token, relays, ...s }) => s);
+  // The named live session, else the newest (`glass watch` with no --task).
+  const liveSession = (want) => {
+    const live = [...sessions.values()].sort((x, y) => y.started_at.localeCompare(x.started_at));
+    return want ? live.find((x) => x.taskId === want) : live[0];
+  };
   const uiRead = createUiApi({
     uiDir: path.join(PKG_ROOT, 'ui'), dataDir: p.data, tokenDb: () => tokenDb,
     dbPath: resolveTokenDbPath(p.data), measurement, liveSessions: publicSessions,
@@ -285,6 +290,10 @@ export async function startDaemon({
   let resolveClosed;
   const closed = new Promise((r) => { resolveClosed = r; });
 
+  const lineData = (session) => statuslineData({
+    session, db: tokenDb?.db, measurement, egress: upstreamProxy(process.env, port), network: netMonitor.facts(), glass: VERSION,
+  });
+
   const server = http.createServer(async (req, res) => {
     touch();
     try {
@@ -306,15 +315,22 @@ export async function startDaemon({
         return span ? json(res, 200, span) : json(res, 404, { error: 'no such session' });
       }
       if (req.method === 'GET' && (url === '/api/statusline' || url.startsWith('/api/statusline?'))) {
-        // The named session, else the newest live one (`glass watch` with no --task).
         const want = new URL(url, 'http://localhost').searchParams.get('task_id');
-        const live = [...sessions.values()].sort((a, b) => b.started_at.localeCompare(a.started_at));
-        const s = want ? live.find((x) => x.taskId === want) : live[0];
+        const s = liveSession(want);
         if (!s) return json(res, 404, { error: want ? `no live session ${want}` : 'no live session' });
-        return json(res, 200, {
-          ...statuslineData({ session: s, db: tokenDb?.db, measurement, egress: upstreamProxy(process.env, port), network: netMonitor.facts(), glass: VERSION }),
-          ca_path: intercept.caPath,
-        });
+        return json(res, 200, { ...lineData(s), ca_path: intercept.caPath });
+      }
+      if (req.method === 'GET' && (url === '/report/net' || url.startsWith('/report/net?'))) {
+        // The network field's link outside tmux (Claude Code's own status line,
+        // glass watch): the popup's report, as a page.
+        const s = liveSession(new URL(url, 'http://localhost').searchParams.get('task'));
+        const text = s ? renderReport(TAGS.net, { d: lineData(s), port, caPath: intercept.caPath }) : 'No live glass session.';
+        const esc = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
+        res.end(`<!doctype html><meta charset="utf-8"><title>glass · network</title>`
+          + `<style>body{font:14px/1.5 ui-monospace,Menlo,Consolas,monospace;margin:24px;background:#fff;color:#111}`
+          + `@media (prefers-color-scheme:dark){body{background:#111;color:#ddd}}</style><pre>${esc}</pre>`);
+        return undefined;
       }
       if (url === '/stop' && req.method === 'POST') {
         json(res, 200, { stopping: true });

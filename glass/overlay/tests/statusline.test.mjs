@@ -10,7 +10,7 @@ import { spawnSync } from 'node:child_process';
 
 const { renderStatusline, renderReport, uiLinks, TAGS } = await import('../lib/glass/statusline.mjs');
 const { clickBinding, tmuxWanted, innerEnv, configureStatus } = await import('../lib/glass/tmux.mjs');
-const { claudeStatusSettings, isTerminalReport } = await import('../lib/glass/cli.mjs');
+const { claudeStatusSettings, isTerminalReport, watchHint } = await import('../lib/glass/cli.mjs');
 
 const D = {
   glass: '0.0.0', task_id: 'glass-claude-1', agent: 'claude', intercept: true, last_at: '2026-10-09T08:00:00Z',
@@ -30,6 +30,7 @@ test('plain, tmux and ansi carry the same fields', () => {
   const ansi = renderStatusline(D, { format: 'ansi', port: 12445 });
   assert.ok(ansi.includes(`\x1b]8;;${uiLinks(12445, D.task_id).explain}\x1b\\`), 'ctx links to the explainer');
   assert.ok(ansi.includes(`\x1b]8;;${uiLinks(12445, D.task_id).session}\x1b\\`), 'tokens link to the session');
+  assert.ok(ansi.includes(`\x1b]8;;${uiLinks(12445, D.task_id).network}\x1b\\`), 'network links to the report page: no popup outside tmux');
   assert.equal(strip(ansi), plain);
 });
 
@@ -73,6 +74,12 @@ test('claude without tmux: a --settings file with glass as statusLine', () => {
   assert.equal(statusLine.type, 'command');
   assert.match(statusLine.command, /^".+" ".+glass\.mjs" statusline --format ansi --port 12445 --task glass-claude-1$/);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('no tmux bar: every agent but Claude Code is pointed at glass watch', () => {
+  assert.equal(watchHint('claude', 'win32'), null);
+  assert.match(watchHint('copilot', 'win32'), /glass watch.*wt split-pane/);
+  assert.doesNotMatch(watchHint('opencode', 'linux'), /wt split-pane/);
 });
 
 test('tmux: when, the inner env, the chained click binding', () => {

@@ -97,11 +97,17 @@ export function fmtTokens(n) {
   return String(v);
 }
 
-/** UI links for the ANSI form and for `glass click`. */
+/**
+ * UI links for the ANSI form and for `glass click`. `network` is the network
+ * report as a page of the daemon's: a terminal hyperlink can only open a URL,
+ * so outside tmux that page stands in for the popup.
+ */
 export function uiLinks(port, taskId) {
   const root = `http://127.0.0.1:${port}/`;
   const q = taskId ? `?task=${encodeURIComponent(taskId)}` : '';
-  return { root, session: `${root}#/sessions${q}`, explain: `${root}#/sessions${q}${q ? '&' : '?'}explain=1` };
+  return {
+    root, session: `${root}#/sessions${q}`, explain: `${root}#/sessions${q}${q ? '&' : '?'}explain=1`, network: `${root}report/net${q}`,
+  };
 }
 
 const ESC = '\x1b';
@@ -151,7 +157,7 @@ export function renderStatusline(d, { format = 'plain', port }) {
   // A daemon from before the badge (left running across an update) sends no
   // network facts: show what it does know, never a made-up ?? / OFF.
   const net = d.network ? networkBadge(d.network).text : `N:${d.egress}`;
-  parts.push(field(TAGS.net, `${net}${d.intercept === false ? ' ¬tap' : ''}`, null));
+  parts.push(field(TAGS.net, `${net}${d.intercept === false ? ' ¬tap' : ''}`, links.network));
   return parts.join(' ');
 }
 

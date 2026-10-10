@@ -99,6 +99,16 @@ export function claudeStatusSettings(file, { port, taskId }) {
   return file;
 }
 
+/**
+ * Where to find the status line when this run has none: no tmux bar, and an
+ * agent other than Claude Code (the only one that takes a status line of glass's).
+ */
+export function watchHint(agent, platform = process.platform) {
+  if (agent === 'claude') return null;
+  const split = platform === 'win32' ? ' (Windows Terminal: wt split-pane, or Alt+Shift+D)' : '';
+  return `glass: no status line for ${agent} without tmux — run \`glass watch\` in a split pane${split}`;
+}
+
 // From this version on a stopping daemon leaves its live sessions for the next
 // one to re-adopt (daemon.mjs), so replacing it costs no session.
 const KEEPS_SESSIONS = [0, 1, 6];
@@ -170,6 +180,9 @@ async function runMeasured(agent, argv) {
   } else if (agent === 'claude' && !process.env.GLASS_NO_STATUSLINE && !args.includes('--settings')) {
     settings = claudeStatusSettings(path.join(p.run, `${session.taskId}.settings.json`), { port, taskId: session.taskId });
     agentArgs = ['--settings', settings, ...args];
+  } else {
+    const hint = watchHint(agent);
+    if (hint) err(hint);
   }
   const code = await runAgent(bin, agentArgs, env);
   restore();

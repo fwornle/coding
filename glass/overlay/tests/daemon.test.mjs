@@ -360,6 +360,9 @@ test('status line: facts of a live session — tokens, the last turn against the
   assert.equal(d.network.location, 'vpn', 'the network monitor\'s facts');
   assert.ok(d.ca_path.endsWith('.pem'));
   assert.equal((await api('GET', '/api/statusline')).body.task_id, s.taskId, 'no task: the newest live session');
+  const page = await fetch(`${daemon.url}/report/net?task=${encodeURIComponent(s.taskId)}`);
+  assert.match(page.headers.get('content-type'), /text\/html/);
+  assert.match(await page.text(), new RegExp(`<pre>[^]*session ${s.taskId}[^]*egress \\(glass daemon\\)`), 'the network report, as a page');
   await api('DELETE', `/sessions/${encodeURIComponent(s.token)}`);
   assert.equal((await api('GET', `/api/statusline?task_id=${s.taskId}`)).status, 404, 'closed sessions have no status line');
 });

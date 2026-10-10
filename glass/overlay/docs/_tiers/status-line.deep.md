@@ -15,8 +15,11 @@ restores it afterwards.
 
     ![Claude Code status line](images/terminal-statusline-claude.png)
 
-- **Any agent** — run `glass watch` in a split pane (`wt split-pane` in Windows
-  Terminal) for a live one-line bar of the newest session (`--task <id>` for another).
+- **Any agent** — run `glass watch` in a split pane (`wt split-pane` or Alt+Shift+D in
+  Windows Terminal) for a live one-line bar of the newest session (`--task <id>` for
+  another). Copilot, opencode and pi have no status line of their own to put glass's
+  in, so on native Windows this is their only bar; `glass <agent>` says so when it
+  starts.
 
 `GLASS_NO_STATUSLINE=1` turns Claude Code's glass status line off.
 
@@ -36,7 +39,11 @@ restores it afterwards.
 | health | opens the UI | link to the UI |
 | context | popup with the context report | link to the context explainer |
 | tokens | opens this session in the UI | link to the session |
-| network | popup with the egress report | — |
+| network | popup with the egress report | link to the same report, as a page |
+
+A terminal hyperlink can only open a URL, so without tmux each field opens a page:
+the context explainer in the UI stands in for the context popup, and the daemon's
+`/report/net` page for the network popup.
 
 **Which browser tab opens.** On macOS with Chrome, a click re-uses an open glass tab:
 it is focused, and navigated only when it shows another page. Everywhere else —
