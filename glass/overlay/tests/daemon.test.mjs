@@ -335,6 +335,13 @@ test('glass ui: one opener chain per platform, no shell', async () => {
   assert.deepEqual(openers(u, 'win32', false)[0], ['cmd', ['/c', 'start', '""', 'http://127.0.0.1:12445/?a=1^&b=2']]);
   assert.equal(openers(u, 'linux', true)[0][0], 'wslview');
   assert.equal(openers(u, 'linux', false)[0][0], 'xdg-open');
+  // macOS: coding's tab reuse (lib/statusline/browser-tab.mjs), keyed on the given prefix.
+  const { openUrl } = await import('../lib/glass/open-url.mjs');
+  const seen = [];
+  assert.equal(await openUrl('http://127.0.0.1:12445/#/sessions?task=t', 'http://127.0.0.1:12445/', {
+    platform: 'darwin', focusTab: (url, prefix) => { seen.push([url, prefix]); return 'reused idx=1 active=1 wins=1'; },
+  }), true);
+  assert.deepEqual(seen, [['http://127.0.0.1:12445/#/sessions?task=t', 'http://127.0.0.1:12445/']]);
 });
 
 test('an idle daemon exits by itself', async () => {

@@ -42,6 +42,8 @@ select:
       - lib/statusline/context-gauge.cjs
       - lib/statusline/model-limits.cjs
       - lib/statusline/clickable.cjs
+      # status-line clicks on macOS: focus an open tab before opening a new one
+      - lib/statusline/browser-tab.mjs
       - lib/statusline/visible-cell-width.cjs
       # data home + proxy resolver
       - lib/paths/index.mjs

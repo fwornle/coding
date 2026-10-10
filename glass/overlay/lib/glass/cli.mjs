@@ -206,8 +206,11 @@ async function click(argv) {
   const port = Number(opt(argv, '--port')) || glassPort();
   const task = opt(argv, '--task') || undefined;
   const links = uiLinks(port, task);
-  if (tag === TAGS.health) return (await openUrl(links.root)) ? 0 : 1;
-  if (tag === TAGS.tok) return (await openUrl(links.session)) ? 0 : 1;
+  // Any open glass UI tab is re-used and navigated (macOS), as coding's
+  // dashboards are: the origin is the reuse prefix.
+  const origin = links.root;
+  if (tag === TAGS.health) return (await openUrl(links.root, origin)) ? 0 : 1;
+  if (tag === TAGS.tok) return (await openUrl(links.session, origin)) ? 0 : 1;
   if (tag === TAGS.ctx || tag === TAGS.net) {
     const which = tag === TAGS.ctx ? 'ctx' : 'net';
     const shown = popup({
@@ -215,7 +218,7 @@ async function click(argv) {
       title: which === 'ctx' ? 'glass · context window' : 'glass · network',
       argv: [...selfCommand(), 'report', which, '--port', String(port), ...(task ? ['--task', task] : []), '--hold'],
     });
-    if (!shown && which === 'ctx') return (await openUrl(links.explain)) ? 0 : 1;
+    if (!shown && which === 'ctx') return (await openUrl(links.explain, origin)) ? 0 : 1;
     return shown ? 0 : 1;
   }
   err(`glass click: unknown field ${tag}`);
@@ -251,7 +254,7 @@ async function ui() {
   }
   const url = `http://127.0.0.1:${port}/`;
   out(url);
-  if (!(await openUrl(url))) err('glass: no browser opener found — open the URL above yourself');
+  if (!(await openUrl(url, url))) err('glass: no browser opener found — open the URL above yourself');
   return 0;
 }
 
