@@ -19,6 +19,7 @@ import { coexistWarnings, opencodeHttpProviders } from './coexist.mjs';
 import { openUrl } from './open-url.mjs';
 import { renderStatusline, renderReport, uiLinks, TAGS } from './statusline.mjs';
 import { tmuxWanted, launchInTmux, configureStatus, popup, selfCommand } from './tmux.mjs';
+import { update } from './update.mjs';
 
 const out = (line = '') => process.stdout.write(`${line}\n`);
 const err = (line) => process.stderr.write(`${line}\n`);
@@ -33,6 +34,7 @@ const HELP = `glass ${VERSION} — token measurement and context insight for cod
   glass doctor       agent binaries, CA, egress, daemon, other local proxies
   glass stop         stop the daemon; running sessions carry on with the next one
                      (it also exits by itself when idle)
+  glass update       install the latest release (needs gh; --check only reports)
   glass uninstall    stop the daemon and delete ${glassHome()} (asks first; --yes skips)
   glass watch        a live status line for the newest session (--task <id> for another)
 
@@ -101,6 +103,12 @@ export function claudeStatusSettings(file, { port, taskId }) {
 // one to re-adopt (daemon.mjs), so replacing it costs no session.
 const KEEPS_SESSIONS = [0, 1, 6];
 
+/** Whether a daemon can be replaced now: it has no live session, or keeps them across a restart. */
+function replaceable(h) {
+  const v = /^(\d+)\.(\d+)\.(\d+)/.exec(h.glass || '')?.slice(1, 4).map(Number);
+  return !h.sessions || Boolean(v && older(v, KEEPS_SESSIONS) >= 0);
+}
+
 /**
  * A daemon of this glass version. One of another version left running after an
  * update is replaced — at once when it keeps its sessions across a restart (or
@@ -110,8 +118,7 @@ const KEEPS_SESSIONS = [0, 1, 6];
 export async function daemonFor({ home, port, env, version = VERSION, warn = err }) {
   let h = await ensureDaemon({ home, port, env });
   if (h && h.glass !== version) {
-    const v = /^(\d+)\.(\d+)\.(\d+)/.exec(h.glass || '')?.slice(1, 4).map(Number);
-    if (!h.sessions || (v && older(v, KEEPS_SESSIONS) >= 0)) {
+    if (replaceable(h)) {
       await stopDaemon(port, { waitMs: 10_000 });
       h = await ensureDaemon({ home, port, env });
     } else {
@@ -317,6 +324,19 @@ async function doctor() {
   return problems ? 1 : 0;
 }
 
+/** After an update: the running daemon is the old glass — replace it when that costs no session. */
+async function afterUpdate(latest) {
+  const port = glassPort();
+  const h = await health(port);
+  if (!h) { out(`the next glass <agent> starts glass ${latest}`); return; }
+  if (replaceable(h)) {
+    await stopDaemon(port, { waitMs: 10_000 });
+    out(`stopped the glass ${h.glass} daemon${h.sessions ? ` — its ${h.sessions} live session(s) carry on with the next one` : ''}; the next glass <agent> starts ${latest}`);
+  } else {
+    out(`the glass ${h.glass} daemon keeps serving its ${h.sessions} live session(s); after they end, glass stop — the next glass <agent> then starts ${latest}`);
+  }
+}
+
 async function uninstall(argv) {
   const home = glassHome();
   await stopDaemon(glassPort(), { waitMs: 10_000 });
@@ -351,6 +371,7 @@ export async function main(argv) {
       out(stopped ? 'glass daemon stopping' : 'glass daemon was not running');
       return 0;
     }
+    case 'update': return update({ version: VERSION, out, err, check: rest.includes('--check'), afterInstall: afterUpdate });
     case 'uninstall': return uninstall(rest);
     case '--version': case '-v': out(VERSION); return 0;
     case undefined: case 'help': case '--help': case '-h': out(HELP); return 0;

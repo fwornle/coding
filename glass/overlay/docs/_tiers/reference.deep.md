@@ -9,7 +9,8 @@
 | `glass watch [--task <id>]` | A live one-line status bar for the newest session, or the given one |
 | `glass statusline [--format plain\|ansi\|tmux] [--task <id>]` | Print the status line once |
 | `glass report ctx\|net [--task <id>]` | The context or network report (what a status-line click shows) |
-| `glass stop` | Stop the daemon |
+| `glass stop` | Stop the daemon; open agent tunnels are closed, so it exits at once |
+| `glass update [--check]` | Download the latest release with `gh` and `npm install -g` it, then replace an older daemon when no running session is lost. `--check` only reports. Exit code 1 when `gh` is missing or not logged in, or the download or install fails |
 | `glass uninstall [--yes]` | Stop the daemon and delete `GLASS_HOME`; asks first unless `--yes` |
 | `glass --version`, `glass help` | Version, help |
 

@@ -14,6 +14,7 @@ Every command, environment variable and setting.
     | `glass doctor` | check the setup |
     | `glass watch` | live status line for the newest session |
     | `glass stop` | stop the daemon |
+    | `glass update [--check]` | install the latest release |
     | `glass uninstall [--yes]` | stop the daemon, delete `~/.glass` |
 
     Per run: `--no-tmux`, `--no-intercept`. Data: `GLASS_HOME`. Port: `GLASS_PORT`.

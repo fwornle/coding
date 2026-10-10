@@ -88,7 +88,7 @@ compile:
 # upstream line changed). Only defaults that the environment cannot set.
 rewrite:
   - file: lib/proxy/proxy-paths.cjs
-    find: "path.resolve(CODING_CHECKOUT, '..', '_work', 'rapid-llm-proxy')"
+    find: "path.resolve((codingMain ??= mainCheckout(CODING_CHECKOUT)), '..', '_work', 'rapid-llm-proxy')"
     replace: "path.resolve(CODING_CHECKOUT, 'proxy')"
     count: 1
   - file: lib/proxy/proxy-paths.cjs

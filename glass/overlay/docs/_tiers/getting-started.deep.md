@@ -64,7 +64,19 @@ terminal:
 
 ## Update
 
-Download and install the newer tarball the same way. Your data in `~/.glass` is kept.
+```sh
+glass update            # download the latest release with gh, npm install -g it
+glass update --check    # only say whether a newer release exists
+```
+
+Your data in `~/.glass` is kept. The download retries a passing server error twice. After
+the install, a daemon of the older version is stopped at once when that costs no running
+session — it has none, or it is 0.1.6 or later, whose sessions carry on with the next
+daemon. An older daemon with live sessions keeps serving them; run `glass stop` once they
+have ended.
+
+Without `gh` (or not logged in to `bmw.ghe.com`), `glass update` says so; download and
+install the newer tarball by hand as under *Install*.
 
 ## Uninstall
 

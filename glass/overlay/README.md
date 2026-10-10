@@ -40,7 +40,10 @@ no install scripts.
 `glass doctor` lists the agents it found, the data directory, the corporate proxy it will
 use and whether the daemon is running. A ✗ line says what to fix.
 
-To update, install the newer tarball the same way; your data is kept.
+To update: `glass update` downloads the latest release with `gh` and installs it the same
+way; `glass update --check` only says whether there is one. Your data is kept. A daemon
+of the older version is replaced at once when that costs no running session (from 0.1.6
+on, sessions survive the restart). Without `gh`, install the newer tarball by hand as above.
 
 ## Use
 
@@ -62,6 +65,7 @@ unmeasured — it never blocks your agent.
 | `glass watch` | a live one-line status bar for the newest session — for a split pane |
 | `glass doctor` | check the setup |
 | `glass stop` | stop the daemon; agents still running keep their sessions, which the next daemon picks up |
+| `glass update [--check]` | install the latest release (needs `gh`); `--check` only reports |
 | `glass help` | all commands and options |
 
 **Status line.** With tmux installed, `glass <agent>` runs the agent in a tmux session

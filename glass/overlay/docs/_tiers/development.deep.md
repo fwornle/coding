@@ -12,6 +12,11 @@
 | verify | Imports closed, no forbidden dependency, a smoke run on the Node floor |
 | publish | A fresh branch `extract/<coding>-<proxy>` and a pull request into `main` |
 
+The proxy checkout is `RAPID_LLM_PROXY_DIR`, else `_work/rapid-llm-proxy` next to the
+`coding` checkout. Run from a linked git worktree of `coding` (for example
+`.claude/worktrees/glass-docs`), that is the main checkout's sibling, so the extractor
+works from a worktree without setting anything.
+
 `EXTRACTED.json` records the source commits and the checksum of every file. CI fails when
 the tree differs from it (`tests/provenance.test.mjs`), so hand edits cannot slip in.
 
