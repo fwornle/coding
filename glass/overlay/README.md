@@ -61,7 +61,7 @@ unmeasured — it never blocks your agent.
 | `glass status` | daemon, live sessions, latest rows |
 | `glass watch` | a live one-line status bar for the newest session — for a split pane |
 | `glass doctor` | check the setup |
-| `glass stop` | stop the daemon |
+| `glass stop` | stop the daemon; agents still running keep their sessions, which the next daemon picks up |
 | `glass help` | all commands and options |
 
 **Status line.** With tmux installed, `glass <agent>` runs the agent in a tmux session

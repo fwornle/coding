@@ -31,7 +31,8 @@ const HELP = `glass ${VERSION} — token measurement and context insight for cod
   glass ui           open the UI (Token Usage, Sessions + context) in the browser
   glass status       daemon, live sessions, latest rows
   glass doctor       agent binaries, CA, egress, daemon, other local proxies
-  glass stop         stop the daemon (it also exits by itself when idle)
+  glass stop         stop the daemon; running sessions carry on with the next one
+                     (it also exits by itself when idle)
   glass uninstall    stop the daemon and delete ${glassHome()} (asks first; --yes skips)
   glass watch        a live status line for the newest session (--task <id> for another)
 
@@ -96,15 +97,21 @@ export function claudeStatusSettings(file, { port, taskId }) {
   return file;
 }
 
+// From this version on a stopping daemon leaves its live sessions for the next
+// one to re-adopt (daemon.mjs), so replacing it costs no session.
+const KEEPS_SESSIONS = [0, 1, 6];
+
 /**
- * A daemon of this glass version. An older (or newer) one left running after an
- * update is replaced when it has no live session; with sessions it keeps serving
- * them, and this run joins it with a warning.
+ * A daemon of this glass version. One of another version left running after an
+ * update is replaced — at once when it keeps its sessions across a restart (or
+ * has none); an older one with live sessions keeps serving them, and this run
+ * joins it with a warning.
  */
 export async function daemonFor({ home, port, env, version = VERSION, warn = err }) {
   let h = await ensureDaemon({ home, port, env });
   if (h && h.glass !== version) {
-    if (!h.sessions) {
+    const v = /^(\d+)\.(\d+)\.(\d+)/.exec(h.glass || '')?.slice(1, 4).map(Number);
+    if (!h.sessions || (v && older(v, KEEPS_SESSIONS) >= 0)) {
       await stopDaemon(port, { waitMs: 10_000 });
       h = await ensureDaemon({ home, port, env });
     } else {

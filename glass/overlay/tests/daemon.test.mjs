@@ -12,7 +12,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import tls from 'node:tls';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -234,6 +234,59 @@ test('opencode relay: a plain-HTTP provider is forwarded to its own URL and meas
   assert.equal((await api('GET', '/sessions')).body.sessions.find((x) => x.taskId === s.taskId).relays, undefined);
 });
 
+// A daemon of its own: these depend on exactly which sessions are live.
+async function ownDaemon(dir) {
+  return startDaemon({ home: dir, port: 0, fetch: stubFetch, log: () => {}, network: stubNetwork });
+}
+const deadPid = () => spawnSync(process.execPath, ['-e', '0']).pid;
+// A proxy credential no session of this daemon was issued (an earlier daemon's).
+const STALE = 'stale';
+
+test('a session credential the daemon does not know is never guessed, even with one live session', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-stale-'));
+  const main = daemon;
+  daemon = await ownDaemon(dir);
+  try {
+    const s = await open('copilot', { pid: process.pid });
+    await intercepted({ host: 'api.githubcopilot.com', token: STALE, route: '/chat/completions', body: { model: 'gpt-5.6-sol', messages: msgs } });
+    await intercepted({ host: 'api.githubcopilot.com', token: s.token, route: '/chat/completions', body: { model: 'gpt-5.6-sol', messages: msgs } });
+    await settle();
+    const rows = await recent();
+    assert.equal(rows.filter((r) => r.task_id === s.taskId).length, 1, 'only its own call');
+    assert.equal(rows.filter((r) => r.agent === 'unknown' && !r.task_id).length, 1, 'the stale credential\'s call stays unbound');
+  } finally {
+    await daemon.close();
+    daemon = main;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('a daemon restart re-adopts sessions whose agent still runs, and closes the ended ones', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-adopt-'));
+  const main = daemon;
+  try {
+    daemon = await ownDaemon(dir);
+    const live = await open('opencode', { pid: process.pid });
+    const gone = await open('pi', { pid: deadPid() });
+    const file = path.join(dir, 'run', 'sessions.json');
+    if (process.platform !== 'win32') assert.equal((fs.statSync(file).mode & 0o777).toString(8), '600', 'the session credentials are owner-only');
+    await daemon.close();
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).map((x) => x.taskId), [live.taskId], 'a stopping daemon keeps the running session');
+    assert.ok(fs.existsSync(path.join(dir, 'data', 'measurements', `${gone.taskId}.json`)), 'the ended one is archived');
+
+    daemon = await ownDaemon(dir);
+    assert.deepEqual((await api('GET', '/sessions')).body.sessions.map((x) => x.taskId), [live.taskId]);
+    await intercepted({ host: 'api.githubcopilot.com', token: live.token, route: '/chat/completions', body: { model: 'gpt-5.6-sol', messages: msgs } });
+    await settle();
+    assert.equal((await rowsFor(live.taskId)).length, 1, 'the same credential is still its session');
+    assert.equal((await api('GET', `/api/statusline?task_id=${live.taskId}`)).status, 200, 'its status line keeps working');
+  } finally {
+    await daemon.close();
+    daemon = main;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('closing a session archives its span', async () => {
   const s = await open('copilot');
   const closed = await api('DELETE', `/sessions/${encodeURIComponent(s.token)}`);
@@ -394,13 +447,13 @@ test('wiring: claude keeps the user\'s keys and gateway; intercepted agents get 
 // ── the CLI, out of process ──────────────────────────────────────────────────
 
 // A daemon left over from another glass version: /health and /stop only.
-async function oldDaemon(sessions) {
+async function oldDaemon(sessions, glass = '0.0.1') {
   const seen = [];
   const srv = http.createServer((req, res) => {
     seen.push(req.url);
     res.writeHead(200, { 'content-type': 'application/json' });
     if (req.url === '/stop') { res.end('{"stopping":true}'); setImmediate(() => { srv.close(); srv.closeAllConnections(); }); return; }
-    res.end(JSON.stringify({ ok: true, glass: '0.0.1', pid: 2 ** 22 + 7, port: srv.address().port, sessions }));
+    res.end(JSON.stringify({ ok: true, glass, pid: 2 ** 22 + 7, port: srv.address().port, sessions }));
   });
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
   return { port: srv.address().port, seen, close: () => new Promise((r) => { srv.close(() => r()); srv.closeAllConnections(); }) };
@@ -426,6 +479,19 @@ test('version check: an older daemon without sessions is replaced by this versio
   const version = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
   const h = await daemonFor({ home: cliHome, port: old.port, env: { PATH: process.env.PATH, HOME: home }, version, warn: () => assert.fail('no warning') });
   assert.ok(old.seen.includes('/stop'));
+  assert.equal(h?.glass, version);
+  await stopDaemon(old.port, { waitMs: 10_000 });
+  fs.rmSync(cliHome, { recursive: true, force: true });
+});
+
+test('version check: a daemon that keeps its sessions (0.1.6+) is replaced even with live ones', { skip: process.platform === 'win32' && 'spawns a detached daemon' }, async () => {
+  const { daemonFor } = await import('../lib/glass/cli.mjs');
+  const { stopDaemon } = await import('../lib/glass/client.mjs');
+  const cliHome = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-ver-'));
+  const old = await oldDaemon(3, '0.1.6');
+  const version = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
+  const h = await daemonFor({ home: cliHome, port: old.port, env: { PATH: process.env.PATH, HOME: home }, version: '9.9.9', warn: () => assert.fail('no warning') });
+  assert.ok(old.seen.includes('/stop'), 'its sessions survive the restart, so it is replaced');
   assert.equal(h?.glass, version);
   await stopDaemon(old.port, { waitMs: 10_000 });
   fs.rmSync(cliHome, { recursive: true, force: true });
