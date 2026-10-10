@@ -70,10 +70,11 @@ glass update --check    # only say whether a newer release exists
 ```
 
 Your data in `~/.glass` is kept. The download retries a passing server error twice. After
-the install, a daemon of the older version is stopped at once when that costs no running
-session — it has none, or it is 0.1.6 or later, whose sessions carry on with the next
-daemon. An older daemon with live sessions keeps serving them; run `glass stop` once they
-have ended.
+the install, a daemon of the older version is replaced when that costs no running
+session — it has none, or it is 0.1.6 or later. With live sessions the new daemon starts
+straight away and picks them up, so running agents keep measuring without a gap. A daemon
+older than 0.1.6 with live sessions keeps serving them; run `glass stop` once they have
+ended.
 
 Without `gh` (or not logged in to `bmw.ghe.com`), `glass update` says so; download and
 install the newer tarball by hand as under *Install*.

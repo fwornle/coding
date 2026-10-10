@@ -43,7 +43,7 @@ use and whether the daemon is running. A ✗ line says what to fix.
 To update: `glass update` downloads the latest release with `gh` and installs it the same
 way; `glass update --check` only says whether there is one. Your data is kept. A daemon
 of the older version is replaced at once when that costs no running session (from 0.1.6
-on, sessions survive the restart). Without `gh`, install the newer tarball by hand as above.
+on, sessions survive the restart); running agents carry on with the new daemon. Without `gh`, install the newer tarball by hand as above.
 
 ## Use
 

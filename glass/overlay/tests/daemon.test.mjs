@@ -497,6 +497,35 @@ test('version check: a daemon that keeps its sessions (0.1.6+) is replaced even 
   fs.rmSync(cliHome, { recursive: true, force: true });
 });
 
+test('glass update: an old daemon with live sessions is replaced and the new one started at once', { skip: process.platform === 'win32' && 'spawns a detached daemon' }, async () => {
+  // Running agents send through the daemon; waiting for the next glass <agent>
+  // left them without one after an update.
+  const { replaceAfterUpdate } = await import('../lib/glass/cli.mjs');
+  const { health, stopDaemon } = await import('../lib/glass/client.mjs');
+  const cliHome = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-upd-'));
+  const old = await oldDaemon(3, '0.1.8');
+  const version = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
+  const said = [];
+  const n = await replaceAfterUpdate({ latest: version, home: cliHome, port: old.port, env: { PATH: process.env.PATH, HOME: home }, say: (l) => said.push(l) });
+  assert.ok(old.seen.includes('/stop'));
+  assert.equal(n?.glass, version);
+  assert.equal((await health(old.port))?.glass, version, 'the new daemon is up before glass update returns');
+  assert.match(said[0], /replaced the glass 0\.1\.8 daemon .* its 3 live session/);
+  await stopDaemon(old.port, { waitMs: 10_000 });
+  fs.rmSync(cliHome, { recursive: true, force: true });
+});
+
+test('glass update: an old daemon without sessions is only stopped', async () => {
+  const { replaceAfterUpdate } = await import('../lib/glass/cli.mjs');
+  const { health } = await import('../lib/glass/client.mjs');
+  const old = await oldDaemon(0, '0.1.8');
+  const said = [];
+  assert.equal(await replaceAfterUpdate({ latest: '9.9.9', home, port: old.port, env: {}, say: (l) => said.push(l) }), null);
+  assert.ok(old.seen.includes('/stop'));
+  assert.equal(await health(old.port), null);
+  assert.match(said[0], /next glass <agent> starts 9\.9\.9/);
+});
+
 test('CLI: a reader that goes away (glass status | head) ends glass quietly', async () => {
   const child = spawn(process.execPath, [BIN, 'status'], { env: { PATH: process.env.PATH, HOME: home, GLASS_PORT: String(await freePort()) } });
   child.stdout.destroy();

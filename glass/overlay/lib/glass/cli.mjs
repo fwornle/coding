@@ -343,17 +343,25 @@ async function doctor() {
   return problems ? 1 : 0;
 }
 
-/** After an update: the running daemon is the old glass — replace it when that costs no session. */
-async function afterUpdate(latest) {
-  const port = glassPort();
+/**
+ * After an update the running daemon is the old glass: replace it when that costs no
+ * session. With live sessions the new one starts at once — running agents send their
+ * traffic through it, and it re-adopts their sessions; without any, the next
+ * `glass <agent>` starts it.
+ */
+export async function replaceAfterUpdate({ latest, home = glassHome(), port = glassPort(), env = process.env, say = out }) {
   const h = await health(port);
-  if (!h) { out(`the next glass <agent> starts glass ${latest}`); return; }
-  if (replaceable(h)) {
-    await stopDaemon(port, { waitMs: 10_000 });
-    out(`stopped the glass ${h.glass} daemon${h.sessions ? ` — its ${h.sessions} live session(s) carry on with the next one` : ''}; the next glass <agent> starts ${latest}`);
-  } else {
-    out(`the glass ${h.glass} daemon keeps serving its ${h.sessions} live session(s); after they end, glass stop — the next glass <agent> then starts ${latest}`);
+  if (!h) { say(`the next glass <agent> starts glass ${latest}`); return null; }
+  if (!replaceable(h)) {
+    say(`the glass ${h.glass} daemon keeps serving its ${h.sessions} live session(s); after they end, glass stop — the next glass <agent> then starts ${latest}`);
+    return h;
   }
+  await stopDaemon(port, { waitMs: 10_000 });
+  if (!h.sessions) { say(`stopped the glass ${h.glass} daemon; the next glass <agent> starts ${latest}`); return null; }
+  const n = await ensureDaemon({ home, port, env });
+  say(n ? `replaced the glass ${h.glass} daemon with glass ${n.glass}; its ${h.sessions} live session(s) carry on`
+    : `stopped the glass ${h.glass} daemon, but glass ${latest} did not start — glass doctor`);
+  return n;
 }
 
 async function uninstall(argv) {
@@ -390,7 +398,7 @@ export async function main(argv) {
       out(stopped ? 'glass daemon stopping' : 'glass daemon was not running');
       return 0;
     }
-    case 'update': return update({ version: VERSION, out, err, check: rest.includes('--check'), afterInstall: afterUpdate });
+    case 'update': return update({ version: VERSION, out, err, check: rest.includes('--check'), afterInstall: (latest) => replaceAfterUpdate({ latest }) });
     case 'uninstall': return uninstall(rest);
     case '--version': case '-v': out(VERSION); return 0;
     case undefined: case 'help': case '--help': case '-h': out(HELP); return 0;
