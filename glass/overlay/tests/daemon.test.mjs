@@ -257,6 +257,57 @@ test('opencode relay to an LLM proxy: the row names the account that answered, n
   assert.deepEqual(rows.map((r) => r.provider).sort(), ['claude-code-max', 'gh-copilot']);
 });
 
+test('call facts: each row names the host its call went to, and a toolless call is a side call', async () => {
+  const tools = [{ name: 'Read', input_schema: {} }];
+  const fn = [{ type: 'function', function: { name: 'read', parameters: {} } }];
+  // claude through its base URL to a gateway; copilot and pi intercepted; opencode relayed.
+  const c = await open('claude');
+  await (await fetch(`${daemon.url}/v1/messages`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-task-id': c.taskId, 'x-agent': 'claude', 'x-glass-upstream': `http://127.0.0.1:${upPort}` },
+    body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 8, messages: msgs, tools: [{ name: 'Agent', input_schema: {} }, ...tools] }),
+  })).text();
+  const cp = await open('copilot');
+  await intercepted({ host: 'copilot-api.acme.ghe.com', token: cp.token, route: '/v1/messages', body: { model: 'claude-sonnet-5.5', max_tokens: 8, messages: msgs, tools } });
+  await intercepted({ host: 'copilot-api.acme.ghe.com', token: cp.token, route: '/v1/messages', body: { model: 'claude-haiku-4.5', max_tokens: 8, messages: msgs } });
+  const pi = await open('pi');
+  await intercepted({ host: 'api.openai.com', token: pi.token, route: '/v1/chat/completions', body: { model: 'gpt-4o-mini', messages: msgs, tools: fn } });
+  const oc = await open('opencode', { relays: { 'rapid-proxy': `http://127.0.0.1:${upPort}/v1` } });
+  await (await fetch(`${daemon.url}/relay/${encodeURIComponent(oc.token)}/rapid-proxy/chat/completions`, {
+    method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer placeholder' },
+    body: JSON.stringify({ model: 'claude-sonnet-5', messages: msgs }),
+  })).text();
+  await settle();
+  const facts = async (s) => (await rowsFor(s.taskId)).map((r) => `${r.upstream} ${r.call_kind} ${r.model}`).sort();
+  const local = `127.0.0.1:${upPort}`;
+  assert.deepEqual(await facts(c), [`${local} main claude-sonnet-5`]);
+  assert.deepEqual(await facts(cp), ['copilot-api.acme.ghe.com main claude-sonnet-5.5', 'copilot-api.acme.ghe.com side claude-haiku-4.5']);
+  assert.deepEqual((await facts(pi)).map((f) => f.split(' ').slice(0, 2).join(' ')), ['api.openai.com main']);
+  assert.deepEqual((await facts(oc)).map((f) => f.split(' ').slice(0, 2).join(' ')), [`${local} side`]);
+});
+
+test('UI reads: a session\'s model mix (by model, account, host, kind) and the unbound calls', async () => {
+  const s = await open('copilot');
+  const tools = [{ name: 'Read', input_schema: {} }];
+  for (const model of ['claude-sonnet-5.5', 'claude-sonnet-5.5']) {
+    await intercepted({ host: 'copilot-api.acme.ghe.com', token: s.token, route: '/v1/messages', body: { model, max_tokens: 8, messages: msgs, tools } });
+  }
+  await intercepted({ host: 'copilot-api.acme.ghe.com', token: s.token, route: '/v1/messages', body: { model: 'claude-haiku-4.5', max_tokens: 8, messages: msgs } });
+  await settle();
+  const r = await api('GET', `/api/experiments/runs/${s.taskId}/models`);
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.groups.map((g) => [g.model, g.provider, g.upstream, g.call_kind, g.calls]), [
+    ['claude-sonnet-5.5', 'github-copilot', 'copilot-api.acme.ghe.com', 'main', 2],
+    ['claude-haiku-4.5', 'github-copilot', 'copilot-api.acme.ghe.com', 'side', 1],
+  ]);
+  assert.equal(r.body.calls.length, 3);
+  assert.equal(r.body.calls[0].model, 'claude-haiku-4.5', 'newest first');
+  assert.equal((await api('GET', '/api/experiments/runs/..%2Fx/models')).status, 400);
+  const u = await api('GET', '/api/calls/unbound');
+  assert.equal(u.status, 200);
+  assert.equal(typeof u.body.calls, 'number');
+});
+
 // A daemon of its own: these depend on exactly which sessions are live.
 async function ownDaemon(dir) {
   return startDaemon({ home: dir, port: 0, fetch: stubFetch, log: () => {}, network: stubNetwork });

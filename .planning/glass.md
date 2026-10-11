@@ -8,7 +8,7 @@ GitHub-hosted runners). `main` is empty — generated content only.
 
 Living plan. Update the phase status and the Session log at the end of every session.
 
-Status: **G7 planned** (read-only routing view, see "G7 plan"). **G6 done (one item open)** — v0.1.2 is the latest release (tag at c0f0f52 = glass PR #7, from coding 51d2d91 + proxy 6170f5d; proxy PR #45 merged as 21ef373): main's tests green on all 4 cells incl. the provenance drift check, release job's install check green, the downloaded asset re-checked on macOS. pi row recorded (exact match with pi's own count). Open: a colleague installs on their own machine (ideally Windows) from the README. **G5 done** — v0.1.1 is the latest release (tag at e58dfc6 = glass PR #6, from coding 8242f7b + proxy b90d48d): main's tests green on all 4 cells incl. the Windows uninstall, release job's install check green, the downloaded asset re-checked on macOS. v0.1.0 (828d204) has the Windows uninstall race. Next: G6 (README for colleagues, CI drift check). **G4 published** — glass `main` = PR #4 → bbafb6f (from coding@45070e2 + proxy@7440525; 70 files incl. the built UI); CI green on ubuntu + windows × Node 22.13.0 / 22.x, 3 Wiz checks pass. Next: G5 (packaging + platform CI); pi row still waits on a pi login. **G3 published** — glass `main` = PR #2 → 63d224a (from coding@0154fa8 + proxy@7440525, proxy PR #43); CI green on ubuntu + windows (Node 22.13 / 22.x). Real runs on macOS measured for claude, copilot, opencode; pi proven through interception — its token row still waits on a pi login. Next: pi row, then G4 (UI + status line). G1 done and merged (coding `main` cae5aad4, proxy PR #42 → 34c78e5). G0 done (IT-security sign-off for local TLS interception still pending).
+Status: **G7 in progress** — WP1 + WP2 done on branches, published together in WP4. **G8 planned** (opt-in local offload, off by default). **G6 done (one item open)** — v0.1.2 is the latest release (tag at c0f0f52 = glass PR #7, from coding 51d2d91 + proxy 6170f5d; proxy PR #45 merged as 21ef373): main's tests green on all 4 cells incl. the provenance drift check, release job's install check green, the downloaded asset re-checked on macOS. pi row recorded (exact match with pi's own count). Open: a colleague installs on their own machine (ideally Windows) from the README. **G5 done** — v0.1.1 is the latest release (tag at e58dfc6 = glass PR #6, from coding 8242f7b + proxy b90d48d): main's tests green on all 4 cells incl. the Windows uninstall, release job's install check green, the downloaded asset re-checked on macOS. v0.1.0 (828d204) has the Windows uninstall race. Next: G6 (README for colleagues, CI drift check). **G4 published** — glass `main` = PR #4 → bbafb6f (from coding@45070e2 + proxy@7440525; 70 files incl. the built UI); CI green on ubuntu + windows × Node 22.13.0 / 22.x, 3 Wiz checks pass. Next: G5 (packaging + platform CI); pi row still waits on a pi login. **G3 published** — glass `main` = PR #2 → 63d224a (from coding@0154fa8 + proxy@7440525, proxy PR #43); CI green on ubuntu + windows (Node 22.13 / 22.x). Real runs on macOS measured for claude, copilot, opencode; pi proven through interception — its token row still waits on a pi login. Next: pi row, then G4 (UI + status line). G1 done and merged (coding `main` cae5aad4, proxy PR #42 → 34c78e5). G0 done (IT-security sign-off for local TLS interception still pending).
 
 ## Decisions (2026-10-08 — do not re-litigate)
 
@@ -287,6 +287,7 @@ Windows (S6). Remaining gate before G1: IT-security sign-off for local TLS inter
 | G5 | Packaging + platform CI | npm tarball on GHE release; CI matrix macos / ubuntu / **windows-latest native**; WSL via cleanroom | install → 4 agents measured → uninstall → **HOME diff empty** on every OS |
 | G6 | Repo + handover | create `bmw.ghe.com/<owner>/glass` (private), first extracted commit, README (install, uninstall, privacy), CI drift check | a colleague installs from the README alone |
 | G7 | Read-only routing view | per call: which model the agent itself chose and which account answered (relay rows); side calls marked; no proxy routing (see "G7 plan") | gsd-browser: one real session per agent shows its model mix and answering accounts; no offload / classifier code in the tree |
+| G8 | Opt-in local offload | optional install of the proxy's routing core + classifier, offloading to a local OpenAI-compatible cluster (see "G8 plan"); off by default, base tree unchanged without it | a session on the BMW cluster: eligible calls offloaded, unreachable cluster → agent's own provider, Routing tab shows it; base tree byte-identical with the option off |
 
 Rough size of glass after extraction: proxy tap + DB (~4k), adapters + reconciler (~4k),
 wiring + CLI + daemon (~1.5k new), gauge (~1.5k), UI (~6–8k) → **~17–19k lines**,
@@ -492,7 +493,7 @@ panes and real command output, paths anonymised. `docs.yml`: PR touching docs �
 with a docs change → build + deploy (Pages accepts main only). README starts with the site link. "A/B experiments": glass
 has no experiment runner — documented as manual run comparison (Comparing Runs page).
 
-## G7 plan — read-only routing view (not started)
+## G7 plan — read-only routing view (WP1 + WP2 done on branches, unpublished)
 
 **Question (2026-10-11):** should glass include coding's semantic router and the Routing
 tab / config / control (dashboard Token Usage → Routing, Flow, settings dialog), installed
@@ -515,9 +516,8 @@ by default and optional to switch off at install?
   tracker (~1.3k), Routing + Flow + settings UI (~5.5k), plus `yaml` and the provider SDKs
   — about the size of glass itself.
 
-If routing is wanted later: an **opt-in** `routing` feature (not default-on), claude only
-(no interception), active only with a configured and reachable local target; the classifier
-comes with it or not at all.
+Routing itself: an **opt-in** feature, off by default — planned as G8 (below), because the
+"no target" objection does not hold at BMW (local Qwen mini-cluster).
 
 **Why the coding Routing tab cannot simply be rendered:** its rows are keyed by `route_key`,
 `route_band`, `route_step` and `attempt_trail` (`components/llm-routing/recent-call.ts`),
@@ -548,7 +548,56 @@ Work packages:
   route"); screenshot from a real session.
 - **WP4 release:** extract, glass PRs on both targets, release, CI green.
 
+### G7 progress (branches `glass-g7-routing-view` in coding, `glass-g7-call-facts` in rapid-llm-proxy)
+
+| WP | Result |
+|---|---|
+| WP1 | What the rows already had (live `~/.glass` DB, 2026-10-11): `model` and `provider` on every row, through `/api/token-usage/recent` (`SELECT *`). Missing: where a call went and whether it was the agent's loop. Two additive columns in `token_usage` (proxy 72ffad0), written only by the measuring passthroughs (`''` elsewhere — routed calls, file adapters, legacy rows): `upstream` = host[:port] the call was forwarded to (`sanitizeUpstream`: never a path, query or credentials); `call_kind` = `main` (tools sent) / `subagent` (claude's toolset without a spawner tool) / `side` (no tools). Not in the hour exports — like agent / task / project. Tests: proxy golden re-recorded (the two fields only) + a subagent and a side scenario, passthrough unit tests (tools → main, toolless → side, a Responses request with only `web_search` → main, host only), proxy suite 504/504 + vitest 35; glass daemon test per capture path (claude base URL, copilot + pi intercepted, opencode relay) — generated tree 58/58 on Node 25.8 (no 22.13 here; CI has it) |
+
+| WP2 | Daemon reads `GET /api/experiments/runs/<id>/models` (groups by model × provider × upstream × call_kind + the newest 200 calls) and `GET /api/calls/unbound` (`lib/glass/ui-api.mjs`). glass-ui `models.tsx`: a Models card under a selected session (headline: calls, models, side-call share of tokens; kind badges main / subagent / side / not recorded; per-call list in a `<details>`) and an unbound-calls note on the Sessions page. `anthropic` labelled "Anthropic (own login)" — the dashboard alias maps it to Claude Max, which is coding's account, not glass's. Coding's `token-usage.tsx`: settings dialog, Routing and Cost tabs lazy-loaded → glass main chunk 471 → 352 KB (140 → 107 KB gzip) including the new card; the three are separate chunks glass never fetches (checked in the browser's resource list). Tests: daemon test for both reads, tree 59/59; real `glass claude` + `glass copilot` runs on the generated tree against a copy of `~/.glass` (copilot row = copilot's own "↑ 31.3k (31.3k written) ↓ 4"; claude relayed through coding's proxy → `127.0.0.1:12435`, `claude-code-max`); gsd-browser: card + unbound note render, pre-G7 rows show "not recorded" / "—" |
+
+Findings during WP1:
+- **Two names for one account family**: glass's own host map says `github-copilot`, coding's proxy (relayed, `x-llm-provider`) says `gh-copilot`; claude direct is `anthropic`, claude relayed through coding's proxy `claude-code-max`. Both are true — the second names the proxy's account. The view shows provider together with `upstream`, so a relay is visible as one; no renaming.
+- **Unbound rows**: 5 intercepted calls on 2026-10-10 recorded with agent `unknown` and no task (no Proxy-Authorization and not exactly one live intercepting session — the rule from G3). The view must show them as "not bound to a session", not drop them.
+- The anthropic wire writes `per-turn`, the OpenAI wire `per-llm-call` — the tier follows the wire, not the call; the view must not read it as main vs side (that is `call_kind`).
+
+## G8 plan — opt-in local offload (not started)
+
+**Premise change (user, 2026-10-11):** at BMW glass will run next to a local mini-cluster of
+Qwen3.8-27B. That gives offload a target, which was the main argument against routing in G7.
+Routing stays **off by default**; an install option (and `glass config`) turns it on.
+
+What changes against G7's reasoning, and what does not:
+
+| G7 objection | With the cluster |
+|---|---|
+| no offload target | gone — the cluster is the target (BMW target; public: any OpenAI-compatible endpoint the user names) |
+| decision 9 (glass only measures) | holds for the default; the option is an explicit user choice to let glass answer some calls |
+| copilot = substituting answers on an intercepted connection | **still out** until IT security says yes to that specifically; the G0 sign-off covers measuring |
+| size (~10k lines + yaml + SDKs) | acceptable as an optional part; the base tree must stay closed and unchanged without it |
+
+Scope sketch (to be checked in a spike first):
+- **Which calls**: claude through its base URL (Anthropic wire → translation to the cluster, as
+  coding's proxy does); opencode / pi on the OpenAI wire (relay or intercepted chat — format-native
+  to the cluster, the easiest case). Copilot: measured only (row above).
+- **Pieces from the proxy**: `routing-config`, `prompt-classifier` + `classifier-client` (judging
+  on the cluster itself, `CLASSIFIER_BASE_URL`), `egress-decision`, the OpenAI-compatible provider,
+  the routing trail columns (rows then carry `route_key` / `route_band` / `attempt_trail`, so the
+  Routing tab — already a lazy chunk since G7 — works unchanged). Not `worker-pool`, keychain, or
+  the subscription providers: glass never answers with an account of its own.
+- **Gates from coding's experience**: offload only when the cluster is reachable and healthy;
+  a timeout falls back to the agent's own provider (coding saw 30 s timeouts and 92 s averages on a
+  wedged llama.cpp — an offload must never be slower than not offloading); tool-call fidelity of
+  Qwen on the agent's toolset is a measured gate per agent, not assumed.
+- **Extractor**: an optional selection in `glass/manifest.yaml` (a second closure; `verify` proves
+  the base closure does not reach it) and an install switch; the release ships both.
+- **Config**: cluster URL / key in `~/.glass` config, never in the repo; the BMW target may carry a
+  default URL, the public one none.
+
+Open: the cluster's URL and auth at BMW; whether its tool calling holds up on each agent's loop.
+
 ## Session log
+- **2026-10-11 (G7 WP1 + WP2, G8 planned)** — proxy `glass-g7-call-facts` 72ffad0 (upstream + call_kind columns); coding `glass-g7-routing-view` (daemon test, models / unbound reads, Models card, lazy Routing / Cost). User: BMW will run glass next to a local Qwen3.8-27B mini-cluster → G8 = opt-in local offload, off by default. Next: WP3 docs, WP4 publish (proxy PR, coding merge, glass PRs on both targets).
 - **2026-10-11 (G7 planned)** — checked whether to include coding's semantic router / Routing tab: no (decision 9, bg-only routes, interception sign-off, no local target, size). G7 = a read-only view of model mix and answering accounts from existing rows; opt-in routing noted as a possible later feature. Next: G7 WP1.
 - **2026-10-09 (docs site)** — MkDocs site with screenshots, PlantUML + Mermaid diagrams, two tiers per page; Pages enabled; docs workflow; strict build green locally, 23/23 tree tests, install check green. Next: merge coding glass-docs, merge the glass PR → first publish.
 - **2026-10-09 (pi row)** — pi logged in (Copilot, bmw.ghe.com; first attempt hit a 429 from a Copilot-side endpoint after device approval, retry fine); measured through the released v0.1.2: exact match with pi's own usage. Remaining: colleague install, IT-security sign-off.

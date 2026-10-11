@@ -16,6 +16,7 @@ import { PerformanceTimeline } from '@/components/performance/timeline'
 import { ContextCacheExplainer, type Topology } from '@/components/performance/context-cache-explainer'
 import { normalizeModel } from '@/components/performance/models'
 import { cn } from '@/lib/utils'
+import { SessionModels, UnboundCalls } from './models'
 
 const POLL_MS = 10_000
 
@@ -144,6 +145,8 @@ export function SessionsPage() {
           )}
         </CardContent>
       </Card>
+      <UnboundCalls />
+      {selected && <SessionModels taskId={selected} />}
       {selected && <PerformanceTimeline />}
       <ContextCacheExplainer topology={GLASS_TOPOLOGY} />
     </div>

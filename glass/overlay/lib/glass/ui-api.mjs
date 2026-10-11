@@ -4,6 +4,8 @@
 //   GET /api/experiments/runs                  glass sessions, as the dashboard's Run rows
 //   GET /api/experiments/runs/<id>/timeline    token rows of one session
 //   GET /api/experiments/runs/<id>/context-turns
+//   GET /api/experiments/runs/<id>/models      one session's model mix + its newest calls
+//   GET /api/calls/unbound                     calls no session could be bound to
 //
 // The UI is the dashboard's own components (token-usage page, timeline, context
 // explainer), so the reads answer in the shapes those components already fetch
@@ -48,6 +50,57 @@ export function totalsByTask(db, taskIds) {
     out.set(r.task_id, t);
   }
   return out;
+}
+
+// upstream / call_kind (rapid-llm-proxy token_usage): '' on rows written before them.
+function factColumns(db) {
+  const have = new Set(db.prepare("SELECT name FROM pragma_table_info('token_usage') WHERE name IN ('upstream','call_kind')").all().map((r) => r.name));
+  return {
+    upstream: have.has('upstream') ? 'upstream' : "''",
+    callKind: have.has('call_kind') ? 'call_kind' : "''",
+  };
+}
+
+/**
+ * One session by model, the account that answered, the host it went to and the
+ * call kind (main / subagent / side; '' = not recorded) — plus its newest calls.
+ * What the agent chose and who served it; glass routes nothing.
+ */
+export function sessionModels(db, taskId, { limit = 200 } = {}) {
+  if (!db) return { groups: [], calls: [] };
+  const cache = hasCacheColumns(db);
+  const f = factColumns(db);
+  const cr = cache ? 'COALESCE(cache_read_tokens,0)' : '0';
+  const cw = cache ? 'COALESCE(cache_write_tokens,0)' : '0';
+  const groups = db.prepare(`
+    SELECT model, provider, ${f.upstream} AS upstream, ${f.callKind} AS call_kind, COUNT(*) AS calls,
+           SUM(input_tokens) AS input, SUM(output_tokens) AS output,
+           SUM(${cr}) AS cache_read, SUM(${cw}) AS cache_write
+    FROM token_usage WHERE task_id = ?
+    GROUP BY model, provider, upstream, call_kind ORDER BY calls DESC, model
+  `).all(taskId);
+  const calls = db.prepare(`
+    SELECT timestamp, model, provider, ${f.upstream} AS upstream, ${f.callKind} AS call_kind,
+           input_tokens AS input, output_tokens AS output, ${cr} AS cache_read, ${cw} AS cache_write, latency_ms
+    FROM token_usage WHERE task_id = ? ORDER BY timestamp DESC LIMIT ?
+  `).all(taskId, limit);
+  return { groups, calls };
+}
+
+/**
+ * Calls recorded without a session: intercepted traffic that carried no session
+ * credential while not exactly one intercepting session was live (G3's rule —
+ * never guessed). Counted, so they are visible rather than silently missing.
+ */
+export function unboundCalls(db) {
+  if (!db) return { calls: 0, tokens: 0, first: null, last: null };
+  const cache = hasCacheColumns(db);
+  const r = db.prepare(`
+    SELECT COUNT(*) AS calls, MIN(timestamp) AS first, MAX(timestamp) AS last,
+           COALESCE(SUM(input_tokens + output_tokens${cache ? ' + COALESCE(cache_read_tokens,0) + COALESCE(cache_write_tokens,0)' : ''}), 0) AS tokens
+    FROM token_usage WHERE task_id = ''
+  `).get();
+  return { calls: r.calls, tokens: r.tokens, first: r.first ?? null, last: r.last ?? null };
 }
 
 /** Archived glass spans (closed sessions) from <data>/measurements/*.json. */
@@ -139,11 +192,17 @@ export function createUiApi({ uiDir, dataDir, tokenDb, dbPath, measurement, live
       json(res, 200, { rows });
       return true;
     }
-    const m = /^\/api\/experiments\/runs\/([^/]+)\/(timeline|context-turns)$/.exec(p);
+    if (p === '/api/calls/unbound') {
+      json(res, 200, unboundCalls(tokenDb()?.db));
+      return true;
+    }
+    const m = /^\/api\/experiments\/runs\/([^/]+)\/(timeline|context-turns|models)$/.exec(p);
     if (m) {
       const taskId = decodeURIComponent(m[1]);
       if (!TASK_ID.test(taskId)) { json(res, 400, { error: 'invalid task id' }); return true; }
-      if (m[2] === 'timeline') {
+      if (m[2] === 'models') {
+        json(res, 200, sessionModels(tokenDb()?.db, taskId));
+      } else if (m[2] === 'timeline') {
         json(res, 200, { timeline: await readTimeline(taskId, dbPath), ambient: [], ambientTimeline: [] });
       } else {
         let contextTurns = [];
