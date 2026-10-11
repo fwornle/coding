@@ -603,6 +603,63 @@ Scope sketch (to be checked in a spike first):
 
 Open: the cluster's URL and auth at BMW; whether its tool calling holds up on each agent's loop.
 
+### G8 spike, step 1 — what coding's proxy already does (2026-10-11, read from rapid-llm-proxy 0afc4d5)
+
+The "local Qwen" is the **on-prem cluster** `qwen-local` (V100, nodes 2+3, `QWEN_LOCAL_API_BASE_URL`,
+default `http://10.143.242.184:8000/v1`, key `QWEN_LOCAL_API_KEY` in coding's `.env`; reachable on
+VPN only). Three models map onto the bands: small → `qwen3.8-27b-dual-fast`, medium →
+`dual-normal` (a reasoning model), high → `dual-deep`. `qwen-laptop` (llama.cpp on 8081) is the
+off-VPN stand-in and is switched off.
+
+How a call is demoted — no new mechanism needed, all of it is in `config/llm-routing.yaml` +
+`proxy-bridge/routing-config.mjs` + `server.mjs`:
+
+1. **Route**: `fg-chat/<agent>` is a `from-caller` route; the band comes from the caller
+   (`complexity` field, `x-complexity`, `reasoning_effort`, or the `/b/<band>` path segment).
+2. **Classifier** (`classifier: enabled, impl: service`, judge = `scripts/prompt-classifier-service.mjs`
+   on :12437, 6 s budget): only for caller-declared bands, DOWNGRADE-ONLY, after a free structural
+   gate (a turn carrying tool results is never classified) and a veto (code, paths, multi-step,
+   length). A lowered band is attributed `complexitySource: classifier` — this is the `[D:n]` count.
+3. **Offload** (`semantic_routing`): if the resolved band is in the target's `offload_bands`, the
+   network matches `require_network: corporate`, the target is `enabled` and the route is not
+   `offload: false`, the provider becomes `qwen-local` (model by band) and the route's own provider
+   is inserted as the FIRST fallback. Today `qwen-local` takes `small` for fg+bg only (medium was
+   removed: dual-normal reasons first, 28 s avg vs copilot's 3.3 s). Timeout 60 s (medium 150 s); the
+   endpoint is re-probed every 60 s and dropped from every chain while unreachable.
+
+Live check (Open network): `/api/llm/routing/resolve?job=fg-chat/opencode&complexity=small&classified=true`
+→ `network=public`: gh-copilot/claude-haiku-4.5, "no offload target for network=public";
+`network=corporate`: qwen-local/qwen3.8-27b-dual-fast, `offloadedFrom: gh-copilot`, gh-copilot second.
+
+Which agents can be demoted:
+
+| Agent | Path into the router in coding | In glass today | Offloadable |
+|---|---|---|---|
+| claude | `/v1/messages` Anthropic passthrough | base-URL forward (measure) | **no** — the passthrough 501s for a provider without `fg_transport`; routing-config refuses it |
+| opencode | shim `/v1/opencode[/t/<task>]/chat/completions` (its `github-copilot` provider's baseURL) | openai-passthrough relay (measure) | yes — OpenAI wire, native to the cluster |
+| copilot | **BYOK**: `COPILOT_PROVIDER_BASE_URL=/v1/copilot[/p/..][/b/<band>][/t/..]`, type openai | TLS intercept (measure) | yes — and via BYOK the CLI talks to the proxy by configuration, so nothing is substituted on an intercepted connection (the G0/IT objection was about the intercept) |
+| pi | shim, `from-caller` | intercept | yes (not in the BMW test set) |
+
+Consequence for glass: offload means opencode and copilot leave the measuring passthroughs for the
+routed shim paths. The open cost is the FALLBACK: when the router keeps a call (non-small band,
+cluster down, timeout), the proxy itself must answer with the agent's own account — for copilot BYOK
+that is the `copilot-provider` with the user's GitHub token, i.e. exactly the subscription-provider
+code G3 cut out. That is the main design question for G8, more than the classifier.
+
+### G8 spike, step 2 — measure on VPN (runbook; Claude Code drops on VPN, so the user drives)
+
+Uses coding's own install unchanged — no glass code yet. On VPN:
+1. `curl -s localhost:12435/api/llm/routing/resolve?job=fg-chat/opencode\&complexity=small\&classified=true`
+   → expect `qwen-local` first and `available: true` (if `false`, the probe has not seen the cluster yet; wait 60 s).
+2. `coding --opencode`, then in one session: (a) "how many r's in strawberry", (b) "what is the capital
+   of Portugal", (c) "list the files in this directory and tell me how many there are", (d) "read
+   README.md and summarise it in one sentence", (e) "write a python function that checks if a number is prime".
+3. Same five prompts in `coding --copilot`.
+4. Back on Open: Claude reads the rows (`provider`, `model`, `route_band`, complexity source,
+   `attempt_trail`, latency, and whether the tool calls in (c)/(d) completed on Qwen) and writes
+   the result here. Expected: (a)(b) demoted to dual-fast; (c)(d) first call possibly demoted, the
+   tool-result turns never classified; (e) vetoed as code → stays on the paid account.
+
 ## Session log
 - **2026-10-11 (0.1.18 released)** — #31 conflicted with the parallel #30 (both rewrote EXTRACTED.json, package.json, ui/index.html from the same main); resolved by `merge -s ours` of main into the extract branch (tree unchanged — ea3c702 already contains 9a7337a), normal push. User merged AIMAAD/glass #31 (01faf87) and fwornle/glass #8 (19d1748): v0.1.18 Latest on both, release + docs workflows green. Checked live on fwornle.github.io/glass: overview says eight slides with Question 3 = Models / Question 4 = compare, Home "eight-slide" (no "six-slide"), /models/ shows ui-models.png + ui-session-models.png. bmw Pages sits behind SSO — verified by its deploy job (success) only. Open idea: `--publish` should update an older open extract PR instead of racing it.
 - **2026-10-11 (G7 follow-up, 0.1.18 — after the parallel status-line fix took 0.1.17)** — user could not find the feature: the card only appeared after selecting a session, and nothing on Home / Overview / README mentioned it (Home still said "six-slide" for seven). Added a top-level **Models** tab (`/api/models?hours=N`: agent × model × account × host × kind across sessions, with session counts; 24 h / 7 d / 30 d / all), an 8th overview slide ("Question 3 / Which models did the work?", compare → Question 4), Home + README + Models page updates, `<1%` instead of a rounded 0% for a non-zero side share. Screenshots from real demo-project runs (opencode ×2, claude); tree 59/59, strict docs build green, slide 7/8 checked in the browser.
