@@ -13,6 +13,13 @@
 #   Copilot  → generates .github/copilot-instructions.md (CLAUDE.md + skill catalog)
 #   OpenCode → appends "Available Skills" section to CLAUDE.md (idempotent)
 #
+# Opting a project out of the skill catalogs:
+#   Put the line  <!-- coding:no-skill-catalog -->  anywhere in its CLAUDE.md.
+#   Both catalogs (CLAUDE.md and .github/copilot-instructions.md) are then left
+#   out — and an existing CLAUDE.md section is removed — so a published repo
+#   doesn't advertise skills that live in this private coding repo, not in it.
+#   The skills themselves still reach agents launched via `coding`.
+#
 # Machine-specific paths (home dir, repo path, username) are replaced with
 # portable placeholders in EVERY output — the copied slash commands, the copilot
 # instructions, and the skills section. See sanitize_paths().
@@ -31,12 +38,19 @@ CODING_REPO="${2:-${CODING_REPO:-$(cd "$(dirname "$0")/.." && pwd)}}"
 
 COMMANDS_DIR="$CODING_REPO/.claude/commands"
 CLAUDE_MD="$PROJECT_DIR/CLAUDE.md"
+NO_CATALOG_MARKER="<!-- coding:no-skill-catalog -->"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
 log() { echo "[agent-instructions] $*" >&2; }
+
+# Whether a CLAUDE.md wants the skill catalogs (see "Opting a project out" above)
+skill_catalog_wanted() {
+    local claude_md="$1"
+    ! grep -qF -- "$NO_CATALOG_MARKER" "$claude_md" 2>/dev/null
+}
 
 # Replace machine-specific paths with portable placeholders
 sanitize_paths() {
@@ -210,7 +224,7 @@ HEADER
             echo ""
         fi
 
-        if [[ -d "$COMMANDS_DIR" ]]; then
+        if [[ -d "$COMMANDS_DIR" ]] && skill_catalog_wanted "$CLAUDE_MD"; then
             echo "## Available Skills"
             echo ""
             echo "The following skills are available. When a task matches a skill's description,"
@@ -263,6 +277,11 @@ ensure_skill_references_in_claude_md() {
     # Use perl to strip trailing newlines (portable across macOS/Linux)
     perl -0777 -pe 's/\n+\z/\n/' "$claude_md" > "$temp2"
     mv "$temp2" "$claude_md"
+
+    if ! skill_catalog_wanted "$claude_md"; then
+        log "OpenCode: $claude_md opts out of the skill catalog — left out"
+        return 0
+    fi
 
     # Append fresh skill catalog
     {
