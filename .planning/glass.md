@@ -594,6 +594,13 @@ Scope sketch (to be checked in a spike first):
 - **Config**: cluster URL / key in `~/.glass` config, never in the repo; the BMW target may carry a
   default URL, the public one none.
 
+- **Status line (only with the option on)**: coding's `[D:n]` (prompts the classifier
+  downgraded) and `[L:n]` (calls the local cluster actually answered — a timed-out offload
+  that fell back does not count); both hidden at 0, never colouring the line. glass's `net`
+  popup gains coding's "Where a turn goes right now" section (route + fallback chain per
+  agent, cluster reachable or not). Not `[P:n]` — that is coding's unpushed learning repos,
+  a feature glass does not have. With the option off, the line and popup stay as today.
+
 Open: the cluster's URL and auth at BMW; whether its tool calling holds up on each agent's loop.
 
 ## Session log
