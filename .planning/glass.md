@@ -660,8 +660,12 @@ code G3 cut out. That is the main design question for G8, more than the classifi
   (claude-opus-5), and turns carrying tool results are never classified. Copilot declares `medium` on its loop
   turns (claude-sonnet-5) and `small` only on its ~640-token side calls. So per prompt, at most the
   first turn plus side calls offload — tool-call fidelity on Qwen was not exercised at all.
-- pi: launched (it rewrote `~/.pi/agent/models.json` / `settings.json`) but left no session file and no token
-  row. Its models.json lists `rapid-proxy-pi` (claude-sonnet-5) and `qwen-laptop` only.
+- pi: all five prompts answered (session in ui-template/.observations/pi-sessions), but on pi's OWN
+  `github-copilot` login, claude-sonnet-5.5 — the router never saw it. Cause: coding wrote
+  `enabledModels: ["claude-sonnet-5", …]`; pi resolves that before `defaultProvider`, the bare id matched
+  both rapid-proxy-pi and github-copilot, and pi's partial fallback chose github-copilot/claude-sonnet-5.5.
+  Fixed in coding (provider-qualified ids). Matters for glass G8: any agent with its own login can
+  silently leave the routed path, so the spike must assert the provider on every row.
 
 ### G8 spike, step 2 — measure on VPN (runbook; Claude Code drops on VPN, so the user drives)
 
