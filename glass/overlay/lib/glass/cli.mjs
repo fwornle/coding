@@ -247,15 +247,15 @@ async function report(argv) {
 }
 
 /**
- * What a tmux status-line click does: open a UI page (the same page the field
- * links to without tmux, so a click lands in the same place everywhere), or —
- * the network field — the egress report in a popup, its page when no popup shows.
+ * What a tmux status-line click does: open a UI page, or — the ctx and network
+ * fields — their report in a popup over the pane, the page the field links to
+ * without tmux when no popup shows (the explainer, the /report/net page).
  */
 export function clickTarget(tag, links) {
   if (tag === TAGS.health) return { open: links.root };
   if (tag === TAGS.tok) return { open: links.session };
-  if (tag === TAGS.ctx) return { open: links.explain };
-  if (tag === TAGS.net) return { popup: 'net', fallback: links.network };
+  if (tag === TAGS.ctx) return { popup: 'ctx', title: 'glass · context window', fallback: links.explain };
+  if (tag === TAGS.net) return { popup: 'net', title: 'glass · network', fallback: links.network };
   return null;
 }
 
@@ -272,7 +272,7 @@ async function click(argv) {
   const origin = links.root;
   if (target.open) return (await openUrl(target.open, origin)) ? 0 : 1;
   const shown = popup({
-    client: opt(argv, '--client'), pane: opt(argv, '--pane'), title: 'glass · network',
+    client: opt(argv, '--client'), pane: opt(argv, '--pane'), title: target.title,
     argv: [...selfCommand(), 'report', target.popup, '--port', String(port), ...(task ? ['--task', task] : []), '--hold'],
   });
   if (shown) return 0;

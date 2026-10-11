@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { useAppDispatch, useAppSelector } from '@/store'
 import {
   fetchRuns,
@@ -53,8 +53,11 @@ export function SessionsPage() {
   const runs = useAppSelector((s) => s.performance.runs) as Run[]
   const loading = useAppSelector((s) => s.performance.runsLoading)
   const selected = useAppSelector(selectSelectedTaskId)
-  const [params] = useSearchParams()
+  const explaining = useAppSelector((s) => s.performance.explainTaskId)
+  const [params, setParams] = useSearchParams()
+  const location = useLocation()
   const linked = useRef<string | null>(null)
+  const shown = useRef(false)
 
   useEffect(() => {
     dispatch(fetchRuns())
@@ -62,15 +65,30 @@ export function SessionsPage() {
     return () => clearInterval(t)
   }, [dispatch])
 
-  // Apply the deep link once, after the linked session is in the list (the
-  // explainer reads the run's window from it).
+  // Apply each deep link once, after the linked session is in the list (the
+  // explainer reads the run's window from it). Once per NAVIGATION, not per
+  // session: a status-line click on a tab already showing this page navigates
+  // it again, and that click must open the explainer again.
   useEffect(() => {
     const task = params.get('task')
-    if (!task || linked.current === task || !runs.some((r) => r.task_id === task)) return
-    linked.current = task
+    if (!task || linked.current === location.key || !runs.some((r) => r.task_id === task)) return
+    linked.current = location.key
     dispatch(setSelectedTaskId(task))
     if (params.get('explain') === '1') dispatch(setExplainTaskId(task))
-  }, [params, runs, dispatch])
+  }, [params, location.key, runs, dispatch])
+
+  // Closing the explainer drops `explain=1` from the URL. A re-used browser tab
+  // that already shows the target URL is only focused, never navigated
+  // (lib/statusline/browser-tab.mjs), so the next click would change nothing.
+  useEffect(() => {
+    if (explaining) { shown.current = true; return }
+    const closed = shown.current
+    shown.current = false
+    if (!closed || params.get('explain') !== '1') return
+    const next = new URLSearchParams(params)
+    next.delete('explain')
+    setParams(next, { replace: true })
+  }, [explaining, params, setParams])
 
   return (
     <div className="p-6 space-y-6">

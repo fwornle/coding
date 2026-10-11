@@ -76,12 +76,12 @@ test('claude without tmux: a --settings file with glass as statusLine', () => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
-test('tmux clicks land where the links do: ctx → the explainer, network → a popup', () => {
+test('tmux clicks: ctx and network → a popup, falling back to the page the field links to', () => {
   const links = uiLinks(12445, D.task_id);
-  assert.deepEqual(clickTarget(TAGS.ctx, links), { open: links.explain });
+  assert.deepEqual(clickTarget(TAGS.ctx, links), { popup: 'ctx', title: 'glass · context window', fallback: links.explain });
   assert.deepEqual(clickTarget(TAGS.tok, links), { open: links.session });
   assert.deepEqual(clickTarget(TAGS.health, links), { open: links.root });
-  assert.deepEqual(clickTarget(TAGS.net, links), { popup: 'net', fallback: links.network });
+  assert.deepEqual(clickTarget(TAGS.net, links), { popup: 'net', title: 'glass · network', fallback: links.network });
   assert.equal(clickTarget('nope', links), null);
 });
 
