@@ -492,7 +492,7 @@ panes and real command output, paths anonymised. `docs.yml`: PR touching docs �
 with a docs change → build + deploy (Pages accepts main only). README starts with the site link. "A/B experiments": glass
 has no experiment runner — documented as manual run comparison (Comparing Runs page).
 
-## G7 plan — read-only routing view (not started)
+## G7 plan — read-only routing view (WP1 done on branches, unpublished)
 
 **Question (2026-10-11):** should glass include coding's semantic router and the Routing
 tab / config / control (dashboard Token Usage → Routing, Flow, settings dialog), installed
@@ -547,6 +547,17 @@ Work packages:
 - **WP3 docs:** a docs page plus the deep tier ("which model answered and why glass does not
   route"); screenshot from a real session.
 - **WP4 release:** extract, glass PRs on both targets, release, CI green.
+
+### G7 progress (branches `glass-g7-routing-view` in coding, `glass-g7-call-facts` in rapid-llm-proxy)
+
+| WP | Result |
+|---|---|
+| WP1 | What the rows already had (live `~/.glass` DB, 2026-10-11): `model` and `provider` on every row, through `/api/token-usage/recent` (`SELECT *`). Missing: where a call went and whether it was the agent's loop. Two additive columns in `token_usage` (proxy 72ffad0), written only by the measuring passthroughs (`''` elsewhere — routed calls, file adapters, legacy rows): `upstream` = host[:port] the call was forwarded to (`sanitizeUpstream`: never a path, query or credentials); `call_kind` = `main` (tools sent) / `subagent` (claude's toolset without a spawner tool) / `side` (no tools). Not in the hour exports — like agent / task / project. Tests: proxy golden re-recorded (the two fields only) + a subagent and a side scenario, passthrough unit tests (tools → main, toolless → side, a Responses request with only `web_search` → main, host only), proxy suite 504/504 + vitest 35; glass daemon test per capture path (claude base URL, copilot + pi intercepted, opencode relay) — generated tree 58/58 on Node 25.8 (no 22.13 here; CI has it) |
+
+Findings during WP1:
+- **Two names for one account family**: glass's own host map says `github-copilot`, coding's proxy (relayed, `x-llm-provider`) says `gh-copilot`; claude direct is `anthropic`, claude relayed through coding's proxy `claude-code-max`. Both are true — the second names the proxy's account. The view shows provider together with `upstream`, so a relay is visible as one; no renaming.
+- **Unbound rows**: 5 intercepted calls on 2026-10-10 recorded with agent `unknown` and no task (no Proxy-Authorization and not exactly one live intercepting session — the rule from G3). The view must show them as "not bound to a session", not drop them.
+- The anthropic wire writes `per-turn`, the OpenAI wire `per-llm-call` — the tier follows the wire, not the call; the view must not read it as main vs side (that is `call_kind`).
 
 ## Session log
 - **2026-10-11 (G7 planned)** — checked whether to include coding's semantic router / Routing tab: no (decision 9, bg-only routes, interception sign-off, no local target, size). G7 = a read-only view of model mix and answering accounts from existing rows; opt-in routing noted as a possible later feature. Next: G7 WP1.
