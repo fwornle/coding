@@ -638,13 +638,30 @@ Which agents can be demoted:
 | claude | `/v1/messages` Anthropic passthrough | base-URL forward (measure) | **no** — the passthrough 501s for a provider without `fg_transport`; routing-config refuses it |
 | opencode | shim `/v1/opencode[/t/<task>]/chat/completions` (its `github-copilot` provider's baseURL) | openai-passthrough relay (measure) | yes — OpenAI wire, native to the cluster |
 | copilot | **BYOK**: `COPILOT_PROVIDER_BASE_URL=/v1/copilot[/p/..][/b/<band>][/t/..]`, type openai | TLS intercept (measure) | yes — and via BYOK the CLI talks to the proxy by configuration, so nothing is substituted on an intercepted connection (the G0/IT objection was about the intercept) |
-| pi | shim, `from-caller` | intercept | yes (not in the BMW test set) |
+| pi | shim, `from-caller` | intercept | yes |
 
 Consequence for glass: offload means opencode and copilot leave the measuring passthroughs for the
 routed shim paths. The open cost is the FALLBACK: when the router keeps a call (non-small band,
 cluster down, timeout), the proxy itself must answer with the agent's own account — for copilot BYOK
 that is the `copilot-provider` with the user's GitHub token, i.e. exactly the subscription-provider
 code G3 cut out. That is the main design question for G8, more than the classifier.
+
+### G8 spike, step 2 result (VPN run 2026-10-11 ~18:00 local) — the cluster was not reachable
+
+- Proxy on VPN: `Network mode from coordinator: corporate`, then `qwen-local: unreachable at
+  http://10.143.242.184:8000/v1 (fetch failed)`; the classifier service warm-up got HTTP 502. The last
+  call qwen-local answered is 2026-09-13 (1,783 calls in total); the last `reachable` verdict is just as old.
+  The address or the deployment moved again (it already moved node 1 → nodes 2+3 on 2026-09-07). Needed: the current URL.
+- The decision path itself worked: small-band calls on both agents carry `offloaded_from: gh-copilot`,
+  with the trail `qwen-local: not reachable` → gh-copilot/claude-haiku-4.5 in ~1.0–1.5 s. Because the
+  probe had already dropped the endpoint, there was no 60 s timeout penalty.
+- Classifier downgrades seen: opencode `classified high -> small` on the first turn, copilot one turn `classifier` → small.
+- How much would move even with the cluster up: opencode's loop turns send no band → `defaults.fg-chat` = high
+  (claude-opus-5), and turns carrying tool results are never classified. Copilot declares `medium` on its loop
+  turns (claude-sonnet-5) and `small` only on its ~640-token side calls. So per prompt, at most the
+  first turn plus side calls offload — tool-call fidelity on Qwen was not exercised at all.
+- pi: launched (it rewrote `~/.pi/agent/models.json` / `settings.json`) but left no session file and no token
+  row. Its models.json lists `rapid-proxy-pi` (claude-sonnet-5) and `qwen-laptop` only.
 
 ### G8 spike, step 2 — measure on VPN (runbook; Claude Code drops on VPN, so the user drives)
 
