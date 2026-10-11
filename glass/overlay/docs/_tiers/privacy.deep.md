@@ -2,7 +2,7 @@
 
 | What | Where (under `~/.glass`) | Kept |
 |---|---|---|
-| One row per model call: time, agent, model, token counts, latency, session id, project folder name, a short redacted prompt preview | `data/llm-proxy/token-usage.db` | until uninstall |
+| One row per model call: time, agent, model, account, the host it went to, whether it was a main or side call, token counts, latency, session id, project folder name, a short redacted prompt preview | `data/llm-proxy/token-usage.db` | until uninstall |
 | Session records: session id, agent, start / end, working directory | `data/measurements/<session>.json` | until uninstall |
 | Context captures: per call, the size of each part of the window plus redacted previews (≤ 2 KB each) of system prompt, tool descriptions and messages | `data/measurements/<session>/context-turns.jsonl`, `data/llm-proxy/context-breakdown/` | 7 days |
 | glass's CA certificate and private key | `ca/` | until uninstall |
