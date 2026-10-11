@@ -10,9 +10,10 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 
 import { scanSource } from '../../scripts/glass/import-graph.mjs';
-import { extract, defaultRoots, diffTrees, parseRemote, checkTargetRemote, ExtractError } from '../../scripts/glass/extract.mjs';
+import { extract, defaultRoots, diffTrees, parseRemote, checkTargetRemote, commitExtract, ExtractError } from '../../scripts/glass/extract.mjs';
 
 test('scanner: static, dynamic, require and createRequire edges; computed sites', () => {
   const src = [
@@ -203,6 +204,56 @@ test('publish: remote URLs parse to gh host + repo, whatever the SSH user', () =
   assert.deepEqual(parseRemote('git@github.com:fwornle/coding.git'), { host: 'github.com', repo: 'fwornle/coding' });
   assert.deepEqual(parseRemote('https://bmw.ghe.com/AIMAAD/glass'), { host: 'bmw.ghe.com', repo: 'AIMAAD/glass' });
   assert.deepEqual(parseRemote('ssh://git@host:22/o/r.git'), { host: 'host', repo: 'o/r' });
+});
+
+test('publish: a newer extract updates the open PR branch as a fast-forward that cannot conflict with main', () => {
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-publish-test-'));
+  const g = (dir, ...args) => execFileSync('git', ['-C', dir, '-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { encoding: 'utf8' }).trim();
+  const tree = (files) => {
+    const d = fs.mkdtempSync(path.join(base, 'tree-'));
+    for (const [f, c] of Object.entries(files)) fs.writeFileSync(path.join(d, f), c);
+    return d;
+  };
+  const clone = (name) => {
+    const d = path.join(base, name);
+    execFileSync('git', ['clone', '--quiet', '--branch', 'main', origin, d]);
+    g(d, 'config', 'user.name', 't'); g(d, 'config', 'user.email', 't@t');
+    return d;
+  };
+  const origin = path.join(base, 'origin.git');
+  execFileSync('git', ['init', '--quiet', '--bare', '--initial-branch=main', origin]);
+  const seed = path.join(base, 'seed');
+  execFileSync('git', ['clone', '--quiet', origin, seed]);
+  fs.writeFileSync(path.join(seed, 'package.json'), '0.1.16');
+  g(seed, 'add', '-A'); g(seed, 'commit', '--quiet', '-m', 'seed'); g(seed, 'push', '--quiet', 'origin', 'HEAD:main');
+  const opts = (branch, onto) => ({ branch, subject: `extract ${branch}`, body: 'generated', onto });
+
+  // An open PR (0.1.17), then main moves on under it (another extract merged: 0.1.17 + a fix).
+  const a = clone('a');
+  const first = commitExtract(a, tree({ 'package.json': '0.1.17' }), opts('extract/one'));
+  g(a, 'push', '--quiet', '-u', 'origin', first.branch);
+  const m = clone('m');
+  fs.writeFileSync(path.join(m, 'package.json'), '0.1.17'); fs.writeFileSync(path.join(m, 'fix.js'), 'fix');
+  g(m, 'add', '-A'); g(m, 'commit', '--quiet', '-m', 'other extract'); g(m, 'push', '--quiet', 'origin', 'HEAD:main');
+
+  // The next extract (0.1.18, contains the fix) updates extract/one instead of racing it.
+  const b = clone('b');
+  const next = tree({ 'package.json': '0.1.18', 'fix.js': 'fix', 'models.js': 'tab' });
+  const second = commitExtract(b, next, opts('extract/two', 'extract/one'));
+  assert.equal(second.branch, 'extract/one');
+  g(b, 'push', '--quiet', 'origin', `${second.sha}:refs/heads/extract/one`); // no --force: a fast-forward
+  g(b, 'merge-base', '--is-ancestor', first.sha, second.sha);
+  g(b, 'merge-base', '--is-ancestor', 'origin/main', second.sha);
+  // Merging the PR into main is clean and lands exactly the new tree.
+  g(b, 'fetch', '--quiet', 'origin');
+  g(b, 'reset', '--quiet', '--hard', 'origin/main');
+  g(b, 'merge', '--quiet', '--no-ff', '-m', 'Merge PR', 'origin/extract/one');
+  assert.equal(g(b, 'rev-parse', 'HEAD^{tree}'), g(b, 'rev-parse', `${second.sha}^{tree}`));
+  assert.equal(fs.readFileSync(path.join(b, 'package.json'), 'utf8'), '0.1.18');
+
+  // Publishing the same tree again pushes nothing.
+  assert.equal(commitExtract(clone('c'), next, opts('extract/two', 'extract/one')), null);
+  fs.rmSync(base, { recursive: true, force: true });
 });
 
 test('build: a bundle step without the source\'s node_modules fails by name', () => {
