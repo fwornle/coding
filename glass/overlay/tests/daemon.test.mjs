@@ -286,6 +286,28 @@ test('call facts: each row names the host its call went to, and a toolless call 
   assert.deepEqual((await facts(oc)).map((f) => f.split(' ').slice(0, 2).join(' ')), [`${local} side`]);
 });
 
+test('UI reads: a session\'s model mix (by model, account, host, kind) and the unbound calls', async () => {
+  const s = await open('copilot');
+  const tools = [{ name: 'Read', input_schema: {} }];
+  for (const model of ['claude-sonnet-5.5', 'claude-sonnet-5.5']) {
+    await intercepted({ host: 'copilot-api.acme.ghe.com', token: s.token, route: '/v1/messages', body: { model, max_tokens: 8, messages: msgs, tools } });
+  }
+  await intercepted({ host: 'copilot-api.acme.ghe.com', token: s.token, route: '/v1/messages', body: { model: 'claude-haiku-4.5', max_tokens: 8, messages: msgs } });
+  await settle();
+  const r = await api('GET', `/api/experiments/runs/${s.taskId}/models`);
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.groups.map((g) => [g.model, g.provider, g.upstream, g.call_kind, g.calls]), [
+    ['claude-sonnet-5.5', 'github-copilot', 'copilot-api.acme.ghe.com', 'main', 2],
+    ['claude-haiku-4.5', 'github-copilot', 'copilot-api.acme.ghe.com', 'side', 1],
+  ]);
+  assert.equal(r.body.calls.length, 3);
+  assert.equal(r.body.calls[0].model, 'claude-haiku-4.5', 'newest first');
+  assert.equal((await api('GET', '/api/experiments/runs/..%2Fx/models')).status, 400);
+  const u = await api('GET', '/api/calls/unbound');
+  assert.equal(u.status, 200);
+  assert.equal(typeof u.body.calls, 'number');
+});
+
 // A daemon of its own: these depend on exactly which sessions are live.
 async function ownDaemon(dir) {
   return startDaemon({ home: dir, port: 0, fetch: stubFetch, log: () => {}, network: stubNetwork });

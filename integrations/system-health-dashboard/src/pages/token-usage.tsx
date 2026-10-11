@@ -1,7 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { RefreshCw, Zap, TrendingUp, Clock, ArrowUpDown, Settings } from 'lucide-react'
-import { TokenUsageSettingsDialog } from './token-usage-settings-dialog'
-import { TokenUsageRoutingTab } from './token-usage-routing-tab'
 import { normalizeProvider, getProviderColor, accountLabel } from '@/lib/providers'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -17,7 +15,12 @@ import {
   PieChart, Pie, Cell, Legend, Treemap, AreaChart, Area, Brush
 } from 'recharts'
 import { normalizeModel } from '@/components/performance/models'
-import { CostTab } from '@/components/cost/CostTab'
+
+// Loaded on first render only: glass's build shows neither (tabs / settings
+// props) and should not carry them in its main chunk; here they cost one fetch.
+const TokenUsageSettingsDialog = lazy(() => import('./token-usage-settings-dialog').then((m) => ({ default: m.TokenUsageSettingsDialog })))
+const TokenUsageRoutingTab = lazy(() => import('./token-usage-routing-tab').then((m) => ({ default: m.TokenUsageRoutingTab })))
+const CostTab = lazy(() => import('@/components/cost/CostTab').then((m) => ({ default: m.CostTab })))
 
 const PROXY_PORT = '12435'
 const PROXY_BASE = `http://localhost:${PROXY_PORT}`
@@ -783,12 +786,14 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
       </div>
 
       {settings && (
-        <TokenUsageSettingsDialog
-          open={settingsOpen}
-          onOpenChange={setSettingsOpen}
-          proxyBase={proxyBase}
-          hours={Number(hoursWindow) || 24}
-        />
+        <Suspense fallback={null}>
+          <TokenUsageSettingsDialog
+            open={settingsOpen}
+            onOpenChange={setSettingsOpen}
+            proxyBase={proxyBase}
+            hours={Number(hoursWindow) || 24}
+          />
+        </Suspense>
       )}
 
       {/* Summary Cards */}
@@ -1267,7 +1272,9 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
         {/* Cost Tab - €/$ cost, budgets, burn-rate, optimization controls */}
         {has('cost') && (
           <TabsContent value="cost">
-            <CostTab proxyBase={proxyBase} />
+            <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
+              <CostTab proxyBase={proxyBase} />
+            </Suspense>
           </TabsContent>
         )}
 
@@ -1276,7 +1283,9 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
             the system is doing, that is where you change it. */}
         {has('routing') && (
           <TabsContent value="routing" className="mt-4">
-            <TokenUsageRoutingTab proxyBase={proxyBase} hours={hoursWindow} />
+            <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
+              <TokenUsageRoutingTab proxyBase={proxyBase} hours={hoursWindow} />
+            </Suspense>
           </TabsContent>
         )}
 
