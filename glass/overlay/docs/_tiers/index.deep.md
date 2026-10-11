@@ -8,6 +8,7 @@ question. glass makes this visible per call, so you can see
 - how large the context window was on each turn, and what filled it;
 - how much of each prompt the provider served from its cache (cheaper, faster) and how
   much it had to process fresh;
+- which models each agent used, which account answered, and how much went to side calls;
 - how two agents or models compare on the same task.
 
 ## How you use it
@@ -29,6 +30,7 @@ The first command starts a small background process — the glass daemon — on
 | Page | What it shows |
 |---|---|
 | [Token Usage](token-usage.md) | Totals, trends and every call, by agent, provider and model |
+| [Models & Accounts](models.md) | Which models the agents used, who answered, main loop vs side calls |
 | [Context Window](context-window.md) | Per session: each turn, what filled the window, cache reuse |
 | [Comparing Runs (A/B)](comparing-runs.md) | Two runs of the same task, side by side |
 | [Status Line](status-line.md) | Context gauge and session tokens in your terminal |

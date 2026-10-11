@@ -65,6 +65,13 @@ function KindBadge({ kind }: { kind: CallKind }) {
   return <Badge variant="outline" title={k.title} className={cn('text-xs font-normal border-transparent', k.className)}>{k.label}</Badge>
 }
 
+// A share that is not zero never reads as 0%.
+const share = (part: number, whole: number) => {
+  if (!whole || !part) return '0%'
+  const pct = (part / whole) * 100
+  return pct < 1 ? '<1%' : `${Math.round(pct)}%`
+}
+
 const tokensOf = (r: { input: number; output: number; cache_read: number; cache_write: number }) =>
   r.input + r.output + r.cache_read + r.cache_write
 
@@ -105,7 +112,7 @@ export function SessionModels({ taskId }: { taskId: string }) {
           {data && calls > 0 && (
             <span className="block mt-1" data-testid="models-headline">
               {calls} call{calls === 1 ? '' : 's'} on {models} model{models === 1 ? '' : 's'}
-              {sideCalls > 0 && <> · {sideCalls} side call{sideCalls === 1 ? '' : 's'} ({allTokens ? Math.round((sideTokens / allTokens) * 100) : 0}% of tokens)</>}
+              {sideCalls > 0 && <> · {sideCalls} side call{sideCalls === 1 ? '' : 's'} ({share(sideTokens, allTokens)} of tokens)</>}
             </span>
           )}
         </CardDescription>
@@ -201,5 +208,132 @@ export function UnboundCalls() {
       {u.last && <> — latest {new Date(u.last).toLocaleString()}</>}. They count in Token Usage, not in any row here:
       an intercepted call that names no session is never guessed.
     </p>
+  )
+}
+
+interface MixGroup extends Group {
+  agent: string
+  sessions: number
+}
+
+const WINDOWS: Array<{ hours: number; label: string }> = [
+  { hours: 24, label: '24 h' },
+  { hours: 24 * 7, label: '7 days' },
+  { hours: 24 * 30, label: '30 days' },
+  { hours: 0, label: 'All' },
+]
+
+/**
+ * The Models tab: every measured call of a time window by agent, model, the
+ * account that answered, the host and the call kind. One session's view is the
+ * card under Sessions (SessionModels).
+ */
+export function ModelsPage() {
+  const [hours, setHours] = useState(24)
+  const [groups, setGroups] = useState<MixGroup[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let alive = true
+    const load = () => fetch(`/api/models?hours=${hours}`)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((d) => { if (alive) { setGroups(d.groups); setError(null) } })
+      .catch((e) => { if (alive) setError(String(e.message || e)) })
+    setGroups(null)
+    load()
+    const t = setInterval(load, POLL_MS)
+    return () => { alive = false; clearInterval(t) }
+  }, [hours])
+
+  const rows = groups ?? []
+  const calls = rows.reduce((n, g) => n + g.calls, 0)
+  const models = new Set(rows.map((g) => g.model)).size
+  const allTokens = rows.reduce((n, g) => n + tokensOf(g), 0)
+  const side = rows.filter((g) => g.call_kind === 'side')
+  const sideCalls = side.reduce((n, g) => n + g.calls, 0)
+  const sideTokens = side.reduce((n, g) => n + tokensOf(g), 0)
+
+  return (
+    <div className="p-6 space-y-6" data-testid="models-tab">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Models</h1>
+          <p className="text-sm text-muted-foreground">
+            Which models your agents used, who answered, and which calls were the agent&apos;s loop or a side call.
+            glass routes nothing — every model here is one the agent chose.
+          </p>
+        </div>
+        <div className="flex shrink-0 gap-1" role="group" aria-label="Time window">
+          {WINDOWS.map((w) => (
+            <button
+              key={w.hours}
+              type="button"
+              data-hours={w.hours}
+              className={cn('px-3 py-1.5 text-sm rounded-md whitespace-nowrap', hours === w.hours ? 'bg-muted font-medium' : 'text-muted-foreground hover:text-foreground')}
+              onClick={() => setHours(w.hours)}
+            >
+              {w.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <Card data-testid="models-page">
+        <CardHeader>
+          <CardTitle className="text-base">Model mix</CardTitle>
+          <CardDescription data-testid="models-page-headline">
+            {groups === null && !error ? 'loading…' : calls === 0 ? 'No measured calls in this window.' : (
+              <>
+                {calls} call{calls === 1 ? '' : 's'} on {models} model{models === 1 ? '' : 's'} · {fmtTokens(allTokens)} tokens
+                {sideCalls > 0 && <> · {sideCalls} side call{sideCalls === 1 ? '' : 's'} ({share(sideTokens, allTokens)} of tokens)</>}
+              </>
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {error && <p className="text-sm text-destructive">Could not read the calls: {error}</p>}
+          {rows.length > 0 && (
+            <Table data-testid="models-page-table">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Agent</TableHead>
+                  <TableHead>Model</TableHead>
+                  <TableHead>Kind</TableHead>
+                  <TableHead>Answered by</TableHead>
+                  <TableHead>Via</TableHead>
+                  <TableHead className="text-right">Sessions</TableHead>
+                  <TableHead className="text-right">Calls</TableHead>
+                  <TableHead className="text-right">Input</TableHead>
+                  <TableHead className="text-right">Cache read</TableHead>
+                  <TableHead className="text-right">Cache write</TableHead>
+                  <TableHead className="text-right">Output</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((g) => (
+                  <TableRow key={`${g.agent}|${g.model}|${g.provider}|${g.upstream}|${g.call_kind}`} data-kind={g.call_kind || 'unrecorded'}>
+                    <TableCell><Badge variant="secondary" className="text-xs">{g.agent || '—'}</Badge></TableCell>
+                    <TableCell className="font-mono text-xs">{normalizeModel(g.model)}</TableCell>
+                    <TableCell><KindBadge kind={g.call_kind} /></TableCell>
+                    <TableCell className="text-xs">{answeredBy(g.provider)}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{g.upstream || '—'}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">{g.sessions || '—'}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">{g.calls}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">{fmtTokens(g.input)}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">{fmtTokens(g.cache_read)}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">{fmtTokens(g.cache_write)}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">{fmtTokens(g.output)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+          <p className="mt-4 text-xs text-muted-foreground">
+            One session&apos;s models: open <span className="font-medium">Sessions</span> and select its row.
+            Kind and Via are recorded since glass 0.1.16; older calls show “not recorded” and “—”.
+          </p>
+        </CardContent>
+      </Card>
+      <UnboundCalls />
+    </div>
   )
 }

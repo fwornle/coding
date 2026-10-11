@@ -6,6 +6,7 @@
 //   GET /api/experiments/runs/<id>/context-turns
 //   GET /api/experiments/runs/<id>/models      one session's model mix + its newest calls
 //   GET /api/calls/unbound                     calls no session could be bound to
+//   GET /api/models?hours=N                    every session's calls by agent × model × account × host × kind
 //
 // The UI is the dashboard's own components (token-usage page, timeline, context
 // explainer), so the reads answer in the shapes those components already fetch
@@ -85,6 +86,28 @@ export function sessionModels(db, taskId, { limit = 200 } = {}) {
     FROM token_usage WHERE task_id = ? ORDER BY timestamp DESC LIMIT ?
   `).all(taskId, limit);
   return { groups, calls };
+}
+
+/**
+ * All measured calls of the last `hours` (0 = all time) by agent, model, account,
+ * host and call kind, with the number of sessions each group spans. The Models tab.
+ */
+export function modelMix(db, { hours = 24 } = {}) {
+  if (!db) return { hours, groups: [] };
+  const cache = hasCacheColumns(db);
+  const f = factColumns(db);
+  const cr = cache ? 'COALESCE(cache_read_tokens,0)' : '0';
+  const cw = cache ? 'COALESCE(cache_write_tokens,0)' : '0';
+  const since = hours > 0 ? new Date(Date.now() - hours * 3_600_000).toISOString() : '';
+  const groups = db.prepare(`
+    SELECT agent, model, provider, ${f.upstream} AS upstream, ${f.callKind} AS call_kind, COUNT(*) AS calls,
+           COUNT(DISTINCT NULLIF(task_id, '')) AS sessions,
+           SUM(input_tokens) AS input, SUM(output_tokens) AS output,
+           SUM(${cr}) AS cache_read, SUM(${cw}) AS cache_write
+    FROM token_usage WHERE timestamp >= ?
+    GROUP BY agent, model, provider, upstream, call_kind ORDER BY calls DESC, agent, model
+  `).all(since);
+  return { hours, groups };
 }
 
 /**
@@ -190,6 +213,11 @@ export function createUiApi({ uiDir, dataDir, tokenDb, dbPath, measurement, live
     if (p === '/api/experiments/runs') {
       const rows = sessionRuns({ live: liveSessions(), spans: readSpans(path.join(dataDir, 'measurements')), db: tokenDb()?.db });
       json(res, 200, { rows });
+      return true;
+    }
+    if (p === '/api/models') {
+      const h = Number(u.searchParams.get('hours') ?? 24);
+      json(res, 200, modelMix(tokenDb()?.db, { hours: Number.isFinite(h) && h >= 0 ? Math.min(h, 24 * 366) : 24 }));
       return true;
     }
     if (p === '/api/calls/unbound') {

@@ -4,7 +4,7 @@ Token measurement and context-window insight for coding agents — GitHub Copilo
 OpenCode, pi and Claude Code. Put `glass` in front of the agent you already use; glass
 records every model call and shows where your tokens go.
 
-**New to glass?** [See the six-slide overview](overview.md): what it can do for you,
+**New to glass?** [See the eight-slide overview](overview.md): what it can do for you,
 how it works, and your first measured run.
 
 === "⚡ Quick (~3 min)"
@@ -13,6 +13,8 @@ how it works, and your first measured run.
 
     - **Token measurement** — every model call's input, output and cache tokens, per agent,
       per session, per model, with no change to how you work.
+    - **Model mix** — which models each agent used, which account answered, and which calls
+      were the agent's loop or a side call (a title, a summary) on a small model.
     - **Context-window analysis** — what filled the window on each turn (system prompt,
       tools, history, your input) and how much the provider served from its prompt cache.
     - **A status line** — context gauge and session tokens live in your terminal.
