@@ -192,7 +192,7 @@ function caseFor(agent, taskId) {
       }, null, 2));
       fs.writeFileSync(path.join(cfgDir, 'settings.json'), JSON.stringify({
         defaultProvider: 'rapid-proxy-pi', defaultModel: 'claude-sonnet-5',
-        enabledModels: ['claude-sonnet-5'],
+        enabledModels: ['rapid-proxy-pi/claude-sonnet-5'],
       }, null, 2));
       return {
         binary: 'pi',
