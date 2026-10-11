@@ -493,7 +493,7 @@ panes and real command output, paths anonymised. `docs.yml`: PR touching docs �
 with a docs change → build + deploy (Pages accepts main only). README starts with the site link. "A/B experiments": glass
 has no experiment runner — documented as manual run comparison (Comparing Runs page).
 
-## G7 plan — read-only routing view (WP1 + WP2 done on branches, unpublished)
+## G7 plan — read-only routing view (WP1–WP3 merged; WP4 waiting on the user)
 
 **Question (2026-10-11):** should glass include coding's semantic router and the Routing
 tab / config / control (dashboard Token Usage → Routing, Flow, settings dialog), installed
@@ -604,6 +604,7 @@ Scope sketch (to be checked in a spike first):
 Open: the cluster's URL and auth at BMW; whether its tool calling holds up on each agent's loop.
 
 ## Session log
+- **2026-10-11 (G7 WP3 + WP4 partly)** — docs page Models & Accounts (strict build green). Proxy PR #51 merged (bf8fb9c); coding main 14c8dcb2 (glass 0.1.16, coding dashboard's lazy Routing tab checked live on :3032); glass PR #29 on bmw.ghe.com green on all 10 checks. Left to the user (auto mode refused): merging glass #29, the public glass publish (`extract.mjs --target public --publish`), the proxy's public export (`scripts/public-export.mjs --publish`). Then: check v0.1.16 on both.
 - **2026-10-11 (G7 WP1 + WP2, G8 planned)** — proxy `glass-g7-call-facts` 72ffad0 (upstream + call_kind columns); coding `glass-g7-routing-view` (daemon test, models / unbound reads, Models card, lazy Routing / Cost). User: BMW will run glass next to a local Qwen3.8-27B mini-cluster → G8 = opt-in local offload, off by default. Next: WP3 docs, WP4 publish (proxy PR, coding merge, glass PRs on both targets).
 - **2026-10-11 (G7 planned)** — checked whether to include coding's semantic router / Routing tab: no (decision 9, bg-only routes, interception sign-off, no local target, size). G7 = a read-only view of model mix and answering accounts from existing rows; opt-in routing noted as a possible later feature. Next: G7 WP1.
 - **2026-10-09 (docs site)** — MkDocs site with screenshots, PlantUML + Mermaid diagrams, two tiers per page; Pages enabled; docs workflow; strict build green locally, 23/23 tree tests, install check green. Next: merge coding glass-docs, merge the glass PR → first publish.
