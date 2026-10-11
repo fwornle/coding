@@ -5,6 +5,7 @@ import { TokenUsagePage } from '@/pages/token-usage'
 import { cycleTheme, getStoredTheme, setTheme, type Theme } from '@/lib/theme'
 import { cn } from '@/lib/utils'
 import { SessionsPage } from './sessions'
+import { ModelsPage } from './models'
 
 const THEME_ICON = { light: Sun, dark: Moon, system: Monitor }
 
@@ -42,12 +43,14 @@ export function GlassApp() {
           <Version />
           <nav className="flex gap-1">
             <NavLink to="/token-usage" className={tab}>Token Usage</NavLink>
+            <NavLink to="/models" className={tab}>Models</NavLink>
             <NavLink to="/sessions" className={tab}>Sessions</NavLink>
           </nav>
           <div className="ml-auto"><ThemeToggle /></div>
         </header>
         <Routes>
           <Route path="/token-usage" element={<TokenUsagePage proxyBase="" tabs={['overview', 'evolution', 'recent']} settings={false} />} />
+          <Route path="/models" element={<ModelsPage />} />
           <Route path="/sessions" element={<SessionsPage />} />
           <Route path="*" element={<Navigate to="/token-usage" replace />} />
         </Routes>

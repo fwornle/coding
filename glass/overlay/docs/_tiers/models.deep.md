@@ -41,10 +41,12 @@ for the same reason.
 ## Reading it programmatically
 
 ```bash
+curl -s 'http://127.0.0.1:12445/api/models?hours=24'      # 0 = all time
 curl -s http://127.0.0.1:12445/api/experiments/runs/<session id>/models
 curl -s http://127.0.0.1:12445/api/calls/unbound
 ```
 
-The first returns `groups` (model × account × host × kind, with calls and token sums) and
-`calls` (the newest 200, newest first). The second returns `calls`, `tokens`, `first` and
+The first returns `groups` for all sessions (agent × model × account × host × kind, with
+sessions, calls and token sums). The second returns one session's `groups` and `calls` (the
+newest 200, newest first). The third returns `calls`, `tokens`, `first` and
 `last` for the unbound calls.

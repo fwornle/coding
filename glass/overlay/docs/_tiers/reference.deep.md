@@ -65,5 +65,5 @@ The daemon serves JSON on `http://127.0.0.1:12445`: `/health`,
 `/api/token-usage/summary`, `/api/token-usage/recent?limit=N`,
 `/api/token-usage/cost`, `/api/context-turns?task_id=…`,
 `/api/context-breakdown?task_id=…`, `/api/statusline`,
-`/api/experiments/runs/<session id>/models` (a session's model mix, see
+`/api/models?hours=N` and `/api/experiments/runs/<session id>/models` (the model mix, see
 [Models & Accounts](models.md)), `/api/calls/unbound`.

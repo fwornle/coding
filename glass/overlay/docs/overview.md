@@ -8,7 +8,7 @@ hide:
 <div class="glass-overview" id="glass-overview" role="region" aria-label="Glass overview presentation" markdown="1">
 
 <div class="overview-toolbar" hidden>
-  <span class="overview-label">glass / in seven slides</span>
+  <span class="overview-label">glass / in eight slides</span>
   <span class="overview-counter" role="status" aria-live="polite" aria-atomic="true"></span>
   <button type="button" data-fullscreen>Fullscreen</button>
 </div>
@@ -217,10 +217,40 @@ Don't assume your last prompt filled the window. Look at the whole context.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-7" aria-labelledby="overview-compare" markdown="1">
+<section class="overview-slide" id="slide-7" aria-labelledby="overview-models" markdown="1">
 <div class="overview-copy" markdown="1">
 
-<p class="overview-kicker">Question 3 / Which setup fits my task?</p>
+<p class="overview-kicker">Question 3 / Which models did the work?</p>
+
+## See the model mix behind the tokens {#overview-models}
+
+Open the **Models** tab.
+
+One row per **agent, model and the account that answered**, for the last day, week,
+month or all time.
+
+**main** calls are the agent's own loop. **side** calls are the extras it makes on its
+own, such as a session title or a summary, often on a smaller model.
+
+For one session, select its row in **Sessions**: the same view, call by call.
+
+</div>
+<figure class="overview-figure" markdown="1">
+
+[![Models tab over 24 hours: OpenCode's main calls on one model and its title calls on a smaller one, Claude Code's calls on another, each with the account that answered.](images/ui-models.png)](images/ui-models.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+
+<figcaption>Example runs on one machine. Every model here is one the agent chose; glass measures, it does not route.</figcaption>
+</figure>
+<p class="overview-takeaway" markdown="1">
+Know which model you are paying for before you switch one.
+[Explore Models & Accounts](models.md)
+</p>
+</section>
+
+<section class="overview-slide" id="slide-8" aria-labelledby="overview-compare" markdown="1">
+<div class="overview-copy" markdown="1">
+
+<p class="overview-kicker">Question 4 / Which setup fits my task?</p>
 
 ## Same task. Two runs. Better evidence. {#overview-compare}
 

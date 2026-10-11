@@ -60,7 +60,7 @@ unmeasured — it never blocks your agent.
 
 | Command | |
 |---|---|
-| `glass ui` | open the UI: Token Usage (overview, evolution, recent calls) and Sessions (per-session timeline, context explainer) |
+| `glass ui` | open the UI: Token Usage (overview, evolution, recent calls), Models (model mix: who answered, main vs side calls) and Sessions (per-session timeline, models, context explainer) |
 | `glass status` | daemon, live sessions, latest rows |
 | `glass watch` | a live one-line status bar for the newest session — for a split pane |
 | `glass doctor` | check the setup |

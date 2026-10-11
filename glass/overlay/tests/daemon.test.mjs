@@ -303,6 +303,12 @@ test('UI reads: a session\'s model mix (by model, account, host, kind) and the u
   assert.equal(r.body.calls.length, 3);
   assert.equal(r.body.calls[0].model, 'claude-haiku-4.5', 'newest first');
   assert.equal((await api('GET', '/api/experiments/runs/..%2Fx/models')).status, 400);
+  const mix = await api('GET', '/api/models?hours=1');
+  assert.equal(mix.status, 200);
+  const mine = mix.body.groups.filter((g) => g.agent === 'copilot' && g.upstream === 'copilot-api.acme.ghe.com' && g.model === 'claude-haiku-4.5');
+  assert.equal(mine.length, 1);
+  assert.equal(mine[0].call_kind, 'side');
+  assert.ok(mine[0].sessions >= 1);
   const u = await api('GET', '/api/calls/unbound');
   assert.equal(u.status, 200);
   assert.equal(typeof u.body.calls, 'number');
