@@ -230,7 +230,9 @@ export async function startDaemon({
     let adapters = s.intercept ? 'skipped (intercepted)' : 'skipped (github-copilot relayed)';
     if (s.agent === 'claude' || (!s.intercept && !relayedCopilot)) {
       try {
-        const r = await captureForegroundTokens(span, { agent: s.agent, reconcile: true, dbPath: resolveTokenDbPath(p.data) });
+        // byokMetered: false — a copilot BYOK provider is the user's own here,
+        // not coding's proxy, so its calls are on no wire glass measured.
+        const r = await captureForegroundTokens(span, { agent: s.agent, reconcile: true, byokMetered: false, dbPath: resolveTokenDbPath(p.data) });
         adapters = typeof r === 'number' ? `${r} rows` : JSON.stringify(r);
       } catch (err) {
         adapters = `failed: ${err.message}`;

@@ -116,3 +116,66 @@ test('a non-existent / unreadable file yields [] without throwing', () => {
   expect(Array.isArray(rows)).toBe(true);
   expect(rows.length).toBe(0);
 });
+
+describe('BYOK calls (coding routes them through the proxy)', () => {
+  const SID = '11111111-0000-4000-a000-000000000000';
+  const usage = (model, isByok, i, o, cr = 0) => ({
+    type: 'session.usage_record',
+    data: { usage: { model, isByok, inputTokens: i, outputTokens: o, cacheReadTokens: cr, cacheWriteTokens: 0 } },
+  });
+  const shutdown = (metrics) => ({
+    type: 'session.shutdown',
+    timestamp: '2026-10-12T11:38:21.000Z',
+    data: { modelMetrics: metrics },
+  });
+  function write(events) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-token-rows-'));
+    const dst = path.join(dir, 'events.jsonl');
+    const start = { type: 'session.start', data: { sessionId: SID, context: { cwd: dir } } };
+    fs.writeFileSync(dst, [start, ...events].map((e) => JSON.stringify(e)).join('\n'));
+    return { dir, dst };
+  }
+
+  test('an all-BYOK session yields no rows — the proxy rows already count it', () => {
+    const { dir, dst } = write([
+      usage('claude-opus-5', true, 13639, 190, 41617),
+      usage('claude-opus-5', true, 41617, 0, 0),
+      shutdown({ 'claude-opus-5': { usage: { inputTokens: 55256, outputTokens: 190, cacheReadTokens: 41617, cacheWriteTokens: 0 } } }),
+    ]);
+    try {
+      expect(buildCopilotTokenRows(dst, { project: 'p' })).toEqual([]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('a mixed session keeps only the non-BYOK share', () => {
+    const { dir, dst } = write([
+      usage('m', true, 1000, 10),
+      usage('m', false, 500, 5),
+      shutdown({ m: { usage: { inputTokens: 1500, outputTokens: 15 } } }),
+    ]);
+    try {
+      const rows = buildCopilotTokenRows(dst, { project: 'p' });
+      expect(rows.length).toBe(1);
+      expect(rows[0].input_tokens).toBe(500);
+      expect(rows[0].output_tokens).toBe(5);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test('byokMetered: false keeps BYOK calls (glass, where nothing else recorded them)', () => {
+    const { dir, dst } = write([
+      usage('m', true, 1000, 10),
+      shutdown({ m: { usage: { inputTokens: 1000, outputTokens: 10 } } }),
+    ]);
+    try {
+      const rows = buildCopilotTokenRows(dst, { project: 'p', byokMetered: false });
+      expect(rows.length).toBe(1);
+      expect(rows[0].input_tokens).toBe(1000);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
