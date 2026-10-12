@@ -16,7 +16,8 @@
 //             Copilot API host: opencode sends its own login there by configuration,
 //             no interception. opencode merges it over its own config.
 //
-// --no-intercept leaves copilot / opencode / pi unwired: unmeasured by the proxy.
+// --no-intercept leaves copilot / opencode / pi unwired: unmeasured by the proxy —
+// except opencode's github-copilot relay, which needs no interception.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -72,7 +73,13 @@ export function sessionEnv(agent, baseEnv, { port, taskId, token, caPath, projec
   }
 
   if (!INTERCEPTED.has(agent)) throw new Error(`unknown agent "${agent}" (one of ${AGENTS.join(', ')})`);
-  if (!intercept) return { env, wired: false, note: `${agent}: --no-intercept — not measured by the proxy` };
+  if (!intercept) {
+    // Relays need no interception: opencode's github-copilot stays measured.
+    const relayed = agent === 'opencode' ? Object.keys(relays) : [];
+    if (!relayed.length) return { env, wired: false, note: `${agent}: --no-intercept — not measured by the proxy` };
+    env.OPENCODE_CONFIG_CONTENT = opencodeRelayContent(baseEnv.OPENCODE_CONFIG_CONTENT, relayed, { port, token });
+    return { env, wired: true, note: `${agent}: --no-intercept — relaying ${relayed.join(', ')}; other providers not measured by the proxy` };
+  }
 
   const proxyUrl = `http://glass:${encodeURIComponent(token)}@127.0.0.1:${port}`;
   env.HTTPS_PROXY = proxyUrl;

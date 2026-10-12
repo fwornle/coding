@@ -224,9 +224,11 @@ export async function startDaemon({
     // github-copilot calls under a different key (in coding that provider
     // bypasses the proxy) — so adapters run only for claude, whose adapter dedups
     // on the request id, and for --no-intercept sessions, where they are the
-    // measurement.
-    let adapters = 'skipped (intercepted)';
-    if (s.agent === 'claude' || !s.intercept) {
+    // measurement — unless opencode's github-copilot (the only provider its
+    // adapter imports) was relayed, and so is on the wire already.
+    const relayedCopilot = s.agent === 'opencode' && Boolean(s.relays?.['github-copilot']);
+    let adapters = s.intercept ? 'skipped (intercepted)' : 'skipped (github-copilot relayed)';
+    if (s.agent === 'claude' || (!s.intercept && !relayedCopilot)) {
       try {
         const r = await captureForegroundTokens(span, { agent: s.agent, reconcile: true, dbPath: resolveTokenDbPath(p.data) });
         adapters = typeof r === 'number' ? `${r} rows` : JSON.stringify(r);

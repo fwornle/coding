@@ -561,6 +561,41 @@ Findings during WP1:
 - **Unbound rows**: 5 intercepted calls on 2026-10-10 recorded with agent `unknown` and no task (no Proxy-Authorization and not exactly one live intercepting session — the rule from G3). The view must show them as "not bound to a session", not drop them.
 - The anthropic wire writes `per-turn`, the OpenAI wire `per-llm-call` — the tier follows the wire, not the call; the view must not read it as main vs side (that is `call_kind`).
 
+## Data flow per agent — coding vs glass (2026-10-12, read from the code)
+
+**One rule does not hold across both:** coding's proxy *routes* (it decides where a call goes and
+answers it with accounts of its own); glass only *measures* (it forwards every call, unchanged, to
+the host the agent chose, with the agent's own login). Measurement happens on **both wires** in
+both: OpenAI-wire calls in the OpenAI tap, Anthropic-wire calls (`/v1/messages`) in the Anthropic tap.
+
+### coding (rapid-llm-proxy :12435) — `lib/agents/proxy-routing.mjs`
+
+| Agent | How it reaches the proxy (configuration) | Wire | Proxy then | Demotable to Qwen? |
+|---|---|---|---|---|
+| claude | `ANTHROPIC_BASE_URL` → `/v1/messages` passthrough | Anthropic | measures, forwards to Anthropic with the Max OAuth login | **no** — the passthrough refuses a provider without `fg_transport` |
+| opencode | `OPENCODE_CONFIG_CONTENT`: `github-copilot` → `/v1/opencode` shim, `rapid-proxy` → `/v1`; its `anthropic` provider via `ANTHROPIC_BASE_URL` | OpenAI (+ Anthropic) | routes (`fg-chat/opencode`), answers with **OpenCode's `auth.json` login read by the proxy** | yes (small band) |
+| copilot | BYOK `COPILOT_PROVIDER_BASE_URL=/v1/copilot[/p/..][/b/..][/t/..]` (opt-out `COPILOT_AMBIENT_ROUTE=0` → direct to GitHub, adapter only) | OpenAI | routes (`fg-chat/copilot`), answers with the same borrowed OpenCode login | yes (small band) |
+| pi | `models.json` provider `rapid-proxy-pi` → `/v1` (default provider pinned) | OpenAI | routes (`fg-chat/pi`) | yes (small band) |
+
+So in coding **three of four** are demotable, not only opencode. In practice little moves (step 2):
+only `small`-band calls are offloaded — a prompt's first turn (if the classifier lowers it) and side
+calls; loop turns are `high`/`medium` and turns carrying tool results are never classified. And today
+nothing moves at all: `qwen-local` is unreachable, so every chain falls back to gh-copilot.
+
+### glass (daemon :12445) — `glass/overlay/lib/glass/wiring.mjs`
+
+| Agent | How it reaches the daemon | Wire | Daemon then | Offload (G8, not built) |
+|---|---|---|---|---|
+| claude | `ANTHROPIC_BASE_URL` (configuration) | Anthropic | measures, forwards to api.anthropic.com (or your prior base URL) with **claude's own login** | later — needs Anthropic→OpenAI translation |
+| opencode | `github-copilot` + plain-HTTP providers → `/relay` (configuration, since 0.1.22; copilot relay also under `--no-intercept`); other HTTPS model hosts → interception | OpenAI (+ Anthropic) | measures, forwards to the host the provider names with **opencode's own login** | **yes — the relay is the hook point** |
+| copilot | `HTTPS_PROXY` → interception (TLS, glass CA) | Anthropic for claude models (`copilot-api…/v1/messages`), OpenAI for others | measures, forwards to `copilot-api.<tenant>` with **copilot's own login** | no — substituting on an intercepted connection needs IT sign-off; BYOK would need an account of glass's own |
+| pi | `HTTPS_PROXY` → interception | per provider | measures, forwards with **pi's own login** | no — pi's copilot login cannot be pointed at a relay by configuration (spike item 2) |
+
+Why "only opencode" is a **glass** constraint, not a coding one: glass offloads only where a call
+reaches it by configuration *and* carries the agent's own login — then the fallback is simply the
+forward glass already does. coding has no such constraint because it answers every routed call
+itself with the borrowed OpenCode login; glass never borrows a login (decision 9, G3).
+
 ## G8 plan — opt-in local offload (not started)
 
 **Premise change (user, 2026-10-11):** at BMW glass will run next to a local mini-cluster of
@@ -799,6 +834,7 @@ Uses coding's own install unchanged — no glass code yet. On VPN:
    tool-result turns never classified; (e) vetoed as code → stays on the paid account.
 
 ## Session log
+- **2026-10-12 (0.1.23 — copilot relay under --no-intercept; data-flow overview)** — `glass opencode --no-intercept` keeps relaying `github-copilot` (no HTTPS_PROXY, no CA); the opencode file adapter is skipped for such a session (`skipped (github-copilot relayed)`) since github-copilot is the only provider it imports — no double count (live: 2 rows, once each). Added "Data flow per agent — coding vs glass": coding routes 3 of 4 (claude never), glass measures all 4 and can offload only opencode.
 - **2026-10-12 (0.1.22 — opencode github-copilot relayed)** — `glass opencode` relays `github-copilot` to its Copilot API host (`copilot-api.<tenant>` from opencode auth.json `enterpriseUrl`, else api.githubcopilot.com; tokens never read) via `OPENCODE_CONFIG_CONTENT` baseURL, so opencode sends its own login by configuration and these calls need no interception. Daemon `relaysOf` accepts https only for Copilot API hosts. Live: rows for the turn + hidden title call; with glass interception bypassed (wrapper pointing HTTPS_PROXY at proxydetox) the calls were still recorded — relay path proven. Extracted tree 62/62. Open: `--no-intercept` still disables all opencode relays. This is G8's offload hook point for opencode.
 - **2026-10-12 (0.1.21 — `glass update` network hint)** — `glass update` answered a 502 from bmw.ghe.com with "logged in? gh auth login", and the login attempt then failed the same way. Cause was proxydetox (:3128) wedged since the previous evening's VPN run across two network switches (corporate upstream, Kerberos and the gh login were all fine); `launchctl kickstart -k gui/$UID/cc.colorto.proxydetox` fixed it. `viewFailureHint()` in update.mjs now names a network/proxy problem (gateway 502/503/504, DNS, refused/timed-out, TLS, proxyconnect; quotes HTTPS_PROXY) and keeps the login hint for everything else. Test hosts are `ghe.example.com` — the public deny scan rejects bmw/AIMAAD strings in shipped tests.
 - **2026-10-12 (0.1.20 — pi stays on the proxy, GitGuardian)** — GitGuardian flagged fwornle/glass 3bb14f7 (2026-10-10): the "apikey" was the SHA-256 of `lib/lsl/token/claude-token-rows.mjs` in EXTRACTED.json (all 135 entries = sha256 of the file; no real key in the commit — the three `apiKey` hits in proxy-routing.mjs are the local-proxy placeholder). Added `glass/overlay/.gitguardian.yaml` (v2, `secret.ignored_paths: [EXTRACTED.json]`, bb7ae330), published as fwornle #10 / AIMAAD #33 together with the pi `enabledModels` fix (bfe20943); merged, no release (version unchanged). Bumped to 0.1.20 to ship the pi fix.

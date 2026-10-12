@@ -400,6 +400,9 @@ test('closing a session archives its span', async () => {
   const file = path.join(home, 'data', 'measurements', `${s.taskId}.json`);
   assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).meta.source, 'glass');
   assert.equal((await api('DELETE', `/sessions/${encodeURIComponent(s.token)}`)).status, 404);
+  // --no-intercept opencode with github-copilot relayed: its adapter would re-add the relayed calls.
+  const oc = await open('opencode', { intercept: false, relays: { 'github-copilot': 'https://copilot-api.ghe.example.com' } });
+  assert.equal((await api('DELETE', `/sessions/${encodeURIComponent(oc.token)}`)).body.adapters, 'skipped (github-copilot relayed)');
 });
 
 test('UI reads: sessions as runs (live + closed), a session\'s timeline and context turns', async () => {
@@ -546,6 +549,14 @@ test('wiring: claude keeps the user\'s keys and gateway; intercepted agents get 
   const off = sessionEnv('pi', {}, { port: 12445, taskId: 'T4', token: 't', caPath: ca, project: 'p', intercept: false });
   assert.equal(off.wired, false);
   assert.equal(off.env.HTTPS_PROXY, undefined);
+  // --no-intercept: opencode's github-copilot relay needs no interception and stays on.
+  const ocOff = sessionEnv('opencode', {}, { port: 12445, taskId: 'T5', token: 't', caPath: ca, project: 'p', intercept: false,
+    relays: { 'github-copilot': 'https://copilot-api.ghe.example.com' } });
+  assert.equal(ocOff.wired, true);
+  assert.equal(ocOff.env.HTTPS_PROXY, undefined, 'nothing is intercepted');
+  assert.equal(ocOff.env.NODE_EXTRA_CA_CERTS, undefined);
+  assert.equal(JSON.parse(ocOff.env.OPENCODE_CONFIG_CONTENT).provider['github-copilot'].options.baseURL, 'http://127.0.0.1:12445/relay/t/github-copilot');
+  assert.equal(sessionEnv('opencode', {}, { port: 12445, taskId: 'T6', token: 't', caPath: ca, project: 'p', intercept: false }).wired, false);
   assert.equal(withHeaders('', { a: '1', b: '' }), 'a: 1');
   assert.equal(cmdQuote('two words'), '"two words"');
   assert.equal(cmdQuote('plain'), 'plain');

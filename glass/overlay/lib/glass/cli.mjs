@@ -157,11 +157,12 @@ async function runMeasured(agent, argv) {
   // opencode providers on plain HTTP never reach HTTPS_PROXY: the daemon relays them.
   // A provider already on this daemon (a nested glass run) is left as it is.
   // github-copilot is relayed too, to its Copilot API host: opencode then sends its own
-  // login to the daemon by configuration, and its calls need no interception.
+  // login to the daemon by configuration, and its calls need no interception — so
+  // that relay stays on under --no-intercept.
   const relays = agent === 'opencode' && intercept
     ? Object.fromEntries(Object.entries(opencodeHttpProviders(baseEnv)).filter(([, url]) => !url.startsWith(`http://127.0.0.1:${port}/relay/`)))
     : {};
-  const copilot = agent === 'opencode' && intercept && !relays['github-copilot'] ? opencodeCopilotUpstream(baseEnv) : null;
+  const copilot = agent === 'opencode' && !relays['github-copilot'] ? opencodeCopilotUpstream(baseEnv) : null;
   if (copilot) relays['github-copilot'] = copilot;
   const up = await daemonFor({ home, port, env: baseEnv });
   const session = up ? await openSession(port, {
