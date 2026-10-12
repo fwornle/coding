@@ -644,7 +644,7 @@ Consequence for glass: offload means opencode and copilot leave the measuring pa
 routed shim paths. The open cost is the FALLBACK: when the router keeps a call (non-small band,
 cluster down, timeout), the proxy itself must answer with the agent's own account — for copilot BYOK
 that is the `copilot-provider` with the user's GitHub token, i.e. exactly the subscription-provider
-code G3 cut out. That is the main design question for G8, more than the classifier.
+code G3 cut out. That is the main design question for G8, more than the classifier. *(Superseded — see "G8 design" below: true of coding's shims, not of glass.)*
 
 ### G8 spike, step 2 result (VPN run 2026-10-11 ~18:00 local) — the cluster was not reachable
 
@@ -679,6 +679,83 @@ On the BMW office LAN (router 10.143.251.254 — no VPN needed for the 10.143.x 
 - Blocker for step 2: the current base URL (which port on node 1, and its model ids) plus its key, from
   the cluster owners. With them: set both in coding's `.env`, restart `com.coding.llm-cli-proxy`, re-run
   the step-2 runbook — on the office LAN, so Claude Code can drive it directly (no VPN drop).
+
+### G8 design — the fallback needs no account of glass's own (2026-10-12)
+
+**Step 1 overstated the problem.** "The fallback must answer with the agent's own account, i.e. the
+subscription-provider code G3 cut" is true of *coding*, not of glass. coding's shims receive a call
+with a dummy key and answer from credentials the proxy reads itself — OpenCode's
+`~/.local/share/opencode/auth.json` (`server.mjs` ~947–980, `Authorization: Bearer ${creds.token}`).
+A shim that took the call over must also be able to finish it, so its fallback needs an account.
+
+glass never takes the auth over. Every call reaches the daemon **carrying the agent's own
+credentials**: claude's on the base-URL forward, copilot / opencode / pi's on the intercept, opencode's
+plain-HTTP providers' on the relay. `openai-passthrough.mjs` and `anthropic-forward.mjs` already hold the
+whole request (body + headers) before they forward it. So:
+
+> **Fallback = what glass does today: forward the held request, unchanged, to the host the agent
+> addressed, with the agent's own credentials.** No subscription provider, no keychain, no token
+> exchange, no `auth.json` reader. Offload is the only new branch.
+
+#### Shape
+
+```
+agent ──► daemon (forward | intercept | relay) ── buffer request ──► decide(call)
+                                                                     ├─ forward ─► agent's host, agent's creds   (today)
+                                                                     └─ offload ─► cluster, cluster key
+                                                                                   └─ failed before first byte ─► forward
+```
+
+- `decide(call)` sits between buffering and forwarding in the two taps; inputs: agent, path, wire,
+  model, band (caller-declared or classified, as in coding), tools present, cluster health. Off by
+  default; with the option off it is never called and the tree is the G7 tree.
+- **Offload**: rewrite base URL + model to the cluster, **strip the agent's credentials** (`Authorization`,
+  `x-api-key`, cookies, `copilot-*`/`openai-*` org headers) and add the cluster key from `~/.glass` config.
+  The user's GitHub / Anthropic token must never reach the cluster, and the cluster key never an upstream.
+- **Fallback is only possible before the first byte reaches the agent.** Connect error, non-2xx, or no
+  first token within the band's budget → forward the held original. After the first streamed byte the
+  agent has a partial answer; an error is surfaced, not retried. Hence: the time-to-first-byte budget is
+  the real gate (coding's 60 s / 150 s timeouts are far too long for glass — budget from the measured
+  p95 of the call's own upstream, so an offload is never slower than not offloading), and the 60 s
+  re-probe keeps a dead cluster out of `decide()` entirely (no per-call timeout penalty — step 2 showed this works).
+- **Rows**: provider `qwen-local`, `offloaded_from` = the provider the agent addressed, `attempt_trail`
+  with the fallback hop, so the Routing tab (G7) and the `[L:n]` count work unchanged.
+
+#### Per agent
+
+| Agent / path | Reaches glass by | Own creds on the call | Offload = substitution on an intercepted connection? | v1 |
+|---|---|---|---|---|
+| claude | `ANTHROPIC_BASE_URL` (configuration) | yes | no | **later** — needs Anthropic→OpenAI request + SSE translation, and no small calls to take: all 184 claude rows in `~/.glass` are opus |
+| opencode, plain-HTTP providers | `/relay` via `OPENCODE_CONFIG_CONTENT` (configuration) | yes | no | **yes** — OpenAI wire, native to the cluster |
+| opencode `github-copilot` | intercept | yes | **yes** → IT gate | move it to the relay by configuration (override its `baseURL`, as coding's shim does) — then no interception; spike item 1 |
+| pi `github-copilot` | intercept | yes | **yes** → IT gate | same via pi's `models.json` provider `baseUrl` override; spike item 2 |
+| copilot CLI | intercept (BYOK would hand glass a *static* key, not the user's) | yes, intercept only | **yes** → IT gate | **measure only** (unchanged). BYOK is the one path where the fallback *would* need an account of glass's own (option B token exchange = the cut code); not worth it: step 2 showed its loop turns are `medium` and only its ~600-token side calls are `small` (5 of ~70 copilot rows in `~/.glass`) |
+
+So the IT-security question narrows from "may glass substitute answers on intercepted connections" to
+nothing at all for v1: every offloaded call arrives by configuration the user's `glass` launch set.
+
+#### What moves (and what does not)
+
+From step 2: opencode's loop turns send no band → `defaults.fg-chat` = high; turns carrying tool results
+are never classified. Offload therefore takes the **first turn of a prompt** (classified, often
+`small`) and opencode's **hidden title call** (gpt-5-mini, ~530 tokens, seen in S8/G3) — not the loop.
+That is the honest size of the win; tool-call fidelity on Qwen matters only once loop turns move, which
+needs a band policy for tool-result turns that coding does not have either.
+
+#### Pieces taken from the proxy
+
+`routing-config`, `classifier-client` (+ classifier service optional — judge on the cluster itself),
+`egress-decision` (network gate), `routing-trail`, the OpenAI-compatible provider call. **Not**
+`providers/`, the `auth.json` reader, `worker-pool`, keychain — the G8 plan's "glass never answers with
+an account of its own" now holds for the fallback too.
+
+#### Spike items (no cluster needed for 1–2)
+
+1. opencode `github-copilot` with `baseURL` → glass relay: does it send its session token there, and does
+   `copilot-api.<tenant>` accept the forwarded call unchanged (enterprise host from `endpoints.api`)?
+2. pi `github-copilot` the same via `models.json`.
+3. With the cluster: first-turn + title-call offload on opencode, time-to-first-byte vs the copilot
+   upstream, and the fallback before first byte (kill the cluster mid-run).
 
 ### G8 spike, step 2 — measure on VPN (runbook; Claude Code drops on VPN, so the user drives)
 
