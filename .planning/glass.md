@@ -667,6 +667,19 @@ code G3 cut out. That is the main design question for G8, more than the classifi
   Fixed in coding (provider-qualified ids). Matters for glass G8: any agent with its own login can
   silently leave the routed path, so the spike must assert the provider on every row.
 
+### G8 spike, step 2b — office LAN probe (2026-10-12 ~09:45 local)
+
+On the BMW office LAN (router 10.143.251.254 — no VPN needed for the 10.143.x range; the proxy reports
+`network=corporate` and resolves small → qwen-local/dual-fast as designed):
+- `10.143.242.184` (nodes 2+3, the configured `QWEN_LOCAL_API_BASE_URL`): host up (ping 6 ms, ssh 22 open),
+  **nothing listening on 8000** (nor 8001/8002/8080/8443) — the proxy's probe says `unreachable` correctly.
+- `10.143.241.223` (node 1, the address before 2026-09-07): **8000 and 8080 open**, both answer
+  `401 invalid API key` with coding's `QWEN_LOCAL_API_KEY` (43 chars) — the deployment moved back to node 1
+  with a new key, or node 1 serves a different tenant.
+- Blocker for step 2: the current base URL (which port on node 1, and its model ids) plus its key, from
+  the cluster owners. With them: set both in coding's `.env`, restart `com.coding.llm-cli-proxy`, re-run
+  the step-2 runbook — on the office LAN, so Claude Code can drive it directly (no VPN drop).
+
 ### G8 spike, step 2 — measure on VPN (runbook; Claude Code drops on VPN, so the user drives)
 
 Uses coding's own install unchanged — no glass code yet. On VPN:
