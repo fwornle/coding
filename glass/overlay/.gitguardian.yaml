@@ -1,4 +1,11 @@
-# GitGuardian / ggshield scan settings for the extracted glass tree.
+# ggshield scan settings for the extracted glass tree (CLI and pre-commit only).
+#
+# NOT read by the GitGuardian GitHub App that posts the PR check: it flagged
+# EXTRACTED.json again on PR #15 (0.1.24) with this file on main. The PR check
+# takes its exclusions from the dashboard: Workspace settings -> Secrets
+# detection -> Filepath exclusions (EXTRACTED.json, scoped to the glass repo).
+# A dashboard exclusion also applies to ggshield, so this file is the fallback
+# for a workspace that has none.
 version: 2
 
 secret:
