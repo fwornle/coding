@@ -141,8 +141,8 @@ home directory must be byte-identical to before).
   then send the daemon log to the maintainers. If you already set `NODE_EXTRA_CA_CERTS`,
   glass adds its CA to yours for that run.
 - **Next to another local LLM proxy** (coding, for instance): start glass from a
-  terminal that tool's launcher did not set up. opencode providers on plain HTTP are
-  relayed through glass and measured; if pi defaults to that proxy, add
+  terminal that tool's launcher did not set up. opencode providers on plain HTTP, and
+  its `github-copilot` login, are relayed through glass and measured; if pi defaults to that proxy, add
   `--model <provider>/<model>` with one of pi's own providers. `glass doctor` warns
   about each.
 - **No rows for copilot:** check `copilot --version` (≥ 1.0.93) and that `which copilot`

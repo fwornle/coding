@@ -21,6 +21,8 @@ glass sits on the path and measures.
 
     The daemon forwards every call unchanged and reads the token usage from the
     response. Only five model hosts are decrypted; all other traffic is tunnelled.
+    opencode's `github-copilot` and plain-HTTP providers reach the daemon by
+    configuration instead (a relay on 127.0.0.1), so their calls are not decrypted.
 
 === "📚 Deep Dive (full)"
 

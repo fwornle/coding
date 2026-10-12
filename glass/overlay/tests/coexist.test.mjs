@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const { coexistWarnings, opencodeDefault, opencodeHttpProviders, piDefault, parseLoose } = await import('../lib/glass/coexist.mjs');
+const { coexistWarnings, opencodeCopilotUpstream, opencodeDefault, opencodeHttpProviders, piDefault, parseLoose } = await import('../lib/glass/coexist.mjs');
 
 const PORT = 12445;
 
@@ -62,6 +62,20 @@ test('opencode: every plain-HTTP provider is relayed, from every config layer; H
   assert.deepEqual(opencodeHttpProviders(env, home), {
     'rapid-proxy': 'http://localhost:12435/v1', qwen: 'http://127.0.0.1:8081/v1', 'github-copilot': 'http://127.0.0.1:12435/v1/opencode',
   });
+});
+
+test('opencode: github-copilot is relayed to copilot-api.<tenant>, or the public API; only with a login and no baseURL of its own', () => {
+  // A placeholder login: the shape opencode writes, no real credential.
+  const login = (extra) => ({ 'github-copilot': { type: 'oauth', access: 'placeholder', refresh: 'placeholder', expires: 0, ...extra } });
+  const auth = '.local/share/opencode/auth.json';
+  assert.equal(opencodeCopilotUpstream({}, fakeHome({ [auth]: login({ enterpriseUrl: 'ghe.example.com' }) })), 'https://copilot-api.ghe.example.com');
+  assert.equal(opencodeCopilotUpstream({}, fakeHome({ [auth]: login({ enterpriseUrl: 'https://GHE.example.com/' }) })), 'https://copilot-api.ghe.example.com');
+  assert.equal(opencodeCopilotUpstream({}, fakeHome({ [auth]: login({}) })), 'https://api.githubcopilot.com');
+  assert.equal(opencodeCopilotUpstream({}, fakeHome({})), null, 'no github-copilot login, nothing to relay');
+  const dataHome = fakeHome({ 'opencode/auth.json': login({ enterpriseUrl: 'ghe.example.com' }) });
+  assert.equal(opencodeCopilotUpstream({ XDG_DATA_HOME: dataHome }, fakeHome({})), 'https://copilot-api.ghe.example.com', 'XDG_DATA_HOME is honoured');
+  const configured = { OPENCODE_CONFIG_CONTENT: JSON.stringify({ provider: { 'github-copilot': { options: { baseURL: 'https://gateway.example.com/v1' } } } }) };
+  assert.equal(opencodeCopilotUpstream(configured, fakeHome({ [auth]: login({}) })), null, 'a baseURL of the user\'s own is left alone');
 });
 
 test('opencode: JSONC config (comments, trailing commas) is read', () => {

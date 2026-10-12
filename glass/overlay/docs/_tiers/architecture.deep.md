@@ -32,6 +32,19 @@
 Claude Code skips steps 3–4: its base URL points at the daemon over plain HTTP on
 127.0.0.1, so nothing needs to be decrypted.
 
+opencode skips them for its model calls too. glass gives it a session-only config
+(`OPENCODE_CONFIG_CONTENT`) that points each relayed provider at the daemon's
+`/relay/<token>/<provider>`:
+
+- **`github-copilot`**, when you are logged in to it and your config gives it no base URL
+  of its own: the daemon forwards to the Copilot API of your login (`copilot-api.<tenant>`
+  for GitHub Enterprise, `api.githubcopilot.com` otherwise). opencode sends its own login
+  to the daemon by configuration, so these calls need no decryption.
+- **Providers on plain HTTP** (a local model server, another tool's proxy): forwarded to
+  their own URL.
+
+The relay forwards only to these: any other HTTPS host still goes through interception.
+
 ## Session lifecycle
 
 ```mermaid

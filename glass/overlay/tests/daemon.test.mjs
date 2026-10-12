@@ -245,6 +245,30 @@ test('opencode relay: a plain-HTTP provider is forwarded to its own URL and meas
   assert.equal((await api('GET', '/sessions')).body.sessions.find((x) => x.taskId === s.taskId).relays, undefined);
 });
 
+test('opencode relay for github-copilot: HTTPS to a Copilot API host only, the agent\'s own login forwarded, measured as github-copilot', async () => {
+  const s = await open('opencode', { relays: {
+    'github-copilot': 'https://copilot-api.ghe.example.com',
+    public: 'https://api.githubcopilot.com',
+    other: 'https://example.com/v1',
+  } });
+  const relay = (id, route, body) => fetch(`${daemon.url}/relay/${encodeURIComponent(s.token)}/${id}${route}`, {
+    method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer placeholder' }, body: JSON.stringify(body),
+  });
+  const chat = await relay('github-copilot', '/chat/completions', { model: 'claude-haiku-4.5', stream: true, messages: msgs });
+  assert.match(await chat.text(), /\[DONE\]/);
+  assert.equal(upSeen.at(-1).headers['x-test-host'], 'copilot-api.ghe.example.com', 'forwarded to the tenant\'s Copilot API');
+  assert.equal(upSeen.at(-1).url, '/chat/completions');
+  assert.equal(upSeen.at(-1).headers.authorization, 'Bearer placeholder', 'the agent\'s own login is forwarded unchanged');
+  assert.equal((await relay('public', '/chat/completions', { model: 'gpt-5-mini', stream: true, messages: msgs })).status, 200);
+  assert.equal(upSeen.at(-1).headers['x-test-host'], 'api.githubcopilot.com');
+  assert.equal((await relay('other', '/chat/completions', {})).status, 404, 'any other HTTPS host is intercepted, never relayed');
+  await settle();
+  const rows = await rowsFor(s.taskId);
+  assert.equal(rows.length, 2);
+  assert.ok(rows.every((r) => r.agent === 'opencode'));
+  assert.deepEqual(rows.map((r) => r.provider).sort(), ['github-copilot', 'public']);
+});
+
 test('opencode relay to an LLM proxy: the row names the account that answered, not the proxy', async () => {
   const base = `http://127.0.0.1:${upPort}/v1`;
   const s = await open('opencode', { relays: { 'rapid-proxy': base } });

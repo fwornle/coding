@@ -95,9 +95,16 @@ function safeUpstream(raw) {
   return '';
 }
 
+// The Copilot API hosts opencode's github-copilot provider talks to: copilot-api.<tenant>
+// for an enterprise login, api[.<plan>].githubcopilot.com otherwise.
+const COPILOT_API_HOST = /^(copilot-api\.[a-z0-9.-]+|api(\.[a-z0-9-]+)?\.githubcopilot\.com)$/i;
+
 /**
- * A session's relays: provider id → its plain-HTTP base URL split into origin and
- * path. Only http: URLs — anything HTTPS reaches the daemon through interception.
+ * A session's relays: provider id → its base URL split into origin and path.
+ * http: URLs (a local model server, another tool's proxy), plus https: for the
+ * Copilot API only — opencode's github-copilot reaches it through the relay by
+ * configuration instead of interception. Any other HTTPS host is intercepted,
+ * never relayed: the relay must not become a general forwarder.
  */
 export function relaysOf(raw) {
   const out = {};
@@ -105,7 +112,8 @@ export function relaysOf(raw) {
   for (const [id, url] of Object.entries(raw)) {
     try {
       const u = new URL(String(url));
-      if (u.protocol !== 'http:' || !/^[\w.@:+~-]+$/.test(id)) continue;
+      const allowed = u.protocol === 'http:' || (u.protocol === 'https:' && COPILOT_API_HOST.test(u.hostname));
+      if (!allowed || !/^[\w.@:+~-]+$/.test(id)) continue;
       out[id] = { origin: u.origin, path: u.pathname.replace(/\/+$/, ''), loopback: ['127.0.0.1', 'localhost', '[::1]'].includes(u.hostname) };
     } catch { /* skip */ }
   }

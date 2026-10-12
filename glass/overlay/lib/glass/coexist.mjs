@@ -78,6 +78,23 @@ export function opencodeHttpProviders(env = process.env, home = os.homedir()) {
   return out;
 }
 
+/**
+ * Where opencode's built-in github-copilot provider sends its calls: copilot-api.<tenant>
+ * for an enterprise login, else the public Copilot API. glass relays it there by
+ * configuration, so opencode's own login reaches the daemon without interception.
+ * Reads only the login's `enterpriseUrl`, never its tokens. null when opencode has no
+ * github-copilot login, or its config already gives the provider a base URL (plain
+ * HTTP is relayed as such; an HTTPS one is the user's choice and is left alone).
+ */
+export function opencodeCopilotUpstream(env = process.env, home = os.homedir()) {
+  if (opencodeConfig(env, home).providers['github-copilot']?.options?.baseURL) return null;
+  const dataHome = env.XDG_DATA_HOME || path.join(home, '.local', 'share');
+  const login = readJson(path.join(dataHome, 'opencode', 'auth.json'))?.['github-copilot'];
+  if (!login || typeof login !== 'object') return null;
+  const domain = String(login.enterpriseUrl || '').replace(/^https?:\/\//i, '').replace(/\/.*$/, '').toLowerCase();
+  return domain ? `https://copilot-api.${domain}` : 'https://api.githubcopilot.com';
+}
+
 /** pi's default provider and its base URL (PI_CODING_AGENT_DIR, else ~/.pi/agent). */
 export function piDefault(env = process.env, home = os.homedir()) {
   const dir = env.PI_CODING_AGENT_DIR || path.join(home, '.pi', 'agent');

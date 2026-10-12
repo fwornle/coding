@@ -15,7 +15,7 @@ import {
 } from './client.mjs';
 import { runAgent } from './spawn.mjs';
 import { upstreamProxy } from './egress.mjs';
-import { coexistWarnings, opencodeHttpProviders } from './coexist.mjs';
+import { coexistWarnings, opencodeCopilotUpstream, opencodeHttpProviders } from './coexist.mjs';
 import { openUrl } from './open-url.mjs';
 import { renderStatusline, renderReport, uiLinks, TAGS } from './statusline.mjs';
 import { tmuxWanted, launchInTmux, configureStatus, popup, selfCommand } from './tmux.mjs';
@@ -156,9 +156,13 @@ async function runMeasured(agent, argv) {
 
   // opencode providers on plain HTTP never reach HTTPS_PROXY: the daemon relays them.
   // A provider already on this daemon (a nested glass run) is left as it is.
+  // github-copilot is relayed too, to its Copilot API host: opencode then sends its own
+  // login to the daemon by configuration, and its calls need no interception.
   const relays = agent === 'opencode' && intercept
     ? Object.fromEntries(Object.entries(opencodeHttpProviders(baseEnv)).filter(([, url]) => !url.startsWith(`http://127.0.0.1:${port}/relay/`)))
     : {};
+  const copilot = agent === 'opencode' && intercept && !relays['github-copilot'] ? opencodeCopilotUpstream(baseEnv) : null;
+  if (copilot) relays['github-copilot'] = copilot;
   const up = await daemonFor({ home, port, env: baseEnv });
   const session = up ? await openSession(port, {
     agent, intercept, cwd: process.cwd(), project: projectOf(process.cwd()), pid: process.pid, relays,

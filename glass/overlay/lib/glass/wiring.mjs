@@ -12,7 +12,9 @@
 //   opencode  also: providers with a plain-HTTP base URL (a local model server,
 //             another tool's proxy) never pass HTTPS_PROXY, so OPENCODE_CONFIG_CONTENT
 //             points each at the daemon's /relay/<token>/<provider>, which forwards
-//             to the original URL. opencode merges it over its own config.
+//             to the original URL. github-copilot is relayed the same way, to its
+//             Copilot API host: opencode sends its own login there by configuration,
+//             no interception. opencode merges it over its own config.
 //
 // --no-intercept leaves copilot / opencode / pi unwired: unmeasured by the proxy.
 import fs from 'node:fs';
