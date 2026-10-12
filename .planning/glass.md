@@ -819,6 +819,35 @@ logging header names and token shapes only.
 Revised v1 offload set: opencode only (relayed plain-HTTP providers + `github-copilot` moved to the relay).
 claude later (translation), copilot and pi measure-only.
 
+### G8 step 2 result — the five prompts with the cluster up (2026-10-12 09:18–09:23 UTC, office LAN)
+
+Cluster moved to `http://10.143.242.222:8000/v1` (8 models: `qwen3.8-27b-{dual,hga}[-fast|-normal|-deep]`); the
+proxy reads `QWEN_LOCAL_API_BASE_URL` from **rapid-llm-proxy/.env**, not coding's. Headless runs, each agent with
+exactly coding's wiring (`proxy-routing.mjs pre-launch` + `route`), 15/15 exit 0.
+
+What Qwen answered (all `offloaded_from gh-copilot`; the cluster reports `qwen3.8-27b-dual` for a `-dual-fast` request):
+- opencode's **title calls** (caller `small`): 562 in / 10 out in 6.3 s; four more (20–27 in / 4–6 out) in **29–39 s**.
+- pi prompt 1 (strawberry), first turn classified `medium -> small`: 2,231 in / 36 out in 13.4 s, correct ("3 r's").
+
+What was offloaded and **fell back after a 60 s timeout** (`attempt_trail: qwen-local … error timeout, ms 60008`):
+- opencode prompt 1 (classified `high -> small`, 27,569 in incl. tools) → gh-copilot/haiku, **62.4 s** total.
+- copilot prompt 1 (classified `medium -> small`, 20,485 in) → gh-copilot/haiku, **61.4 s** total.
+
+Everything else stayed paid, as step 2 predicted: opencode loop turns `high` (no band sent → defaults), copilot
+and pi loop turns `medium` (caller). No turn carrying tool results was offloaded, so Qwen tool-call fidelity was
+**still not exercised**.
+
+Findings:
+1. The decision logic works as designed (classifier, offload, fallback chain, trail).
+2. **The fallback is too slow to be safe**: an offloaded first turn with a full agent context does not answer
+   within 60 s, and the user waits the whole timeout before the paid answer — offload made those two prompts
+   ~60× slower. Even tiny calls took 6–39 s on the cluster vs ~1 s on gh-copilot (contention with coding's
+   background jobs, now also routed to Qwen, is the likely cause — not measured).
+3. Consequence for glass G8: a time-to-first-byte budget of a few seconds (not 60 s) and a size gate
+   (offload only below N input tokens — title/side calls) are prerequisites, not tuning.
+4. Side observation (coding, not glass): copilot sessions also produce `provider copilot / claude-opus-5 /
+   latency 0` rows from the events adapter next to the proxy rows — check for double counting.
+
 ### G8 spike, step 2 — measure on VPN (runbook; Claude Code drops on VPN, so the user drives)
 
 Uses coding's own install unchanged — no glass code yet. On VPN:
