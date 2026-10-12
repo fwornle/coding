@@ -19,6 +19,8 @@ class ClaudeTranscriptReader {
       /sk-proj-[a-zA-Z0-9]{20,}/g,      // OpenAI keys  
       /xai-[a-zA-Z0-9]{20,}/g,          // XAI/Grok keys
       /gsk_[a-zA-Z0-9]{20,}/g,          // Grok keys (actual format)
+      /gh[pousr]_[a-zA-Z0-9]{36,255}/g, // GitHub tokens (classic PAT, OAuth, app, refresh)
+      /github_pat_[a-zA-Z0-9_]{22,255}/g, // GitHub fine-grained PATs
       /[A-Za-z0-9]{32,}/g,              // Generic long keys
     ];
   }

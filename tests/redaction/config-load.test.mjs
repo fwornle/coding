@@ -75,6 +75,22 @@ test('redact() masks sk-/Bearer/JWT/env-var secrets — no raw secret substring 
   assert.equal(result.securityLevel, 'HIGH', 'securityLevel HIGH when redactions occurred');
 });
 
+test('redact() masks GitHub tokens (ghp_/gho_/ghu_/ghs_/ghr_/github_pat_) bare, in tool output and as GH_TOKEN=', () => {
+  const applier = new RedactionApplier({ configPath: CONFIG_PATH });
+  // Built at runtime so the repo holds no token-shaped literal for secret scanners.
+  const body = (n) => 'aB3dE6gH9jK2mN5pQ8sT1vW4yZ7cF0hL'.repeat(8).slice(0, n);
+  const tokens = ['ghp', 'gho', 'ghu', 'ghs', 'ghr'].map((p) => `${p}_${body(36)}`);
+  tokens.push(`github${'_pat_'}${body(22)}_${body(59)}`);
+
+  for (const token of tokens) {
+    for (const raw of [token, `**Output:** \`\`\`\n${token}\nGH TOKEN AVAILABLE\n\`\`\``, `GH_TOKEN=${token}`]) {
+      const result = applier.redact(raw);
+      assert.ok(!result.content.includes(token.slice(4)), `${token.slice(0, 4)}… masked in ${JSON.stringify(raw.slice(0, 12))}`);
+      assert.ok(result.redactionCount > 0, 'at least one redaction applied');
+    }
+  }
+});
+
 test('redact() preserves the exact { content, redactionCount, securityLevel } return shape', () => {
   const applier = new RedactionApplier({ configPath: CONFIG_PATH });
   const result = applier.redact('hello Bearer abcDEF123ghiJKL456mnoPQR789stuVWX world');
