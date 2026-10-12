@@ -848,6 +848,23 @@ Findings:
 4. Side observation (coding, not glass): copilot sessions also produce `provider copilot / claude-opus-5 /
    latency 0` rows from the events adapter next to the proxy rows — check for double counting.
 
+### G8 step 2 rerun with the foreground gates (2026-10-12 11:37–11:39 UTC, rapid-llm-proxy PR #53)
+
+Same five prompts, sandbox and wiring; qwen-local now has `foreground: {max_input_tokens: 3000, timeout_ms: 15000,
+max_in_flight: 1}`. 15/15 exit 0, **1 m 49 s** for the whole run (first run ~5 min). **No timeouts, no fallbacks.**
+
+- **First turns no longer reach the cluster:** opencode 28.3k (est. ~25.9k) and copilot 20.5k (est. ~19.2k) were
+  classified `small` and kept on gh-copilot by the size gate — 1.7 s each, against 62.4 s / 61.4 s before.
+- **Qwen answered two foreground calls:** one opencode title (566 in, 6.2 s) and pi's first turn (2,231 in, 9.5 s,
+  correct "3"; 13.4 s in the first run).
+- **The in-flight gate fired on 4 of 5 opencode title calls** — they went to gh-copilot in 0.6–0.9 s instead of
+  queueing. The cluster was busy with BACKGROUND work the agent sessions themselves trigger: `bg-kb-relevance-judge`
+  (1.2–2.3k in, 9.6–14.5 s, one per prompt) and `bg-observation-writer` (7–10 s). So the "~620 s busy per day"
+  average understates load during an active session; the gate bites exactly then.
+- Everything else stayed paid as before (opencode loop `high` by default; copilot / pi loop turns `medium`).
+- Even when Qwen serves a foreground call it is slower than gh-copilot (6–10 s vs 0.6–2 s): offload trades latency
+  for cost, it does not win on both.
+
 ### G8 cluster latency, measured directly (2026-10-12 ~09:40 UTC, no proxy, no other cluster traffic via the proxy)
 
 Streaming chat calls to `10.143.242.222:8000/v1`, sequential unless noted:
