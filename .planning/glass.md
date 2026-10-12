@@ -757,6 +757,33 @@ an account of its own" now holds for the fallback too.
 3. With the cluster: first-turn + title-call offload on opencode, time-to-first-byte vs the copilot
    upstream, and the fallback before first byte (kill the cluster mid-run).
 
+### G8 spike items 1–2 result (2026-10-12, office LAN, standalone relay in the session scratchpad)
+
+A 60-line relay on 127.0.0.1 forwarding verbatim to `https://copilot-api.bmw.ghe.com` (via proxydetox),
+logging header names and token shapes only.
+
+1. **opencode 1.15.13 — works.** `OPENCODE_CONFIG_CONTENT={"provider":{"github-copilot":{"options":{"baseURL":"<relay>"}}}}`
+   + `-m github-copilot/claude-haiku-4.5`: opencode sends its own login to the relay (`Authorization: Bearer`,
+   40-char `gho_` OAuth token — no exchange, no copilot session token), plus `openai-intent`, `x-initiator`,
+   `x-session-affinity`; copilot-api accepts both calls forwarded unchanged (200, usage in the stream):
+   the hidden title call `gpt-5-mini` 537 in / 143 out (TTFB 1.6 s) and the turn `claude-haiku-4.5`,
+   20 tools, 27,671 in / 6 out (TTFB 0.9 s). The one unauthenticated `GET /models` gets 403 and opencode
+   carries on. → opencode's `github-copilot` can leave the intercept for a configured relay; offload and
+   the fallback-by-forward both work there with no interception and no credential of glass's own.
+   Note: the relay now handles the user's GitHub OAuth token directly — it must never log or capture
+   `Authorization` (raw-body capture redaction covers `gho_` since caf93d27).
+2. **pi 1.1.0 — does not work by configuration.** Its OAuth `github-copilot` provider derives the base URL
+   from the credential on every request (`pi-ai/dist/auth/oauth/github-copilot.js` `toAuth()` →
+   `copilot-api.<enterpriseUrl>`), which wins over `models.json`: a provider `baseUrl` and a
+   `modelOverrides.<id>.baseUrl` are ignored (pi answered, the relay saw nothing); a replacement `models`
+   entry with `baseUrl` still did not reach the relay and lost the copilot headers (`400 missing
+   Editor-Version header`). Only a pi provider extension (`extension.oauth` wrapping the built-in
+   `toAuth`, returning the relay URL) could move it. → **pi stays measure-only in v1** (intercept, as
+   today); an extension is a later option if pi usage justifies it.
+
+Revised v1 offload set: opencode only (relayed plain-HTTP providers + `github-copilot` moved to the relay).
+claude later (translation), copilot and pi measure-only.
+
 ### G8 spike, step 2 — measure on VPN (runbook; Claude Code drops on VPN, so the user drives)
 
 Uses coding's own install unchanged — no glass code yet. On VPN:
