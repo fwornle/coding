@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const { update, newer } = await import('../lib/glass/update.mjs');
+const { update, newer, viewFailureHint } = await import('../lib/glass/update.mjs');
 
 /** A fake gh/npm: `latest` is the release tag; `fail` names steps that fail (download fails that many times). */
 function fake({ latest = 'v0.2.0', fail = {} } = {}) {
@@ -93,5 +93,24 @@ test('no gh, no login, failed install: exit 1 with what to do', async () => {
     assert.equal(await update({ version: '0.1.7', ...o, exec: f.exec, tmpRoot: tmpRoot(), retryMs: 0, afterInstall: async () => { after = true; } }), 1);
     assert.match(o.lines.err.join('\n'), pattern);
     assert.equal(after, false, 'the daemon is left alone when nothing was installed');
+  }
+});
+
+test('a gateway or network failure points at the network, a refused login at gh auth login', () => {
+  const host = 'ghe.example.com';
+  for (const stderr of [
+    'Get "https://api.ghe.example.com/repos/acme/glass/releases/latest": Bad Gateway',
+    'HTTP 503: Service Unavailable',
+    'dial tcp: lookup api.ghe.example.com: no such host',
+    'proxyconnect tcp: dial tcp 127.0.0.1:3128: connect: connection refused',
+  ]) {
+    const hint = viewFailureHint(stderr, host, { HTTPS_PROXY: 'http://127.0.0.1:3128' });
+    assert.match(hint, /network or proxy problem/, stderr);
+    assert.match(hint, /HTTPS_PROXY=http:\/\/127\.0\.0\.1:3128/);
+    assert.doesNotMatch(hint, /gh auth login/);
+  }
+  assert.doesNotMatch(viewFailureHint('Bad Gateway', host, {}), /HTTPS_PROXY/, 'no proxy named when none is set');
+  for (const stderr of ['HTTP 401: Bad credentials', 'HTTP 404: Not Found', 'To get started with GitHub CLI, please run:  gh auth login']) {
+    assert.match(viewFailureHint(stderr, host, {}), /gh auth login --hostname ghe\.example\.com/, stderr);
   }
 });

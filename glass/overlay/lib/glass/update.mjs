@@ -29,6 +29,21 @@ export function run(cmd, args) {
 
 const manual = (repo) => `download glass-<version>.tgz from https://${repo}/releases/latest, then: npm install -g ./glass-<version>.tgz`;
 
+// gh's wording when the request never got an answer from the host: a proxy or
+// gateway error, DNS, a refused or timed-out connection. A login would not help.
+const NETWORK = /\b(Bad Gateway|Service Unavailable|Gateway Time-?out|HTTP 50[234])\b|could not resolve|no such host|dial tcp|i\/o timeout|connection (refused|reset)|TLS handshake|proxyconnect/i;
+
+/** What to try when `gh release view` failed, from what gh said. */
+export function viewFailureHint(stderr, host, env = process.env) {
+  if (NETWORK.test(stderr)) {
+    const proxy = env.HTTPS_PROXY || env.https_proxy;
+    return `  a network or proxy problem, not the login — can this machine reach https://${host}?`
+      + (proxy ? ` (requests go through HTTPS_PROXY=${proxy}; is it up?)` : '')
+      + ` gh auth status --hostname ${host} shows whether the login itself is fine`;
+  }
+  return `  logged in? gh auth login --hostname ${host}`;
+}
+
 /**
  * @param {object} o
  * @param {string} o.version                      the running glass
@@ -50,7 +65,7 @@ export async function update({
   }
   if (view.status !== 0) {
     err(`glass: could not read the latest release of ${repo}: ${(view.stderr || '').trim()}`);
-    err(`  logged in? gh auth login --hostname ${host}`);
+    err(viewFailureHint(view.stderr || '', host));
     return 1;
   }
   const latest = view.stdout.trim().replace(/^v/, '');
