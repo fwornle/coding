@@ -848,6 +848,36 @@ Findings:
 4. Side observation (coding, not glass): copilot sessions also produce `provider copilot / claude-opus-5 /
    latency 0` rows from the events adapter next to the proxy rows — check for double counting.
 
+### G8 cluster latency, measured directly (2026-10-12 ~09:40 UTC, no proxy, no other cluster traffic via the proxy)
+
+Streaming chat calls to `10.143.242.222:8000/v1`, sequential unless noted:
+
+| Case | Time to first byte = total | Notes |
+|---|---|---|
+| tiny (24 in / 4 out), `dual-fast` ×3 | 3.0 s, 1.9 s, 1.9 s | no reasoning, correct |
+| tiny, `hga-fast` ×3 | 1.9 s each | same floor |
+| tiny, `dual` ×3 | 4.2 s, 2.3 s, 2.3 s | **reasons first** (~70 chars) and hit `max_tokens 16` with no answer — the `-fast` variants are the no-thinking ones |
+| ~2k in, `dual-fast` ×2 | **6.7 s**, then 1.95 s | second call hits the prefix cache |
+| ~20k in, `dual-fast` ×2 | **38.8 s**, then 2.2 s | uncached prefill ≈ 540 tokens/s |
+| 4 tiny calls in parallel, `dual-fast` | 12–18 s each, 17.8 s wall | concurrent requests queue badly (≈ 4–9× a single call) |
+
+Causes of the step-2 timeouts:
+1. **Uncached prefill, not contention.** An agent's first turn carries 20–28k tokens (system prompt + tools);
+   uncached that is ~40–55 s of prefill alone, so the 60 s timeout is hit. The prefix cache makes a repeat ~2 s —
+   but whether an agent's prompt is still cached (eviction, which of the two nodes answers) is not knowable from outside.
+2. **Small calls queue behind big ones.** Concurrency degrades sharply; the 29–39 s title calls in step 2 overlapped
+   the offloaded 20–28k first turns.
+3. **No incremental streaming**: the first byte arrives when the answer is complete, so the planned
+   "fall back before the first byte" budget is a total-time budget — and the agent sees nothing until then.
+4. Floor ≈ 1.9 s per call (gh-copilot ≈ 1 s for the same calls).
+
+Consequences for G8 (and for coding's own routing):
+- **Size gate**: offload only calls below a few thousand input tokens (≈ ≤ 7 s uncached) — title/side calls,
+  not agent first turns with a full tool context.
+- **Short budget** (~8 s) instead of 60 s, and **at most one call in flight** to the cluster per client; when one
+  is pending, route the next call to its paid provider instead of queueing it.
+- Request the `-fast` variants only (already the case for `small`).
+
 ### G8 spike, step 2 — measure on VPN (runbook; Claude Code drops on VPN, so the user drives)
 
 Uses coding's own install unchanged — no glass code yet. On VPN:
