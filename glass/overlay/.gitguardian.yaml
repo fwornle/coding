@@ -1,0 +1,9 @@
+# GitGuardian / ggshield scan settings for the extracted glass tree.
+version: 2
+
+secret:
+  ignored_paths:
+    # The extract's provenance record: a SHA-256 of every shipped file. A hash next
+    # to a path such as lib/lsl/token/*.mjs reads as an API key to the generic
+    # detectors (false positive, 2026-10-10, commit 3bb14f7).
+    - 'EXTRACTED.json'
