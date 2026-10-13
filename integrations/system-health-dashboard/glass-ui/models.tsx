@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { normalizeModel } from '@/components/performance/models'
 import { accountLabel } from '@/lib/providers'
 import { cn } from '@/lib/utils'
+import { ModelFlow } from './flow'
 
 const POLL_MS = 10_000
 
@@ -277,6 +278,20 @@ export function ModelsPage() {
           ))}
         </div>
       </div>
+      {rows.length > 0 && (
+        <Card data-testid="models-flow-card">
+          <CardHeader>
+            <CardTitle className="text-base">Flow</CardTitle>
+            <CardDescription>
+              The same calls as the table below, drawn from the agent to the model it chose to the account that answered.
+              There is no decision in the middle: glass forwards every call to the host the agent addressed, with the agent&apos;s own login.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ModelFlow groups={rows} answeredBy={answeredBy} />
+          </CardContent>
+        </Card>
+      )}
       <Card data-testid="models-page">
         <CardHeader>
           <CardTitle className="text-base">Model mix</CardTitle>

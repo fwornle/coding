@@ -90,3 +90,19 @@ hand-maintained fork:
 The measurement code is shared with the `coding` development environment and the
 `rapid-llm-proxy`; glass adds the CLI, the daemon and a reduced UI.
 [Development & Releases](development.md) describes the pipeline.
+
+What each source contributes, counted in an extract of v0.1.24 (runtime JavaScript, tests
+excluded):
+
+![Where glass's runtime code comes from: coding and rapid-llm-proxy modules pass through the extractor; glass adds 2.3k lines of glue](images/glass-composition.png)
+
+| Source | Lines | What |
+|---|---|---|
+| coding | 11.9k (3.9k of it a vendored YAML parser) | agent wiring, token rows for direct traffic, status line, network verdict, session timelines, paths |
+| rapid-llm-proxy | 5.4k (2.2k compiled from TypeScript) | the Anthropic forward, OpenAI passthrough, interception, measurement, token database |
+| glass only | 2.3k (12%) | `lib/glass/*` and `bin/glass.mjs`: CLI, daemon, agent wiring, UI read API, update |
+
+The UI is coding's dashboard Token Usage pages built into one bundle, plus 0.9k lines for
+the Models and Sessions tabs. Every copied file is listed in the manifest, and the extract
+fails if an import reaches a file that is not. coding's router, classifier, background
+services and knowledge base are never taken.

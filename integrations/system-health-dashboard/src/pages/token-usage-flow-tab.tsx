@@ -6,6 +6,7 @@ import { DecisionLadder, layoutLadder } from '@/components/llm-routing/decision-
 import type { LadderRung } from '@/components/llm-routing/decision-ladder'
 import { GATES, RUNG_OFFLOADED, describeTargets, evaluateOffload } from '@/components/llm-routing/offload-gates'
 import type { OffloadPolicy } from '@/components/llm-routing/offload-gates'
+import { GLASS_NOTE, GLASS_TINT, inGlassAccount, inGlassCaller, runsOf } from '@/lib/glass-scope'
 
 /**
  * Flow — the routing config drawn as the data flow it actually is.
@@ -471,6 +472,26 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
             </marker>
           </defs>
 
+          {/* ── glass underlay ──
+              Drawn first so it sits behind every edge and node: the share of this
+              flow the glass extract also carries (lib/glass-scope). Bands, not
+              per-node tints — one band per contiguous run reads as a region. */}
+          {[
+            ...runsOf(callers, c => inGlassCaller(c.id)).map(r => ({ x: COL_CALLER, w: CALLER_W, r, y: callerY, k: 'c' })),
+            ...runsOf(accounts, p => inGlassAccount(p.id)).map(r => ({ x: COL_ACCT, w: ACCT_W, r, y: acctY, k: 'a' })),
+          ].map(({ x, w, r, y, k }) => (
+            <g key={`glass-${k}-${r[0]}`} data-glass-band={k}>
+              <title>{GLASS_NOTE}</title>
+              <rect x={x - 6} y={y(r[0]) - 6} width={w + 12} height={y(r[1]) - y(r[0]) + NODE_H + 12} rx={8}
+                fill={GLASS_TINT} fillOpacity={0.09} stroke={GLASS_TINT} strokeOpacity={0.35}
+                strokeWidth={1} strokeDasharray="3 3" />
+              <text x={x + w + 2} y={y(r[0]) - 9} textAnchor="end" fontSize={8.5}
+                fontWeight={600} letterSpacing={0.6} fill={GLASS_TINT} opacity={0.8}>
+                ALSO IN GLASS
+              </text>
+            </g>
+          ))}
+
           {/* Column headings */}
           <text x={COL_CALLER} y={26} className="fill-muted-foreground" fontSize={11} fontWeight={600}>
             CALLERS — what asks for an LLM
@@ -683,6 +704,11 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
         <span className="flex items-center gap-1.5">
           <svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="currentColor" strokeWidth="2" strokeDasharray="2 4" /></svg>
           fallback with a guard
+        </span>
+        <span className="flex items-center gap-1.5" title={GLASS_NOTE}>
+          <svg width="26" height="12"><rect x="1" y="1" width="24" height="10" rx="3" fill={GLASS_TINT} fillOpacity={0.09}
+            stroke={GLASS_TINT} strokeOpacity={0.35} strokeDasharray="3 3" /></svg>
+          also in glass (measured, not routed) — the rest is coding only
         </span>
         <span>hover a node to isolate it · hover for the full member list</span>
       </div>

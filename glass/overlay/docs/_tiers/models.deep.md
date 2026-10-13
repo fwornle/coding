@@ -24,6 +24,45 @@ the wire, show **not recorded** and **—**. glass does not guess them afterward
 - **Newest calls, one by one** lists the last 200 calls of the session with their kind and
   latency. Side calls are greyed out.
 
+## Reading the flow
+
+The **Flow** card on the Models tab draws the same rows as the table, in three columns:
+
+| Column | Node | Number on the node |
+|---|---|---|
+| **Agents** — who asked | one per agent (`unknown` = calls glass could not tie to an agent) | tokens, calls |
+| **Models** — what the agent chose | one per model, split into loop and side calls | — |
+| **Accounts** — who answered | one per account, with the hosts its calls went to | tokens |
+
+- **Thickness** is tokens (square-root scale, so a small agent stays visible next to a large one).
+- **Colour** is the account that answered; **dashed** edges are side calls.
+- Hovering an agent lights the models it used and those models' paths to the account that
+  answered it. A model shared by several agents shows its *total* on the right-hand edge;
+  the per-agent split is in the table.
+- Accounts are merged by who answered, not by spelling: `github-copilot` and `gh-copilot`
+  rows are one Copilot node.
+
+coding's dashboard has a flow with the same left and right columns and a decision column in
+the middle — the router choosing an account per call. glass has no router, so the middle
+column is the models the agent itself picked.
+
+## Local offload — planned, not in this release
+
+Where a local Qwen3.8-27B cluster is available, the next phase (G8)
+lets glass hand **some** calls to it — **opt-in, off by default**. What is decided so far,
+from measurements with coding's own router against that cluster:
+
+| | |
+|---|---|
+| Which calls | Small ones only: opencode's session titles and side calls. An agent's first turn carries 20–28k tokens of system prompt and tools; uncached, the cluster needs ~40–55 s for that, so it stays on the paid account. |
+| Which agents | opencode first: its calls already reach glass by configuration (the relay), so glass can answer them without decrypting anything. Copilot CLI and pi stay measure-only. |
+| Gates | at most a few thousand input tokens, a short time budget (~8 s), one call in flight to the cluster; a dead cluster is skipped without a per-call timeout |
+| Fallback | the original call, unchanged, to the host the agent addressed, with the agent's own login — what glass does today. Your GitHub or Anthropic credentials never reach the cluster. |
+| Trade-off | Qwen answers small calls in ~2–10 s against ~1–2 s on Copilot: offload saves paid tokens, not time. |
+
+With the option on, the Models flow would show offloaded calls arriving at a local account
+node; with it off, glass stays exactly as described on this page.
+
 ## Calls without a session
 
 Below the session table, glass counts the calls it measured but could not bind to a
@@ -36,7 +75,7 @@ These calls count in **Token Usage** but not in any session row.
 coding, the project glass is extracted from, has a router that moves calls between accounts
 and to local models. glass leaves that out on purpose: the agent keeps its own login, model
 catalogue and routing, and glass only measures. This card shows the agent's own choices
-for the same reason.
+for the same reason. The one planned exception is the opt-in local offload above.
 
 ## Reading it programmatically
 

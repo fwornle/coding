@@ -4,7 +4,7 @@ Token measurement and context-window insight for coding agents — GitHub Copilo
 OpenCode, pi and Claude Code. Put `glass` in front of the agent you already use; glass
 records every model call and shows where your tokens go.
 
-**New to glass?** [See the eight-slide overview](overview.md): what it can do for you,
+**New to glass?** [See the ten-slide overview](overview.md): what it can do for you,
 how it works, and your first measured run.
 
 === "⚡ Quick (~3 min)"

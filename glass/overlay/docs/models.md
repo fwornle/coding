@@ -21,6 +21,17 @@ agent's own loop rather than side requests.
     The headline says how many calls were side calls and what share of the tokens they
     took. Above, OpenCode asked a small model for a session title in both of its sessions.
 
+    ## The same calls as flow
+
+    Above the table, **Flow** draws the window's calls from the agent, to the model it
+    chose, to the account that answered. Edge thickness is tokens; dashed edges are side
+    calls. Hover a node to isolate its paths.
+
+    ![Flow over 7 days: claude to claude-opus-5.5 to Claude Max; opencode, copilot and pi to several models, all answered by GitHub Copilot; side calls dashed](images/ui-models-flow.png)
+
+    There is no decision in the middle: every edge is a choice the agent made, and glass
+    forwarded the call to the host the agent addressed.
+
     For **one session**, open **Sessions** and select its row: the same columns appear in a
     Models card above the session's timeline, with its calls one by one.
 

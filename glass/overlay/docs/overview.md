@@ -8,7 +8,7 @@ hide:
 <div class="glass-overview" id="glass-overview" role="region" aria-label="Glass overview presentation" markdown="1">
 
 <div class="overview-toolbar" hidden>
-  <span class="overview-label">glass / in eight slides</span>
+  <span class="overview-label">glass / in ten slides</span>
   <span class="overview-counter" role="status" aria-live="polite" aria-atomic="true"></span>
   <button type="button" data-fullscreen>Fullscreen</button>
 </div>
@@ -226,20 +226,21 @@ Don't assume your last prompt filled the window. Look at the whole context.
 
 Open the **Models** tab.
 
-One row per **agent, model and the account that answered**, for the last day, week,
-month or all time.
+Every call from **the agent, to the model it chose, to the account that answered**, for
+the last day, week, month or all time. Thicker edges carried more tokens.
 
-**main** calls are the agent's own loop. **side** calls are the extras it makes on its
-own, such as a session title or a summary, often on a smaller model.
+Solid edges are the agent's own loop. **Dashed** edges are side calls it makes on its
+own, such as a session title or a summary, often on a smaller model. The table below the
+flow has the numbers.
 
 For one session, select its row in **Sessions**: the same view, call by call.
 
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Models tab over 24 hours: OpenCode's main calls on one model and its title calls on a smaller one, Claude Code's calls on another, each with the account that answered.](images/ui-models.png)](images/ui-models.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![Models flow over 7 days: claude to claude-opus-5.5 to Claude Max; opencode, copilot and pi to several models, all answered by GitHub Copilot; side calls dashed.](images/ui-models-flow.png)](images/ui-models-flow.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
-<figcaption>Example runs on one machine. Every model here is one the agent chose; glass measures, it does not route.</figcaption>
+<figcaption>A week on one machine. No decision in the middle: every model here is one the agent chose; glass measures, it does not route.</figcaption>
 </figure>
 <p class="overview-takeaway" markdown="1">
 Know which model you are paying for before you switch one.
@@ -247,7 +248,44 @@ Know which model you are paying for before you switch one.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-8" aria-labelledby="overview-compare" markdown="1">
+<section class="overview-slide" id="slide-8" aria-labelledby="overview-offload" markdown="1">
+<div class="overview-copy" markdown="1">
+
+<p class="overview-kicker">Planned / Opt-in, off by default</p>
+
+## Small calls to the local Qwen cluster {#overview-offload}
+
+Next, glass can hand **some** calls to a local Qwen3.8-27B cluster instead of a paid account.
+
+**What moves:** small calls only, such as session titles and side calls. An agent's first
+turn carries 20–28k tokens of tools and instructions; the cluster needs ~40–55 s for
+that uncached, so it stays paid.
+
+**Who first:** opencode, whose calls already reach glass by configuration. Copilot CLI and pi
+stay measured only.
+
+**If the cluster is busy, slow or down:** the original call goes to your own provider with
+your own login. Your credentials never reach the cluster.
+
+</div>
+<figure class="overview-figure" markdown="1">
+
+| Measured on the cluster | |
+|---|---|
+| Small call (≈2k tokens) | 2–7 s |
+| First turn (≈20k tokens, uncached) | ~39 s |
+| Same call on Copilot | 1–2 s |
+| Gates | ≤ a few k tokens · ~8 s budget · 1 call in flight |
+
+<figcaption>Measured with coding's router on the office network. Offload saves paid tokens, not time.</figcaption>
+</figure>
+<p class="overview-takeaway" markdown="1">
+Not in this release. With it off, glass is exactly what the previous slides show.
+[Models & Accounts → Local offload](models.md)
+</p>
+</section>
+
+<section class="overview-slide" id="slide-9" aria-labelledby="overview-compare" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Question 4 / Which setup fits my task?</p>
@@ -278,6 +316,37 @@ Judge the answer too: fewer tokens don't automatically mean a better result.
 <p class="overview-takeaway" markdown="1">
 Try it on your next real task: `glass <agent>`, then `glass ui`.
 [Get started](getting-started.md) · [Compare runs](comparing-runs.md)
+</p>
+</section>
+
+<section class="overview-slide" id="slide-10" aria-labelledby="overview-built" markdown="1">
+<div class="overview-copy" markdown="1">
+
+<p class="overview-kicker">Behind the scenes / How glass is made</p>
+
+## Extracted, not rewritten {#overview-built}
+
+glass is generated from two projects that already measure agents every day:
+**coding** and **rapid-llm-proxy**.
+
+A script copies the modules glass needs, unchanged. Every file is listed, and the
+build fails if an import reaches a file that isn't.
+
+What glass adds is glue: the `glass` command, the daemon and the wiring. That's
+**about 12% of its code**.
+
+The router, background services and knowledge base stay behind in coding.
+
+</div>
+<figure class="overview-figure" markdown="1">
+
+[![Modules from coding and rapid-llm-proxy pass through the extractor into glass; glass adds 2.3k lines of glue.](images/glass-composition.png)](images/glass-composition.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
+
+<figcaption>Runtime code of v0.1.24 by origin: 11.9k lines from coding, 5.4k from rapid-llm-proxy, 2.3k glass-only.</figcaption>
+</figure>
+<p class="overview-takeaway" markdown="1">
+A fix in coding reaches glass on the next extract.
+[Architecture → Where glass comes from](architecture.md)
 </p>
 </section>
 

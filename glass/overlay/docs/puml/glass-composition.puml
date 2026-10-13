@@ -1,0 +1,49 @@
+@startuml glass-composition
+!include _standard-style.puml
+' Left to right on purpose: the subject is a flow, sources → extractor → glass.
+left to right direction
+skinparam defaultFontSize 15
+skinparam component {
+  FontSize 15
+}
+skinparam package {
+  FontSize 17
+}
+
+package "coding\n11.9k lines taken\n(3.9k = vendored YAML parser)" as coding {
+  component "Agent wiring\nToken rows for direct traffic" as c_agents <<core>>
+  component "Status line\nNetwork verdict" as c_status <<core>>
+  component "Session timelines\nPaths, scope, teams" as c_util <<util>>
+  component "Dashboard UI\nToken Usage pages" as c_ui <<api>>
+}
+
+package "rapid-llm-proxy\n5.4k lines taken" as proxy {
+  component "Forward + intercept\nMeasurement, redaction" as p_fwd <<core>>
+  component "Token database\n(TypeScript → tsc)" as p_db <<storage>>
+}
+
+component "extract.mjs\n\nevery file listed\nimports closed\nsmoke run" as extract <<infra>>
+
+package "glass\n19.6k runtime lines" as glass {
+  component "Copied modules\nunchanged" as g_copied <<core>>
+  component "UI bundle\n+ 0.9k lines of glass tabs" as g_ui <<api>>
+  component "**glass-only glue**\n2.3k lines · 12%\nCLI, daemon, wiring" as g_overlay <<cli>>
+}
+
+c_agents DATA_LINE extract
+c_status DATA_LINE extract
+c_util DATA_LINE extract
+c_ui DATA_LINE extract : vite
+p_fwd DATA_LINE extract
+p_db DATA_LINE extract
+extract DATA_LINE g_copied
+extract DATA_LINE g_ui
+g_overlay CONTROL_LINE g_copied : glues
+
+note bottom of extract
+  **Not taken (coding only):**
+  routing, classifier, offload,
+  background services,
+  knowledge base, Docker
+end note
+@enduml
