@@ -27,7 +27,7 @@ agent's own loop rather than side requests.
     chose, to the account that answered. Edge thickness is tokens; dashed edges are side
     calls. Hover a node to isolate its paths.
 
-    ![Flow over 7 days: claude to claude-opus-5.5 to Claude Max; opencode, copilot and pi to several models, all answered by GitHub Copilot; side calls dashed](images/ui-models-flow.png)
+    ![Flow over 7 days: claude to claude-opus-5.5 to the Claude subscription; opencode, copilot and pi to several models, all answered by GitHub Copilot; side calls dashed](images/ui-models-flow.png)
 
     There is no decision in the middle: every edge is a choice the agent made, and glass
     forwarded the call to the host the agent addressed.

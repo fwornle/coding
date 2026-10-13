@@ -50,9 +50,18 @@ const fmtTokens = (n: number | null | undefined) => {
   return String(v)
 }
 
-// In glass `anthropic` is the claude CLI's own login (Max or an API key — glass
-// cannot tell), not coding's Max account the shared alias maps it to.
-const answeredBy = (provider: string) => (provider === 'anthropic' ? 'Anthropic (own login)' : accountLabel(provider))
+// In glass, claude answers with the claude CLI's own login. The daemon records
+// its kind (lib/glass/daemon.mjs): `anthropic` = a bearer login, i.e. a Claude
+// subscription (Max or Pro — the wire does not say which), `anthropic-api` = an
+// x-api-key. An LLM proxy in between names the account (`claude-code-max`), and
+// rows from claude's own transcript say `claude-code`: all one subscription.
+// Before 0.1.26 an API-key login was recorded as `anthropic` too.
+const CLAUDE_SUBSCRIPTION = new Set(['anthropic', 'claude-code', 'claude-code-max'])
+const answeredBy = (provider: string) =>
+  (CLAUDE_SUBSCRIPTION.has(provider) ? 'Claude subscription' : accountLabel(provider))
+
+// A call the daemon measured but could not tie to a glass session has no agent.
+const agentLabel = (agent: string) => (!agent || agent === 'unknown' ? 'no session' : agent)
 
 const KIND: Record<CallKind, { label: string; title: string; className: string }> = {
   main: { label: 'main', title: 'Sent tool definitions: the agent\'s own loop', className: 'bg-primary/10 text-foreground' },
@@ -288,7 +297,7 @@ export function ModelsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ModelFlow groups={rows} answeredBy={answeredBy} />
+            <ModelFlow groups={rows} answeredBy={answeredBy} agentLabel={agentLabel} />
           </CardContent>
         </Card>
       )}
@@ -326,7 +335,7 @@ export function ModelsPage() {
               <TableBody>
                 {rows.map((g) => (
                   <TableRow key={`${g.agent}|${g.model}|${g.provider}|${g.upstream}|${g.call_kind}`} data-kind={g.call_kind || 'unrecorded'}>
-                    <TableCell><Badge variant="secondary" className="text-xs">{g.agent || '—'}</Badge></TableCell>
+                    <TableCell><Badge variant="secondary" className="text-xs" title={agentLabel(g.agent) === 'no session' ? 'Measured, but not tied to a glass session — see the note below the table' : undefined}>{agentLabel(g.agent)}</Badge></TableCell>
                     <TableCell className="font-mono text-xs">{normalizeModel(g.model)}</TableCell>
                     <TableCell><KindBadge kind={g.call_kind} /></TableCell>
                     <TableCell className="text-xs">{answeredBy(g.provider)}</TableCell>

@@ -17,8 +17,11 @@ the wire, show **not recorded** and **—**. glass does not guess them afterward
   agent asked for. When the agent talks to an LLM proxy that picks the model itself, the
   answering model can differ from the request. The card shows what was actually used.
 - **Answered by** is the account. For calls through such a proxy it is the account the proxy
-  names in its response (`x-llm-provider`), not the proxy's own name. **Anthropic (own
-  login)** is Claude Code's own login: a subscription or an API key. glass cannot tell which.
+  names in its response (`x-llm-provider`), not the proxy's own name. For Claude Code,
+  **Claude subscription** is a sign-in with a Claude plan (Max or Pro — the request does
+  not say which) and **Anthropic API (metered)** is an API key. glass tells them apart by
+  which header carries the login, never by reading it. Before glass 0.1.26 both were
+  recorded the same way and show as Claude subscription.
 - Side calls are usually cheap but frequent: titles, summaries, prompt checks on a small
   model. The headline's share of tokens tells you whether they matter in a session.
 - **Newest calls, one by one** lists the last 200 calls of the session with their kind and
@@ -30,7 +33,7 @@ The **Flow** card on the Models tab draws the same rows as the table, in three c
 
 | Column | Node | Number on the node |
 |---|---|---|
-| **Agents** — who asked | one per agent (`unknown` = calls glass could not tie to an agent) | tokens, calls |
+| **Agents** — who asked | one per agent; **no session** = calls glass measured but could not tie to a session (see below) | tokens, calls |
 | **Models** — what the agent chose | one per model, split into loop and side calls | — |
 | **Accounts** — who answered | one per account, with the hosts its calls went to | tokens |
 
@@ -46,9 +49,9 @@ coding's dashboard has a flow with the same left and right columns and a decisio
 the middle — the router choosing an account per call. glass has no router, so the middle
 column is the models the agent itself picked.
 
-## Local offload — planned, not in this release
+## On-prem offload — planned, not in this release
 
-Where a local Qwen3.8-27B cluster is available, the next phase (G8)
+Where an on-prem Qwen3.8-27B cluster is available, the next phase (G8)
 lets glass hand **some** calls to it — **opt-in, off by default**. What is decided so far,
 from measurements with coding's own router against that cluster:
 
@@ -60,7 +63,7 @@ from measurements with coding's own router against that cluster:
 | Fallback | the original call, unchanged, to the host the agent addressed, with the agent's own login — what glass does today. Your GitHub or Anthropic credentials never reach the cluster. |
 | Trade-off | Qwen answers small calls in ~2–10 s against ~1–2 s on Copilot: offload saves paid tokens, not time. |
 
-With the option on, the Models flow would show offloaded calls arriving at a local account
+With the option on, the Models flow would show offloaded calls arriving at an on-prem account
 node; with it off, glass stays exactly as described on this page.
 
 ## Calls without a session
@@ -68,14 +71,15 @@ node; with it off, glass stays exactly as described on this page.
 Below the session table, glass counts the calls it measured but could not bind to a
 session. That happens when an intercepted request names no session and more than one
 intercepting session is open. glass never guesses which session such a call belongs to.
-These calls count in **Token Usage** but not in any session row.
+These calls count in **Token Usage** but not in any session row; on the Models tab their
+agent shows as **no session**.
 
 ## Why glass does not route
 
 coding, the project glass is extracted from, has a router that moves calls between accounts
 and to local models. glass leaves that out on purpose: the agent keeps its own login, model
 catalogue and routing, and glass only measures. This card shows the agent's own choices
-for the same reason. The one planned exception is the opt-in local offload above.
+for the same reason. The one planned exception is the opt-in on-prem offload above.
 
 ## Reading it programmatically
 

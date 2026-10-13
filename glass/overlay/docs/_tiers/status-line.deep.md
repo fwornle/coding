@@ -5,7 +5,7 @@
 Inside an existing tmux session, glass sets the bar on that session for the run and
 restores it afterwards.
 
-![Status line in tmux](images/terminal-statusline-tmux.png)
+![Status line in tmux, with the popup a click on ctx opens](images/terminal-statusline-tmux.png)
 
 **Without tmux** — native Windows, or `--no-tmux` / `GLASS_NO_TMUX=1`:
 

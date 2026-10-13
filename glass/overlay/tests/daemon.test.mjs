@@ -170,12 +170,26 @@ test('claude via the base URL: forwarded, row + context turn under the session t
   assert.equal(up.headers['x-glass-upstream'], undefined, 'the glass header stays local');
   const [row] = await rowsFor(s.taskId);
   assert.equal(row.agent, 'claude');
-  assert.equal(row.provider, 'anthropic');
+  assert.equal(row.provider, 'anthropic-api', 'an x-api-key login is a metered key');
   assert.equal(row.input_tokens, 12);
   assert.equal(row.output_tokens, 9);
   assert.equal(row.cache_read_tokens, 300);
   const turns = await eventually(async () => (await api('GET', `/api/context-turns?task_id=${s.taskId}`)).body.contextTurns, (t) => t.length > 0);
   assert.equal(turns.length, 1);
+});
+
+test('claude via the base URL with a bearer login: recorded as the Claude subscription', async () => {
+  const s = await open('claude');
+  const res = await fetch(`${daemon.url}/v1/messages`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: 'Bearer oauth-standin', 'x-task-id': s.taskId, 'x-agent': 'claude', 'x-project': 'glass', 'x-glass-upstream': `http://127.0.0.1:${upPort}` },
+    body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 8, stream: true, messages: msgs }),
+  });
+  assert.match(await res.text(), /message_stop/);
+  await settle();
+  assert.equal(upSeen.at(-1).headers.authorization, 'Bearer oauth-standin', 'the login is forwarded unchanged');
+  const [row] = await rowsFor(s.taskId);
+  assert.equal(row.provider, 'anthropic');
 });
 
 test('copilot via interception: Anthropic wire to copilot-api.<tenant>.ghe.com, own login forwarded', async () => {

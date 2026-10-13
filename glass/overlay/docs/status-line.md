@@ -15,7 +15,7 @@ Context gauge and session tokens, live, in the terminal you work in.
     | `↑ ↓ ⚡` | session tokens sent / received, cache share | the session in the UI |
     | `N:` | egress: `direct` or via `proxy` | network report |
 
-    ![Status line in tmux](images/terminal-statusline-tmux.png)
+    ![Status line in tmux, with the popup a click on ctx opens](images/terminal-statusline-tmux.png)
 
     With tmux it is the bar at the bottom; without tmux Claude Code shows it as its own
     status line, and `glass watch` shows it for any agent.

@@ -114,9 +114,9 @@ glass ui                # in another terminal
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Claude Code running through glass in tmux, with a context gauge and session token counts in the bottom status bar.](images/terminal-statusline-tmux.png)](images/terminal-statusline-tmux.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![Claude Code running through glass in tmux after three prompts: the status bar at the bottom, and the context popup a click on its ctx field opens: bytes per part of the latest turn and every turn's prompt size and cache hit.](images/terminal-statusline-tmux.png)](images/terminal-statusline-tmux.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
-<figcaption>The status bar gives live context and token counts. With tmux, click a field for details. Without it, use <code>glass watch</code> in a split pane; Claude Code also has its own status line.</figcaption>
+<figcaption>The status bar gives live context and token counts. With tmux, click a field for details (here: <strong>ctx</strong>). Without it, use <code>glass watch</code> in a split pane; Claude Code also has its own status line.</figcaption>
 </figure>
 <p class="overview-takeaway" markdown="1">
 No Docker or build tools. [Installation and platform details](getting-started.md)
@@ -238,7 +238,7 @@ For one session, select its row in **Sessions**: the same view, call by call.
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Models flow over 7 days: claude to claude-opus-5.5 to Claude Max; opencode, copilot and pi to several models, all answered by GitHub Copilot; side calls dashed.](images/ui-models-flow.png)](images/ui-models-flow.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![Models flow over 7 days: claude to claude-opus-5.5 to the Claude subscription; opencode, copilot and pi to several models, all answered by GitHub Copilot; side calls dashed.](images/ui-models-flow.png)](images/ui-models-flow.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
 <figcaption>A week on one machine. No decision in the middle: every model here is one the agent chose; glass measures, it does not route.</figcaption>
 </figure>
@@ -253,9 +253,9 @@ Know which model you are paying for before you switch one.
 
 <p class="overview-kicker">Planned / Opt-in, off by default</p>
 
-## Small calls to the local Qwen cluster {#overview-offload}
+## Small calls to the on-prem Qwen cluster {#overview-offload}
 
-Next, glass can hand **some** calls to a local Qwen3.8-27B cluster instead of a paid account.
+Next, glass can hand **some** calls to an on-prem Qwen3.8-27B cluster instead of a paid account.
 
 **What moves:** small calls only, such as session titles and side calls. An agent's first
 turn carries 20–28k tokens of tools and instructions; the cluster needs ~40–55 s for
@@ -281,7 +281,7 @@ your own login. Your credentials never reach the cluster.
 </figure>
 <p class="overview-takeaway" markdown="1">
 Not in this release. With it off, glass is exactly what the previous slides show.
-[Models & Accounts → Local offload](models.md)
+[Models & Accounts → On-prem offload](models.md)
 </p>
 </section>
 

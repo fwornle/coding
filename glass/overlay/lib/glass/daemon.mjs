@@ -352,8 +352,14 @@ export async function startDaemon({
       if (req.method === 'POST' && url.split('?')[0].startsWith('/v1/messages')) {
         const upstreamBase = safeUpstream(req.headers['x-glass-upstream']) || 'https://api.anthropic.com';
         delete req.headers['x-glass-upstream'];
+        // Which account a direct call bills is the login's KIND, read from which
+        // header carries it — never from the credential: an x-api-key is a metered
+        // API key, an Authorization bearer is a Claude subscription (Max or Pro,
+        // indistinguishable on the wire). An LLM proxy in between names the
+        // account itself (x-llm-provider), which takes precedence in the forward.
+        const provider = req.headers['x-api-key'] ? 'anthropic-api' : 'anthropic';
         return handleAnthropicMessages(req, res, {
-          measurement, fetch: egress, upstreamBase, provider: 'anthropic', subscription: '', logErr,
+          measurement, fetch: egress, upstreamBase, provider, subscription: '', logErr,
         });
       }
       if (url.startsWith('/relay/')) return onRelay(req, res);

@@ -27,6 +27,8 @@ interface Props {
   groups: FlowGroup[]
   /** The account's display name — the Models table's "Answered by". */
   answeredBy: (provider: string) => string
+  /** The agent's display name — the Models table's "Agent". */
+  agentLabel: (agent: string) => string
 }
 
 const W = 1120
@@ -59,7 +61,7 @@ interface Edge { from: string; to: string; tokens: number; side: boolean; color:
 
 function addTo<K>(m: Map<K, number>, k: K, v: number) { m.set(k, (m.get(k) ?? 0) + v) }
 
-export function ModelFlow({ groups, answeredBy }: Props) {
+export function ModelFlow({ groups, answeredBy, agentLabel }: Props) {
   const [hover, setHover] = useState<string | null>(null)
 
   const g = useMemo(() => {
@@ -77,7 +79,7 @@ export function ModelFlow({ groups, answeredBy }: Props) {
 
     for (const r of groups) {
       const t = tokensOf(r)
-      const agent = `a:${r.agent || '—'}`
+      const agent = `a:${agentLabel(r.agent)}`
       const model = `m:${normalizeModel(r.model) || '—'}`
       // By the account that answered, not the provider spelling: rows say both
       // `github-copilot` and `gh-copilot` for one Copilot login.
@@ -124,7 +126,7 @@ export function ModelFlow({ groups, answeredBy }: Props) {
     }))
     const max = Math.max(1, ...[...left.values()].map((e) => e.tokens))
     return { agents, models, accounts, left: [...left.values()], right: [...right.values()], max }
-  }, [groups, answeredBy])
+  }, [groups, answeredBy, agentLabel])
 
   if (!groups.length) return null
 
