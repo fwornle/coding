@@ -15,6 +15,7 @@ function monitor(seq) {
       port: async () => s.port.shift() ?? true,
       functional: async () => s.functional.shift() ?? true,
       enabled: () => s.enabled ?? false,
+      kerberos: async () => s.kerberos ?? null,
     },
   });
 }
@@ -59,4 +60,36 @@ test('concurrent ticks share one probe round', async () => {
   } });
   await Promise.all([m.tick(), m.tick(), m.tick()]);
   assert.equal(rounds, 1);
+});
+
+test('Kerberos: the monitor publishes the ticket, the badge says K:NO only on CN / VPN', async () => {
+  const m = monitor({ location: ['corporate'], port: [true], functional: [true], kerberos: false });
+  await m.tick();
+  assert.equal(m.facts().kerberos_ticket, false);
+  assert.equal(networkBadge(m.facts()).text, 'N:CN P:AUTO K:NO');
+});
+
+test('egress: a refused tunnel names the proxy and the host, and is not asked again for 10 s', async () => {
+  const http = await import('node:http');
+  const { createEgressFetch, TUNNEL_REFUSAL_MEMORY_MS } = await import('../lib/glass/egress.mjs');
+  let connects = 0;
+  const px = http.createServer();
+  px.on('connect', (req, sock) => { connects++; sock.end('HTTP/1.1 502 Bad Gateway\r\nContent-Length: 0\r\n\r\n'); });
+  await new Promise((r) => px.listen(0, '127.0.0.1', r));
+  const proxy = `http://127.0.0.1:${px.address().port}`;
+  let clock = 1_000_000;
+  const seen = [];
+  const f = createEgressFetch({ HTTPS_PROXY: proxy }, 12445, { now: () => clock, onRefusal: (r) => seen.push(r) });
+  try {
+    await assert.rejects(f('https://api.example.com/v1'), (e) => e.code === 'GLASS_TUNNEL_REFUSED'
+      && e.message.includes(proxy) && e.message.includes('api.example.com') && e.message.includes('HTTP 502') && e.message.includes('klist'));
+    assert.deepEqual(seen.map((r) => [r.host, r.status]), [['api.example.com', 502]]);
+    await assert.rejects(f('https://api.example.com/v1'), (e) => e.code === 'GLASS_TUNNEL_REFUSED');
+    assert.equal(connects, 1, 'the retry inside the window does not wait on the proxy again');
+    clock += TUNNEL_REFUSAL_MEMORY_MS;
+    await assert.rejects(f('https://api.example.com/v1'), (e) => e.code === 'GLASS_TUNNEL_REFUSED');
+    assert.equal(connects, 2, 'after the window the proxy is asked again');
+  } finally {
+    px.close();
+  }
 });

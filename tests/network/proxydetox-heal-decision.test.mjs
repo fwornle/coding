@@ -243,3 +243,31 @@ describe('2026-10-03, leaving VPN: the heal debounce raced the location hysteres
     assert.equal(d.cause, CAUSES.HEALTHY);
   });
 });
+
+describe('decideProxydetoxHeal — a stale daemon right after a network-class change', () => {
+  // 2026-10-13, VPN up at 16:22:12: the location settled on `vpn` at 16:22:25,
+  // :3128 refused every tunnel, the OS change was still "recent", direct
+  // internet was blocked and the PAC host answered. Rules 4-6 each excused it;
+  // the daemon came back only after the restart ~70 s later.
+  const vpnUp = {
+    portListening: true, proxiedExternalOk: false, directExternalOk: false,
+    proxiedInternalOk: true, location: 'vpn', networkChanging: true, consecutiveFailures: 1,
+  };
+
+  it('heals at once when the change is settled and :3128 does not forward', () => {
+    const d = decideProxydetoxHeal({ ...vpnUp, staleAfterChange: true });
+    assert.equal(d.heal, true);
+    assert.equal(d.cause, CAUSES.STALE_AFTER_CHANGE);
+  });
+
+  it('without the one-shot flag the same shape is still left alone (2026-10-03 rule)', () => {
+    const d = decideProxydetoxHeal({ ...vpnUp, staleAfterChange: false });
+    assert.equal(d.heal, false);
+  });
+
+  it('never heals a proxy that forwards, whatever changed', () => {
+    const d = decideProxydetoxHeal({ ...vpnUp, proxiedExternalOk: true, staleAfterChange: true });
+    assert.equal(d.heal, false);
+    assert.equal(d.cause, CAUSES.HEALTHY);
+  });
+});

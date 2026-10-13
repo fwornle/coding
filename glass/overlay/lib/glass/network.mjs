@@ -8,7 +8,7 @@
 // only observes: it never restarts proxydetox and never changes proxy
 // variables.
 import {
-  observeLocation, probePortListening, probeProxyFunctional, readProxyEnabledByUser,
+  observeLocation, probePortListening, probeProxyFunctional, probeKerberosTicket, readProxyEnabledByUser,
   countFunctionalFailures, publishedFunctional, FUNCTIONAL_FAIL_THRESHOLD,
 } from '../network/location-probe.mjs';
 import { settleLocation } from '../network/location-hysteresis.mjs';
@@ -18,7 +18,7 @@ export const NETWORK_PROBE_INTERVAL_MS = 15_000; // the coordinator's cadence
 
 /**
  * @param {object} [o]
- * @param {object} [o.probes]   { location, port, functional, enabled } — injectable for tests
+ * @param {object} [o.probes]   { location, port, functional, enabled, kerberos } — injectable for tests
  * @param {boolean} [o.watch]   subscribe to the OS's network-change notification (macOS)
  * @param {(line: string) => void} [o.log]
  */
@@ -27,8 +27,9 @@ export function createNetworkMonitor({ probes = {}, watch = true, log = () => {}
   const port = probes.port || probePortListening;
   const functional = probes.functional || probeProxyFunctional;
   const enabled = probes.enabled || readProxyEnabledByUser;
+  const kerberos = probes.kerberos || probeKerberosTicket;
   const state = {
-    location: 'unknown', proxy_running: false, proxy_functional: false, proxy_enabled_by_user: false,
+    location: 'unknown', proxy_running: false, proxy_functional: false, proxy_enabled_by_user: false, kerberos_ticket: null,
     location_demotion_pending: 0, consecutive_functional_failures: 0, last_network_change_at: null, last_probe_end: null,
   };
   let running = null;
@@ -54,6 +55,7 @@ export function createNetworkMonitor({ probes = {}, watch = true, log = () => {}
     if (settled.location !== state.location) log(`network: location ${state.location} → ${settled.location}`);
     state.location = settled.location;
     state.location_demotion_pending = settled.pending;
+    state.kerberos_ticket = await kerberos();
     state.last_probe_end = new Date().toISOString();
   }
 

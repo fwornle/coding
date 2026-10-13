@@ -54,7 +54,7 @@ export function conversationTurn(turns) {
  * @param {string} o.egress         upstream proxy URL, '' when direct
  * @param {object} [o.network]      network facts (network.mjs facts())
  */
-export function statuslineData({ session, db, measurement, egress, network = null, glass }) {
+export function statuslineData({ session, db, measurement, egress, network = null, glass, refusal = null }) {
   const taskId = session.taskId;
   const t = totalsByTask(db, [taskId]).get(taskId);
   let turns = [];
@@ -82,10 +82,11 @@ export function statuslineData({ session, db, measurement, egress, network = nul
     },
     egress: egress ? 'proxy' : 'direct',
     egress_url: egress ? egress.replace(/\/\/[^@/]*@/, '//') : '',
+    egress_refused: refusal && { host: refusal.host, status: refusal.status, at: new Date(refusal.at).toISOString() },
     network: network && {
       location: network.location, proxy_running: network.proxy_running,
       proxy_functional: network.proxy_functional, proxy_enabled_by_user: network.proxy_enabled_by_user,
-      last_probe_end: network.last_probe_end,
+      kerberos_ticket: network.kerberos_ticket ?? null, last_probe_end: network.last_probe_end,
     },
   };
 }
@@ -174,8 +175,13 @@ export function renderReport(tag, { d, turns = [], port, caPath = '' }) {
     const where = { CN: 'corporate network (on-site)', VPN: 'corporate VPN', OPEN: 'open internet', '??': 'not probed yet' }[b.n] || n.location;
     lines.push(`network: N:${b.n} — ${where}`);
     lines.push(`local proxy :3128: ${!n.proxy_running ? 'not listening' : n.proxy_functional ? 'forwarding' : 'listening, not forwarding'} · px toggle ${n.proxy_enabled_by_user ? 'on' : 'off'} → P:${b.p}`);
-    if (b.warn) lines.push('  ! on the corporate network without a working local proxy: external hosts are unreachable');
+    const corporate = n.location === 'corporate' || n.location === 'vpn';
+    if (corporate && n.kerberos_ticket != null) {
+      lines.push(`Kerberos ticket: ${n.kerberos_ticket ? 'present' : 'MISSING — the corporate proxy will refuse tunnels (renew: kinit, or the Kerberos SSO menu)'}`);
+    }
+    if (b.warn && !(n.kerberos_ticket === false && n.proxy_functional)) lines.push('  ! on the corporate network without a working local proxy: external hosts are unreachable');
     lines.push(`egress (glass daemon): ${d.egress === 'proxy' ? `via ${d.egress_url}` : 'direct'}`);
+    if (d.egress_refused) lines.push(`  last refused tunnel: ${d.egress_refused.host} (HTTP ${d.egress_refused.status}) at ${d.egress_refused.at}`);
     if (caPath) lines.push(`interception CA: ${caPath}`);
     lines.push(`last measured call: ${d.last_at || '—'}`);
     return lines.join('\n');

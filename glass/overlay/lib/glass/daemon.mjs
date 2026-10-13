@@ -140,7 +140,14 @@ export async function startDaemon({
   const p = glassPaths(home);
   for (const d of [p.data, p.ca, p.logs]) fs.mkdirSync(d, { recursive: true });
   const logErr = (l) => log(`ERROR ${l}`);
-  const egress = fetch || createEgressFetch(process.env, port);
+  // The last tunnel the upstream proxy refused, for the network popup.
+  let lastRefusal = null;
+  const egress = fetch || createEgressFetch(process.env, port, {
+    onRefusal: (r) => {
+      lastRefusal = r;
+      logErr(`upstream proxy refused the tunnel to ${r.host} (HTTP ${r.status})`);
+    },
+  });
   const direct = fetch || createEgressFetch({}, port); // a relay to loopback never takes the corporate proxy
   const config = readConfig(p.config);
 
@@ -304,6 +311,7 @@ export async function startDaemon({
 
   const lineData = (session) => statuslineData({
     session, db: tokenDb?.db, measurement, egress: upstreamProxy(process.env, port), network: netMonitor.facts(), glass: VERSION,
+    refusal: lastRefusal,
   });
 
   const server = http.createServer(async (req, res) => {

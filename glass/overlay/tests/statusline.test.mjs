@@ -63,6 +63,14 @@ test('reports: context make-up of the last turn; network', () => {
   const net = renderReport(TAGS.net, { d: D, port: 12445, caPath: '/h/ca.pem' });
   assert.match(net, /network: N:CN — corporate network \(on-site\)\nlocal proxy :3128: forwarding · px toggle on → P:ON/);
   assert.match(net, /egress \(glass daemon\): via http:\/\/127\.0\.0\.1:3128[\s\S]*CA: \/h\/ca\.pem/);
+  const noTicket = renderReport(TAGS.net, {
+    d: { ...D, network: { location: 'corporate', proxy_running: true, proxy_functional: true, kerberos_ticket: false },
+      egress_refused: { host: 'copilot-api.example.ghe.com', status: 502, at: '2026-10-13T13:47:08.000Z' } },
+    port: 1,
+  });
+  assert.match(noTicket, /Kerberos ticket: MISSING/);
+  assert.match(noTicket, /last refused tunnel: copilot-api\.example\.ghe\.com \(HTTP 502\) at 2026-10-13T13:47:08/);
+  assert.doesNotMatch(noTicket, /without a working local proxy/, 'the proxy forwards; the ticket is what is missing');
   const broken = renderReport(TAGS.net, { d: { ...D, network: { location: 'vpn', proxy_running: true, proxy_functional: false } }, port: 1 });
   assert.match(broken, /listening, not forwarding · px toggle off → P:OFF\n  ! on the corporate network without a working local proxy/);
 });

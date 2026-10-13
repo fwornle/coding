@@ -9,7 +9,7 @@ import { EventEmitter } from 'node:events';
 
 import {
   classifyLocation, observeLocation, networkBadge, countFunctionalFailures, publishedFunctional,
-  readProxyEnabledByUser, probePacResolves, probeProxyFunctional, probeVpnConnected, FUNCTIONAL_FAIL_THRESHOLD,
+  readProxyEnabledByUser, probePacResolves, probeProxyFunctional, probeKerberosTicket, probeVpnConnected, FUNCTIONAL_FAIL_THRESHOLD, PROXY_PROBE_HOST,
 } from '../../lib/network/location-probe.mjs';
 
 describe('classifyLocation', () => {
@@ -49,6 +49,15 @@ describe('networkBadge', () => {
     assert.equal(networkBadge({ location: 'open' }).warn, false);
     assert.equal(networkBadge({ location: 'corporate', proxy_running: true, proxy_functional: true }).warn, false);
   });
+  it('K:NO on CN / VPN without a Kerberos ticket — the proxy cannot authenticate', () => {
+    const up = { proxy_running: true, proxy_functional: true };
+    const b = networkBadge({ location: 'corporate', ...up, kerberos_ticket: false });
+    assert.equal(b.text, 'N:CN P:AUTO K:NO');
+    assert.equal(b.warn, true);
+    assert.equal(networkBadge({ location: 'vpn', ...up, kerberos_ticket: true }).text, 'N:VPN P:AUTO');
+    assert.equal(networkBadge({ location: 'vpn', ...up, kerberos_ticket: null }).text, 'N:VPN P:AUTO', 'unknown is not shown');
+    assert.equal(networkBadge({ location: 'open', ...up, kerberos_ticket: false }).text, 'N:OPEN P:AUTO', 'off the corporate network it does not matter');
+  });
 });
 
 describe('functional debounce', () => {
@@ -84,12 +93,35 @@ describe('probes', () => {
     assert.equal(await probePacResolves({ execFile: dig('', noDig), lookup: async () => ({ address: '10.1.2.3' }) }), true);
     assert.equal(await probePacResolves({ execFile: dig('', noDig), lookup: async () => { throw new Error('NXDOMAIN'); } }), false);
   });
+  it('proxy functional: a CONNECT tunnel to a host the proxy must carry, nothing sent through it', async () => {
+    const net = await import('node:net');
+    const answer = (statusLine) => {
+      const seen = [];
+      const srv = net.createServer((c) => c.once('data', (d) => { seen.push(String(d).split('\r\n')[0]); c.end(statusLine ? `${statusLine}\r\n\r\n` : ''); }));
+      return new Promise((r) => srv.listen(0, '127.0.0.1', () => r({ srv, seen, port: srv.address().port })));
+    };
+    assert.equal(PROXY_PROBE_HOST, 'api.github.com', 'not captive.apple.com: on CN that passes while every tunnel is refused');
+    for (const [line, ok] of [['HTTP/1.1 200 Connection established', true], ['HTTP/1.1 502 Bad Gateway', false],
+      ['HTTP/1.1 407 Proxy Authentication Required', false], [null, false]]) {
+      const { srv, seen, port } = await answer(line);
+      assert.equal(await probeProxyFunctional({ port }), ok, String(line));
+      assert.deepEqual(seen, ['CONNECT api.github.com:443 HTTP/1.1']);
+      srv.close();
+    }
+    assert.equal(await probeProxyFunctional({ port: 1, timeoutMs: 500 }), false, 'nothing listening');
+  });
+  it('Kerberos: klist -s exit 0 = ticket; non-zero = none; no klist / Windows = unknown', async () => {
+    const klist = (err) => (file, args, opts, cb) => { assert.deepEqual([file, args], ['klist', ['-s']]); cb(err); };
+    assert.equal(await probeKerberosTicket({ execFile: klist(null), platform: 'darwin' }), true);
+    assert.equal(await probeKerberosTicket({ execFile: klist(Object.assign(new Error('exit 1'), { code: 1 })), platform: 'darwin' }), false);
+    assert.equal(await probeKerberosTicket({ execFile: klist(Object.assign(new Error('missing'), { code: 'ENOENT' })), platform: 'linux' }), null);
+    assert.equal(await probeKerberosTicket({ execFile: () => assert.fail('not run'), platform: 'win32' }), null);
+  });
   it('console probes start hidden: no window flashes from the console-less daemon on Windows', async () => {
     const seen = [];
     const spy = (out) => (file, args, opts, cb) => { seen.push([file, opts.windowsHide]); cb(null, out); };
     await probePacResolves({ execFile: spy('10.1.2.3\n') });
-    await probeProxyFunctional({ execFile: spy('200') });
-    assert.deepEqual(seen, [['dig', true], ['curl', true]]);
+    assert.deepEqual(seen, [['dig', true]]);
   });
   it('VPN CLI: "state: Connected" on stdout; no CLI for the platform → false', async () => {
     const fake = (text) => () => {

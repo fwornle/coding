@@ -39,14 +39,21 @@ INSIDE_CN=false
 PROXY_WORKING=true
 PROXY_REQUIRED=false
 
-# Generic internet-reachability probe target.
-# Must NOT be api.github.com: GitHub is intermittently throttled/blocked by the
-# GFW on the CN corporate network, producing false "no internet" results and
-# proxy on/off flapping. captive.apple.com is a tiny fixed "Success" page on
-# Apple's global CDN, reachable in mainland China, returns HTTP 200 fast.
-# Override with HEALTH_REACHABILITY_HOST. (Service-specific checks below still
-# probe api.github.com / api.anthropic.com directly — those are intentional.)
+# Generic internet-reachability probe target, for DIRECT checks (does this
+# machine have internet at all). captive.apple.com is a tiny fixed "Success"
+# page, returns HTTP 200 fast. Override with HEALTH_REACHABILITY_HOST.
+# (Service-specific checks below still probe api.github.com / api.anthropic.com
+# directly — those are intentional.)
 REACHABILITY_HOST="${HEALTH_REACHABILITY_HOST:-captive.apple.com}"
+# Whether proxydetox FORWARDS: a host the corporate proxy has to carry. Not
+# REACHABILITY_HOST — on the corporate network (N:CN, not China) that one passes
+# even when every tunnel the agents need is refused (2026-10-13: four hours of
+# 502s on api.github.com through :3128 while the captive probe said functional).
+# Same host as lib/network/location-probe.mjs PROXY_PROBE_HOST: curl without -f
+# exits 0 on any HTTP answer and non-zero on a refused tunnel. (Run once per
+# launch, so a real request is fine here; the coordinator's every-15 s probe
+# stops at the CONNECT.)
+PROXY_PROBE_HOST="${HEALTH_PROXY_PROBE_HOST:-api.github.com}"
 
 # ============================================
 # Corporate Network Detection
@@ -175,7 +182,7 @@ ensure_proxydetox_up() {
   local uid_gui="gui/$(id -u)"
 
   # Fast path: already functional — no launchd surgery on the happy path.
-  if timeout 8 curl -s --connect-timeout 4 -x "$px_url" -o /dev/null "https://${REACHABILITY_HOST}" 2>/dev/null; then
+  if timeout 8 curl -s --connect-timeout 4 -x "$px_url" -o /dev/null "https://${PROXY_PROBE_HOST}" 2>/dev/null; then
     return 0
   fi
 
@@ -271,7 +278,7 @@ ensure_proxydetox_up() {
   launchctl kickstart -k "$uid_gui/$label" 2>/dev/null || true
   sleep 1
 
-  if timeout 10 curl -s --connect-timeout 4 -x "$px_url" -o /dev/null "https://${REACHABILITY_HOST}" 2>/dev/null; then
+  if timeout 10 curl -s --connect-timeout 4 -x "$px_url" -o /dev/null "https://${PROXY_PROBE_HOST}" 2>/dev/null; then
     log "✅ proxydetox healed — :3128 functional"
     return 0
   fi

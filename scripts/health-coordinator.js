@@ -43,7 +43,7 @@ import { startNetworkChangeWatcher, networkChangeRecent } from '../lib/network/n
 import { settleLocation, OPEN_DEMOTION_CONFIRM_TICKS } from '../lib/network/location-hysteresis.mjs';
 import {
   REACHABILITY_HOST, PAC_HOST, FUNCTIONAL_FAIL_THRESHOLD,
-  probePortListening, readProxyEnabledByUser, probeProxyFunctional, countFunctionalFailures,
+  probePortListening, readProxyEnabledByUser, probeProxyFunctional, probeKerberosTicket, countFunctionalFailures,
   publishedFunctional, probeVpnConnected, probePacResolves, probePacOnSite, classifyLocation,
 } from '../lib/network/location-probe.mjs';
 import { settleModeFlip, classifyNetClass } from '../lib/network/proxy-mode-flip.mjs';
@@ -373,6 +373,9 @@ const currentState = {
     internet_reachable: false,           // true if we can reach github.com (directly or via proxy)
     consecutive_functional_failures: 0,  // debounce: raw functional-probe failures in a row (hysteresis)
     last_network_change_at: null,        // epoch ms of the OS's last network-change notification
+    kerberos_ticket: null,               // klist -s: true / false / null (cannot tell) — the corporate proxy's login
+    class_change_at: null,               // epoch ms the location last moved between open and corporate/VPN
+    class_change_heal_due: false,        // one proxydetox restart still owed to that change (proxydetox-heal-decision rule 3b)
     last_probe_end: null                 // ISO timestamp
   },
   generated_at: new Date(STARTED_AT).toISOString(),
@@ -3121,7 +3124,8 @@ function refreshLslStaleness() {
 const NETWORK_PROBE_INTERVAL_MS = 15_000;
 
 
-// REACHABILITY_HOST (reachable from every network, CN included) and PAC_HOST
+// REACHABILITY_HOST (plain internet, probed direct), PROXY_PROBE_HOST (a host
+// the corporate proxy has to carry — what "proxydetox forwards" means) and PAC_HOST
 // (the one name that means "corporate": its DNS, its latency, and the heal
 // decision's proxied corporate probe) come from lib/network/location-probe.mjs,
 // shared with glass's status line.
@@ -3187,6 +3191,8 @@ async function pollNetworkStatus() {
     {
       // Functional probe: actually try to proxy a request (not just TCP connect)
       if (portListening) proxyFunctional = await probeProxyFunctional();
+      // A forwarding proxy settles the change: nothing is owed to it any more.
+      if (proxyFunctional) netState.class_change_heal_due = false;
 
       // ── Hysteresis / debounce (2026-07-17) ────────────────────────────────
       // A single transient curl failure (proxy busy, network jitter, in-flight
@@ -3270,6 +3276,11 @@ async function pollNetworkStatus() {
         // confirming: either way a failed proxied request is the network's.
         networkChanging: networkChangeRecent(netState.last_network_change_at)
           || (netState.location_demotion_pending || 0) > 0,
+        // Owed once per open ↔ corporate/VPN change, within 3 min of it, once
+        // the new location is settled (no demotion still being confirmed).
+        staleAfterChange: netState.class_change_heal_due
+          && (netState.location_demotion_pending || 0) === 0
+          && Number.isFinite(netState.class_change_at) && Date.now() - netState.class_change_at < 3 * 60_000,
         consecutiveFailures: netState.consecutive_functional_failures || 0,
         failureThreshold: FUNCTIONAL_FAIL_THRESHOLD,
       });
@@ -3281,6 +3292,7 @@ async function pollNetworkStatus() {
         log(`network: proxy probe failing but NOT healing — cause=${healVerdict.cause}: ${healVerdict.reason}`, 'WARN');
       }
       if (needsKickstart) {
+        netState.class_change_heal_due = false;
         log(`network: kickstarting proxydetox — cause=${healVerdict.cause}: ${healVerdict.reason}`, 'WARN');
         try {
           // kickstart only works if the job is loaded; when the job was
@@ -3297,15 +3309,9 @@ async function pollNetworkStatus() {
             sock.once('timeout', () => { sock.destroy(); resolve(false); });
           });
           if (portNow) {
-            // Re-probe: functional check
+            // Re-probe: functional check — the same probe that judged it broken.
             try {
-              const { stdout: healCode } = await execFileAsync('curl', [
-                '-s', '--connect-timeout', '3', '--max-time', '5',
-                '-x', 'http://127.0.0.1:3128',
-                '-o', '/dev/null', '-w', '%{http_code}',
-                `https://${REACHABILITY_HOST}`
-              ], { timeout: 8000 });
-              if (healCode.trim() !== '200') throw new Error('not functional');
+              if (!(await probeProxyFunctional())) throw new Error('not functional');
               proxyFunctional = true;
               log('network: proxydetox auto-healed — port 3128 listening and functional', 'INFO');
               // Force immediate semantic re-probe and LLM proxy restart on next tick
@@ -3421,7 +3427,19 @@ async function pollNetworkStatus() {
   const toClass = classifyNetClass(netState.location);
   if (fromClass && toClass && fromClass !== toClass) {
     nudgeProxyEgress(`host location ${previousLocation} -> ${netState.location}`);
+    // proxydetox does not recover from a class change on its own; the next
+    // poll restarts it once if it still does not forward (rule 3b).
+    netState.class_change_at = Date.now();
+    netState.class_change_heal_due = true;
   }
+
+  // The corporate proxy's login. Cheap (klist -s, no network), so every poll;
+  // shown only on CN / VPN (networkBadge K:NO).
+  const kerberosTicket = await probeKerberosTicket();
+  if (netState.kerberos_ticket !== kerberosTicket && (netState.location === 'corporate' || netState.location === 'vpn')) {
+    log(`network: Kerberos ticket ${kerberosTicket === true ? 'present' : kerberosTicket === false ? 'MISSING — the corporate proxy will refuse tunnels (renew: kinit or the Kerberos SSO menu)' : 'unknown'}`, kerberosTicket === false ? 'WARN' : 'INFO');
+  }
+  netState.kerberos_ticket = kerberosTicket;
 
    log(`network: location=${netState.location} (vpnCli=${vpnConnected}, pac=${pacResolved}, physCN=${onPhysicalCN}, px=${effectivePortListening}, envSet=${proxyEnvSet})`, 'DEBUG');
 
@@ -3461,10 +3479,8 @@ async function pollNetworkStatus() {
    // re-probe here — a second single-shot probe (previously CONNECT to
    // api.github.com:443) would OVERWRITE the debounced value with a raw,
    // un-debounced result, re-introducing the exact P:ON/OFF/ON oscillation
-   // the debounce exists to prevent. This is especially harmful on the CN
-   // corporate network where api.github.com is intermittently throttled by
-   // the GFW, producing frequent transient misses even when the proxy is
-   // perfectly healthy. netState.proxy_functional is left as set above.
+   // the debounce exists to prevent. netState.proxy_functional is left as
+   // set above.
 
   // 6. Can we reach the internet?
   // Strategy: on corporate/vpn, try via proxy; on open, try direct.
