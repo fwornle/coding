@@ -38,7 +38,7 @@ Coordinator-centric health architecture (Phase 33). One process — the **health
   "lsl_by_project": { "coding": "healthy", "rapid-automations": "healthy" },
   "processes": [],
   "databases": { "status": "healthy", "levelDB": {}, "qdrant": {}, "leveldb_lock_check": "passed", "qdrant_availability": "passed", "graph_integrity": "passed" },
-  "network": { "internet_reachable": true, "location": "vpn", "vpn_cli": true, "utun_detected": true, "dns_internal_ok": true },
+  "network": { "location": "vpn", "proxy_functional": true, "kerberos_ticket": true, "proxy_heal_cause": "healthy", "internet_reachable": true },
   "proxy": { "state": "on", "user_enabled": true, "connect_ok": true },
   "files": [],
   "generated_at": "..."
@@ -51,7 +51,7 @@ Coordinator-centric health architecture (Phase 33). One process — the **health
 - LSL entries are marked `status=stopped` automatically after **>15 s** without a fresh `lsl_heartbeat` from their reporter.
 - ETM service status is **derived** from `lsl_heartbeats` — there is no `service_status` signal kind for ETM. Other services are probed directly by the coordinator.
 - Database sub-checks (`leveldb_lock_check`, `qdrant_availability`, `graph_integrity`) are probed on every coordinator tick and mapped to `passed` / `failed`. The dashboard's `toUiStatus()` function maps these to UI-friendly states.
-- Network environment (`network.location`: `vpn` / `corporate` / `home`) is detected every tick via a 3-signal approach: (1) Cisco VPN CLI — queries `vpn status` for tunnel state, (2) utun interface detection — checks for active `utun*` interfaces via `ifconfig`, (3) BMW internal DNS + latency — resolves an internal hostname and measures round-trip. Network location is fully decoupled from proxy state.
+- Network environment (`network.location`: `vpn` / `corporate` / `open`) is probed every 15 s (5 s while the corporate path is broken), at once on a macOS network-change event and after sleep: (1) Cisco VPN CLI `vpn state`, (2) the PAC host resolves via `dig`, (3) on-site latency to it (<100 ms → `corporate`). Network location is fully decoupled from proxy state. The same block carries the proxy and Kerberos facts and the last heal verdict — see [Connectivity & Recovery](../architecture/connectivity.md).
 - Process checks (`stale_pids`) actively probe for orphaned consolidation heartbeat files; placeholder rules without implementations (`process_uptime`, `high_cpu_usage`, `memory_usage`, `disk_usage`) are disabled.
 - `generated_at` is updated on every state refresh; consumers use it for staleness detection (`>180 s` is a `[🏥⏰]` stale badge). Knowledge pipeline staleness uses graduated fading (matching the session activity lifecycle icons) rather than red for stalled state; red is reserved exclusively for `obs_api` unreachable.
 

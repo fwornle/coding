@@ -3400,10 +3400,10 @@ async function pollNetworkStatus() {
     netState.proxy_enabled_by_user = proxyEnabledByUser;  // the persistent toggle
 
   // ── N: Network location (independent of P) ─────────────────────────────
-  // Strategy: 3 independent signals, evaluated in priority order.
+  // Strategy: 3 probes (no utun — not a signal any more).
   //   1. Cisco Secure Client VPN CLI — definitive "vpn" signal
-  //   2. BMW PAC DNS resolution + latency — distinguishes corporate vs open
-  //   3. utun interface presence — fallback VPN indicator
+  //   2. BMW PAC DNS resolution — corporate DNS reachable (VPN or on site)
+  //   3. TCP latency to the PAC host — < 100 ms on site ("corporate"), else "vpn"
 
   // Signal 1: Cisco VPN state (most reliable). Signal 2: the PAC host resolves
   // (corporate DNS; dig, not Node's cached resolver). Signal 3, only when PAC

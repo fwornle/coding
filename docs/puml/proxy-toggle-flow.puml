@@ -1,0 +1,37 @@
+@startuml proxy-toggle-flow
+!include _standard-style.puml
+skinparam defaultFontSize 13
+skinparam shadowing false
+
+title px — toggles your shell's proxy, never stops proxydetox
+
+actor User
+participant "px\n(<U+007E>/proxy.sh)" as PX
+participant "<U+007E>/.bash_profile\nhttp_proxy= line" as BP
+participant "launchd\nproxydetox :3128" as LD
+participant "health\ncoordinator" as HC
+participant "status line\n(tmux)" as SL
+
+User -> PX: px
+alt shell has http_proxy set → OFF
+  PX -> BP: comment out http_proxy= (intent: off)
+  PX -> PX: unset proxy vars in this shell
+  note right of LD
+    proxydetox stays loaded: agent sessions
+    are pinned to :3128, and it goes DIRECT
+    off the corporate network by itself
+  end note
+else not set → ON
+  PX -> LD: launchctl load (if not running)
+  opt :3128 does not answer
+    PX -> LD: unload + load (stale socket after sleep)
+  end
+  PX -> BP: uncomment http_proxy= (intent: on)
+  PX -> PX: source <U+007E>/.bash_profile
+end
+PX -> HC: POST /health/refresh (re-probe now)
+PX -> SL: delete status-line caches
+HC -> HC: proxy_enabled_by_user = intent
+SL -> HC: next render (≤ 5 s)
+SL --> User: P:ON (working + intent on)\nP:AUTO (working + intent off)\nP:OFF (down / no tunnel, either way)
+@enduml

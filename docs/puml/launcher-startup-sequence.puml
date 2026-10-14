@@ -1,5 +1,7 @@
 @startuml launcher-startup-sequence
 !include _standard-style.puml
+skinparam defaultFontSize 13
+skinparam shadowing false
 
 title Coding Launcher Startup Sequence
 
@@ -7,67 +9,65 @@ actor User as user
 participant "bin/coding" as launcher
 participant "launch-agent-\ncommon.sh" as common
 participant "detect-\nnetwork.sh" as network
-participant "agent config\n(opencode.sh\nclaude.sh\ncopilot.sh)" as agent
-participant "Docker\nServices" as docker
+participant "health\ncoordinator :3034" as coord
+participant "agent config\n(config/agents/*.sh)" as agent
+participant "LLM proxy\n:12435" as llm
 participant "tmux-session-\nwrapper.sh" as tmux
 
 user -> launcher: coding --opencode
 activate launcher
-
-launcher -> launcher: Parse args\nFORCE_AGENT=opencode
-launcher -> launcher: Validate config exists\nconfig/agents/opencode.sh
 launcher -> common: launch_agent()
 activate common
 
-== Environment Setup ==
-common -> common: _load_env_files()\n.env, .env.ports
+== Environment ==
+common -> common: resolve project · load .env files · resolve features
 
-== Network Detection ==
-common -> network: detect_network_and_configure_proxy()
+== Network (detect_network_and_configure_proxy) ==
+common -> network: detect_corporate_network()
 activate network
-network -> network: detect_corporate_network()\ncurl cc-github.bmwgroup.net
-alt Inside VPN
-  network -> network: INSIDE_CN=true, PROXY_REQUIRED=true
-  network -> network: configure_proxy_if_needed()\nVerify/set HTTP_PROXY
-else Outside VPN
-  network -> network: INSIDE_CN=false
-  network -> network: Clear proxy env vars
+network -> network: dig PAC host / cc-github\n(DNS — needs no proxy)
+opt neither resolves
+  network -> coord: GET /health/state → network.location
 end
-network -> network: test_proxy_connectivity()\nVerify API access
-network --> common: INSIDE_CN, PROXY_WORKING
+network -> network: INSIDE_CN, PROXY_REQUIRED
+network -> network: configure_proxy_if_needed()
+alt :3128 answers (ensure_proxydetox_up)
+  network -> network: pin HTTP(S)_PROXY=127.0.0.1:3128\nNO_PROXY=localhost,…,.bmwgroup.net\n(on every network)
+else :3128 broken
+  network -> coord: network.proxy_heal_cause?
+  alt restarting / network-change / no-ticket
+    network -> network: defer to the coordinator\n(wait ≤ 20 s for a restart in progress)
+  else daemon, or no answer
+    network -> network: one local heal attempt
+  end
+  network -> network: still dead → leave the session direct
+end
+network -> network: test_proxy_connectivity() → PROXY_WORKING
+network --> common
 deactivate network
 
-== Docker Services ==
-common -> docker: docker compose up -d
-docker --> common: Containers healthy
+== Services (enabled features only) ==
+common -> common: start services · verify monitoring\ninject knowledge context
 
-== Monitoring ==
-common -> common: _verify_monitoring()\nLSL, health monitors
-
-== Agent Configuration ==
-common -> agent: agent_check_requirements()
-agent --> common: ✅ CLI available
-
-common -> agent: agent_pre_launch()
+== Agent ==
+common -> agent: check requirements · agent_pre_launch()
 activate agent
-alt OpenCode + VPN
-  agent -> agent: OPENCODE_CONFIG_CONTENT =\n{model: "github-copilot-enterprise/..."}
-else OpenCode + Public
-  agent -> agent: OPENCODE_CONFIG_CONTENT =\n{model: "claude-opus-4-6"}
-end
-agent -> network: validate_agent_connectivity()
-network --> agent: ✅ API reachable
+agent -> network: validate_agent_connectivity()\n(warning only)
 agent --> common
 deactivate agent
+common -> common: agent_common_init()\nLSL, hooks, status line
 
-== Common Init ==
-common -> common: agent_common_init()\nLSL, hooks, gitignore,\nstatus line
+== Route through the LLM proxy (configure_proxy_routing) ==
+common -> llm: GET /health (5 × 2 s)
+alt proxy answers
+  common -> common: wire the agent's seam\n(base URL / BYOK / provider config)
+else never answers
+  common --> user: stop, with the restart command
+end
 
 == Launch ==
 common -> tmux: tmux_session_wrapper()
-tmux -> tmux: Create tmux session\nAttach status bar
-tmux --> user: Agent running in tmux
+tmux --> user: agent running in tmux
 deactivate common
 deactivate launcher
-
 @enduml

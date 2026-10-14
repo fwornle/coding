@@ -69,8 +69,8 @@ from it — which is what makes the dashboard, the status line and the hooks agr
       process that is alive but wedged.
     - **Database sub-checks** — LevelDB lock, Qdrant availability, graph integrity — are probed
       every tick and reported individually rather than as one opaque "databases: ok".
-    - **Network location is detected independently of proxy state**, from three signals: the VPN
-      CLI, active `utun` interfaces, and internal DNS with a latency measurement. Conflating the
+    - **Network location is detected independently of proxy state**, from three probes: the VPN
+      CLI, the internal PAC host resolving, and on-site latency to it. Conflating the
       two is how "am I on the VPN?" and "is the proxy working?" became the same question.
     - **`generated_at` moves every tick**, so consumers can detect staleness rather than trusting
       a document that stopped updating.

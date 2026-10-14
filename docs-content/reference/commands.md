@@ -31,22 +31,22 @@ coding --help
 
 ### Network-Aware Agent Selection
 
-The launcher automatically detects your network environment and configures each agent accordingly:
+The launcher detects your network environment; every agent then reaches its model through the LLM proxy, whose egress follows the network:
 
 ![Network-Aware Agent Selection](../images/network-aware-agent-selection.png)
 
-| Agent | Inside VPN (proxy) | Outside VPN (direct) | Provider |
+| Agent | Inside VPN / CN | Outside VPN | Answered by |
 |---|---|---|---|
-| `--claude` | Works via proxy | Works direct | Anthropic (OAuth / Max) |
-| `--opencode` | GitHub Copilot Enterprise | Anthropic direct | Auto-selected |
-| `--copilot` | Works via proxy | Works direct | GitHub Copilot CLI |
+| `--claude` | LLM proxy → `:3128` → corporate proxy | LLM proxy, direct | Claude subscription (OAuth / Max) |
+| `--opencode` · `--pi` | LLM proxy → `:3128` → corporate proxy | LLM proxy, direct | GitHub Copilot |
+| `--copilot` | LLM proxy (BYOK) → `:3128` → corporate proxy | LLM proxy, direct | GitHub Copilot |
 
 **Auto-configuration:**
 
-- **Inside VPN**: proxy auto-detected (proxydetox on 127.0.0.1:3128), all APIs routed through proxy
-- **Outside VPN**: proxy env vars cleared, direct connections used
-- **OpenCode** switches model: `github-copilot-enterprise/claude-opus-4.6` (VPN) → `claude-opus-4-6` (public)
-- Each agent validates its API endpoint is reachable before launch
+- Every session is pinned to proxydetox on `127.0.0.1:3128`, which forwards to the corporate proxy on VPN / CN and goes direct elsewhere
+- Each agent is wired into the LLM proxy (`:12435`); the launch stops if the proxy does not answer
+- Each agent checks that its API endpoint is reachable before launch (warning only)
+- See [Network Configuration](../guides/network-configuration.md) and [Connectivity & Recovery](../architecture/connectivity.md)
 
 ### `--force` Flag
 

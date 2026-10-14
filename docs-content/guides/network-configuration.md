@@ -13,15 +13,15 @@ network.
 
     ## Three environments, one detector
 
-    | Where you are | Proxy |
+    | Where you are | Path to the model |
     |---------------|-------|
-    | On the corporate network | Required — proxydetox on `127.0.0.1:3128` |
-    | On VPN | Required — same proxy |
-    | At home or anywhere public | None; direct |
+    | On the corporate network | LLM proxy → proxydetox `127.0.0.1:3128` → corporate proxy (Kerberos) |
+    | On VPN | the same |
+    | At home or anywhere public | LLM proxy → direct |
 
     The **health coordinator is the single authority** on which one you are in. It probes every
-    15 seconds; the launcher, the status line and the LLM proxy all read its answer rather than
-    detecting independently.
+    15 seconds and at once when macOS reports a network change; the launcher, the status line and
+    the LLM proxy all read its answer rather than detecting independently.
 
     ## Check where the system thinks you are
 
@@ -43,21 +43,24 @@ network.
     curl -s localhost:12435/health | jq '.egress, .networkMode'
     ```
 
-    A proxy pinned to a network you have since left produces exactly this. Restarting the proxy
-    *while on the network you are actually on* re-pins it.
+    `"degraded": true` means no proxy answered on the corporate network. The pin moves on its own
+    (every 30 s, and at once when the coordinator sees a network change); if it stays degraded,
+    the local proxy or the Kerberos ticket is the problem — `K:NO` in the status line says which.
 
 === "📖 Standard (~15 min)"
 
     ## How the network is detected
 
-    Three signals, in priority order, first match wins:
+    Three probes:
 
-    | Priority | Signal | Gives |
-    |----------|--------|-------|
-    | 1 | Cisco VPN CLI reports a connected tunnel | `vpn` |
-    | 2 | An active `utun*` interface with an address | `vpn` |
-    | 3 | Internal DNS resolves, plus a latency measurement | `corporate` under 100 ms, else `vpn` |
-    | — | DNS does not resolve at all | `open` |
+    | Signal | Gives |
+    |--------|-------|
+    | Cisco VPN CLI reports a connected tunnel | `vpn` |
+    | The internal PAC host resolves, and answers on :80 in under 100 ms | `corporate` (slower: `vpn`) |
+    | Nothing resolves | `open` |
+
+    Moving to `open` needs three readings in a row (unless macOS just reported a change), so a
+    short DNS blip does not flip anything.
 
     ![Network Detection Flow](../images/network-detection-flow.png)
 
@@ -76,9 +79,11 @@ network.
 
     ![Network-Aware Agent Selection](../images/network-aware-agent-selection.png)
 
-    Inside the corporate network the launcher auto-detects proxydetox and sets `HTTP_PROXY` and
-    `HTTPS_PROXY`. Outside, it actively **clears** those variables — a stale proxy setting
-    pointing at a proxy that is not there fails in a way that looks like an API outage.
+    Every session is pinned to proxydetox on `127.0.0.1:3128`, **on every network**: on VPN / CN
+    it forwards to the corporate proxy, off it it goes direct, so the pin stays correct across a
+    network change mid-session. The launcher makes sure `:3128` answers before pinning, and only
+    leaves the session direct if it cannot be brought up. Every agent's LLM calls go to the LLM
+    proxy, which keeps its own egress pin.
 
     ## The two network vocabularies
 
@@ -113,8 +118,9 @@ network.
     curl -s localhost:12435/health | jq '.networkMode'      # what the proxy believes
     ```
 
-    If those two disagree after mapping `vpn` to `corporate`, the proxy is holding a stale
-    reading; kickstarting it while on your current network re-pins it.
+    If those two disagree after mapping `vpn` to `corporate` for three ticks (~15 s), the
+    coordinator nudges the proxy and, if that does not settle it, restarts it. `network.proxy_heal_cause` and
+    `.logs/health-coordinator.log` say what it decided and why.
 
 === "📚 Deep Dive (full)"
 

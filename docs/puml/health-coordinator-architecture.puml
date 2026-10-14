@@ -55,14 +55,17 @@ note right of COORD
   every tick and mapped to
   passed/failed.
 
-  Network detection (3-signal,
-  decoupled from proxy):
+  Network detection (decoupled from proxy):
   1. Cisco VPN CLI → vpn
-  2. utun interface → vpn
-  3. BMW DNS + latency:
-     <30ms → corporate
-     ≥30ms → vpn
+  2. PAC host resolves (dig) +
+     TCP latency to it:
+     <100ms → corporate
+     ≥100ms → vpn
      no resolve → open
+  Open confirmed over 3 readings;
+  macOS change events re-probe at once.
+  No Kerberos ticket on vpn/corporate
+  → ask macOS for one.
 
   Proxy detection (user intent):
   ~/.bash_profile toggle (px alias)
@@ -113,7 +116,8 @@ note bottom of STATUSLINE
        is unreachable (broken)
 
   N: network = VPN CLI +
-     utun + DNS (never proxy)
+     PAC DNS + latency (never proxy)
+  K:NO = no Kerberos ticket on vpn/CN
   P: proxy = ~/.bash_profile
      toggle + CONNECT test
 end note

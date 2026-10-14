@@ -115,8 +115,8 @@ Two ASCII-only badges reflect the network environment detected by the coordinato
 
 | Display | Meaning | Action |
 |---------|---------|--------|
-| `N:VPN` | Connected via corporate VPN (Cisco CLI or utun interface detected) | Normal remote-work state |
-| `N:CN` | On the physical corporate network (BMW DNS resolves via `dig`, TCP latency <100 ms, no VPN interface) | Normal on-site state |
+| `N:VPN` | Corporate VPN: the Cisco client reports a connected tunnel, or the PAC host resolves but does not answer within 100 ms | Normal remote-work state |
+| `N:CN` | On the physical corporate network: the PAC host resolves and answers on :80 in under 100 ms, no VPN tunnel | Normal on-site state |
 | `N:OPEN` | Home / public network — no VPN, no corporate LAN | Expected off-VPN |
 | `N:??` | Network location unknown (coordinator just started or probe failed) | Transient — clears within 15s |
 
@@ -124,24 +124,25 @@ Two ASCII-only badges reflect the network environment detected by the coordinato
 |---------|---------|--------|
 | `P:ON` | Daemon running + functional AND user toggled `px` on | Normal on VPN/CN |
 | `P:AUTO` | Daemon running + functional, `px` toggle off — adaptive `--direct-fallback` mode; pinned sessions still routed | Normal off-CN state |
-| `P:OFF` | Daemon down or not functional | Problem on VPN/CN (bar turns yellow); investigate proxydetox |
+| `P:OFF` | Daemon down, or it listens but cannot open a tunnel (`CONNECT api.github.com:443`) | Problem on VPN/CN (bar turns yellow); the coordinator restarts it — see [Connectivity & Recovery](../architecture/connectivity.md#recovery) |
+| `… K:NO` | On VPN/CN without a Kerberos ticket (`klist -s` fails); the corporate proxy refuses every tunnel until there is one | The coordinator asks macOS for a ticket at once; wait ~15 s, or run `klist` |
 
 !!! note "P: is three-state since 2026-07-26"
     Since the always-on proxy redesign (2026-07-25), the proxydetox daemon stays loaded on :3128 regardless of the `px` toggle — agent sessions are pinned to it and its `--direct-fallback` adapts routing per request. A daemon-truth-only badge would therefore read `ON` nearly always. The badge now combines daemon truth with user intent (`proxy_enabled_by_user` from the coordinator): `ON` (daemon healthy + `px` on), `AUTO` (daemon healthy, `px` off), `OFF` (daemon down/not functional — the only broken state). The former `P:ERR` state remains removed.
 
 !!! note "Proxy toggle via `px`"
-    The `px` alias toggles proxydetox via `launchctl unload`/`launchctl load` (not `stop`/`start`, which was ineffective due to launchd socket activation). After toggling, `px` invalidates all status line caches and triggers an immediate coordinator re-probe via `POST /health/refresh`. The P: badge updates within **≤5 seconds** (one tmux refresh cycle). See [Network Configuration → Proxy Management](network-configuration.md#proxy-management) for details.
+    `px` toggles your *shell's* proxy variables and the persistent intent line in `~/.bash_profile` (`http_proxy=`), which is what makes `P:` read `ON` rather than `AUTO`. It never stops proxydetox: agent sessions are pinned to `:3128`, and stopping it broke `/login` and every egress inside running sessions. `px` on also loads proxydetox if it is not running. Either way it invalidates the status-line caches and asks the coordinator to re-probe (`POST /health/refresh`), so `P:` updates within one tmux refresh (≤5 s). See [Network Configuration → The `px` toggle](network-configuration.md#the-px-toggle).
 
-!!! note "VPN / network detection logic (3-signal approach)"
-    The coordinator determines `location` using three independent signals. **N never depends on proxy state.**
+!!! note "VPN / network detection logic"
+    The coordinator determines `location` from three probes (`lib/network/location-probe.mjs`). **N never depends on proxy state.**
 
-    **Signal 1 — Cisco VPN CLI:** runs `/opt/cisco/secureclient/bin/vpn state`. If the output contains "Connected" → `vpn`.
+    **Cisco VPN CLI:** `/opt/cisco/secureclient/bin/vpn state` reports "state: Connected" → `vpn`.
 
-    **Signal 2 — utun interface detection:** parses `ifconfig` for any `utun*` interface with an `inet` address. If found → `vpn`.
+    **PAC host DNS:** `dig +short muc.proxy-pac.bmwgroup.net` (a fresh subprocess, so always the current OS DNS servers; getaddrinfo as a fallback).
 
-    **Signal 3 — BMW internal DNS:** spawns `dig +short muc.proxy-pac.bmwgroup.net` (fresh subprocess — always uses current OS DNS servers, never stale). If resolution succeeds, measures TCP latency to the resolved address: latency <100 ms → `corporate` (on-site LAN); latency ≥100 ms → `vpn` (tunnelled). If resolution fails entirely → `open` (home / public network).
+    **On-site latency:** only when the PAC host resolved and there is no VPN tunnel — a TCP connect to it on :80 in under 100 ms → `corporate`; slower → `vpn`.
 
-    Signals are evaluated in order; the first match wins.
+    Nothing resolves → `open`. Moving *to* VPN/CN is immediate; moving *to* `open` needs three readings in a row unless macOS reported a network change in the last minute, so a short DNS blip does not flip the badge. (`utun` interfaces are no longer a signal.)
 
 ### Routing & Execution Indicators
 

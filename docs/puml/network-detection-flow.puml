@@ -1,47 +1,41 @@
 @startuml network-detection-flow
 !include _standard-style.puml
+skinparam defaultFontSize 14
+skinparam shadowing false
+title Where am I? — the health coordinator's network probe
 
-title Network Location Detection (Unified)
-
-participant "Coordinator\n(health-coordinator.js)" as coord
-participant "dig CLI\n(fresh DNS)" as dig
-participant "VPN CLI\n(/opt/cisco)" as vpn
-participant "TCP probe\n(PAC host)" as tcp
-
-== Every 15s tick ==
-
-coord -> dig: dig +short muc.proxy-pac.bmwgroup.net\n(fresh process = current OS DNS)
-alt DNS resolves (e.g. 160.50.180.101)
-  dig --> coord: IP address
-  coord -> vpn: /opt/cisco/secureclient/bin/vpn status
-  alt output contains "Connected"
-    vpn --> coord: Connected
-    coord -> coord: location = **vpn**
-  else Disconnected (office LAN, no VPN)
-    vpn --> coord: Disconnected
-    coord -> tcp: TCP connect to PAC IP, port 80
-    tcp --> coord: latency (e.g. 13ms)
-    alt latency < 100ms
-      coord -> coord: location = **corporate**\n(on-site LAN)
-    else latency ≥ 100ms
-      coord -> coord: location = **vpn**\n(tunnelled, high latency)
-    end
-  end
-else DNS fails (NXDOMAIN / timeout)
-  dig --> coord: (empty)
-  coord -> coord: location = **open**\n(home / public network)
-end
-
-note over coord
-  **Key fix**: Uses `dig` (spawns fresh process)
-  instead of Node.js `dns.Resolver` which
-  caches DNS servers from process startup.
-
-  On office LAN without VPN:
-  • VPN CLI = "Disconnected"
-  • PAC DNS resolves (corporate DNS)
-  • TCP latency < 100ms
-  → Correctly detects **corporate**
-end note
-
+start
+:Probe now — every 15 s (5 s while the corporate path is broken),
+on a macOS network-change event, after sleep, or POST /health/refresh;
+if (Cisco VPN CLI: state Connected?) then (yes)
+  :reading = **vpn**;
+else (no)
+  if (dig muc.proxy-pac… resolves?\n(fresh subprocess, never a cached resolver)) then (yes)
+    if (TCP :80 to the PAC host < 100 ms?) then (yes)
+      :reading = **corporate**\n(on site);
+    else (no)
+      :reading = **vpn**;
+    endif
+  else (no)
+    :reading = **open**;
+  endif
+endif
+if (reading is **open**, previous was vpn / corporate,\nand no macOS change in the last 60 s?) then (yes)
+  :hold the previous location until **open**
+  is read 3 times in a row (hysteresis);
+else (no)
+  :location = reading;
+endif
+if (class changed: open ↔ vpn / corporate?) then (yes)
+  :nudge the LLM proxy to re-decide egress now;
+  :one proxydetox restart is due if :3128 does not forward;
+else (no)
+endif
+:probe :3128 — port listening, then a bare CONNECT api.github.com:443;
+:klist -s — Kerberos ticket on vpn / corporate?
+missing → ask macOS Kerberos SSO for one (≤ every 2 min);
+:decide whether to heal proxydetox (cause logged + published);
+:publish /health/state → network
+(status line: N: · P: · K:NO);
+stop
 @enduml

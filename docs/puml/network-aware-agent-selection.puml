@@ -1,93 +1,50 @@
 @startuml network-aware-agent-selection
 !include _standard-style.puml
+top to bottom direction
+skinparam defaultFontSize 14
+skinparam componentFontSize 14
+skinparam arrowFontSize 12
+skinparam shadowing false
+skinparam componentStyle rectangle
+hide stereotype
+title Same agents on every network — only the egress changes
 
-title Network-Aware Agent Selection & Connectivity Matrix
-
-rectangle "Network Detection" as detect #F0FFF0 {
-  component [Cisco VPN CLI\n/opt/cisco/secureclient] <<infra>> as vpncli
-  component [utun Interface\nCheck] <<infra>> as utun
-  component [BMW DNS\nmuc.proxy-pac.bmwgroup.net\n+ TCP latency] <<infra>> as dns
-  note bottom of vpncli
-    Priority 1: VPN CLI state
-    Priority 2: utun interface
-    Priority 3: DNS + latency
-    N decoupled from P
-  end note
+package "coding launcher (once, at start)" {
+  component "detect: dig PAC host\n(else ask the coordinator)" as detect <<cli>>
+  component "pin the session to :3128\nHTTPS_PROXY · NO_PROXY=localhost,…,.bmwgroup.net" as pin <<cli>>
+  component "wire the agent into the LLM proxy\n(health-gated: no proxy → no launch)" as wire <<cli>>
 }
 
-rectangle "Proxy Detection" as pdetect #FFF0F0 {
-  component [~/.bash_profile\nhttp_proxy toggle\n(px alias)] <<infra>> as pxtoggle
-  component [CONNECT test\nvia 127.0.0.1:3128] <<infra>> as pxtest
-  note bottom of pxtoggle
-    P:ON   = daemon up + px on
-    P:AUTO = daemon up, px off
-             (adaptive direct-fallback)
-    P:OFF  = daemon down/broken
-  end note
+package "Agents" {
+  component "claude\nANTHROPIC_BASE_URL" as claude <<agent>>
+  component "copilot\nBYOK provider" as copilot <<agent>>
+  component "opencode · pi\nprovider config" as ocpi <<agent>>
 }
 
-rectangle "Network Environment" as env #F0F8FF {
-  rectangle "Inside VPN / Corporate Network" as vpn #E8F5E8 {
-    component [Proxydetox\n127.0.0.1:3128] <<infra>> as proxy
-    note bottom of proxy
-      Required for ALL
-      external API calls
-    end note
-  }
+component "LLM proxy :12435\nroute → account · fallback · offload" as llm <<core>>
 
-  rectangle "Outside VPN / Public Network" as pub #FFF9E6 {
-    component [Direct Internet\nAccess] <<infra>> as direct
-    note bottom of direct
-      No proxy needed
-      Proxy vars cleared
-    end note
-  }
+package "Egress, decided by the network" {
+  component "home / public\ndirect" as home <<external>>
+  component "VPN / corporate\n:3128 proxydetox → corporate proxy\n(Kerberos ticket)" as corp <<infra>>
+  component "VPN / corporate, small calls\non-prem Qwen cluster, direct" as qwen <<external>>
 }
 
-rectangle "Agent Selection" as sel #FFF0F5 {
-  component [coding --claude\n\nAuth: OAuth (Max sub)\nAPI: api.anthropic.com] <<agent>> as claude
-  component [coding --opencode\n\nAuto-selects provider\nbased on network] <<agent>> as opencode
-  component [coding --copilot\n\nAuth: VS Code token\nAPI: api.github.com] <<agent>> as copilot
-}
+component "Claude subscription\napi.anthropic.com" as anth <<api>>
+component "GitHub Copilot\ncopilot-api.<tenant>.ghe.com" as cop <<api>>
 
-cloud "External APIs" as apis {
-  component [Anthropic API\napi.anthropic.com] <<api>> as anthropic
-  component [GitHub API\napi.github.com] <<api>> as github
-  component [GitHub Copilot\napi.githubcopilot.com] <<api>> as ghcopilot
-}
-
-' Detection flows
-vpncli --> vpn : "Connected"
-vpncli --> pub : "Disconnected"
-utun --> vpn : utun+inet
-dns --> vpn : resolves\n<30ms=CN\n≥30ms=VPN
-dns --> pub : no resolve
-
-' Proxy detection flows
-pxtoggle --> proxy : enabled
-pxtest --> proxy : CONNECT ok
-
-' VPN connections (via proxy)
-proxy SYNC_LINE anthropic : via proxy
-proxy SYNC_LINE github : via proxy
-proxy SYNC_LINE ghcopilot : via proxy
-
-' Public connections (direct)
-direct DATA_LINE anthropic : direct
-direct DATA_LINE github : direct
-direct DATA_LINE ghcopilot : direct
-
-' Agent to API mappings
-claude -[#4A90E2,thickness=2]-> anthropic : always
-opencode -[#43A047,thickness=2]-> ghcopilot : VPN (Copilot)
-opencode -[#FF9800,thickness=2,dashed]-> anthropic : Public (Anthropic)
-copilot -[#9C27B0,thickness=2]-> github : always
-
-legend right
-  |= Scenario |= Claude |= OpenCode |= Copilot |
-  | VPN + Proxy | via proxy | GH Copilot\nvia proxy | via proxy |
-  | VPN no Proxy | blocked | blocked | blocked |
-  | Outside VPN | direct | Anthropic\ndirect | direct |
-end legend
-
+detect CONTROL_LINE pin
+pin CONTROL_LINE wire
+wire CONTROL_LINE claude
+wire CONTROL_LINE copilot
+wire CONTROL_LINE ocpi
+claude SYNC_LINE llm : /v1/messages\n(passthrough)
+copilot SYNC_LINE llm : /v1/copilot
+ocpi SYNC_LINE llm : /v1/opencode · /v1
+llm SYNC_LINE home
+llm SYNC_LINE corp
+llm SYNC_LINE qwen
+home SYNC_LINE anth
+home SYNC_LINE cop
+corp SYNC_LINE anth
+corp SYNC_LINE cop
 @enduml

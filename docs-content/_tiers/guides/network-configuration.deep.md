@@ -1,4 +1,6 @@
-How the Coding launcher handles corporate VPN, proxy detection, and agent-specific API routing.
+How the Coding launcher, the health coordinator and the LLM proxy handle the corporate VPN,
+the local proxy and each agent's API traffic. [Connectivity & Recovery](../architecture/connectivity.md)
+has the full path map and every recovery mechanism in one place.
 
 ---
 
@@ -6,11 +8,21 @@ How the Coding launcher handles corporate VPN, proxy detection, and agent-specif
 
 The Coding system operates in three network environments:
 
-- **VPN** — connected to corporate network via VPN tunnel; proxy (proxydetox on `127.0.0.1:3128`) is running and required for external API calls
-- **Corporate Network (CN)** — physically on the corporate network (e.g. office ethernet/Wi-Fi); proxy is running and required for external API calls
-- **Home / Public Network** — direct internet access, no proxy needed
+- **VPN** — connected to the corporate network through the Cisco VPN; external APIs need the
+  corporate proxy.
+- **Corporate Network (CN)** — physically on the corporate network (office LAN / Wi-Fi);
+  external APIs need the corporate proxy.
+- **Home / public network** — direct internet access.
 
-The **health coordinator** is the single source of truth for network state. It probes every **15 seconds** and exposes the result via `GET /health/state` → `network`. The launcher, status line, and LLM proxy all consume this endpoint — there is no independent detection elsewhere.
+Everything reaches the corporate proxy through **proxydetox** on `127.0.0.1:3128`, which logs in
+with your **Kerberos ticket**. It runs on every network: off the corporate network it goes
+DIRECT (`--direct-fallback`), so a session pinned to it is correct everywhere, including
+mid-session network changes.
+
+The **health coordinator** (`:3034`) is the single authority on where you are. It probes every
+15 s (5 s while the corporate path is broken), at once on a macOS network-change event and after
+sleep, and publishes the result at `GET /health/state` → `network`. The status line, the LLM
+proxy and the launcher read it rather than detecting independently.
 
 ![Network-Aware Agent Selection](../images/network-aware-agent-selection.png)
 
@@ -18,17 +30,19 @@ The **health coordinator** is the single source of truth for network state. It p
 
 ## Connectivity Matrix
 
-| Agent | Auth Method | Inside VPN (proxy) | Outside VPN (direct) |
-|---|---|---|---|
-| `coding --claude` | OAuth (Max subscription) | Works via proxy | Works direct |
-| `coding --opencode` | Auto-selected | GH Copilot Enterprise via proxy | Anthropic direct |
-| `coding --copilot` | VS Code Copilot token | Works via proxy | Works direct |
+Every agent's LLM traffic goes to the LLM proxy on `:12435`; the proxy decides the route and the
+egress. Which network you are on changes the *egress*, not the agent's configuration.
 
-!!! info "OpenCode Model Switching"
-    OpenCode automatically switches its LLM provider based on network location:
+| Agent | Into the LLM proxy | Answered by | At home | On VPN / CN |
+|---|---|---|---|---|
+| `coding --claude` | `ANTHROPIC_BASE_URL`, `/v1/messages` passthrough | Claude subscription (Max OAuth) | direct | via `:3128` → corporate proxy |
+| `coding --copilot` | BYOK, `/v1/copilot` | GitHub Copilot | direct | via `:3128` → corporate proxy |
+| `coding --opencode` | provider config, `/v1/opencode` | GitHub Copilot | direct | via `:3128` → corporate proxy |
+| `coding --pi` | provider config, `/v1` | GitHub Copilot | direct | via `:3128` → corporate proxy |
 
-    - **VPN**: `github-copilot-enterprise/claude-opus-4.6` (free via corporate subscription)
-    - **Public**: `claude-opus-4-6` (personal Anthropic API key or subscription)
+Small background calls (and small foreground ones) are offloaded to the on-prem Qwen cluster on
+VPN / CN; a private address always bypasses the proxy. The agent's own non-LLM traffic (sign-in,
+GitHub API) uses the session's `HTTPS_PROXY=http://127.0.0.1:3128`.
 
 ---
 
@@ -36,31 +50,47 @@ The **health coordinator** is the single source of truth for network state. It p
 
 ### Unified Detection (Health Coordinator)
 
-The coordinator (`scripts/health-coordinator.js`) is the **single authority** for network location. It probes every 15 seconds using three independent signals — evaluated in order, first match wins:
+The coordinator (`scripts/health-coordinator.js`, probes in `lib/network/location-probe.mjs`)
+decides `location` from three probes:
 
-| Priority | Signal | Method | Result |
-|----------|--------|--------|--------|
-| 1 | **Cisco VPN CLI** | `/opt/cisco/secureclient/bin/vpn state` → output contains "Connected" | `vpn` |
-| 2 | **utun interface** | `ifconfig` → any `utun*` with an `inet` address | `vpn` |
-| 3 | **BMW internal DNS** | `dig +short muc.proxy-pac.bmwgroup.net` (spawns a fresh process — never stale) + TCP latency to resolved IP | `corporate` (<100 ms) or `vpn` (≥100 ms) |
-| — | None match | DNS resolution fails entirely | `open` |
+| Probe | Method | Result |
+|-------|--------|--------|
+| **Cisco VPN CLI** | `/opt/cisco/secureclient/bin/vpn state` reports `state: Connected` | `vpn` |
+| **PAC host DNS** | `dig +short muc.proxy-pac.bmwgroup.net` (fresh subprocess; getaddrinfo fallback) | resolves → corporate or VPN, see below |
+| **On-site latency** | only if the PAC host resolved and there is no VPN tunnel: TCP connect to it on :80 | < 100 ms → `corporate`, else `vpn` |
+| — | nothing resolves | `open` |
+
+**Hysteresis** (`lib/network/location-hysteresis.mjs`): moving *to* VPN / CN is immediate; moving
+*to* `open` needs three consecutive readings (~45 s), unless macOS reported a network change in
+the last 60 s. A short DNS blip therefore does not flip the badge or the proxy's egress.
+
+**When it looks again** — besides the 15 s timer:
+
+- a macOS network-change event (`notifyutil`, `lib/network/network-change-watcher.mjs`);
+- waking from sleep;
+- `POST /health/refresh` (what `px` sends).
+
+On a change between `open` and VPN / CN, the coordinator **nudges the LLM proxy** to re-decide
+its egress at once (`POST :12435/api/egress/reevaluate`). If `:3128` then still does not
+forward, it **restarts proxydetox once**, unless the Kerberos ticket is missing.
 
 !!! warning "Why `dig` instead of Node.js `dns.Resolver`"
     Node.js caches the system DNS servers at process start. If the coordinator starts on a hotspot (public DNS like `8.8.8.8`) and the user later connects to the office LAN (corporate DNS `160.50.x.x`), `dns.getServers()` returns the **stale startup servers** — BMW internal hostnames can't resolve, and the coordinator reports `open` indefinitely. Spawning `dig` as a subprocess reads the current OS DNS config on every probe, eliminating this class of bugs.
 
+`utun` interfaces are no longer a signal; older versions of this page listed them.
+
 ### Launcher Bootstrap (`detect-network.sh`)
 
-The startup script runs a **one-time** DNS-based check before the coordinator is available:
+The launcher runs a **one-time** DNS-based check, so it works before the coordinator answers:
 
 ```bash
 # DNS-based — works without proxy (no chicken-and-egg)
-dig +short muc.proxy-pac.bmwgroup.net +timeout=2
-dig +short cc-github.bmwgroup.net +timeout=2
+dig +short +timeout=2 +tries=1 muc.proxy-pac.bmwgroup.net
+dig +short +timeout=2 +tries=1 cc-github.bmwgroup.net
 ```
 
-If either resolves to a corporate IP → `INSIDE_CN=true`. This replaced the previous `curl https://cc-github.bmwgroup.net` approach, which required the proxy to already be configured (circular dependency on CN).
-
-Once the coordinator is running, the launcher defers to `GET http://localhost:3034/health/state` for all subsequent network state.
+If either resolves to an IP → `INSIDE_CN=true`; otherwise it asks the coordinator. Then it pins
+the session's proxy environment (next section) and checks that the agent's API is reachable.
 
 ![Network Detection Flow](../images/network-detection-flow.png)
 
@@ -72,40 +102,74 @@ Once the coordinator is running, the launcher defers to `GET http://localhost:30
 
 ## Proxy Management
 
-### The `px` Toggle
+### The session's proxy environment
 
-The `px` shell alias is the **only** way to toggle the proxy. It performs three actions atomically:
-
-1. **Toggles the proxydetox daemon** via `launchctl unload`/`launchctl load` of the plist — this truly stops/starts the daemon and closes/opens port 3128 (previous implementations used `launchctl stop` which was ineffective due to launchd socket activation respawning the process immediately)
-2. **Invalidates status line caches** — deletes all per-pane cache files so the next tmux render reflects the new state
-3. **Notifies the health coordinator** — `POST /health/refresh` triggers an immediate network re-probe (bypasses the 15s poll interval)
+Every agent session is pinned to proxydetox, on every network:
 
 ```bash
-px          # Toggle: if proxy running → stop; if stopped → start
+export HTTP_PROXY="http://127.0.0.1:3128"  HTTPS_PROXY="http://127.0.0.1:3128"
+export http_proxy="http://127.0.0.1:3128"  https_proxy="http://127.0.0.1:3128"
+export NO_PROXY="localhost,127.0.0.1,::1,.bmwgroup.net"
 ```
 
-### Update Propagation After `px`
+Before pinning, `ensure_proxydetox_up` makes sure `:3128` actually answers. If it does not, it
+asks the coordinator why (`network.proxy_heal_cause`) and defers when the coordinator is already
+on it — a restart in progress, a network still changing, a missing Kerberos ticket — rather than
+restarting proxydetox on top of it. Only if proxydetox cannot be brought up is the session left
+direct: correct off-CN, and on CN a loud warning, since nothing pinnable would work either.
+
+### The `px` toggle
+
+`px` (`source ~/proxy.sh`) toggles **your shell's** proxy setting and records the intent in
+`~/.bash_profile` (an uncommented `http_proxy=` line). It does **not** stop proxydetox any
+more: agent sessions are pinned to `:3128`, and unloading it broke `/login` and every egress in
+running sessions.
+
+```bash
+px          # toggle: on → loads proxydetox if needed, sets the shell env; off → clears the shell env
+px s        # status: intent, port 3128, shell env
+```
+
+The intent is what `P:` shows: `P:ON` (proxydetox working, `px` on) or `P:AUTO` (working, `px`
+off). `P:OFF` means proxydetox is down or cannot open a tunnel, whatever `px` says.
 
 ![Proxy Toggle Flow](../images/proxy-toggle-flow.png)
 
-The status line reflects the new P: state within **≤5 seconds** (one tmux refresh cycle):
+The status line reflects a toggle within **≤5 seconds**:
 
 | Step | Latency | Mechanism |
 |------|---------|-----------|
-| proxydetox stop/start | instant | `launchctl unload`/`load` |
+| Shell env + `~/.bash_profile` intent | instant | `px` |
+| proxydetox loaded (`px` on only) | instant | `launchctl load` if not running |
 | Cache invalidation | instant | `rm .logs/combined-status-line-cache-*.txt` |
-| Coordinator re-probe | instant | `POST /health/refresh` resets rate-limiter + forces tick |
+| Coordinator re-probe | instant | `POST /health/refresh` |
 | tmux renders | ≤5s | `status-interval 5` picks up fresh state |
 
-### LLM Proxy Dynamic Routing
+### LLM Proxy Egress
 
-The LLM proxy (`rapid-llm-proxy`, port 12435) dynamically adapts to proxy availability without restart:
+The LLM proxy (`rapid-llm-proxy`, `:12435`) keeps an **egress pin** and moves it at runtime, no
+restart needed (`proxy-bridge/egress-decision.mjs`):
 
-- On each outbound request, `smartFetch()` TCP-probes port 3128 (with 5s cache)
-- If proxydetox is **up** → routes via `undici.ProxyAgent` (corporate proxy)
-- If proxydetox is **down** → routes via native `fetch` (direct internet)
+| Coordinator says | Decision |
+|---|---|
+| `open` | direct |
+| `vpn` / `corporate` | the first candidate proxy that passes `curl --proxy <p> https://api.github.com` (4 s): `LLM_CORPORATE_PROXY_URL`, `HTTPS_PROXY`, `http://127.0.0.1:3128`, the last one that worked; none → direct, logged as **egress DEGRADED** |
+| no answer | keep the current pin |
 
-This means `px off` on a hotspot (direct internet) works immediately — the LLM proxy stops trying to route through the dead proxy within 5 seconds.
+It decides again every 30 s, at once on the coordinator's nudge, and when a request through the
+pin fails to connect (that request is retried once if the pin moved). A private address — the
+Qwen cluster — always goes direct. `curl -s localhost:12435/health | jq .egress` shows the pin.
+
+### Kerberos
+
+proxydetox logs in to the corporate proxy with your Kerberos ticket (Negotiate). Without one,
+every tunnel is refused: a 502 for every call, `K:NO` in the status line. The ticket lasts about
+10 hours, so one that expired overnight off the network is the common case on joining VPN.
+
+On VPN / CN with no ticket (`klist -s` fails), the coordinator asks the macOS Kerberos SSO
+extension for one (`app-sso -a <realm> -R -q`, at most every 2 minutes) instead of restarting
+proxydetox, which cannot help. Measured: ~12 s, against 2 min 20 s for macOS on its own. With
+no password in the keychain, the extension shows its own login dialog.
 
 ### Proxy Auto-Heal
 
@@ -158,45 +222,19 @@ A restart takes 3–8 s to come back and a probe cycle to prove anything, so a s
 
 Both modules are pure (every input an argument; no env, no I/O, no clock) and live outside `health-coordinator.js`, which binds ports on import and therefore cannot be imported by a test. Covered by `tests/network/kickstart-gate.test.mjs`, which replays the 2026-08-31 cascade, and `tests/network/probe-result-semantics.test.mjs`.
 
-### Inside VPN / Corporate Network
-
-The corporate proxy (proxydetox) runs on `127.0.0.1:3128`. The launcher:
-
-1. Checks if `HTTP_PROXY` is already set in the environment
-2. If not, probes `127.0.0.1:3128` and auto-configures:
-
-```bash
-export HTTP_PROXY="http://127.0.0.1:3128"
-export HTTPS_PROXY="http://127.0.0.1:3128"
-export NO_PROXY="localhost,127.0.0.1,.bmwgroup.net"
-```
-
-All external API calls (Anthropic, GitHub, OpenAI) **require** this proxy when inside VPN/CN. Direct connections time out.
-
-### Outside VPN (Public Network)
-
-The launcher **clears** any proxy env vars inherited from shell profiles:
-
-```bash
-unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
-```
-
-This prevents opencode/claude from trying to route through a non-existent proxy.
-
 ---
 
 ## Agent API Endpoints
 
-Each agent validates its required API endpoint before launch:
+After pinning, the launcher checks that the agent's API answers. A failure is a warning, not a
+blocker (the agent may still work through the proxy's fallbacks):
 
-| Agent | Required API | Endpoint Tested |
-|---|---|---|
-| Claude Code | Anthropic | `https://api.anthropic.com` |
-| OpenCode (VPN) | GitHub Copilot | `https://api.github.com` |
-| OpenCode (public) | Anthropic | `https://api.anthropic.com` |
-| Copilot CLI | GitHub | `https://api.github.com` |
-
-If validation fails, the launcher logs a warning but does not block startup (the agent may still work via cached tokens or fallback mechanisms).
+| Agent | Endpoint Tested |
+|---|---|
+| Claude Code | `https://api.anthropic.com` |
+| OpenCode (inside CN) | `https://api.github.com` |
+| OpenCode (outside CN) | `https://api.anthropic.com` |
+| Copilot CLI | `https://api.github.com` |
 
 ---
 
@@ -207,45 +245,39 @@ If validation fails, the launcher logs a warning but does not block startup (the
 Test network detection without launching an agent:
 
 ```bash
-coding --opencode --dry-run
 coding --claude --dry-run
 ```
 
 Output includes:
+
 ```
-[OpenCode] 🏢 Inside Corporate Network (cc-github.bmwgroup.net reachable)
-[OpenCode] Proxy active: http://127.0.0.1:3128/
-[OpenCode] ✅ External access working (via proxy)
-[OpenCode] DRY-RUN: Network: CN=true, Proxy=true, Required=true
-[OpenCode] 🏢 VPN → GitHub Copilot Enterprise (claude-opus-4.6)
-[OpenCode] ✅ GitHub API reachable (for Copilot provider)
+[Claude] 🏢 Inside Corporate Network (PAC DNS resolves to 160.50.180.101)
+[Claude] ✅ Session pinned to local adaptive proxy http://127.0.0.1:3128 (survives CN/VPN/home transitions)
+[Claude] ✅ External access working (via proxy)
+[Claude] DRY-RUN: Network: CN=true, Proxy=true, Required=true
 ```
 
 ### Force Network Mode
 
-Override detection for testing:
+Override the launcher's detection for testing (the coordinator is unaffected):
 
 ```bash
-# Simulate outside VPN
-CODING_FORCE_CN=false coding --opencode --dry-run
-
-# Simulate inside VPN
-CODING_FORCE_CN=true coding --opencode --dry-run
+CODING_FORCE_CN=false coding --opencode --dry-run   # simulate outside CN
+CODING_FORCE_CN=true  coding --opencode --dry-run   # simulate inside CN
 ```
 
 ### Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `N:OPEN` when on office LAN | Coordinator started on hotspot; stale DNS servers (pre-`dig` fix) or process running old code | Restart coordinator: `launchctl stop com.coding.health-coordinator && launchctl start com.coding.health-coordinator` |
-| `P:ON` after `px off` | Pre-2026-07-26 badge showed daemon truth only | Fixed: badge is now three-state — `px off` with the daemon loaded renders `P:AUTO` (expected; the always-on daemon auto-DIRECTs off-CN). `P:OFF` now only means the daemon is down |
-| Status line takes >10s to show P: change | Cache files not invalidated; coordinator not notified | Ensure `px` does `rm .logs/combined-status-line-cache-*.txt` AND `curl -s -X POST http://localhost:3034/health/refresh` |
-| LLM proxy 500s after `px off` | Proxy dead but LLM proxy still routing through `ProxyAgent` | LLM proxy now has `smartFetch()` with 5s proxy-alive cache — recovers automatically |
-| 502 Bad Gateway in OpenCode | Proxy interfering with streaming API | Check proxydetox is running: `lsof -i :3128` |
-| All API calls timeout (000) | Inside VPN/CN without proxy | Run `px` to start proxydetox, or set `HTTP_PROXY` |
-| "Credit balance too low" | Using API key instead of OAuth | Log in via `claude auth login` for Max subscription |
-| OpenCode uses wrong model | Network detection mismatch | Use `--dry-run` to check, or `CODING_FORCE_CN=true/false` |
-| Semantic readiness yellow (brain badge) | `processOverrides` routing health-coordinator through `claude-code` (slow subprocess) | Set override to `copilot`: `curl -X POST http://localhost:12435/api/llm/settings -H 'Content-Type: application/json' -d '{"settings":{"processOverrides":{"health-coordinator":{"provider":"copilot"}}}}'` |
+| `502 proxy forward failed after 3 attempts` right after joining VPN, `K:NO` | No Kerberos ticket (expired overnight) | Wait ~15 s for the automatic request, or run `klist` / the Kerberos SSO menu |
+| Same 502, ticket present, `P:OFF` | proxydetox stale after the network change | The coordinator restarts it (once per change, 45 s apart); `tail .logs/health-coordinator.log` shows the cause |
+| Every call fails on VPN with "fetch failed", `egress DEGRADED` in the proxy log | No proxy answered the LLM proxy's egress test | Fix `:3128` (above); the pin follows within 30 s, or at once on the coordinator's nudge |
+| `N:OPEN` when on office LAN | Coordinator running old code, or the PAC host does not resolve | `launchctl kickstart -k gui/$(id -u)/com.coding.health-coordinator`; check `dig +short muc.proxy-pac.bmwgroup.net` |
+| `P:AUTO` instead of `P:ON` | `px` is off — expected; proxydetox still serves every session | `px` if you want your shell's own commands proxied too |
+| Status line slow to show a `px` change | Caches not invalidated, or the coordinator not told | `px` does both; otherwise `curl -s -X POST localhost:3034/health/refresh` |
+| "Credit balance too low" | Using an API key instead of OAuth | `claude auth login` for the Max subscription |
+| OpenCode reaches the wrong API at launch | Launcher detection mismatch | `--dry-run` to check, or `CODING_FORCE_CN=true/false` |
 
 ---
 
@@ -253,13 +285,14 @@ CODING_FORCE_CN=true coding --opencode --dry-run
 
 | Variable | Set By | Purpose |
 |---|---|---|
-| `HTTP_PROXY` / `HTTPS_PROXY` | detect-network.sh | Route traffic through corporate proxy |
-| `NO_PROXY` | detect-network.sh | Bypass proxy for local/internal hosts |
-| `INSIDE_CN` | detect-network.sh | `true` when on corporate VPN |
+| `HTTP_PROXY` / `HTTPS_PROXY` (+ lowercase) | detect-network.sh | Pin the session to proxydetox `:3128` |
+| `NO_PROXY` | detect-network.sh | Keep loopback services and corporate hosts direct |
+| `INSIDE_CN` | detect-network.sh | `true` on VPN / CN (launcher's own check) |
 | `PROXY_WORKING` | detect-network.sh | `true` when external APIs are reachable |
-| `PROXY_REQUIRED` | detect-network.sh | `true` when proxy is needed (= inside CN) |
-| `CODING_FORCE_CN` | User override | Force `true`/`false` to skip detection |
-| `OPENCODE_CONFIG_CONTENT` | opencode.sh | JSON config for model/provider selection |
+| `PROXY_REQUIRED` | detect-network.sh | `true` when the corporate proxy is needed (= inside CN) |
+| `CODING_FORCE_CN` | User override | Force `true`/`false` to skip the launcher's detection |
+| `HEALTH_PROXY_PROBE_HOST` | User override | Host the `P:` probe opens a tunnel to (default `api.github.com`) |
+| `LLM_EGRESS_RECHECK_MS` | User override | How often the LLM proxy re-decides its egress (default 30 s) |
 
 ---
 
@@ -270,26 +303,37 @@ The coordinator exposes live network state at `GET http://localhost:3034/health/
 ```json
 {
   "network": {
-    "internet_reachable": true,
+    "location": "vpn",
+    "location_demotion_pending": 0,
+    "proxy_port_listening": true,
     "proxy_running": true,
     "proxy_functional": true,
-    "proxy_port_listening": true,
-    "location": "vpn",
-    "last_check": "2026-05-29T07:48:52.982Z",
-    "last_probe_end": "2026-05-29T07:48:52.980Z"
+    "proxy_enabled_by_user": false,
+    "consecutive_functional_failures": 0,
+    "kerberos_ticket": true,
+    "proxy_heal_cause": "healthy",
+    "proxy_heal_reason": "a request through :3128 reached the internet",
+    "internet_reachable": true,
+    "last_network_change_at": 1792044460000,
+    "last_probe_end": "2026-10-14T07:41:12.408Z"
   }
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `internet_reachable` | boolean | Whether external endpoints are reachable (via proxy or direct) |
-| `proxy_running` | boolean | Whether proxydetox process is alive |
-| `proxy_functional` | boolean | Whether CONNECT through proxy succeeds |
-| `proxy_port_listening` | boolean | Whether port 3128 accepts TCP connections |
-| `location` | string | `vpn`, `corporate`, `open`, or `unknown` |
-| `last_probe_end` | ISO string | Timestamp of last completed network probe |
+| Field | Description |
+|-------|-------------|
+| `location` | `vpn`, `corporate`, `open` or `unknown` |
+| `location_demotion_pending` | readings toward `open` still being confirmed (hysteresis) |
+| `proxy_port_listening` | `:3128` accepts TCP connections |
+| `proxy_functional` | a bare `CONNECT api.github.com:443` through `:3128` answered 200 (debounced over 3 failures) |
+| `proxy_enabled_by_user` | the `px` intent (`ON` vs `AUTO`) |
+| `kerberos_ticket` | `klist -s`: `true`, `false`, or `null` when it cannot be told |
+| `proxy_heal_cause` / `proxy_heal_reason` | the last proxydetox heal verdict: `healthy`, `restarting`, `daemon`, `no-ticket`, `stale-after-change`, `offline`, `upstream`, `network-change`, `indeterminate` |
+| `last_network_change_at` | last macOS network-change event (ms) |
+| `last_probe_end` | last completed network probe |
 
-The `POST /health/refresh` endpoint triggers an immediate network re-probe (resets the rate-limiter so the probe runs on the next tick, regardless of the 15s interval).
+`POST /health/refresh` triggers an immediate re-probe.
 
-The dashboard's **LLM Proxy Health** card and the statusline's `[N:xx]` / `[P:xx]` badges both consume this state. **N** reflects `location`; **P** reflects `proxy_port_listening` (binary ON/OFF — there is no ERR state).
+The status line renders this as `N:{CN|VPN|OPEN|??} P:{ON|AUTO|OFF}` plus `K:NO` on VPN / CN
+without a ticket. **N** reflects `location`; **P** combines `proxy_functional` with
+`proxy_enabled_by_user`.

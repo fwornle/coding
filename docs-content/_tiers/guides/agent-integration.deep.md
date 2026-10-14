@@ -60,22 +60,23 @@ When a new agent is launched:
 
 ![Network-Aware Agent Selection](../images/network-aware-agent-selection.png)
 
-The launcher detects the network environment and automatically configures each agent:
+The agents are configured the same way on every network; only the LLM proxy's egress changes:
 
-| Scenario | Proxy | Claude Code | OpenCode | Copilot CLI |
+| Scenario | Session proxy | Claude Code | OpenCode · pi | Copilot CLI |
 |---|---|---|---|---|
-| **Inside VPN** | Required (proxydetox) | Anthropic via proxy | GH Copilot Enterprise via proxy | GH API via proxy |
-| **Outside VPN** | Cleared | Anthropic direct | Anthropic direct | GH API direct |
-| **Inside VPN, no proxy** | Missing | Blocked | Blocked | Blocked |
+| **Inside VPN / CN** | pinned to proxydetox `:3128` | Claude subscription via LLM proxy → `:3128` → corporate proxy | GitHub Copilot via LLM proxy → `:3128` | GitHub Copilot (BYOK) via LLM proxy → `:3128` |
+| **Outside VPN** | pinned to `:3128` (goes DIRECT off-CN) | Claude subscription via LLM proxy, direct | GitHub Copilot via LLM proxy, direct | GitHub Copilot via LLM proxy, direct |
+| **Inside VPN, `:3128` dead or no Kerberos ticket** | — | fails until the coordinator heals it / the ticket arrives | same | same |
 
 **Key behaviors:**
 
 - **`detect-network.sh`** runs early in the startup pipeline (before agent hooks)
-- Inside CN: auto-detects proxydetox on `127.0.0.1:3128`, sets `HTTP_PROXY`/`HTTPS_PROXY`
-- Outside CN: **clears** proxy env vars that would route through a non-existent proxy
-- **OpenCode** auto-switches model: `github-copilot-enterprise/claude-opus-4.6` (VPN) → `claude-opus-4-6` (public)
-- All agents call `validate_agent_connectivity()` to verify API reachability before launch
-- `CODING_FORCE_CN=true/false` overrides detection for testing
+- Every session is pinned to proxydetox `127.0.0.1:3128` (`HTTP(S)_PROXY`, `NO_PROXY` for loopback and corporate hosts), on every network; only if it cannot be brought up is the session left direct
+- `configure_proxy_routing` wires each agent into the LLM proxy `:12435`, and stops the launch if the proxy does not answer
+- All agents call `validate_agent_connectivity()` to check API reachability before launch (warning only)
+- `CODING_FORCE_CN=true/false` overrides the launcher's detection for testing
+
+See [Connectivity & Recovery](../architecture/connectivity.md) for every path and recovery.
 
 ### Launcher Service-Startup Flow
 
