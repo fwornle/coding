@@ -79,7 +79,7 @@ import { Router } from 'express';
 // Phase 44 Plan 14 — shared Artifacts-patch mutator used by both
 // `/patch-artifacts/recent` and `/patch-artifacts/historical`. Single
 // source of truth for the regex + meta merge.
-import { patchArtifactsInPlace } from './lib/artifacts-patch-util.mjs';
+import { patchArtifactsInPlace, setArtifactsInPlace } from './lib/artifacts-patch-util.mjs';
 // Experiment API (27 endpoints) — re-homed here from vkb-server so retiring
 // VKB does not take the Experiments feature with it. These handlers use the
 // DEDICATED experiment LevelDB via openExperimentStore(), not the knowledge
@@ -316,6 +316,12 @@ let _exportTimer = null;
 const EXPORT_DEBOUNCE_MS = 30_000;
 function ensureExporter() {
   if (_exporter) return _exporter;
+  // Imported in-process (NO_AUTOSTART: the integration tests) the store is a
+  // tmpdir fixture, but the export targets are the REAL data home and the real
+  // repos' learning checkouts. 2026-10-14: one run of the legacy-endpoints
+  // suite exported its 1005 fixture rows ("Intent: perf0", perf-agent) into
+  // both. Only the running daemon exports.
+  if (process.env.OBSERVATIONS_API_NO_AUTOSTART === '1') return null;
   if (!_kmStoreReady || !_kmStore) return null;
   _exporter = new ObservationExporter({
     kmStore: _kmStore,
@@ -1027,9 +1033,16 @@ app.post('/api/observations/messages', async (req, res) => {
  */
 app.post('/api/observations/patch-artifacts/recent', async (req, res) => {
   try {
-    const { agent, modifiedFiles } = req.body || {};
+    const { agent, modifiedFiles, turnKey, sessionId } = req.body || {};
     if (!agent || !Array.isArray(modifiedFiles) || modifiedFiles.length === 0) {
       return res.status(400).json({ error: 'agent and non-empty modifiedFiles required' });
+    }
+    // A file list belongs to ONE turn. Unscoped, this route wrote the same list
+    // into every "none" row of the agent in 4h, across projects and sessions:
+    // one list ("edited README.md, edited harvest.csv, …") sat on 11 unrelated
+    // rows. Now the caller names the turn (turnKey), or at least its session.
+    if (!turnKey && !sessionId) {
+      return res.status(400).json({ error: 'turnKey or sessionId required — a file list is patched onto its own turn only' });
     }
     const store = await ensureKMStore();
     if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
@@ -1038,6 +1051,7 @@ app.post('/api/observations/patch-artifacts/recent', async (req, res) => {
     const candidates = await store.findByOntologyClass('Observation');
     const filtered = candidates.filter((e) => {
       if ((e.metadata?.agent ?? null) !== agent) return false;
+      if (turnKey ? e.metadata?.turnKey !== turnKey : (e.metadata?.sessionId ?? e.metadata?.session_id ?? null) !== sessionId) return false;
       const summary = typeof e.metadata?.summary === 'string'
         ? e.metadata.summary
         : (typeof e.description === 'string' ? e.description : '');
@@ -1060,6 +1074,10 @@ app.post('/api/observations/patch-artifacts/recent', async (req, res) => {
     // backfill (not a new write) so we explicitly bump too — the
     // dashboard staleness clock should reflect the patch.
     _stalenessCache.invalidate();
+    // The dashboard's list reads the cold export, not this store: without an
+    // export a patched row kept showing its old Artifacts line there until some
+    // unrelated observation write happened to trigger one.
+    if (patched > 0) scheduleExport();
     res.json({ patched });
   } catch (err) {
     process.stderr.write(`[obs-api] /patch-artifacts/recent error: ${err.message}\n`);
@@ -1093,7 +1111,10 @@ app.post('/api/observations/patch-artifacts/recent', async (req, res) => {
  */
 app.post('/api/observations/patch-artifacts/by-id', async (req, res) => {
   try {
-    const { updates, dryRun } = req.body || {};
+    // `replace`: set each row's Artifacts to exactly its list ("none" when
+    // empty) — for a re-derivation that is authoritative, including undoing a
+    // wrong list. Without it, only "Artifacts: none" rows are filled.
+    const { updates, dryRun, replace } = req.body || {};
     if (!Array.isArray(updates) || updates.length === 0) {
       return res.status(400).json({ error: 'non-empty updates[] required' });
     }
@@ -1113,6 +1134,15 @@ app.post('/api/observations/patch-artifacts/by-id', async (req, res) => {
       const entity = byId.get(String(u?.id ?? ''));
       if (!entity) { missing.push(u?.id ?? null); continue; }
       const files = Array.isArray(u.modifiedFiles) ? u.modifiedFiles.filter(Boolean) : [];
+      if (replace) {
+        // Mutate a copy for a dry run, so it reports exactly what would change.
+        const target = dryRun ? JSON.parse(JSON.stringify(entity)) : entity;
+        if (setArtifactsInPlace(target, files)) {
+          if (!dryRun) await store.putEntity(entity, { skipOntologyCheck: true });
+          patched += 1;
+        }
+        continue;
+      }
       if (files.length === 0) continue;
       if (dryRun) {
         // Same predicate patchArtifactsInPlace applies, without mutating.
@@ -1128,6 +1158,8 @@ app.post('/api/observations/patch-artifacts/by-id', async (req, res) => {
       }
     }
     if (!dryRun) _stalenessCache.invalidate();
+    // The dashboard reads the cold export — refresh it (see /recent above).
+    if (!dryRun && patched > 0) scheduleExport();
     res.json({ patched, requested: updates.length, missing: missing.length, dryRun: !!dryRun });
   } catch (err) {
     process.stderr.write(`[obs-api] /patch-artifacts/by-id error: ${err.message}\n`);
@@ -1177,6 +1209,7 @@ app.post('/api/observations/patch-artifacts/historical', async (_req, res) => {
       }
     }
     _stalenessCache.invalidate();
+    if (patched > 0) scheduleExport(); // the dashboard reads the cold export
     res.json({ patched, scanned: targets.length });
   } catch (err) {
     process.stderr.write(`[obs-api] /patch-artifacts/historical error: ${err.message}\n`);

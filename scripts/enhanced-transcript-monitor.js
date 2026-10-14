@@ -134,6 +134,8 @@ const MODIFY_TOOL_NAMES = new Set([
   'edit', 'write', 'multiedit', 'notebookedit', 'patch', 'applypatch',
   'apply_patch', 'str_replace_editor', 'str_replace_based_edit_tool',
   'create_file', 'insert_edit_into_file', 'createfile',
+  // Copilot CLI: `create` writes a new file, `str_replace` edits one (`path`).
+  'create', 'str_replace',
 ]);
 const READ_TOOL_NAMES = new Set(['read', 'readfile', 'read_file']);
 const SHELL_TOOL_NAMES = new Set(['bash', 'shell', 'run_command', 'runcommand', 'run_in_terminal']);
@@ -177,8 +179,171 @@ function toolCallArgs(tc) {
   return {};
 }
 
-/** Throwaway locations: real writes, but never artifacts of the work. */
-const SCRATCH_PATH_RE = /^(?:\/private)?\/tmp\/|^(?:\/private)?\/var\/folders\/|\/scratchpad\//;
+/**
+ * Throwaway locations: real writes, but never artifacts of the work — temp and
+ * scratchpad dirs, and an agent's own session state (copilot keeps its plan and
+ * checkpoints under ~/.copilot/session-state/<id>/).
+ */
+const SCRATCH_PATH_RE = /^(?:\/private)?\/tmp\/|^(?:\/private)?\/var\/folders\/|\/scratchpad\/|\/\.copilot\/session-state\//;
+
+/**
+ * Does a string look like a file an agent authored (rather than prose, a flag or
+ * a system path)? Shared by every extractor below so a path is judged the same
+ * way whichever tool produced it.
+ */
+function plausibleArtifactPath(p) {
+  const clean = String(p || '').trim().replace(/^['"]|['"]$/g, '');
+  if (!clean || clean.length > 300 || /[\s$`*{}<>|]/.test(clean)) return null;
+  if (clean.startsWith('/dev/') || clean.startsWith('&') || clean.startsWith('-')) return null;
+  if (/^\/(?:bin|sbin|usr|etc|opt|System|Library|Applications|Volumes)\//.test(clean)) return null;
+  if (clean.endsWith('/')) return null;
+  if (/(^|\/)\.git(\/|$)/.test(clean)) return null;
+  if (/\.log$/.test(clean) || clean.startsWith('.logs/')) return null;
+  // An extension, a directory part (`bin/status`), or a well-known bare name.
+  // Callers only pass strings that ARE write targets, so a slash is enough.
+  if (!/\.[A-Za-z0-9]+$/.test(clean) && !clean.includes('/') && !/^(Makefile|Dockerfile|LICENSE|README)$/.test(clean)) return null;
+  if (SCRATCH_PATH_RE.test(clean)) return null;
+  return clean;
+}
+
+/** Interpreters whose heredoc / -c scripts are read for file writes. */
+const SCRIPT_INTERPRETER_RE = /\b(?:python3?|node|bun|deno|ruby|perl)\b/;
+
+/**
+ * Files a Python / JavaScript script writes, from its source text.
+ *
+ * WHY. Measured 2026-10-14 on this repo's transcripts: an agent in auto mode
+ * edits mostly through `python3 - <<'PY' … open(p,'w').write(s)` (one session:
+ * 247 Bash calls, 0 Edit, 25 such heredocs writing 37 files), and 110 of 126
+ * observation fires reported "0 modified". The shell scan strips heredoc bodies
+ * on purpose — prose there parses as shell — so the body is read here as what it
+ * is: a program.
+ *
+ * Only WRITE SINKS count, and only when their target resolves to a literal:
+ *   open(X, 'w'|'a'|'x')  Path(X).write_text/_bytes  X.write_text(…)
+ *   shutil.copy/copy2/copyfile/move(_, X)   os.remove/unlink(X)
+ *   fs.writeFileSync / writeFile / appendFile(Sync) / copyFileSync / renameSync(…X)
+ * X is a string literal, `Path('…')`, or a name bound to literals by
+ * `name = '…'`, `for name in [...]`, or `for name[, …] in DICT[.items()|.keys()]`
+ * / `Object.entries(DICT)` over a literal dict or list. Anything computed — an
+ * f-string, os.path.join, sys.argv — is skipped: a missed artifact is a gap, an
+ * invented one is a lie.
+ *
+ * @param {string} source script text
+ * @returns {string[]} written paths, in order, de-duplicated
+ */
+function scriptWriteTargets(source, lang = 'python') {
+  // Python triple-quoted strings and JS template literals are DATA — replacement
+  // text, a test fixture, a generated file's body. Code written into them
+  // (`rep('scripts/x.cjs', …)` inside a test being written) is not this
+  // script's code; blank them so their calls and assignments are not read as
+  // the script's own. Per language: a backtick is plain text in Python, where
+  // replacement strings full of markdown `code` would otherwise blank the
+  // script between them.
+  let src = String(source || '');
+  src = lang === 'js'
+    ? src.replace(/`(?:[^`\\]|\\[\s\S])*`/g, '""')
+    : src.replace(/("""|''')[\s\S]*?\1/g, '""');
+  if (!src) return [];
+  const literals = (text) => [...String(text).matchAll(/(['"])((?:(?!\1)[^\\\n])+)\1/g)].map((m) => m[2]);
+
+  // name -> candidate literal values
+  const bound = new Map();
+  const bind = (name, values) => {
+    if (!values.length) return;
+    bound.set(name, [...(bound.get(name) || []), ...values]);
+  };
+  // Literal collections: NAME = { ... } / [ ... ] — keys of a dict, items of a list.
+  const collections = new Map();
+  for (const m of src.matchAll(/^[ \t]*(?:const |let |var )?([A-Za-z_]\w*)\s*=\s*([[{])/gm)) {
+    const open = m[2];
+    const close = open === '{' ? '}' : ']';
+    let depth = 0;
+    let i = m.index + m[0].length - 1;
+    for (; i < src.length; i++) {
+      if (src[i] === open) depth++;
+      else if (src[i] === close && --depth === 0) break;
+    }
+    const body = src.slice(m.index + m[0].length, i);
+    const values = open === '{'
+      // dict keys: a literal followed by ':' at the start of an entry
+      ? [...body.matchAll(/(?:^|[,{\n])\s*(['"])((?:(?!\1)[^\\\n])+)\1\s*:/g)].map((k) => k[2])
+      : literals(body);
+    // A list of tuples — [('path', old, new), …] — unpacks its FIRST element
+    // into the first loop variable; the rest are replacement text, not paths.
+    const firsts = open === '[' && /^\s*[([]/.test(body)
+      ? [...body.matchAll(/[([]\s*(['"])((?:(?!\1)[^\\\n])+)\1/g)].map((k) => k[2])
+      : values;
+    collections.set(m[1], { values, firsts });
+  }
+  // name = 'literal'
+  // `p='x'` as its own line or as one `;`-separated statement (`p='x'; s=open(p).read()`).
+  for (const m of src.matchAll(/(?:^|;)[ \t]*(?:const |let |var )?([A-Za-z_]\w*)[ \t]*=[ \t]*(?<q>['"])((?:(?!\k<q>)[^\\\n])+)\k<q>[ \t]*(?=;|$)/gm)) bind(m[1], [m[3]]);
+  // a, b = 'x', 'y' is rare enough to ignore; for-loops bind from collections.
+  for (const m of src.matchAll(/\bfor\s+\(?\s*([A-Za-z_]\w*)((?:\s*,\s*[A-Za-z_]\w*)*)\s*\)?\s+in\s+([A-Za-z_]\w*)(?:\.(?:items|keys)\(\))?/g)) {
+    const c = collections.get(m[3]);
+    if (c) bind(m[1], m[2] ? c.firsts : c.values);
+  }
+  for (const m of src.matchAll(/\bfor\s+([A-Za-z_]\w*)(?:\s*,\s*[A-Za-z_]\w*)*\s+in\s+\[([^\]]*)\]/g)) bind(m[1], literals(m[2]));
+  for (const m of src.matchAll(/\bfor\s*\(\s*(?:const|let|var)\s+(?:\[\s*([A-Za-z_]\w*)[^\]]*\]|([A-Za-z_]\w*))\s+of\s+(?:Object\.(?:entries|keys)\(\s*([A-Za-z_]\w*)\s*\)|([A-Za-z_]\w*))/g)) {
+    bind(m[1] || m[2], collections.get(m[3] || m[4])?.values || []);
+  }
+  // Helpers: `def rep(f, pairs): … open(f,'w')` called as `rep('path', …)`, and
+  // the JS `function w(f, …)` / `const w = (f, …) =>` equivalents. The first
+  // parameter takes every literal first argument of a call to the helper.
+  for (const m of src.matchAll(/\b(?:def|function)\s+([A-Za-z_]\w*)\s*\(\s*([A-Za-z_]\w*)|\b(?:const|let|var)\s+([A-Za-z_]\w*)\s*=\s*(?:async\s*)?\(\s*([A-Za-z_]\w*)/g)) {
+    const fn = m[1] || m[3];
+    const param = m[2] || m[4];
+    const calls = [...src.matchAll(new RegExp(`(?<![\\w.])${fn}\\(\\s*(['"])((?:(?!\\1)[^\\\\\\n])+)\\1`, 'g'))].map((c) => c[2]);
+    bind(param, calls);
+  }
+
+  const resolve = (expr) => {
+    const e = String(expr || '').trim();
+    const lit = e.match(/^(?:Path\(\s*)?(['"])((?:(?!\1)[^\\\n])+)\1\s*\)?$/);
+    if (lit) return [lit[2]];
+    const name = e.match(/^(?:Path\(\s*)?([A-Za-z_]\w*)\s*\)?$/);
+    if (name) return bound.get(name[1]) || [];
+    return [];
+  };
+  const ARG = `((?:Path\\(\\s*)?(?:['"][^'"\\n]+['"]|[A-Za-z_]\\w*)\\s*\\)?)`;
+  const sinks = [
+    new RegExp(`\\bopen\\(\\s*${ARG}\\s*,\\s*(?:mode\\s*=\\s*)?['"][wax]`, 'g'),
+    new RegExp(`${ARG}\\.write_(?:text|bytes)\\(`, 'g'),
+    new RegExp(`\\bshutil\\.(?:copy2?|copyfile|move)\\(\\s*[^,]+,\\s*${ARG}`, 'g'),
+    new RegExp(`\\bos\\.(?:remove|unlink)\\(\\s*${ARG}`, 'g'),
+    new RegExp(`\\b(?:writeFileSync|writeFile|appendFileSync|appendFile)\\(\\s*${ARG}`, 'g'),
+    new RegExp(`\\b(?:copyFileSync|renameSync)\\(\\s*[^,]+,\\s*${ARG}`, 'g'),
+  ];
+  const out = [];
+  for (const re of sinks) {
+    for (const m of src.matchAll(re)) {
+      for (const v of resolve(m[1])) {
+        const p = plausibleArtifactPath(v);
+        if (p && !out.includes(p)) out.push(p);
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Files named by an apply_patch envelope or a unified diff.
+ *
+ * opencode stores apply_patch as `{ patchText: "*** Begin Patch\n*** Update
+ * File: /abs/path …" }`, Copilot as a raw patch string — neither has a path
+ * argument, so the path lookup saw nothing and every opencode / copilot patch
+ * reported "Artifacts: none".
+ */
+function patchTargets(text) {
+  const t = String(text || '');
+  if (!t.includes('*** ') && !t.includes('+++ ')) return [];
+  const out = [];
+  for (const m of t.matchAll(/^\*\*\* (?:Update|Add|Delete) File:\s*(.+?)\s*$/gm)) out.push(m[1]);
+  for (const m of t.matchAll(/^\*\*\* Move to:\s*(.+?)\s*$/gm)) out.push(m[1]);
+  for (const m of t.matchAll(/^\+\+\+ (?:b\/)?(\S+)/gm)) if (m[1] !== '/dev/null') out.push(m[1]);
+  return [...new Set(out)];
+}
 
 /**
  * Shell redirection targets that are worth calling artifacts.
@@ -213,11 +378,20 @@ function bashWriteTargets(command) {
   const heredoc = /<<-?\s*(['"]?)([A-Za-z_][\w-]*)\1/g;
   let m;
   const cuts = [];
+  const scripted = [];
   while ((m = heredoc.exec(cmd)) !== null) {
     const bodyStart = cmd.indexOf('\n', m.index);
     if (bodyStart < 0) { cuts.push([m.index, cmd.length]); continue; }
     const end = cmd.indexOf(`\n${m[2]}`, bodyStart);
     cuts.push([bodyStart, end < 0 ? cmd.length : end + m[2].length + 1]);
+    // A heredoc fed to an interpreter is a program, not prose: read its writes.
+    const head = cmd.slice(cmd.lastIndexOf('\n', m.index) + 1, m.index);
+    if (SCRIPT_INTERPRETER_RE.test(head)) {
+      const lang = /\b(?:node|bun|deno)\b/.test(head) ? 'js' : 'python';
+      for (const p of scriptWriteTargets(cmd.slice(bodyStart + 1, end < 0 ? cmd.length : end), lang)) {
+        scripted.push({ p, before: cmd.slice(0, m.index) });
+      }
+    }
   }
   for (const [s, e] of cuts.reverse()) text = text.slice(0, s) + '\n' + text.slice(e);
 
@@ -236,6 +410,8 @@ function bashWriteTargets(command) {
     // A sed script that reached here as a bare word: `s/old/new/g`. It is an
     // argument, not a destination.
     if (/^[a-z]\/.*\/.*\/[a-z]*$/.test(clean)) return;
+    // …or the head of one cut at a `|` alternation: 's/GITHUB_TOKEN|GITLAB_TOKEN/…/'.
+    if (/^[sy]\/[^/]*$/.test(clean)) return;
     if (clean.endsWith('/')) return;                  // a directory, not a file
     if (/(^|\/)\.git(\/|$)/.test(clean)) return;      // git internals
     // Build/test output captured for reading back. A real write, but a
@@ -272,8 +448,41 @@ function bashWriteTargets(command) {
   for (const r of unquoted.matchAll(/\btee\b\s+(?:-a\s+)?([\w./~@+-]+)/g)) add(r[1]);
   // `sed -i` (GNU) and `sed -i ''` (BSD/macOS): the file is the last bare word.
   for (const r of text.matchAll(/\bsed\b\s+(?:-[^\s]+\s+|''\s+|""\s+)*-i[^\s]*\s+(?:''\s+|""\s+)?(?:-[^\s]+\s+)*(?:'[^']*'|"[^"]*"|[^\s;|&]+)\s+(['"]?[\w./~@+-]+['"]?)/g)) add(r[1]);
+  // Inline programs: `python3 -c "…"`, `node -e '…'`.
+  for (const r of text.matchAll(/\b(python3?|node|bun|ruby|perl)\s+-[ce]\s+(['"])([\s\S]*?)\2(?=\s|$)/g)) {
+    for (const p of scriptWriteTargets(r[3], /^(?:node|bun)$/.test(r[1]) ? 'js' : 'python')) {
+      scripted.push({ p, before: text.slice(0, r.index) });
+    }
+  }
 
-  return out;
+  // A leading `cd DIR &&` / `cd DIR;` is the command's working directory
+  // (Claude Code starts every Bash call in the project root), so a relative
+  // target is relative to DIR: `cd glass/overlay/docs/puml && plantuml …` wrote
+  // glass/overlay/docs/puml/x.png, not x.png in the root.
+  //
+  // One literal `cd` anywhere sets that directory. A `cd` into a variable
+  // (`cd $Q/sandbox`), into a scratch area, or more than one `cd`, leaves a
+  // relative target's location unknown — it is dropped rather than reported as
+  // a root-level file: `cd $Q/sandbox && printf … > harvest.csv` put a bare
+  // "harvest.csv" (a throwaway sandbox) on rows as if it were repo work.
+  //
+  // A script's writes resolve against the `cd`s BEFORE its heredoc: in
+  // `cd glass-ui && python3 - <<'PY' … PY\ncd .. && npx tsc`, the second cd
+  // runs after the write and does not make it ambiguous. A redirect's position
+  // is not tracked, so it takes the whole command's cds.
+  const cdsIn = (s) => [...s.matchAll(/(?:^|&&|;|\|\||\n)\s*cd\s+(['"]?)([^\s;&|'"]+)\1/g)].map((c) => c[2]);
+  // undefined: no cd (the project root) · string: that directory · null: unknown
+  const dirOf = (cds) => (cds.length === 0 ? undefined
+    : cds.length === 1 && !/[$`]/.test(cds[0]) ? cds[0].replace(/^~(?=\/|$)/, os.homedir()) : null);
+  const place = (p, dir) => (path.isAbsolute(p) || p.startsWith('~') || dir === undefined ? p
+    : dir ? path.join(dir, p) : null);
+
+  const shellDir = dirOf(cdsIn(text));
+  const resolved = [
+    ...out.map((p) => place(p, shellDir)),
+    ...scripted.map(({ p, before }) => place(p, dirOf(cdsIn(before)))),
+  ];
+  return [...new Set(resolved.filter((p) => p && !SCRATCH_PATH_RE.test(p)))];
 }
 
 /**
@@ -310,6 +519,19 @@ function extractFileChanges(exchanges) {
         continue;
       }
 
+      // apply_patch / patch: the paths ride inside the patch text, not in an
+      // argument (opencode `patchText`, copilot a raw string).
+      if (MODIFY_TOOL_NAMES.has(toolName) || toolName.includes('patch')) {
+        const texts = [args.patchText, args.patch, args.input, args.diff, tc?.input, tc?.arguments]
+          .filter((t) => typeof t === 'string');
+        for (const t of texts) {
+          for (const raw of patchTargets(t)) {
+            const p = plausibleArtifactPath(raw);
+            if (p && !modifiedFiles.includes(p)) modifiedFiles.push(p);
+          }
+        }
+      }
+
       const filePath = PATH_ARG_KEYS.map((k) => args[k]).find(Boolean);
       if (!filePath) continue;
       // Agent-agnostic tool-name matching. Claude emits capitalized names
@@ -318,6 +540,9 @@ function extractFileChanges(exchanges) {
       // case-insensitively across the known file-mutation / read tool variants
       // so artifacts are captured regardless of which agent produced the turn.
       if (MODIFY_TOOL_NAMES.has(toolName)) {
+        // A scratchpad / tmp write is real but is not an artifact of the work —
+        // the same rule the shell scan applies (14 rows listed one checklist.py).
+        if (SCRATCH_PATH_RE.test(filePath)) continue;
         if (!modifiedFiles.includes(filePath)) modifiedFiles.push(filePath);
       } else if (READ_TOOL_NAMES.has(toolName)) {
         if (!readFiles.includes(filePath)) readFiles.push(filePath);
@@ -325,6 +550,70 @@ function extractFileChanges(exchanges) {
     }
   }
   return { modifiedFiles, readFiles };
+}
+
+const AGENT_TOOL_NAMES = new Set(['agent', 'task']);
+
+/** Sub-agent ids an exchange launched (Agent result) or was notified about (<task-id>). */
+function subagentIdsOf(exchange) {
+  const ids = [];
+  const text = (c) => (typeof c === 'string' ? c
+    : Array.isArray(c) ? c.map((b) => (typeof b?.text === 'string' ? b.text : '')).join('\n') : '');
+  const agentCalls = new Set((exchange?.toolCalls || [])
+    .filter((tc) => AGENT_TOOL_NAMES.has(String(tc?.name || '').toLowerCase()))
+    .map((tc) => tc.id));
+  for (const r of exchange?.toolResults || []) {
+    if (!agentCalls.has(r?.tool_use_id)) continue;
+    for (const m of text(r.content).matchAll(/agentId:\s*([a-z0-9]{8,})/gi)) ids.push(m[1]);
+  }
+  for (const m of String(exchange?.userMessage || '').matchAll(/<task-id>\s*([a-z0-9]{8,})\s*<\/task-id>/gi)) ids.push(m[1]);
+  return [...new Set(ids)];
+}
+
+/**
+ * Files changed by the sub-agents a turn ran (Claude's Agent tool).
+ *
+ * A sub-agent's edits live in its own transcript,
+ * `<session>.jsonl` → `<session>/subagents/agent-<id>.jsonl`; the parent turn
+ * shows only the `Agent` call, so a turn that delegated all of its editing
+ * reported "Artifacts: none". The id comes from the Agent result (`agentId: …`,
+ * 30 of 31 calls measured; the other was refused before it ran) or, for a
+ * background agent, from the `<task-id>` of its completion notification — the
+ * turn that receives it is the one that sees the finished work.
+ *
+ * @param {object[]} exchanges
+ * @param {string} transcriptPath the parent session's .jsonl
+ * @param {{readFile?: (f: string) => string}} [o]
+ * @returns {{ modifiedFiles: string[], readFiles: string[] }}
+ */
+function subagentFileChanges(exchanges, transcriptPath, { readFile = (f) => fs.readFileSync(f, 'utf8') } = {}) {
+  const none = { modifiedFiles: [], readFiles: [] };
+  if (typeof transcriptPath !== 'string' || !transcriptPath.endsWith('.jsonl')) return none;
+  const dir = path.join(transcriptPath.slice(0, -'.jsonl'.length), 'subagents');
+  const toolCalls = [];
+  for (const id of new Set((exchanges || []).flatMap(subagentIdsOf))) {
+    let raw;
+    try { raw = readFile(path.join(dir, `agent-${id}.jsonl`)); } catch { continue; }
+    for (const line of String(raw).split('\n')) {
+      if (!line.includes('"tool_use"')) continue;
+      let entry;
+      try { entry = JSON.parse(line); } catch { continue; }
+      const content = entry?.message?.content;
+      if (!Array.isArray(content)) continue;
+      for (const b of content) if (b?.type === 'tool_use') toolCalls.push({ name: b.name, input: b.input, id: b.id });
+    }
+  }
+  return toolCalls.length ? extractFileChanges([{ toolCalls }]) : none;
+}
+
+/**
+ * An absolute path inside the project → repo-relative, so one file is listed
+ * one way whether it came from Write (absolute) or a heredoc (relative).
+ */
+function relativizeArtifact(p, projectPath) {
+  if (!projectPath || typeof p !== 'string' || !path.isAbsolute(p)) return p;
+  const rel = path.relative(projectPath, p);
+  return rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel : p;
 }
 
 // CR-02: stamp a message timestamp WITHOUT ever throwing. An absent/unparseable
@@ -1484,7 +1773,14 @@ class EnhancedTranscriptMonitor {
   }
 
   _extractFileChanges(exchanges) {
-    return extractFileChanges(exchanges);
+    const own = extractFileChanges(exchanges);
+    const sub = this.transcriptPath ? subagentFileChanges(exchanges, this.transcriptPath) : { modifiedFiles: [], readFiles: [] };
+    const root = this.config?.projectPath;
+    const norm = (list) => [...new Set(list.map((p) => relativizeArtifact(p, root)))];
+    return {
+      modifiedFiles: norm([...own.modifiedFiles, ...sub.modifiedFiles]),
+      readFiles: norm([...own.readFiles, ...sub.readFiles]),
+    };
   }
 
   /**
@@ -1613,13 +1909,16 @@ class EnhancedTranscriptMonitor {
       // summary text. The writer needs a fact to check that verdict against.
       //
       // Tool-call COUNT rather than modified files, because the two are not
-      // interchangeable: `bashWriteTargets` deliberately strips heredoc bodies
-      // before scanning (otherwise the body's prose parses as shell), so an
-      // edit made by `python3 - <<'PY' ... open(p,'w').write(s)` — the shape an
-      // agent in auto mode uses constantly — leaves modifiedFiles EMPTY. A
-      // floor keyed only on files would still have dropped that turn.
+      // interchangeable: a turn can work through tools without writing a file,
+      // and some writes stay invisible to the extractor by design (a path
+      // computed at run time — os.path.join, sys.argv, a shell variable). A
+      // floor keyed only on files would still drop that turn.
       toolCallCount: allToolCalls.length,
       sourceFile: 'live-etm',
+      // The transcript this turn was read from, so a later re-derivation (e.g.
+      // scripts/backfill-observation-artifacts.mjs) finds it exactly instead of
+      // matching rows to turns by timestamp.
+      transcriptPath: this.transcriptPath || undefined,
       // The repo's project id (lib/teams/config.cjs): its directory name unless
       // a team's `repos:` entry names it. Team membership is derived from this.
       project: projectIdFor(this.config.projectPath || ''),
@@ -1644,8 +1943,9 @@ class EnhancedTranscriptMonitor {
       // Fix (b): buffer this edit-set so the periodic sweep re-applies the patch
       // for a bounded window — catches sibling observations that land AFTER this
       // immediate patch (async enrichment / offline-retry race).
-      this._recordArtifactPatch(this.agentType, modifiedFiles);
-      this._patchRecentObservationsWithArtifacts(modifiedFiles, readFiles);
+      const scope = { turnKey: opts.turnKey || null, sessionId: this.sessionId || null };
+      this._recordArtifactPatch(this.agentType, modifiedFiles, scope);
+      this._patchRecentObservationsWithArtifacts(modifiedFiles, readFiles, undefined, scope);
     }
 
     // Fire-and-forget: do NOT await. Per D-04 and D-05.
@@ -1667,7 +1967,7 @@ class EnhancedTranscriptMonitor {
    * (2) multi-turn tool calls across prompt set boundaries,
    * (3) ETM restarts re-processing already-written exchanges.
    */
-  async _patchRecentObservationsWithArtifacts(modifiedFiles, readFiles, agentOverride) {
+  async _patchRecentObservationsWithArtifacts(modifiedFiles, readFiles, agentOverride, scope = {}) {
     if (!this.observationWriter) return;
     if (!modifiedFiles || modifiedFiles.length === 0) return;
 
@@ -1678,7 +1978,9 @@ class EnhancedTranscriptMonitor {
     // HTTP path (single-owner mode): delegate to host API.
     if (this.observationWriter instanceof ObservationApiClient) {
       try {
-        const r = await this.observationWriter.patchRecentArtifacts(agent, modifiedFiles);
+        // Scoped to the turn the files came from (turnKey), else its session —
+        // never "every recent row of this agent".
+        const r = await this.observationWriter.patchRecentArtifacts(agent, modifiedFiles, scope);
         if (r?.patched > 0) {
           process.stderr.write(`[ObservationTap] Patched ${r.patched} recent observations via API\n`);
         }
@@ -1705,11 +2007,11 @@ class EnhancedTranscriptMonitor {
    * @param {string} agent agent type at fire time (the sweep runs out of loop)
    * @param {string[]} files repo-rooted modified paths
    */
-  _recordArtifactPatch(agent, files) {
+  _recordArtifactPatch(agent, files, scope = {}) {
     if (!Array.isArray(files) || files.length === 0) return;
     if (!this._recentArtifactPatches) this._recentArtifactPatches = new Map();
-    const key = `${agent || ''}::${[...files].sort().join('|')}`;
-    this._recentArtifactPatches.set(key, { agent, files: [...files], atMs: Date.now() });
+    const key = `${agent || ''}::${scope.turnKey || scope.sessionId || ''}::${[...files].sort().join('|')}`;
+    this._recentArtifactPatches.set(key, { agent, files: [...files], scope, atMs: Date.now() });
     // Bound memory: 100 distinct edit-sets is far above any real 15-min window.
     if (this._recentArtifactPatches.size > 100) {
       const oldestKey = this._recentArtifactPatches.keys().next().value;
@@ -1735,7 +2037,7 @@ class EnhancedTranscriptMonitor {
         continue;
       }
       try {
-        await this._patchRecentObservationsWithArtifacts(entry.files, [], entry.agent);
+        await this._patchRecentObservationsWithArtifacts(entry.files, [], entry.agent, entry.scope || {});
       } catch (err) {
         process.stderr.write(`[ObservationTap] periodic artifact re-patch failed (non-fatal): ${err?.message || err}\n`);
       }
@@ -3072,16 +3374,24 @@ ORDER BY m.time_created ASC;`;
         });
       } else if (msg.role === 'assistant') {
         const content = flatten(msg.content);
-        // A tool-call-only assistant entry has no text. Emitting it as an empty
-        // assistant message would close the exchange with a blank response.
-        if (!content) continue;
+        // pi's tool calls ({type:'toolCall', name, arguments}) become Claude-shaped
+        // tool_use blocks, so the exchange builder records them and the artifact
+        // extractor sees what pi edited. Dropping them made every pi
+        // observation "Artifacts: none".
+        const toolUses = Array.isArray(msg.content)
+          ? msg.content.filter((b) => b && b.type === 'toolCall' && b.name)
+            .map((b) => ({ type: 'tool_use', id: b.id, name: b.name, input: b.arguments && typeof b.arguments === 'object' ? b.arguments : {} }))
+          : [];
+        // A tool-call-only assistant entry with nothing to record would close
+        // the exchange with a blank response.
+        if (!content && toolUses.length === 0) continue;
         normalized.push({
           type: 'assistant',
           uuid,
           timestamp: ts,
           message: {
             role: 'assistant',
-            content,
+            content: toolUses.length ? [...(content ? [{ type: 'text', text: content }] : []), ...toolUses] : content,
             model: msg.model || null,
             // pi reports real token usage, so this survives to the token path
             // instead of the zero-token special case mastra needed.
@@ -5517,4 +5827,4 @@ runIfMain(import.meta.url, () => {
 export default EnhancedTranscriptMonitor;
 // Pure helpers behind _extractFileChanges, exported so the artifact tests can
 // drive them directly rather than through a stubbed monitor instance.
-export { toolCallArgs, bashWriteTargets, extractFileChanges };
+export { toolCallArgs, bashWriteTargets, scriptWriteTargets, patchTargets, extractFileChanges, subagentFileChanges, relativizeArtifact };

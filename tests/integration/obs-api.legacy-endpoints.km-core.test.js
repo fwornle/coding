@@ -176,7 +176,7 @@ describe('obs-api legacy /api/* endpoints km-core round-trip (Phase 44 Plan 14)'
         summary: 'Intent: I\nApproach: J\nArtifacts: none\nResult: pending',
         agent: 'test-agent',
         created_at: new Date().toISOString(),
-        metadata: { project: 'coding' },
+        metadata: { project: 'coding', turnKey: 'turn-recent' },
       },
     ];
 
@@ -360,9 +360,23 @@ describe('obs-api legacy /api/* endpoints km-core round-trip (Phase 44 Plan 14)'
   });
 
   test('POST /api/observations/patch-artifacts/recent patches a recent Artifacts:none row', async () => {
+    // Unscoped: refused — one turn's files must not land on every recent row.
+    const unscoped = await httpPost('/api/observations/patch-artifacts/recent', {
+      agent: 'test-agent',
+      modifiedFiles: ['src/x.ts'],
+    });
+    expect(unscoped.status).toBe(400);
+    // Another turn's key: nothing patched.
+    const other = await httpPost('/api/observations/patch-artifacts/recent', {
+      agent: 'test-agent',
+      modifiedFiles: ['src/x.ts'],
+      turnKey: 'some-other-turn',
+    });
+    expect(other.body.patched).toBe(0);
     const { status, body } = await httpPost('/api/observations/patch-artifacts/recent', {
       agent: 'test-agent',
       modifiedFiles: ['src/x.ts'],
+      turnKey: 'turn-recent',
     });
     expect(status).toBe(200);
     expect(body.patched).toBe(1);
@@ -371,9 +385,9 @@ describe('obs-api legacy /api/* endpoints km-core round-trip (Phase 44 Plan 14)'
     const matches = await kmStore.findByOntologyClass('Observation');
     const recent = matches.find((e) => e.legacyId?.id === 'obs-recent');
     expect(recent).toBeDefined();
-    expect(/Artifacts:\s*edited x\.ts/i.test(recent.metadata?.summary || '')).toBe(true);
+    expect(/Artifacts:\s*edited src\/x\.ts/i.test(recent.metadata?.summary || '')).toBe(true);
     // Description mirrors the summary mutation.
-    expect(/Artifacts:\s*edited x\.ts/i.test(recent.description || '')).toBe(true);
+    expect(/Artifacts:\s*edited src\/x\.ts/i.test(recent.description || '')).toBe(true);
     // modifiedFiles set-union: prior was empty (this row had no
     // modifiedFiles in seed), so the new list is ['src/x.ts'].
     expect(recent.metadata?.modifiedFiles).toEqual(['src/x.ts']);
@@ -391,7 +405,7 @@ describe('obs-api legacy /api/* endpoints km-core round-trip (Phase 44 Plan 14)'
     expect(body.scanned).toBe(1);
 
     // Confirm obs-2 mutated. The util joins basenames with `, ` so the
-    // final summary line is `Artifacts: edited foo.ts, edited bar.js`.
+    // final summary line is `Artifacts: edited src/foo.ts, edited lib/bar.js` (whole paths).
     // Match the "Artifacts:" prefix once, then check each basename
     // appears as a literal substring (NOT immediately after the
     // colon — they share one comma-separated list).
@@ -399,8 +413,8 @@ describe('obs-api legacy /api/* endpoints km-core round-trip (Phase 44 Plan 14)'
     const obs2 = matches.find((e) => e.legacyId?.id === 'obs-2');
     expect(obs2).toBeDefined();
     const obs2Summary = obs2.metadata?.summary || '';
-    expect(/Artifacts:\s*edited foo\.ts/i.test(obs2Summary)).toBe(true);
-    expect(obs2Summary).toMatch(/edited bar\.js/i);
+    expect(/Artifacts:\s*edited src\/foo\.ts/i.test(obs2Summary)).toBe(true);
+    expect(obs2Summary).toMatch(/edited lib\/bar\.js/i);
   });
 
   test('GET /api/consolidation/status returns km-core counts + staleness ISO timestamps', async () => {

@@ -6,7 +6,7 @@
  * obs-api endpoints (and, after Plan 44-13 lands, the writer's
  * `_maybePatchArtifacts` path):
  *
- *   * POST /api/observations/patch-artifacts/recent      (last 4h, agent-scoped, limit 10)
+ *   * POST /api/observations/patch-artifacts/recent      (last 4h, one turn / session, limit 10)
  *   * POST /api/observations/patch-artifacts/historical  (one-shot, limit 500)
  *   * src/live-logging/ObservationWriter.js _maybePatchArtifacts  (Plan 44-13)
  *
@@ -77,7 +77,10 @@ export function patchArtifactsInPlace(entity, modifiedFiles) {
 
   if (!/Artifacts:\s*none/i.test(currentSummary)) return false;
 
-  const artifactsList = modifiedFiles.map((f) => `edited ${f.split('/').pop()}`).join(', ');
+  // Whole (repo-relative) paths, as ObservationWriter._enforceArtifacts writes
+  // them: a basename made two rows for the same file read differently, and
+  // `index.ts` named nothing.
+  const artifactsList = modifiedFiles.map((f) => `edited ${f}`).join(', ');
   const updatedSummary = currentSummary.replace(/Artifacts:\s*none/i, `Artifacts: ${artifactsList}`);
 
   meta.summary = updatedSummary;
@@ -88,5 +91,47 @@ export function patchArtifactsInPlace(entity, modifiedFiles) {
   const priorFiles = Array.isArray(meta.modifiedFiles) ? meta.modifiedFiles : [];
   meta.modifiedFiles = Array.from(new Set([...priorFiles, ...modifiedFiles]));
 
+  return true;
+}
+
+/**
+ * Set the Artifacts line to exactly `files` — "none" when empty — and
+ * `metadata.modifiedFiles` to match.
+ *
+ * patchArtifactsInPlace only FILLS a "none"; it cannot correct a wrong list.
+ * Wrong lists exist: until 2026-10-14 `/patch-artifacts/recent` wrote one
+ * turn's files into every "none" row of the same agent within 4h, across
+ * projects and sessions — an LSL-loading turn read "Artifacts: edited
+ * fake-upstream.mjs". A re-derivation from the transcript (the turn's own tool
+ * calls) is authoritative for its row, so it replaces.
+ *
+ * Same rules otherwise: both summary copies change together; a summary with no
+ * Artifacts line (a "[Raw]" fallback, "No actionable content.") is left alone.
+ *
+ * @param {object} entity km-core entity (or `{ metadata: coldRow }`)
+ * @param {string[]} files the turn's files, repo-relative where possible
+ * @returns {boolean} whether anything changed
+ */
+export function setArtifactsInPlace(entity, files) {
+  if (!entity || typeof entity !== 'object') return false;
+  const list = Array.isArray(files) ? [...new Set(files.filter(Boolean))] : [];
+  const meta = entity.metadata && typeof entity.metadata === 'object'
+    ? entity.metadata
+    : (entity.metadata = {});
+  const currentSummary = typeof meta.summary === 'string'
+    ? meta.summary
+    : (typeof entity.description === 'string' ? entity.description : '');
+  if (!/^[ \t]*Artifacts:/m.test(currentSummary)) return false;
+
+  const value = list.length ? list.map((f) => `edited ${f}`).join(', ') : 'none';
+  const updatedSummary = currentSummary.replace(/^([ \t]*Artifacts:).*$/m, `$1 ${value}`);
+  const prior = Array.isArray(meta.modifiedFiles) ? meta.modifiedFiles : [];
+  const sameFiles = prior.length === list.length && prior.every((f, i) => f === list[i]);
+  if (updatedSummary === currentSummary && sameFiles) return false;
+
+  meta.summary = updatedSummary;
+  if (typeof entity.description === 'string') entity.description = updatedSummary;
+  if (list.length) meta.modifiedFiles = list;
+  else delete meta.modifiedFiles;
   return true;
 }

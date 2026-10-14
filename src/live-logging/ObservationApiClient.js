@@ -61,12 +61,13 @@ export class ObservationApiClient {
   /**
    * Patch recent observations whose summary still says "Artifacts: none".
    */
-  async patchRecentArtifacts(agent, modifiedFiles) {
+  async patchRecentArtifacts(agent, modifiedFiles, { turnKey, sessionId } = {}) {
     if (!modifiedFiles || modifiedFiles.length === 0) return { patched: 0 };
+    if (!turnKey && !sessionId) return { patched: 0 };
     try {
       const r = await this._fetch('/api/observations/patch-artifacts/recent', {
         method: 'POST',
-        body: JSON.stringify({ agent, modifiedFiles }),
+        body: JSON.stringify({ agent, modifiedFiles, turnKey, sessionId }),
       });
       if (!r.ok) return { patched: 0 };
       return await r.json();

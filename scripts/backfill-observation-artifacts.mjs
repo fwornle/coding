@@ -3,38 +3,56 @@
  * backfill-observation-artifacts.mjs — re-derive the Artifacts line of existing
  * observations from the transcripts they were written from.
  *
- * WHY THIS EXISTS. `_extractFileChanges` (scripts/enhanced-transcript-monitor.js)
- * decides what an observation lists under "Artifacts:". Until 2026-09-18 it read
- * a file path from exactly one place — `tc.input.file_path|filePath|path` — and
- * therefore missed three whole classes of real change:
+ * WHY THIS EXISTS. The Artifacts line is not the LLM's: ObservationWriter
+ * overwrites it from `metadata.modifiedFiles`, which ETM's extractor derives from
+ * the turn's tool calls (scripts/enhanced-transcript-monitor.js,
+ * extractFileChanges + subagentFileChanges). Whatever the extractor missed reads
+ * "Artifacts: none". It missed a lot — measured 2026-10-14, 62 of 201 tool-using
+ * turns in this repo's last 15 transcripts had files; 83 with the current rules:
  *
- *   - notebook edits, whose path rides on `notebook_path`;
- *   - every pi tool call, because PiSessionReader emits `{name, type, content}`
- *     with the arguments JSON-encoded in `content` and no `input` key at all;
- *   - files written by the shell (`cat > f`, `>>`, `tee`, `sed -i`).
+ *   - edits made by `python3 - <<'EOF' … open(p,'w').write(s)` (the dominant
+ *     editing shape in auto mode), helper functions, dict / tuple loops;
+ *   - edits made by sub-agents (their own transcripts);
+ *   - opencode / copilot apply_patch envelopes, copilot `create`;
+ *   - pi tool calls, which never reached the extractor at all.
  *
- * Rows written before the fix carry "Artifacts: none" for turns that did touch
- * files. This walks the transcripts again, recomputes each turn's files with the
- * CURRENT extractor (imported, never re-implemented — see extractFileChanges),
- * and patches only rows that still say "none".
+ * And some rows carry WRONG files: until the same day, `/patch-artifacts/recent`
+ * wrote one turn's list into every "none" row of that agent within 4h — an
+ * LSL-loading turn read "Artifacts: edited fake-upstream.mjs".
  *
- * NOT a re-run of backfill-gap-observations.mjs, which CREATES observations for
- * a window that has none. This one creates nothing and calls no LLM: it edits
- * the Artifacts line of rows that already exist, so it is cheap and repeatable.
- * Re-running is safe — a row already carrying artifacts no longer matches.
+ * WHAT IT DOES. Indexes every Claude transcript turn (user prompt → next user
+ * prompt) by its prompt uuid and by every message timestamp in it, computes the
+ * turn's files with the CURRENT extractor (imported, never re-implemented), and
+ * SETS each matched row's Artifacts to exactly that list — "none" included:
+ *
+ *   hot rows   (km-core, obs-api)  matched by metadata.turnKey — the prompt uuid
+ *   cold rows  (JSON export)       matched by createdAt — the timestamp of the
+ *              batch's first message, equal to the millisecond; a different
+ *              session's turn cannot collide with it
+ *
+ * A row with no match (transcript gone, another agent) is left as it is. No LLM
+ * call, nothing created; re-running is a no-op once rows agree.
  *
  * Usage:
- *   node scripts/backfill-observation-artifacts.mjs --dry-run
- *   node scripts/backfill-observation-artifacts.mjs --since 2026-09-01
- *   node scripts/backfill-observation-artifacts.mjs --project coding --apply
+ *   node scripts/backfill-observation-artifacts.mjs                 # dry run, hot + cold
+ *   node scripts/backfill-observation-artifacts.mjs --apply
+ *   node scripts/backfill-observation-artifacts.mjs --since 2026-09-01 --project coding
+ *   node scripts/backfill-observation-artifacts.mjs --only hot|cold
  *
- * Env: OBS_API_URL (default http://localhost:12436)
+ * Env: OBS_API_URL (default http://localhost:12436), OBSERVATION_EXPORT_DIR
+ *      (default: the data home's observation-export, lib/paths/data-home.cjs)
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { extractFileChanges } from './enhanced-transcript-monitor.js';
-import { patchArtifactsInPlace } from './lib/artifacts-patch-util.mjs';
+import { createRequire } from 'node:module';
+import EnhancedTranscriptMonitor, { extractFileChanges, subagentFileChanges, relativizeArtifact } from './enhanced-transcript-monitor.js';
+import { execFileSync } from 'node:child_process';
+import { setArtifactsInPlace } from './lib/artifacts-patch-util.mjs';
+import ConfigurableRedactor from '../src/live-logging/ConfigurableRedactor.js';
+
+const require = createRequire(import.meta.url);
+const { observationExportDir } = require('../lib/paths/data-home.cjs');
 
 const args = process.argv.slice(2);
 const getArg = (k, d = null) => {
@@ -42,276 +60,336 @@ const getArg = (k, d = null) => {
   return i >= 0 && args[i + 1] ? args[i + 1] : d;
 };
 const APPLY = args.includes('--apply');
-const DRY = !APPLY;
 const OBS_API = process.env.OBS_API_URL || 'http://localhost:12436';
 const SINCE = getArg('since', '2026-01-01');
 const ONLY_PROJECT = getArg('project', null);
-// Observations age out of the hot km-core store into the JSON cold store, where
-// putEntity cannot reach them — so the API route fixes only recent rows and
-// reports the rest as `missing`. `--cold` patches the export file instead.
-const COLD = args.includes('--cold');
-const EXPORT_DIR = process.env.OBSERVATION_EXPORT_DIR
-  || path.join(process.env.CODING_REPO || process.cwd(), '.data', 'observation-export');
-/**
- * Slack allowed when pairing an observation with the turn it describes.
- *
- * ZERO BY DEFAULT, and that is the whole safety argument. An observation's
- * `createdAt` is the earliest message timestamp of its turn — the user prompt —
- * so the row and the turn carry the SAME instant. A non-zero gap does not mean
- * "close enough", it means the nearest turn that touched files is a DIFFERENT
- * turn, and adopting its files puts edits on a row that never made them.
- *
- * Measured, before this was tightened: of 106 cold rows matched within 180s, 79
- * were exact and the loose remainder included rows whose own summary says they
- * only looked — "Search for all instances … BEFORE making edits", "Investigated
- * system configuration" — each about to inherit a neighbour's edits. A missing
- * artifact is a gap; an invented one is a lie in the record.
- *
- * `--window-ms N` loosens it deliberately, for a caller who will check the
- * result by hand.
- */
-const MATCH_WINDOW_MS = Number(getArg('window-ms', '0'));
-
+const ONLY = getArg('only', null); // 'hot' | 'cold' | null (both)
+const EXPORT_DIR = process.env.OBSERVATION_EXPORT_DIR || observationExportDir();
 const PROJECTS_DIR = path.join(os.homedir(), '.claude', 'projects');
 
-/** Decode Claude's projects-dir slug back to a project NAME (last segment). */
-function projectNameFromSlug(slug) {
-  const parts = slug.split('-').filter(Boolean);
-  return parts[parts.length - 1] || 'unknown';
+const say = (s) => process.stderr.write(`${s}\n`);
+
+// The live writer redacts the summary AND the metadata JSON
+// (ObservationWriter._redact), so a stored path reads `/Users/<USER_ID_REDACTED>/…`.
+// A re-derived path goes through the same redactor before it is compared or
+// written — otherwise every absolute path would "differ", and the backfill
+// would write the raw ones the live path never stores.
+let redact = (t) => t;
+
+/**
+ * A user message opens a turn — EXACTLY the rule ETM's exchange builder applies
+ * (type:user that is not a tool_result), so turn boundaries and turnKeys agree
+ * with the live rows'. That includes `isMeta` messages: a sub-agent hand-back
+ * arrives as one and the live tap keys a turn on it.
+ */
+function isUserPrompt(o) {
+  if (o.type !== 'user' || o.message?.role !== 'user') return false;
+  const c = o.message?.content;
+  return !(Array.isArray(c) && c.some((b) => b && b.type === 'tool_result' && b.tool_use_id));
 }
 
 /**
- * A user prose prompt opens a turn. Same rules as backfill-gap-observations.mjs:
- * type:user (not meta, not a pure tool_result, not a bare command marker), plus
- * the queue-operation form that carries a prompt the user typed while the agent
- * was still working.
+ * Every turn of one transcript, with its files, and the timestamps of all its
+ * messages. Files are repo-relative to the session's own cwd, as the live tap
+ * writes them.
  */
-function userPromptText(o) {
-  if (o.type === 'queue-operation' && o.operation === 'enqueue' && typeof o.content === 'string') {
-    const t = o.content.trim();
-    if (!t || (t.startsWith('<command-') && t.length < 200)) return null;
-    return t;
-  }
-  if (o.type !== 'user' || o.isMeta) return null;
-  const c = o.message?.content;
-  let txt = '';
-  if (typeof c === 'string') txt = c;
-  else if (Array.isArray(c)) {
-    if (c.some((b) => b && b.type === 'tool_result')) return null;
-    txt = c.filter((b) => b && b.type === 'text').map((b) => b.text || '').join('\n');
-  }
-  txt = (txt || '').trim();
-  if (!txt) return null;
-  if (txt.startsWith('<command-') && txt.length < 200) return null;
-  return txt;
-}
-
-/** Turns of one transcript, each with the files it touched. */
 function turnsOf(file) {
+  let raw;
+  try { raw = fs.readFileSync(file, 'utf8'); } catch { return []; }
   const turns = [];
   let cur = null;
-  let raw;
-  try { raw = fs.readFileSync(file, 'utf8'); } catch { return turns; }
+  let cwd = null;
   for (const ln of raw.split('\n')) {
     if (!ln.trim()) continue;
     let o;
     try { o = JSON.parse(ln); } catch { continue; }
-    const prompt = userPromptText(o);
-    if (prompt !== null) {
+    if (!cwd && typeof o.cwd === 'string') cwd = o.cwd;
+    if (isUserPrompt(o)) {
       if (cur) turns.push(cur);
-      cur = { ts: o.timestamp, toolCalls: [] };
-      continue;
+      const c = o.message.content || '';
+      cur = {
+        key: o.uuid,
+        stamps: new Set(),
+        exchange: { userMessage: typeof c === 'string' ? c : (Array.isArray(c) ? c.map((b) => b?.text || '').join('\n') : ''), toolCalls: [], toolResults: [] },
+      };
     }
     if (!cur) continue;
-    if (o.type === 'assistant' && Array.isArray(o.message?.content)) {
-      for (const item of o.message.content) {
-        if (item.type === 'tool_use') cur.toolCalls.push({ name: item.name, input: item.input });
-      }
+    if (o.timestamp) cur.stamps.add(Date.parse(o.timestamp));
+    const content = o.message?.content;
+    if (!Array.isArray(content)) continue;
+    for (const b of content) {
+      if (b?.type === 'tool_use') cur.exchange.toolCalls.push({ name: b.name, input: b.input, id: b.id });
+      if (b?.type === 'tool_result') cur.exchange.toolResults.push({ tool_use_id: b.tool_use_id, content: b.content });
     }
   }
   if (cur) turns.push(cur);
-  // One shared extractor call per turn — same rules the live tap applies.
-  return turns.map((t) => ({
-    ts: t.ts,
-    modifiedFiles: extractFileChanges([{ toolCalls: t.toolCalls }]).modifiedFiles,
-  })).filter((t) => t.ts && t.modifiedFiles.length > 0);
+  return turns.map((t) => {
+    const own = extractFileChanges([t.exchange]).modifiedFiles;
+    const sub = subagentFileChanges([t.exchange], file).modifiedFiles;
+    const files = [...new Set([...own, ...sub].map((p) => redact(relativizeArtifact(p, cwd))))];
+    return { key: t.key, stamps: t.stamps, files, file, tools: t.exchange.toolCalls.map((tc) => tc.name) };
+  });
 }
 
-/**
- * Pair one row with the nearest same-project turn that touched files.
- * Returns the turn's files, or null when nothing lands close enough.
- */
-function filesForRow(turnsByProject, project, stamp) {
-  const turns = turnsByProject.get(project) || [];
-  const at = Date.parse(stamp || '');
-  if (!Number.isFinite(at)) return null;
-  let best = null;
-  let bestGap = Infinity;
-  for (const t of turns) {
-    const gap = Math.abs(Date.parse(t.ts) - at);
-    if (gap < bestGap) { bestGap = gap; best = t; }
+/** Index: prompt uuid → turn, message timestamp (ms) → turn. */
+async function indexTranscripts() {
+  const byKey = new Map();
+  const byStamp = new Map();
+  const sinceMs = Date.parse(SINCE);
+  let slugs = [];
+  try { slugs = fs.readdirSync(PROJECTS_DIR); } catch {
+    say(`ERROR: cannot read ${PROJECTS_DIR}`);
+    process.exit(2);
   }
-  return best && bestGap <= MATCH_WINDOW_MS ? { files: best.modifiedFiles, gapMs: bestGap } : null;
+  let transcripts = 0;
+  for (const slug of slugs) {
+    const dir = path.join(PROJECTS_DIR, slug);
+    let files = [];
+    try { files = fs.readdirSync(dir).filter((f) => f.endsWith('.jsonl')); } catch { continue; }
+    for (const f of files) {
+      const full = path.join(dir, f);
+      try { if (fs.statSync(full).mtimeMs < sinceMs) continue; } catch { continue; }
+      transcripts += 1;
+      for (const t of turnsOf(full)) {
+        if (t.key) byKey.set(t.key, t);
+        for (const s of t.stamps) if (Number.isFinite(s) && !byStamp.has(s)) byStamp.set(s, t);
+      }
+    }
+  }
+  say(`indexed ${transcripts} transcripts: ${byKey.size} turns`);
+  await indexOtherAgents({ byKey, byStamp }, sinceMs);
+  return { byKey, byStamp };
 }
 
 /**
- * Patch the JSON cold store in place.
- *
- * This is safe to do — and it is the ONLY way to reach these rows — because of
- * how ObservationExporter rebuilds the file: rows absent from the hot store are
- * carried over verbatim from the existing JSON (`preserved`, keyed on id alone,
- * not on content), so an edited summary survives every subsequent export.
- *
- * The mutation itself goes through the SAME `patchArtifactsInPlace` the two API
- * routes use. A cold row is flat (`{id, summary, modifiedFiles, …}`) where an
- * entity nests those under `metadata`, so it is passed as `{ metadata: row }`:
- * the util then reads and writes exactly the row's own fields. Reusing it rather
- * than re-implementing the string surgery is what keeps a cold row's Artifacts
- * line identical in shape to a hot one's.
+ * opencode, copilot and pi, through ETM's OWN readers — readTranscriptMessages
+ * (opencode's SQLite, copilot's events.jsonl, pi's session JSONL, each
+ * normalized to Claude's shape) and extractExchanges — so turn boundaries,
+ * turnKeys and tool calls are exactly the live tap's.
  */
-function coldPass(turnsByProject) {
+async function indexOtherAgents(idx, sinceMs) {
+  const etm = Object.create(EnhancedTranscriptMonitor.prototype);
+  etm.debug = () => {};
+  etm.config = {};
+  const sources = [];
+  // opencode: one virtual path per session updated since SINCE
+  try {
+    const db = path.join(os.homedir(), '.local', 'share', 'opencode', 'opencode.db');
+    const out = execFileSync('sqlite3', ['-readonly', '-separator', '\t', db,
+      `select id, directory from session where time_updated >= ${sinceMs};`], { encoding: 'utf8', timeout: 20_000 });
+    for (const line of out.split('\n').filter(Boolean)) {
+      const [id, dir] = line.split('\t');
+      sources.push({ agent: 'opencode', path: `opencode://${id}`, cwd: dir || null });
+    }
+  } catch { /* no opencode */ }
+  // copilot: ~/.copilot/session-state/<id>/events.jsonl
+  const copilotRoot = path.join(os.homedir(), '.copilot', 'session-state');
+  for (const d of (() => { try { return fs.readdirSync(copilotRoot); } catch { return []; } })()) {
+    const f = path.join(copilotRoot, d, 'events.jsonl');
+    try { if (fs.statSync(f).mtimeMs >= sinceMs) sources.push({ agent: 'copilot', path: f, cwd: null }); } catch { /* none */ }
+  }
+  // pi: ~/.pi/agent/sessions/<slug>/*.jsonl, cwd in the session header
+  const piRoot = path.join(os.homedir(), '.pi', 'agent', 'sessions');
+  for (const d of (() => { try { return fs.readdirSync(piRoot); } catch { return []; } })()) {
+    for (const f of (() => { try { return fs.readdirSync(path.join(piRoot, d)); } catch { return []; } })()) {
+      const full = path.join(piRoot, d, f);
+      if (!f.endsWith('.jsonl')) continue;
+      try { if (fs.statSync(full).mtimeMs < sinceMs) continue; } catch { continue; }
+      let cwd = null;
+      try { cwd = JSON.parse(fs.readFileSync(full, 'utf8').split('\n', 1)[0]).cwd || null; } catch { /* no header */ }
+      sources.push({ agent: 'pi', path: full, cwd });
+    }
+  }
+
+  const counts = {};
+  for (const src of sources) {
+    etm.agentType = src.agent;
+    let msgs;
+    let exchanges;
+    try {
+      msgs = etm.readTranscriptMessages(src.path) || [];
+      exchanges = await etm.extractExchanges(msgs);
+    } catch { continue; }
+    if (!exchanges?.length) continue;
+    const turns = exchanges.map((ex) => ({
+      tools: (ex.toolCalls || []).map((tc) => tc.name),
+      key: ex.id,
+      at: Date.parse(ex.timestamp),
+      stamps: new Set(),
+      files: [...new Set(extractFileChanges([ex]).modifiedFiles.map((p) => redact(relativizeArtifact(p, src.cwd))))],
+    })).filter((t) => Number.isFinite(t.at)).sort((a, b) => a.at - b.at);
+    // A message belongs to the latest turn that began at or before it.
+    for (const m of msgs) {
+      const at = Date.parse(m.timestamp);
+      if (!Number.isFinite(at)) continue;
+      let owner = null;
+      for (const t of turns) { if (t.at <= at) owner = t; else break; }
+      owner?.stamps.add(at);
+    }
+    for (const t of turns) {
+      t.stamps.add(t.at);
+      if (t.key) idx.byKey.set(t.key, t);
+      for (const st of t.stamps) if (!idx.byStamp.has(st)) idx.byStamp.set(st, t);
+    }
+    counts[src.agent] = (counts[src.agent] || 0) + turns.length;
+  }
+  say(`indexed other agents: ${JSON.stringify(counts)}`);
+}
+
+const sameList = (a, b) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+/**
+ * A timestamp match is only evidence when it is the row's own message time.
+ * Two shapes say it is not, and the row is left alone:
+ *   - several rows carry the SAME createdAt (an earlier gap backfill stamped
+ *     a session's rows with one instant — 5 different opencode intents at
+ *     2026-05-13T05:52:28.273Z, 9 km-core rows at 2026-05-20T08:01:08.682Z);
+ *   - the matched turn ran no tools at all, yet the row lists files — the row
+ *     describes work that turn did not do, so clearing it would erase it.
+ */
+function trustStampMatch(turn, before, sharedStamp) {
+  if (sharedStamp) return false;
+  if (!(turn.tools || []).length && !turn.files.length && before.length) return false;
+  return true;
+}
+
+/**
+ * Whether a row already says exactly `files` — in its summary line AND its
+ * metadata. Both, because they drifted apart: the old recent-patch route wrote
+ * basenames into the summary ("edited enhanced-transcript-monitor.js") while
+ * metadata held the full path, so comparing metadata alone skipped those rows.
+ */
+function agrees(summary, modifiedFiles, files) {
+  const line = (String(summary).match(/^[ \t]*Artifacts:(.*)$/m) || [])[1];
+  const want = files.length ? files.map((f) => `edited ${f}`).join(', ') : 'none';
+  const meta = Array.isArray(modifiedFiles) ? modifiedFiles : [];
+  return line !== undefined && line.trim() === want && sameList(meta, files);
+}
+
+function report(label, changes) {
+  const toFiles = changes.filter((c) => c.files.length && !c.before.length).length;
+  const toNone = changes.filter((c) => !c.files.length).length;
+  const corrected = changes.length - toFiles - toNone;
+  say(`${label}: ${changes.length} row(s) to change — none→files ${toFiles}, wrong→right ${corrected}, wrong→none ${toNone}`);
+  const byAgent = {};
+  for (const c of changes) {
+    const k = `${c.agent || '?'}:${!c.files.length ? 'wrong→none' : c.before.length ? 'wrong→right' : 'none→files'}`;
+    byAgent[k] = (byAgent[k] || 0) + 1;
+  }
+  say(`  by agent: ${JSON.stringify(byAgent)}`);
+  if (args.includes('--sample')) {
+    const want = getArg('sample');
+    for (const c of changes.filter((x) => `${x.agent}:${!x.files.length ? 'wrong→none' : x.before.length ? 'wrong→right' : 'none→files'}` === want).slice(0, 6)) {
+      say(`  --- ${c.when} ${c.project} [${c.before.join(', ').slice(0, 90)}] → [${c.files.join(', ').slice(0, 90)}]`);
+      say(`      intent: ${String(c.summary || '').split('\n')[0].slice(0, 140)}`);
+      say(`      turn tools: ${(c.tools || []).slice(0, 18).join(' ')}`);
+    }
+    return;
+  }
+  for (const c of changes.slice(0, 15)) {
+    say(`  ${c.when} ${c.project || ''}  [${c.before.join(', ').slice(0, 60) || 'none'}] → [${c.files.join(', ').slice(0, 80) || 'none'}]`);
+  }
+}
+
+async function hotPass(idx) {
+  const resp = await fetch(`${OBS_API}/api/v1/entities?ontologyClass=Observation&limit=100000`);
+  if (!resp.ok) { say(`ERROR: obs-api ${resp.status}`); process.exit(2); }
+  const rows = (await resp.json()).data || [];
+  const changes = [];
+  let matched = 0;
+  const hotStamps = new Map();
+  for (const e of rows) hotStamps.set(e.createdAt, (hotStamps.get(e.createdAt) || 0) + 1);
+  for (const e of rows) {
+    const m = e.metadata || {};
+    if ((e.createdAt || '') < SINCE) continue;
+    if (ONLY_PROJECT && m.project !== ONLY_PROJECT) continue;
+    const keyed = m.turnKey && idx.byKey.get(m.turnKey);
+    const turn = keyed || idx.byStamp.get(Date.parse(e.createdAt));
+    if (!turn) continue;
+    const before = Array.isArray(m.modifiedFiles) ? m.modifiedFiles : [];
+    if (!keyed && !trustStampMatch(turn, before, hotStamps.get(e.createdAt) > 1)) continue;
+    matched += 1;
+    const summary = m.summary || e.description || '';
+    if (!/^[ \t]*Artifacts:/m.test(summary)) continue;
+    const shown = /^[ \t]*Artifacts:\s*none\s*$/im.test(summary) ? [] : before;
+    if (agrees(summary, before, turn.files)) continue;
+    changes.push({ id: e.id, before: shown, files: turn.files, when: e.createdAt, project: m.project, agent: m.agent });
+  }
+  say(`hot: ${rows.length} rows, ${matched} matched to a transcript turn`);
+  report('hot', changes);
+  if (!changes.length || !APPLY) return;
+  for (let i = 0; i < changes.length; i += 100) {
+    const r = await fetch(`${OBS_API}/api/observations/patch-artifacts/by-id`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ replace: true, updates: changes.slice(i, i + 100).map((c) => ({ id: c.id, modifiedFiles: c.files })) }),
+    });
+    say(`  applied: ${JSON.stringify(await r.json().catch(() => ({ status: r.status })))}`);
+  }
+}
+
+/**
+ * The JSON cold store, patched in place: rows absent from the hot store are
+ * carried over verbatim by ObservationExporter (keyed on id), so the change
+ * survives later exports; per-project slices are rebuilt from this file by id.
+ */
+function coldPass(idx) {
   const file = path.join(EXPORT_DIR, 'observations.json');
   let rows;
   try { rows = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (err) {
-    process.stderr.write(`ERROR: cannot read cold store ${file}: ${err.message}\n`);
+    say(`ERROR: cannot read cold store ${file}: ${err.message}`);
     process.exit(2);
   }
-  if (!Array.isArray(rows)) {
-    process.stderr.write(`ERROR: cold store is not an array\n`);
-    process.exit(2);
+  const changes = [];
+  let matched = 0;
+  const coldStamps = new Map();
+  for (const r of rows) if (r?.createdAt) coldStamps.set(r.createdAt, (coldStamps.get(r.createdAt) || 0) + 1);
+  for (const row of rows) {
+    if (!row || (row.createdAt || '') < SINCE) continue;
+    if (ONLY_PROJECT && row.project !== ONLY_PROJECT) continue;
+    const turn = idx.byStamp.get(Date.parse(row.createdAt));
+    if (!turn) continue;
+    const before = Array.isArray(row.modifiedFiles) ? row.modifiedFiles : [];
+    if (!trustStampMatch(turn, before, coldStamps.get(row.createdAt) > 1)) continue;
+    matched += 1;
+    const shown = /^[ \t]*Artifacts:\s*none\s*$/im.test(row.summary || '') ? [] : before;
+    if (!/^[ \t]*Artifacts:/m.test(row.summary || '')) continue;
+    if (agrees(row.summary, before, turn.files)) continue;
+    changes.push({ row, before: shown, files: turn.files, when: row.createdAt, project: row.project, agent: row.agent, summary: row.summary, tools: turn.tools });
   }
-  process.stderr.write(`cold store: ${rows.length} rows in ${file}\n`);
-
-  const candidates = rows.filter((r) => {
-    if (!r || (r.createdAt || '') < SINCE) return false;
-    const mf = r.modifiedFiles;
-    if (Array.isArray(mf) && mf.length > 0) return false;
-    return /Artifacts:\s*none/i.test(r.summary || '');
-  });
-  process.stderr.write(`cold rows saying "Artifacts: none": ${candidates.length}\n`);
-
+  say(`cold: ${rows.length} rows in ${file}, ${matched} matched to a transcript turn`);
+  report('cold', changes);
+  if (!changes.length || !APPLY) return;
   let patched = 0;
-  const shown = [];
-  const gaps = [];
-  const note = (row, m) => {
-    gaps.push(m.gapMs);
-    if (shown.length < 30) {
-      shown.push(`  ${row.project} ${row.createdAt} +${(m.gapMs / 1000).toFixed(0)}s  ${m.files.join(', ').slice(0, 95)}`);
-    }
-  };
-  for (const row of candidates) {
-    const m = filesForRow(turnsByProject, row.project, row.createdAt);
-    if (!m) continue;
-    if (DRY) { patched += 1; note(row, m); continue; }
-    // The util reads/writes metadata.summary + metadata.modifiedFiles, which on
-    // this shim ARE the row's own fields.
-    if (patchArtifactsInPlace({ metadata: row }, m.files)) { patched += 1; note(row, m); }
-  }
-  for (const s of shown) process.stderr.write(`${s}\n`);
-  if (gaps.length) {
-    const exact = gaps.filter((g) => g === 0).length;
-    gaps.sort((a, b) => a - b);
-    process.stderr.write(
-      `\ngap: exact=${exact}/${gaps.length}  median=${(gaps[Math.floor(gaps.length / 2)] / 1000).toFixed(0)}s  max=${(gaps[gaps.length - 1] / 1000).toFixed(0)}s\n`,
-    );
-  }
-
-  if (patched === 0) { process.stderr.write('\nnothing to patch\n'); return; }
-  if (DRY) {
-    process.stderr.write(`\nDRY-RUN: would patch ${patched} cold row(s)\nre-run with --apply to write\n`);
-    return;
-  }
-
-  // Backup, then atomic replace — the exporter may rewrite this file on its own
-  // 10s debounce, and a torn write would take the whole history with it.
+  // The util reads/writes metadata.summary + metadata.modifiedFiles, which on
+  // this shim ARE the row's own fields.
+  for (const c of changes) if (setArtifactsInPlace({ metadata: c.row }, c.files)) patched += 1;
+  // Backup, then atomic replace — the exporter rewrites this file on its own
+  // debounce, and a torn write would take the whole history with it.
   const backup = `${file}.bak-${Date.now()}`;
   fs.copyFileSync(file, backup);
   const tmp = `${file}.tmp-${process.pid}`;
   fs.writeFileSync(tmp, JSON.stringify(rows, null, 2));
   fs.renameSync(tmp, file);
-  process.stderr.write(`\nAPPLIED: patched ${patched} cold row(s)\nbackup: ${backup}\n`);
+  say(`  applied: ${patched} cold row(s); backup ${backup}`);
 }
 
 async function main() {
-  // 1. Every turn that touched a file, per project.
-  const turnsByProject = new Map();
-  let slugs = [];
-  try { slugs = fs.readdirSync(PROJECTS_DIR); } catch {
-    process.stderr.write(`ERROR: cannot read ${PROJECTS_DIR}\n`);
+  try {
+    const redactor = new ConfigurableRedactor();
+    await redactor.initialize();
+    redact = (t) => redactor.redact(t);
+  } catch (err) {
+    say(`ERROR: redactor unavailable (${err.message}) — refusing to write unredacted paths`);
     process.exit(2);
   }
-  for (const slug of slugs) {
-    const dir = path.join(PROJECTS_DIR, slug);
-    const project = projectNameFromSlug(slug);
-    if (ONLY_PROJECT && project !== ONLY_PROJECT) continue;
-    let files = [];
-    try { files = fs.readdirSync(dir).filter((f) => f.endsWith('.jsonl')); } catch { continue; }
-    for (const f of files) {
-      for (const t of turnsOf(path.join(dir, f))) {
-        if (t.ts < SINCE) continue;
-        if (!turnsByProject.has(project)) turnsByProject.set(project, []);
-        turnsByProject.get(project).push(t);
-      }
-    }
-  }
-  const totalTurns = [...turnsByProject.values()].reduce((n, a) => n + a.length, 0);
-  process.stderr.write(`transcript turns with files (since ${SINCE}): ${totalTurns}\n`);
-
-  if (COLD) return coldPass(turnsByProject);
-
-  // 2. Observations that still say "Artifacts: none".
-  //
-  // Paged, because the typed view hard-caps `limit` at 200 (TYPED_VIEW_MAX_LIMIT)
-  // and silently returns that many rather than erroring — so a single request
-  // asking for 5000 quietly backfills only the newest 200 and reports success.
-  const rows = [];
-  const PAGE = 200;
-  for (let offset = 0; ; offset += PAGE) {
-    const url = `${OBS_API}/api/coding/observations?limit=${PAGE}&offset=${offset}&from=${SINCE}`;
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      process.stderr.write(`ERROR: obs-api ${resp.status}\n`);
-      process.exit(2);
-    }
-    const page = (await resp.json()).data || [];
-    rows.push(...page);
-    if (page.length < PAGE) break;
-    if (offset > 50_000) break; // guard against a server that ignores offset
-  }
-  const candidates = rows.filter((r) => {
-    const mf = r.modifiedFiles || r.metadata?.modifiedFiles;
-    if (Array.isArray(mf) && mf.length > 0) return false;
-    return /Artifacts:\s*none/i.test(r.content || r.summary || '');
-  });
-  process.stderr.write(`observations saying "Artifacts: none": ${candidates.length} (of ${rows.length})\n`);
-
-  // 3. Pair each candidate with the nearest same-project turn.
-  const updates = [];
-  for (const row of candidates) {
-    const m = filesForRow(turnsByProject, row.project, row.timestamp || row.createdAt);
-    if (!m) continue;
-    updates.push({ id: row.id, modifiedFiles: m.files, _gapMs: m.gapMs, _project: row.project });
-  }
-  process.stderr.write(`matched within ${MATCH_WINDOW_MS}ms: ${updates.length}\n\n`);
-  for (const u of updates.slice(0, 40)) {
-    process.stderr.write(`  ${u._project} +${(u._gapMs / 1000).toFixed(0)}s  ${u.modifiedFiles.join(', ').slice(0, 110)}\n`);
-  }
-  if (updates.length === 0) { process.stderr.write('\nnothing to patch\n'); return; }
-
-  const r = await fetch(`${OBS_API}/api/observations/patch-artifacts/by-id`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      updates: updates.map((u) => ({ id: u.id, modifiedFiles: u.modifiedFiles })),
-      dryRun: DRY,
-    }),
-  });
-  const out = await r.json().catch(() => ({}));
-  process.stderr.write(`\n${DRY ? 'DRY-RUN' : 'APPLIED'}: ${JSON.stringify(out)}\n`);
-  if (DRY) process.stderr.write('re-run with --apply to write\n');
+  const idx = await indexTranscripts();
+  if (ONLY !== 'cold') await hotPass(idx);
+  if (ONLY !== 'hot') coldPass(idx);
+  if (!APPLY) say('\nDRY RUN — re-run with --apply to write');
 }
 
 main().catch((err) => {
-  process.stderr.write(`ERROR: ${err.message}\n`);
+  say(`ERROR: ${err.message}`);
   process.exit(1);
 });
