@@ -232,83 +232,143 @@ const SCRIPT_INTERPRETER_RE = /\b(?:python3?|node|bun|deno|ruby|perl)\b/;
  * @param {string} source script text
  * @returns {string[]} written paths, in order, de-duplicated
  */
+/**
+ * Split a script into code and string literals.
+ *
+ * Every string literal is replaced by a numbered placeholder `"§n§"`; `lits[n]`
+ * holds its value, or null when it cannot be a path (multi-line, triple-quoted,
+ * a template literal, an f-string with fields). Comments are dropped. The write
+ * patterns then run on code that contains NO string content at all.
+ *
+ * WHY A LEXER. Regexes over raw source cannot pair quotes: an edit script whose
+ * data holds `"""` inside a `"""` string (a script editing this very parser),
+ * or a backtick in Python prose, threw the pairing out of step and turned test
+ * fixtures inside the data into "the script's own" writes. Walking the text
+ * once, with escapes honoured, cannot get out of step.
+ *
+ * Python: ' " ''' """ with r/b/f/u prefixes, # comments. JS: ' " ` (a template
+ * literal is data as a whole), // and /* comments. A JS regex literal is not
+ * recognised — a quote inside one can desync the rest of THAT script, which at
+ * worst loses its writes (a gap), never invents one from a fixture.
+ */
+function lexScript(source, lang = 'python') {
+  const src = String(source || '');
+  const lits = [];
+  let code = '';
+  let i = 0;
+  const n = src.length;
+  const push = (value) => { lits.push(value); code += `"§${lits.length - 1}§"`; };
+  while (i < n) {
+    const c = src[i];
+    if (lang === 'python' && c === '#') {
+      while (i < n && src[i] !== '\n') i++;
+      continue;
+    }
+    if (lang === 'js' && c === '/' && src[i + 1] === '/') {
+      while (i < n && src[i] !== '\n') i++;
+      continue;
+    }
+    if (lang === 'js' && c === '/' && src[i + 1] === '*') {
+      const end = src.indexOf('*/', i + 2);
+      i = end < 0 ? n : end + 2;
+      continue;
+    }
+    const isQuote = c === '"' || c === "'" || (lang === 'js' && c === '`');
+    if (!isQuote) { code += c; i++; continue; }
+    // A Python string prefix (r, b, f, u, rb, …) is already in `code`; an
+    // f-string's fields make its value unknowable.
+    const prefix = lang === 'python' ? (code.match(/([rbfuRBFU]{1,2})$/) || [])[1] || '' : '';
+    if (prefix) code = code.slice(0, -prefix.length);
+    const triple = lang === 'python' && src.startsWith(c.repeat(3), i);
+    const quote = triple ? c.repeat(3) : c;
+    let j = i + quote.length;
+    let value = '';
+    let closed = false;
+    while (j < n) {
+      if (src[j] === '\\') { value += src.slice(j, j + 2); j += 2; continue; }
+      if (src.startsWith(quote, j)) { closed = true; break; }
+      if (!triple && c !== '`' && src[j] === '\n') break; // an unterminated line string
+      value += src[j];
+      j++;
+    }
+    i = closed ? j + quote.length : j;
+    const usable = !triple && c !== '`' && !value.includes('\n') && !(/f/i.test(prefix) && value.includes('{'));
+    push(usable ? value : null);
+  }
+  return { code, lits };
+}
+
 function scriptWriteTargets(source, lang = 'python') {
-  // Python triple-quoted strings and JS template literals are DATA — replacement
-  // text, a test fixture, a generated file's body. Code written into them
-  // (`rep('scripts/x.cjs', …)` inside a test being written) is not this
-  // script's code; blank them so their calls and assignments are not read as
-  // the script's own. Per language: a backtick is plain text in Python, where
-  // replacement strings full of markdown `code` would otherwise blank the
-  // script between them.
-  let src = String(source || '');
-  src = lang === 'js'
-    ? src.replace(/`(?:[^`\\]|\\[\s\S])*`/g, '""')
-    : src.replace(/("""|''')[\s\S]*?\1/g, '""');
-  if (!src) return [];
-  const literals = (text) => [...String(text).matchAll(/(['"])((?:(?!\1)[^\\\n])+)\1/g)].map((m) => m[2]);
+  const { code, lits } = lexScript(source, lang);
+  if (!code) return [];
+  const LIT = '"§(\\d+)§"';
+  const litAt = (k) => lits[Number(k)];
+  const litsIn = (text) => [...String(text).matchAll(/"§(\d+)§"/g)].map((m) => litAt(m[1])).filter((v) => v != null);
 
   // name -> candidate literal values
   const bound = new Map();
   const bind = (name, values) => {
-    if (!values.length) return;
-    bound.set(name, [...(bound.get(name) || []), ...values]);
+    const vs = values.filter((v) => v != null);
+    if (!vs.length) return;
+    bound.set(name, [...(bound.get(name) || []), ...vs]);
   };
   // Literal collections: NAME = { ... } / [ ... ] — keys of a dict, items of a list.
   const collections = new Map();
-  for (const m of src.matchAll(/^[ \t]*(?:const |let |var )?([A-Za-z_]\w*)\s*=\s*([[{])/gm)) {
+  for (const m of code.matchAll(/^[ \t]*(?:const |let |var )?([A-Za-z_]\w*)\s*=\s*([[{])/gm)) {
     const open = m[2];
     const close = open === '{' ? '}' : ']';
     let depth = 0;
     let i = m.index + m[0].length - 1;
-    for (; i < src.length; i++) {
-      if (src[i] === open) depth++;
-      else if (src[i] === close && --depth === 0) break;
+    for (; i < code.length; i++) {
+      if (code[i] === open) depth++;
+      else if (code[i] === close && --depth === 0) break;
     }
-    const body = src.slice(m.index + m[0].length, i);
+    const body = code.slice(m.index + m[0].length, i);
     const values = open === '{'
       // dict keys: a literal followed by ':' at the start of an entry
-      ? [...body.matchAll(/(?:^|[,{\n])\s*(['"])((?:(?!\1)[^\\\n])+)\1\s*:/g)].map((k) => k[2])
-      : literals(body);
+      ? [...body.matchAll(new RegExp(`(?:^|[,{\\n])\\s*${LIT}\\s*:`, 'g'))].map((k) => litAt(k[1]))
+      : litsIn(body);
     // A list of tuples — [('path', old, new), …] — unpacks its FIRST element
     // into the first loop variable; the rest are replacement text, not paths.
     const firsts = open === '[' && /^\s*[([]/.test(body)
-      ? [...body.matchAll(/[([]\s*(['"])((?:(?!\1)[^\\\n])+)\1/g)].map((k) => k[2])
+      ? [...body.matchAll(new RegExp(`[([]\\s*${LIT}`, 'g'))].map((k) => litAt(k[1]))
       : values;
     collections.set(m[1], { values, firsts });
   }
-  // name = 'literal'
   // `p='x'` as its own line or as one `;`-separated statement (`p='x'; s=open(p).read()`).
-  for (const m of src.matchAll(/(?:^|;)[ \t]*(?:const |let |var )?([A-Za-z_]\w*)[ \t]*=[ \t]*(?<q>['"])((?:(?!\k<q>)[^\\\n])+)\k<q>[ \t]*(?=;|$)/gm)) bind(m[1], [m[3]]);
-  // a, b = 'x', 'y' is rare enough to ignore; for-loops bind from collections.
-  for (const m of src.matchAll(/\bfor\s+\(?\s*([A-Za-z_]\w*)((?:\s*,\s*[A-Za-z_]\w*)*)\s*\)?\s+in\s+([A-Za-z_]\w*)(?:\.(?:items|keys)\(\))?/g)) {
+  for (const m of code.matchAll(new RegExp(`(?:^|;)[ \\t]*(?:const |let |var )?([A-Za-z_]\\w*)[ \\t]*=[ \\t]*${LIT}[ \\t]*(?=;|$)`, 'gm'))) {
+    bind(m[1], [litAt(m[2])]);
+  }
+  for (const m of code.matchAll(/\bfor\s+\(?\s*([A-Za-z_]\w*)((?:\s*,\s*[A-Za-z_]\w*)*)\s*\)?\s+in\s+([A-Za-z_]\w*)(?:\.(?:items|keys)\(\))?/g)) {
     const c = collections.get(m[3]);
     if (c) bind(m[1], m[2] ? c.firsts : c.values);
   }
-  for (const m of src.matchAll(/\bfor\s+([A-Za-z_]\w*)(?:\s*,\s*[A-Za-z_]\w*)*\s+in\s+\[([^\]]*)\]/g)) bind(m[1], literals(m[2]));
-  for (const m of src.matchAll(/\bfor\s*\(\s*(?:const|let|var)\s+(?:\[\s*([A-Za-z_]\w*)[^\]]*\]|([A-Za-z_]\w*))\s+of\s+(?:Object\.(?:entries|keys)\(\s*([A-Za-z_]\w*)\s*\)|([A-Za-z_]\w*))/g)) {
+  for (const m of code.matchAll(/\bfor\s+([A-Za-z_]\w*)(?:\s*,\s*[A-Za-z_]\w*)*\s+in\s+\[([^\]]*)\]/g)) bind(m[1], litsIn(m[2]));
+  for (const m of code.matchAll(/\bfor\s*\(\s*(?:const|let|var)\s+(?:\[\s*([A-Za-z_]\w*)[^\]]*\]|([A-Za-z_]\w*))\s+of\s+(?:Object\.(?:entries|keys)\(\s*([A-Za-z_]\w*)\s*\)|([A-Za-z_]\w*))/g)) {
     bind(m[1] || m[2], collections.get(m[3] || m[4])?.values || []);
   }
   // Helpers: `def rep(f, pairs): … open(f,'w')` called as `rep('path', …)`, and
   // the JS `function w(f, …)` / `const w = (f, …) =>` equivalents. The first
   // parameter takes every literal first argument of a call to the helper.
-  for (const m of src.matchAll(/\b(?:def|function)\s+([A-Za-z_]\w*)\s*\(\s*([A-Za-z_]\w*)|\b(?:const|let|var)\s+([A-Za-z_]\w*)\s*=\s*(?:async\s*)?\(\s*([A-Za-z_]\w*)/g)) {
+  for (const m of code.matchAll(/\b(?:def|function)\s+([A-Za-z_]\w*)\s*\(\s*([A-Za-z_]\w*)|\b(?:const|let|var)\s+([A-Za-z_]\w*)\s*=\s*(?:async\s*)?\(\s*([A-Za-z_]\w*)/g)) {
     const fn = m[1] || m[3];
     const param = m[2] || m[4];
-    const calls = [...src.matchAll(new RegExp(`(?<![\\w.])${fn}\\(\\s*(['"])((?:(?!\\1)[^\\\\\\n])+)\\1`, 'g'))].map((c) => c[2]);
-    bind(param, calls);
+    bind(param, [...code.matchAll(new RegExp(`(?<![\\w.])${fn}\\(\\s*${LIT}`, 'g'))].map((c) => litAt(c[1])));
   }
 
   const resolve = (expr) => {
     const e = String(expr || '').trim();
-    const lit = e.match(/^(?:Path\(\s*)?(['"])((?:(?!\1)[^\\\n])+)\1\s*\)?$/);
-    if (lit) return [lit[2]];
+    const lit = e.match(new RegExp(`^(?:Path\\(\\s*)?${LIT}\\s*\\)?$`));
+    if (lit) return [litAt(lit[1])];
     const name = e.match(/^(?:Path\(\s*)?([A-Za-z_]\w*)\s*\)?$/);
     if (name) return bound.get(name[1]) || [];
     return [];
   };
-  const ARG = `((?:Path\\(\\s*)?(?:['"][^'"\\n]+['"]|[A-Za-z_]\\w*)\\s*\\)?)`;
+  const ARG = `((?:Path\\(\\s*)?(?:${LIT}|[A-Za-z_]\\w*)\\s*\\)?)`;
+  const MODE = `${LIT}`;
   const sinks = [
-    new RegExp(`\\bopen\\(\\s*${ARG}\\s*,\\s*(?:mode\\s*=\\s*)?['"][wax]`, 'g'),
+    // open(X, 'w'|'a'|'x'…): the mode is itself a placeholder now; checked below
+    new RegExp(`\\bopen\\(\\s*${ARG}\\s*,\\s*(?:mode\\s*=\\s*)?${MODE}`, 'g'),
     new RegExp(`${ARG}\\.write_(?:text|bytes)\\(`, 'g'),
     new RegExp(`\\bshutil\\.(?:copy2?|copyfile|move)\\(\\s*[^,]+,\\s*${ARG}`, 'g'),
     new RegExp(`\\bos\\.(?:remove|unlink)\\(\\s*${ARG}`, 'g'),
@@ -316,14 +376,19 @@ function scriptWriteTargets(source, lang = 'python') {
     new RegExp(`\\b(?:copyFileSync|renameSync)\\(\\s*[^,]+,\\s*${ARG}`, 'g'),
   ];
   const out = [];
-  for (const re of sinks) {
-    for (const m of src.matchAll(re)) {
+  sinks.forEach((re, k) => {
+    for (const m of code.matchAll(re)) {
+      if (k === 0) {
+        // the mode literal is the last capture group: only a write mode counts
+        const mode = litAt(m[m.length - 1]);
+        if (typeof mode !== 'string' || !/^[wax]/.test(mode)) continue;
+      }
       for (const v of resolve(m[1])) {
         const p = plausibleArtifactPath(v);
         if (p && !out.includes(p)) out.push(p);
       }
     }
-  }
+  });
   return out;
 }
 
@@ -384,6 +449,9 @@ function bashWriteTargets(command) {
     if (bodyStart < 0) { cuts.push([m.index, cmd.length]); continue; }
     const end = cmd.indexOf(`\n${m[2]}`, bodyStart);
     cuts.push([bodyStart, end < 0 ? cmd.length : end + m[2].length + 1]);
+    // Resume AFTER the body: a `<<'EOF'` inside it (a test fixture, a quoted
+    // command) is the body's data, not another heredoc of this command.
+    heredoc.lastIndex = Math.max(heredoc.lastIndex, end < 0 ? cmd.length : end + m[2].length + 1);
     // A heredoc fed to an interpreter is a program, not prose: read its writes.
     const head = cmd.slice(cmd.lastIndexOf('\n', m.index) + 1, m.index);
     if (SCRIPT_INTERPRETER_RE.test(head)) {

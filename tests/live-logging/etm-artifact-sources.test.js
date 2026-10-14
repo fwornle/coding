@@ -110,6 +110,24 @@ test('code inside a triple-quoted string or template literal is data, not the sc
   assert.deepEqual(scriptWriteTargets(md), ['docs/x.md']);
 });
 
+test('a heredoc marker inside a heredoc body is data', () => {
+  // The outer script writes a test whose text holds a whole python heredoc.
+  const cmd = [
+    "python3 - <<'PYEOF'",
+    "p='tests/t.test.js'",
+    "b='''x",
+    "python3 - <<'EOF'",
+    'def rep(f, pairs):',
+    "    open(f,'w')",
+    "rep('scripts/fixture.cjs', [])",
+    'EOF',
+    "'''",
+    "open(p,'a').write(b)",
+    'PYEOF',
+  ].join('\n');
+  assert.deepEqual(bashWriteTargets(cmd), ['tests/t.test.js']);
+});
+
 test('a heredoc that is not a program is still not scanned (commit message)', () => {
   const cmd = `git commit -q -F - <<'EOF'
 fix: write open('x.py','w') > out.txt in prose
