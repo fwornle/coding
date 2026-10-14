@@ -177,16 +177,16 @@ If a login dialog appears, that is macOS asking for your password, not glass.
 
 <p class="overview-kicker">What glass leaves to you</p>
 
-## Two things glass does not fix {#connectivity-yours}
+## The local proxy is yours {#connectivity-yours}
 
-**The local proxy.** glass only watches it. After joining or leaving VPN it can
-need a restart (`P:OFF` in the bar); with coding installed, its health
-coordinator does that for you.
+**glass only watches the local proxy.** After joining or leaving VPN it can need
+a restart (`P:OFF` in the bar); with coding installed, its health coordinator
+does that for you.
 
-**The daemon's proxy settings.** The daemon keeps the `HTTPS_PROXY` of the shell
-that first started it. Started at home and then on VPN, it still goes direct.
-It exits after 30 idle minutes; to switch sooner, close your glass sessions and
-start one from a shell with the right settings.
+**glass follows your shell's proxy settings.** Each `glass <agent>` sends its
+shell's `HTTPS_PROXY` and `NO_PROXY`, and the daemon adopts them for new calls
+if they differ from what it had. A daemon started at home switches to the VPN
+proxy with the first session you start on VPN.
 
 `glass doctor` and `glass report net` show what glass sees.
 
@@ -198,7 +198,7 @@ start one from a shell with the right settings.
 <figcaption>glass doctor names the egress proxy the daemon would use.</figcaption>
 </figure>
 <p class="overview-takeaway" markdown="1">
-Measure, retry, explain. Healing the network stays outside glass.
+Measure, retry, explain, follow your shell. Healing the network stays outside glass.
 [Troubleshooting](troubleshooting.md)
 </p>
 </section>

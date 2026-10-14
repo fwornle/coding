@@ -14,7 +14,7 @@ import {
   ensureDaemon, health, openSession, closeSession, listSessions, recentRows, stopDaemon, statusline as fetchStatusline, contextTurns,
 } from './client.mjs';
 import { runAgent } from './spawn.mjs';
-import { upstreamProxy } from './egress.mjs';
+import { upstreamProxy, proxyEnvOf } from './egress.mjs';
 import { coexistWarnings, opencodeCopilotUpstream, opencodeHttpProviders } from './coexist.mjs';
 import { openUrl } from './open-url.mjs';
 import { renderStatusline, renderReport, uiLinks, TAGS } from './statusline.mjs';
@@ -167,6 +167,9 @@ async function runMeasured(agent, argv) {
   const up = await daemonFor({ home, port, env: baseEnv });
   const session = up ? await openSession(port, {
     agent, intercept, cwd: process.cwd(), project: projectOf(process.cwd()), pid: process.pid, relays,
+    // This shell's proxy settings: the daemon adopts them if they differ from
+    // its own (it may have been started from another shell, on another network).
+    proxyEnv: proxyEnvOf(baseEnv),
   }) : null;
   if (!session) {
     err(`glass: daemon not reachable on 127.0.0.1:${port} — running ${agent} unmeasured (log: ${path.join(glassPaths(home).logs, 'daemon.log')})`);

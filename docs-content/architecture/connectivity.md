@@ -155,13 +155,18 @@ curl -s localhost:12435/health | jq .egress         # direct or which proxy, DEG
 klist                                              # the Kerberos ticket
 ```
 
-## Known gaps
+## Recently fixed
 
-- **5 s healing probe interval never applies.** The coordinator checks
-  `network.proxy_enabled`, which is never written (the field is
-  `proxy_enabled_by_user`), so it stays at 15 s.
-- **The claude CLI fallback can use a stale proxy.** When the Max token is rejected, the
-  LLM proxy falls back to a claude CLI subprocess, which inherits `HTTPS_PROXY` from
-  startup. The runtime egress pin only moves the proxy's own connections.
-- **The status-line network popup overstates claude's fallback.** It lists a fallback for
-  `claude`, but foreground claude is a passthrough with none.
+The research behind this page (2026-10-14) found four gaps. All are fixed now:
+
+- **5 s healing probe interval.** The coordinator used to check `network.proxy_enabled`,
+  which nothing ever set, so it always probed every 15 s. `networkProbeIntervalMs()` now
+  probes every 5 s on CN / VPN while `:3128` does not forward or the ticket is missing.
+- **claude CLI fallback proxy.** The `claude` subprocess used to inherit `HTTPS_PROXY` from
+  the LLM proxy's startup. `buildClaudeEnv()` now sets it from the current egress pin
+  (`subprocessProxyEnv()`).
+- **Status-line network popup.** The popup used to list a fallback for `claude`.
+  `/api/llm/routing/resolve` now names `transport: anthropic-passthrough` for
+  `fg-chat/claude`, and the popup says "no fallback".
+- **glass daemon proxy settings.** The glass daemon used to keep the proxy settings of the
+  shell that started it. It now adopts those of each new `glass <agent>` session.

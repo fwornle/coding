@@ -45,6 +45,7 @@ import {
   REACHABILITY_HOST, PAC_HOST, FUNCTIONAL_FAIL_THRESHOLD,
   probePortListening, readProxyEnabledByUser, probeProxyFunctional, probeKerberosTicket, requestKerberosTicket, countFunctionalFailures,
   publishedFunctional, probeVpnConnected, probePacResolves, probePacOnSite, classifyLocation,
+  networkProbeIntervalMs,
 } from '../lib/network/location-probe.mjs';
 import { settleModeFlip, classifyNetClass } from '../lib/network/proxy-mode-flip.mjs';
 import { decidePostKickstartRecovery } from '../lib/network/post-kickstart-recovery.mjs';
@@ -3121,7 +3122,7 @@ function refreshLslStaleness() {
 // ---------------------------------------------------------------------------
 // Network environment detection — single source of truth
 // ---------------------------------------------------------------------------
-const NETWORK_PROBE_INTERVAL_MS = 15_000;
+// Cadence: networkProbeIntervalMs() (lib/network/location-probe.mjs).
 
 
 // REACHABILITY_HOST (plain internet, probed direct), PROXY_PROBE_HOST (a host
@@ -3660,9 +3661,8 @@ async function runAllChecks() {
   const _netProbeAge = currentState.network.last_probe_end
     ? Date.now() - new Date(currentState.network.last_probe_end).getTime()
     : Infinity;
-  // Probe faster when proxy is enabled but not functional (healing in progress)
-  const _proxyHealing = currentState.network.proxy_enabled && !currentState.network.proxy_functional;
-  const _effectiveProbeInterval = _proxyHealing ? 5_000 : NETWORK_PROBE_INTERVAL_MS;
+  // Faster while the corporate path is broken (healing, or a ticket on its way).
+  const _effectiveProbeInterval = networkProbeIntervalMs(currentState.network);
   if (_netProbeAge >= _effectiveProbeInterval) {
     try {
       // Hard ceiling: pollNetworkStatus must complete within 15s or we abandon it.

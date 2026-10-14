@@ -112,7 +112,12 @@ async function reportNet() {
     const chain = summary.split('->').slice(1).join('->').trim();
     const hops = chain.split('>').map((h) => h.trim()).filter(Boolean);
     row(label, hops[0] || chain);
-    if (hops.length > 1) {
+    // Foreground claude is forwarded verbatim to its one provider: the configured
+    // chain past the head is never tried, so listing it would promise a fallback
+    // that does not exist.
+    if (resolved.transport === 'anthropic-passthrough') {
+      console.log(`  ${''.padEnd(16)}no fallback (passed through unchanged; retried on a blip)`);
+    } else if (hops.length > 1) {
       console.log(`  ${''.padEnd(16)}falls back to ${hops.slice(1).join(' then ')}`);
     }
   }

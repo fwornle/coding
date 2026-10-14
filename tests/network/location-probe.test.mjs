@@ -9,7 +9,7 @@ import { EventEmitter } from 'node:events';
 
 import {
   classifyLocation, observeLocation, networkBadge, countFunctionalFailures, publishedFunctional,
-  readProxyEnabledByUser, probePacResolves, probeProxyFunctional, probeKerberosTicket, requestKerberosTicket, probeVpnConnected, FUNCTIONAL_FAIL_THRESHOLD, PROXY_PROBE_HOST,
+  readProxyEnabledByUser, probePacResolves, probeProxyFunctional, probeKerberosTicket, requestKerberosTicket, networkProbeIntervalMs, probeVpnConnected, FUNCTIONAL_FAIL_THRESHOLD, PROXY_PROBE_HOST,
 } from '../../lib/network/location-probe.mjs';
 
 describe('classifyLocation', () => {
@@ -165,5 +165,23 @@ describe('requestKerberosTicket — asks the SSO extension, never waits for it',
     const ex = fake('["R"]');
     assert.deepEqual(await requestKerberosTicket({ execFile: ex, platform: 'linux' }), []);
     assert.equal(ex.calls.length, 0);
+  });
+});
+
+describe('networkProbeIntervalMs — faster only while the corporate path is broken', () => {
+  it('15 s when everything works, wherever you are', () => {
+    assert.equal(networkProbeIntervalMs({ location: 'vpn', proxy_functional: true, kerberos_ticket: true }), 15_000);
+    assert.equal(networkProbeIntervalMs({ location: 'open', proxy_functional: true }), 15_000);
+  });
+  it('5 s on CN / VPN while the local proxy does not forward', () => {
+    assert.equal(networkProbeIntervalMs({ location: 'vpn', proxy_functional: false, kerberos_ticket: true }), 5_000);
+    assert.equal(networkProbeIntervalMs({ location: 'corporate', proxy_functional: false }), 5_000);
+  });
+  it('5 s on CN / VPN while the Kerberos ticket is missing', () => {
+    assert.equal(networkProbeIntervalMs({ location: 'vpn', proxy_functional: true, kerberos_ticket: false }), 5_000);
+  });
+  it('off the corporate network a broken local proxy is no reason to hurry', () => {
+    assert.equal(networkProbeIntervalMs({ location: 'open', proxy_functional: false, kerberos_ticket: false }), 15_000);
+    assert.equal(networkProbeIntervalMs({}), 15_000);
   });
 });

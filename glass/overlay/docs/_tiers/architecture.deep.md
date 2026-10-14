@@ -98,9 +98,12 @@ proxy. [Connectivity](connectivity.md) is the same material as slides.
 | Corporate proxy | VPN, corporate | egress, per request | 502 naming the proxy, the host and the status |
 | Model host | always | the forward, per request | the host's own error, passed through |
 
-The daemon takes its proxy settings from the environment of the `glass` command that
-started it, and keeps them until it exits (30 idle minutes, `GLASS_IDLE_MIN`). A daemon
-started at home goes direct even after you join VPN.
+The daemon starts with the proxy settings of the `glass` command that started it, and then
+follows each new session: `glass <agent>` sends its shell's `HTTPS_PROXY` / `NO_PROXY`, and when
+they differ the daemon rebuilds its egress and points new interception tunnels at the new
+proxy (calls already in flight keep their route). A proxy that points back at glass is never
+adopted. A daemon started at home therefore moves to the VPN proxy with the first session
+started on VPN.
 
 ![What breaks, who notices it, what happens](images/glass-connectivity-recovery.png)
 
@@ -112,7 +115,8 @@ started at home goes direct even after you join VPN.
 | Daemon not running | the next `glass <agent>` / `glass ui` | starts it; live sessions are re-adopted from `run/sessions.json`, dead ones closed | `lib/glass/client.mjs`, `daemon.mjs` |
 | Daemon of another version | the next `glass <agent>` | replaced once it has no live session | `lib/glass/cli.mjs` |
 | A blind tunnel or an intercepted host cannot be dialled | interception | 502 to the agent, no retry | `proxy-bridge/intercept.mjs` |
-| Local proxy stale after a VPN change | network monitor | shown as `P:OFF` only: glass never restarts the local proxy and never changes proxy variables | — |
+| Daemon started on another network | `glass <agent>`, at session open | adopts that shell's `HTTPS_PROXY` / `NO_PROXY` for new calls and tunnels; logged as `egress proxy A → B` | `lib/glass/daemon.mjs` |
+| Local proxy stale after a VPN change | network monitor | shown as `P:OFF` only: glass never restarts the local proxy and never invents proxy settings | — |
 
 ## Where glass comes from
 

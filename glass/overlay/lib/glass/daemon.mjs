@@ -42,7 +42,7 @@ import { canonicalizeModelName } from '../../proxy/proxy-bridge/model-canonical.
 import { sweepAgedCaptures } from '../measurement/context-turns-retention.mjs';
 import { captureForegroundTokens } from '../lsl/token/stop-adapter-registry.mjs';
 import { glassPaths, PKG_ROOT } from './home.mjs';
-import { createEgressFetch, upstreamProxy } from './egress.mjs';
+import { createEgressFetch, upstreamProxy, proxyEnvOf, noProxyOf } from './egress.mjs';
 import { createUiApi } from './ui-api.mjs';
 import { statuslineData, renderReport, TAGS } from './statusline.mjs';
 import { createNetworkMonitor } from './network.mjs';
@@ -142,12 +142,31 @@ export async function startDaemon({
   const logErr = (l) => log(`ERROR ${l}`);
   // The last tunnel the upstream proxy refused, for the network popup.
   let lastRefusal = null;
-  const egress = fetch || createEgressFetch(process.env, port, {
+  const makeEgress = (env) => createEgressFetch(env, port, {
     onRefusal: (r) => {
       lastRefusal = r;
       logErr(`upstream proxy refused the tunnel to ${r.host} (HTTP ${r.status})`);
     },
   });
+  // The proxy settings egress uses. They start as the daemon's own environment
+  // (the shell of the first `glass` command) and follow each new session's shell:
+  // a daemon started at home must not keep going direct after you join VPN.
+  let egressEnv = proxyEnvOf(process.env);
+  // glass's own port, for "a proxy pointing back at glass is no proxy": the
+  // requested one until the server is bound (port 0 binds a random one).
+  let selfPort = port;
+  let egress = fetch || makeEgress(egressEnv);
+  function adoptProxyEnv(env) {
+    if (!env || typeof env !== 'object') return;
+    const next = proxyEnvOf(env);
+    const before = upstreamProxy(egressEnv, selfPort);
+    const after = upstreamProxy(next, selfPort);
+    if (before === after && noProxyOf(egressEnv) === noProxyOf(next)) return;
+    egressEnv = next;
+    if (!fetch) egress = makeEgress(next);
+    intercept.setUpstream({ upstreamProxy: after, noProxy: noProxyOf(next) });
+    log(`egress proxy ${before || 'direct'} → ${after || 'direct'} (proxy settings of the newest glass session)`);
+  }
   const direct = fetch || createEgressFetch({}, port); // a relay to loopback never takes the corporate proxy
   const config = readConfig(p.config);
 
@@ -310,7 +329,7 @@ export async function startDaemon({
   const closed = new Promise((r) => { resolveClosed = r; });
 
   const lineData = (session) => statuslineData({
-    session, db: tokenDb?.db, measurement, egress: upstreamProxy(process.env, port), network: netMonitor.facts(), glass: VERSION,
+    session, db: tokenDb?.db, measurement, egress: upstreamProxy(egressEnv, selfPort), network: netMonitor.facts(), glass: VERSION,
     refusal: lastRefusal,
   });
 
@@ -324,6 +343,7 @@ export async function startDaemon({
       if (url === '/sessions' && req.method === 'POST') {
         const body = await readJson(req);
         if (!body || !['claude', 'copilot', 'opencode', 'pi'].includes(body.agent)) return json(res, 400, { error: 'agent must be claude, copilot, opencode or pi' });
+        adoptProxyEnv(body.proxyEnv);
         const s = openSession(body);
         return json(res, 200, { taskId: s.taskId, token: s.token, caPath: intercept.caPath });
       }
@@ -385,8 +405,8 @@ export async function startDaemon({
   const intercept = attachIntercept(server, {
     caDir: p.ca,
     hosts: Array.isArray(config.interceptHosts) && config.interceptHosts.length ? config.interceptHosts : DEFAULT_INTERCEPT_HOSTS,
-    upstreamProxy: upstreamProxy(process.env, port),
-    noProxy: process.env.NO_PROXY ?? process.env.no_proxy ?? '',
+    upstreamProxy: upstreamProxy(egressEnv, port),
+    noProxy: noProxyOf(egressEnv),
     onRequest: onIntercepted,
     logErr,
   });
@@ -396,6 +416,7 @@ export async function startDaemon({
     server.listen(port, '127.0.0.1', () => { server.off('error', reject); resolve(); });
   });
   const boundPort = server.address().port;
+  selfPort = boundPort;
   fs.writeFileSync(p.lock, `${JSON.stringify({ pid: process.pid, port: boundPort, glass: VERSION, started_at: new Date().toISOString() }, null, 2)}\n`);
 
   // Re-adopt the previous daemon's sessions — only now, with the port won, so a

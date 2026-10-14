@@ -21,6 +21,24 @@ export function upstreamProxy(env, port) {
   }
 }
 
+const PROXY_KEYS = ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy', 'NO_PROXY', 'no_proxy'];
+
+/**
+ * Just the proxy settings of an environment — what `glass <agent>` sends the
+ * daemon with each new session, so the daemon follows the shell you are in now
+ * rather than the one that happened to start it.
+ */
+export function proxyEnvOf(env = {}) {
+  const out = {};
+  for (const k of PROXY_KEYS) if (typeof env[k] === 'string') out[k] = env[k];
+  return out;
+}
+
+/** NO_PROXY of an environment, '' when unset. */
+export function noProxyOf(env = {}) {
+  return env.NO_PROXY ?? env.no_proxy ?? '';
+}
+
 // How long a refused tunnel is remembered per host. The forward retries a
 // network error twice within ~1.2 s (forwardWithRetry); asking the same proxy
 // again that soon only makes the user wait for the same refusal.

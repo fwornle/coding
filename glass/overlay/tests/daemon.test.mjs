@@ -465,6 +465,19 @@ test('status line: facts of a live session — tokens, the last turn against the
   assert.equal((await api('GET', `/api/statusline?task_id=${s.taskId}`)).status, 404, 'closed sessions have no status line');
 });
 
+test('egress proxy follows the newest session\'s shell, not the shell that started the daemon', async () => {
+  const egressOf = async (s) => (await api('GET', `/api/statusline?task_id=${s.taskId}`)).body.egress;
+  const home = await open('claude', { proxyEnv: {} });
+  assert.equal(await egressOf(home), 'direct', 'started at home: direct');
+  const vpn = await open('claude', { proxyEnv: { HTTPS_PROXY: 'http://127.0.0.1:3999', NO_PROXY: 'localhost' } });
+  assert.equal(await egressOf(vpn), 'proxy', 'a session from a VPN shell moves the daemon onto its proxy');
+  const old = await open('claude');
+  assert.equal(await egressOf(old), 'proxy', 'a client that sends no proxy settings changes nothing');
+  const own = await open('claude', { proxyEnv: { HTTPS_PROXY: `http://127.0.0.1:${daemon.port}` } });
+  assert.equal(await egressOf(own), 'direct', 'a proxy pointing back at glass is never adopted as egress');
+  for (const s of [home, vpn, old, own]) await api('DELETE', `/sessions/${encodeURIComponent(s.token)}`);
+});
+
 test('UI static: page, assets, client routes; no escape from the UI dir', async () => {
   const { createUiApi } = await import('../lib/glass/ui-api.mjs');
   const uiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-ui-'));
