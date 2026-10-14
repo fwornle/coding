@@ -186,12 +186,16 @@ ensure_proxydetox_up() {
     return 0
   fi
 
-  # Only macOS ships the launchd job; elsewhere we cannot heal it.
-  if [ "$(uname -s)" != "Darwin" ]; then
-    return 1
-  fi
-  if [ ! -f "$plist" ]; then
-    log "proxydetox plist missing ($plist) — cannot heal; will fall back to direct"
+  # What can be restarted: the launchd agent on macOS, the .deb's systemd user
+  # unit on Linux / WSL (lib/network/proxydetox-restart.mjs). Anything else on
+  # :3128 — cntlm, a hand-started binary — is the user's and is not touched.
+  local manager=""
+  case "$(uname -s)" in
+    Darwin) [ -f "$plist" ] && manager=launchd ;;
+    Linux)  systemctl --user cat proxydetox.service >/dev/null 2>&1 && manager=systemd ;;
+  esac
+  if [ -z "$manager" ]; then
+    log "proxydetox: no launchd agent / systemd user unit to restart — cannot heal"
     return 1
   fi
 
@@ -286,17 +290,22 @@ ensure_proxydetox_up() {
   # bootout only when nothing is bound: `kickstart -k` re-spawns a live job
   # without dropping the listener, whereas bootout unregisters the socket and is
   # only the right tool when the socket is already gone.
-  if [ "$bound" -ne 0 ] && ! launchctl print "$uid_gui/$label" >/dev/null 2>&1; then
-    log "  proxydetox: not loaded — bootstrapping launchd job"
-    launchctl bootstrap "$uid_gui" "$plist" 2>/dev/null \
-      || launchctl load "$plist" 2>/dev/null || true
-  elif [ "$bound" -ne 0 ]; then
-    log "  proxydetox: loaded but :3128 not bound — bootout + bootstrap"
-    launchctl bootout "$uid_gui/$label" 2>/dev/null || true
-    sleep 1
-    launchctl bootstrap "$uid_gui" "$plist" 2>/dev/null || true
+  if [ "$manager" = systemd ]; then
+    log "  proxydetox: systemctl --user restart proxydetox.service"
+    timeout 15 systemctl --user restart proxydetox.service 2>/dev/null || true
+  else
+    if [ "$bound" -ne 0 ] && ! launchctl print "$uid_gui/$label" >/dev/null 2>&1; then
+      log "  proxydetox: not loaded — bootstrapping launchd job"
+      launchctl bootstrap "$uid_gui" "$plist" 2>/dev/null \
+        || launchctl load "$plist" 2>/dev/null || true
+    elif [ "$bound" -ne 0 ]; then
+      log "  proxydetox: loaded but :3128 not bound — bootout + bootstrap"
+      launchctl bootout "$uid_gui/$label" 2>/dev/null || true
+      sleep 1
+      launchctl bootstrap "$uid_gui" "$plist" 2>/dev/null || true
+    fi
+    launchctl kickstart -k "$uid_gui/$label" 2>/dev/null || true
   fi
-  launchctl kickstart -k "$uid_gui/$label" 2>/dev/null || true
   sleep 1
 
   if timeout 10 curl -s --connect-timeout 4 -x "$px_url" -o /dev/null "https://${PROXY_PROBE_HOST}" 2>/dev/null; then
@@ -355,7 +364,24 @@ configure_proxy_if_needed() {
   # ECONNREFUSED 127.0.0.1:3128). Fall back to direct: correct off-CN; on CN it
   # fails loudly in validate_agent_connectivity, which is the honest outcome —
   # nothing we could pin here would work either.
-  unset HTTP_PROXY HTTPS_PROXY http_proxy https_proxy
+  #
+  # Only a pin to :3128 is dropped. A proxy of the user's own (a corporate
+  # proxy or cntlm in the shell profile — the usual Linux setup without
+  # proxydetox) is not ours to remove: unsetting it took a working proxy away.
+  local v kept=""
+  for v in HTTP_PROXY HTTPS_PROXY http_proxy https_proxy; do
+    case "${!v:-}" in
+      "") ;;
+      *://127.0.0.1:3128*|*://localhost:3128*) unset "$v" ;;
+      *) kept="${!v}" ;;
+    esac
+  done
+  if [ -n "$kept" ]; then
+    export NO_PROXY="${NO_PROXY:-$no_proxy_val}"
+    export no_proxy="${no_proxy:-$NO_PROXY}"
+    log "proxydetox on $px_url not functional — keeping your own proxy $kept"
+    return 0
+  fi
   export NO_PROXY="$no_proxy_val" no_proxy="$no_proxy_val"
   if [ "$INSIDE_CN" = "true" ]; then
     log "⚠️  proxydetox on $px_url not functional and we are INSIDE CN — external APIs will fail until it is restored (try: px)"

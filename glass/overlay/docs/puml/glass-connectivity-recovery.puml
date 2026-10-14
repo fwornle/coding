@@ -22,14 +22,14 @@ package "What breaks" {
 package "Who notices" {
   component "the forward\n(each request)" as d1 <<core>>
   component "egress\n(each request)" as d2 <<core>>
-  component "network monitor\n(every 15 s, and on an\nOS network change)" as d3 <<util>>
+  component "network monitor\n(every 15 s, and on an OS\nnetwork change: macOS, Linux)" as d3 <<util>>
   component "glass <agent> / glass ui\n(at launch)" as d4 <<cli>>
 }
 
 package "What happens" {
   component "retry up to 3× (0 · 300 · 900 ms),\nonly before the first byte;\nthen a 502 the agent can show" as a1 <<core>>
   component "error names proxy, host and status;\nsame host fails fast for 10 s" as a2 <<core>>
-  component "asks the macOS Kerberos SSO\nextension for a ticket (≤ every 2 min);\nstatus line K:NO until it lands" as a3 <<core>>
+  component "macOS: asks the Kerberos SSO extension\n(≤ every 2 min); Linux / WSL: run kinit;\nWindows renews it at logon;\nstatus line K:NO until it lands" as a3 <<core>>
   component "starts the daemon, re-adopts live\nsessions; if it cannot, the agent\nruns unmeasured — never blocked" as a4 <<core>>
   component "not healed by glass — status line\nP:OFF; restart the local proxy\n(coding's coordinator does this)" as a5 <<api>>
 }

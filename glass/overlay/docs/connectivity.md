@@ -124,7 +124,8 @@ answer is never sent twice.
 A **refused tunnel** fails with an error that names the proxy, the host and
 the status, and is not retried against the same proxy for 10 s.
 
-A **missing ticket** on VPN is requested from macOS at once.
+A **missing ticket** on VPN is requested from macOS's Kerberos SSO at once;
+on Linux and WSL, `K:NO` asks you to run `kinit`.
 
 A **missing daemon** is started by the next `glass` command. If it cannot be,
 your agent runs unmeasured: glass never blocks your work.

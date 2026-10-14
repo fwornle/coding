@@ -63,9 +63,10 @@ note right of COORD
      ≥100ms → vpn
      no resolve → open
   Open confirmed over 3 readings;
-  macOS change events re-probe at once.
+  OS change events (macOS, Linux)
+  re-probe at once.
   No Kerberos ticket on vpn/corporate
-  → ask macOS for one.
+  → macOS: ask SSO; Linux: kinit.
 
   Proxy detection (user intent):
   ~/.bash_profile toggle (px alias)

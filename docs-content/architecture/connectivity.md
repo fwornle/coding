@@ -81,16 +81,36 @@ Providers by network:
 
 | Element | Runs as | Needed | Watched by | If it is missing |
 |---|---|---|---|---|
-| LLM proxy `:12435` | launchd `com.coding.llm-cli-proxy`, KeepAlive | always | launcher gate; coordinator probes | launch stops; agent API errors |
-| Health coordinator `:3034` | launchd `com.coding.health-coordinator`, KeepAlive | always | launchd | no network verdict (the proxy keeps its pin), no healing |
+| LLM proxy `:12435` | launchd `com.coding.llm-cli-proxy` / systemd `llm-cli-proxy.service`, always restarted | always | launcher gate; coordinator probes | launch stops; agent API errors |
+| Health coordinator `:3034` | launchd `com.coding.health-coordinator` / systemd `health-coordinator.service`, always restarted | always | launchd / systemd | no network verdict (the proxy keeps its pin), no healing |
 | Agent account | the agent's own login / keychain | always | the provider | the provider's auth error |
-| Local proxy `:3128` | proxydetox, launchd socket activation (started on demand) | VPN, office | coordinator: port + bare `CONNECT api.github.com:443` every 15 s | `P:OFF`; "fetch failed" |
-| Kerberos ticket | macOS Kerberos SSO extension | VPN, office | coordinator: `klist -s` | `K:NO`; 502 for every call |
+| Local proxy `:3128` | proxydetox: launchd socket activation on macOS, systemd user unit on Linux / WSL | VPN, office | coordinator: port + bare `CONNECT api.github.com:443` every 15 s | `P:OFF`; "fetch failed" |
+| Kerberos ticket | macOS: Kerberos SSO extension · Linux / WSL: `kinit` · Windows: the logon | VPN, office | coordinator: `klist -s` | `K:NO`; 502 for every call |
 | Corporate proxy | corporate infrastructure | VPN, office | the LLM proxy's egress test | 502 naming the proxy |
 | Qwen cluster | on-prem | small calls on VPN, office | LLM proxy re-probe, 60 s | dropped from chains; Copilot answers |
 
 The status line shows the network part as `N:{CN|VPN|OPEN} P:{ON|AUTO|OFF}`, with `K:NO` on CN /
 VPN when the ticket is missing.
+
+## By platform
+
+coding runs on macOS, Linux and WSL 2 (on Windows, inside WSL); glass also runs natively on
+Windows. The rules on this page hold everywhere — what differs is how a step is carried out.
+
+| | macOS | Linux | WSL 2 | Windows (glass) |
+|---|---|---|---|---|
+| Keeps the LLM proxy and coordinator running | launchd, `KeepAlive` | systemd user units, `Restart=always` | systemd user units (systemd on in `/etc/wsl.conf`) | — |
+| proxydetox, and its restart | launchd agent `cc.colorto.proxydetox`, socket-activated; `launchctl kickstart -k` | the `.deb`'s user unit `proxydetox.service`; `systemctl --user restart`. Anything else on `:3128` (cntlm, a hand-started binary) is left alone | as Linux, inside the distro | started from the Run key; glass never restarts it |
+| VPN signal | Cisco `vpn state` | Cisco `vpn state` | the Windows host's `vpncli.exe state`, through interop | `vpncli.exe state` |
+| PAC host lookup | `dig` | `dig`, else the OS resolver | `dig`, else the OS resolver | the OS resolver |
+| Network-change events | `notifyutil` (configd) | `ip monitor`, container interfaces ignored | `ip monitor`; under the default NAT networking the host joining VPN is not visible, so the 15 s poll notices | none — the 15 s poll |
+| Kerberos ticket check | `klist -s` | `klist -s` | `klist -s` — the distro's own cache, not the Windows logon's | not checked (Windows' `klist` has no `-s`); no `K:NO` |
+| Missing ticket | asks the Kerberos SSO extension | `K:NO` until you run `kinit` | `K:NO` until you run `kinit` | Windows renews the logon's ticket |
+| LLM proxy restart | `launchctl kickstart -k` | `systemctl --user try-restart` | as Linux | — |
+| Launcher heals `:3128` | yes | yes, with the systemd unit | yes, with the systemd unit | — |
+
+When the launcher cannot get proxydetox working it drops only its own `:3128` pin. A proxy you
+set yourself — the usual Linux setup without proxydetox — is kept.
 
 ## Where am I?
 
@@ -104,10 +124,11 @@ The health coordinator (`scripts/health-coordinator.js`, probes in
     - Otherwise `open`.
 2. **When it looks.**
     - Every 15 s.
-    - At once on a macOS network-change event (`notifyutil`, `lib/network/network-change-watcher.mjs`).
+    - At once on an OS network-change event (macOS `notifyutil`, Linux `ip monitor`;
+      `lib/network/network-change-watcher.mjs`).
     - At once after waking from sleep.
 3. **Hysteresis** (`lib/network/location-hysteresis.mjs`). Moving *to* VPN or corporate is
-   immediate. Moving *to* open needs three readings in a row, unless macOS reported a change
+   immediate. Moving *to* open needs three readings in a row, unless the OS reported a change
    within the last 60 s.
 4. **On a class change** (open ↔ VPN / corporate):
     - The coordinator nudges the LLM proxy to decide its egress again.
@@ -120,16 +141,16 @@ The health coordinator (`scripts/health-coordinator.js`, probes in
 | Failure | Noticed by | What happens | Guard | Where |
 |---|---|---|---|---|
 | You change networks | coordinator | egress nudge; one proxydetox restart if `:3128` does not forward | once per change, within 3 min of it | `health-coordinator.js`, `proxydetox-heal-decision.mjs` rule 3b |
-| `:3128` not listening | coordinator | `launchctl kickstart -k cc.colorto.proxydetox` (bootstrap / load if unloaded) | 45 s cooldown after any restart | rules 1b, 3 |
+| `:3128` not listening | coordinator | restart proxydetox: `launchctl kickstart -k cc.colorto.proxydetox` (bootstrap / load if unloaded), or `systemctl --user restart proxydetox.service`; a proxy that is neither is left alone (`proxydetox-restart.mjs`) | 45 s cooldown after any restart | rules 1b, 3 |
 | `:3128` listening but not forwarding | coordinator | restart after 3 failed probes in a row | not while the network is changing, the host is offline, internal hosts still answer, or the ticket is missing | rules 4–6 |
-| Kerberos ticket missing on CN / VPN | coordinator | asks macOS: `app-sso -a <realm> -R -q`; no proxydetox restart | at most every 2 min | `location-probe.mjs` `requestKerberosTicket`; rule 3a |
+| Kerberos ticket missing on CN / VPN | coordinator | macOS: asks the SSO extension, `app-sso -a <realm> -R -q`; Linux / WSL: `K:NO` until you run `kinit`. No proxydetox restart | at most every 2 min | `location-probe.mjs` `requestKerberosTicket`; rule 3a |
 | Network blip, 502 / 503 / 504 | LLM proxy | up to 3 attempts (0, 300, 900 ms), before the first byte only; then `502 proxy forward failed after 3 attempts` | `LLM_PROXY_FORWARD_ATTEMPTS` | `anthropic-forward.mjs` |
 | A request through the pin cannot connect | LLM proxy | egress decided again; retried once if the pin moved | one re-check at a time | `server.mjs` `proxyFetch` |
 | Provider fails (quota, down, timeout, 5xx) | LLM proxy | next provider in `llm-fallback.yaml`; one same-provider retry on network errors | tools requests only to tools-capable providers | routing config |
 | Qwen cluster unreachable | LLM proxy | dropped from every chain | re-probed every 60 s | `server.mjs` |
-| LLM proxy wedged | coordinator | `launchctl kickstart -k com.coding.llm-cli-proxy` | 60 s between restarts, at most 3 in 5 min; probes paused while you are away | `kickstart-gate.mjs` |
+| LLM proxy wedged | coordinator | `launchctl kickstart -k com.coding.llm-cli-proxy`, or `systemctl --user try-restart llm-cli-proxy.service` | 60 s between restarts, at most 3 in 5 min; probes paused while you are away | `kickstart-gate.mjs` |
 | `:3128` healed | coordinator | LLM proxy restarted to drop stale connections | at most every 10 min | `health-coordinator.js` |
-| LLM proxy or coordinator exits | launchd | restarted | `ThrottleInterval` 10 s / 30 s | `launchd/*.plist` |
+| LLM proxy or coordinator exits | launchd / systemd | restarted | 10 s / 30 s apart (`ThrottleInterval`, `RestartSec`) | `launchd/*.plist`, `systemd/*.service` |
 | LLM proxy down at launch | launcher | waits 5 × 2 s, then stops with the restart command | — | `proxy-routing.mjs` |
 | `:3128` broken at launch | launcher | defers to the coordinator's cause; waits up to 20 s for a restart in progress; heals itself only if the coordinator blames the daemon or does not answer | one attempt | `detect-network.sh` `ensure_proxydetox_up` |
 

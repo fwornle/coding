@@ -6,7 +6,8 @@ title Where am I? — the health coordinator's network probe
 
 start
 :Probe now — every 15 s (5 s while the corporate path is broken),
-on a macOS network-change event, after sleep, or POST /health/refresh;
+on an OS network-change event (macOS notifyutil · Linux ip monitor),
+after sleep, or POST /health/refresh;
 if (Cisco VPN CLI: state Connected?) then (yes)
   :reading = **vpn**;
 else (no)
@@ -20,7 +21,7 @@ else (no)
     :reading = **open**;
   endif
 endif
-if (reading is **open**, previous was vpn / corporate,\nand no macOS change in the last 60 s?) then (yes)
+if (reading is **open**, previous was vpn / corporate,\nand no OS change event in the last 60 s?) then (yes)
   :hold the previous location until **open**
   is read 3 times in a row (hysteresis);
 else (no)
@@ -33,7 +34,8 @@ else (no)
 endif
 :probe :3128 — port listening, then a bare CONNECT api.github.com:443;
 :klist -s — Kerberos ticket on vpn / corporate?
-missing → ask macOS Kerberos SSO for one (≤ every 2 min);
+missing → macOS: ask the Kerberos SSO for one (≤ every 2 min),
+Linux / WSL: K:NO until you kinit;
 :decide whether to heal proxydetox (cause logged + published);
 :publish /health/state → network
 (status line: N: · P: · K:NO);

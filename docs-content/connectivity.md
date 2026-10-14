@@ -150,18 +150,18 @@ Read the bar before reading the logs.
 
 **The health coordinator** watches the network: on every OS network change,
 every 15 s, and after sleep. It moves the egress, restarts a stale local proxy
-and asks macOS for a missing ticket.
+and, on macOS, asks for a missing ticket (on Linux / WSL: `kinit`).
 
 **The LLM proxy** handles each request: retries a blip, falls back to the next
 provider, and drops the Qwen cluster while it is unreachable.
 
-**launchd** restarts a process that dies. **The launcher** refuses to start an
-agent without the proxy.
+**launchd** (macOS) or **systemd** (Linux, WSL) restarts a process that dies.
+**The launcher** refuses to start an agent without the proxy.
 
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Nine failures mapped to who notices them and what happens: egress re-decision, proxy restart, ticket request, retries, fallback, Qwen drop, LLM proxy restart, launchd restart, launch gate.](images/agent-connectivity-recovery.png)](images/agent-connectivity-recovery.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
+[![Nine failures mapped to who notices them and what happens: egress re-decision, proxy restart, ticket request, retries, fallback, Qwen drop, LLM proxy restart, launchd / systemd restart, launch gate.](images/agent-connectivity-recovery.png)](images/agent-connectivity-recovery.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
 
 <figcaption>Each failure has one place that notices it, and one answer.</figcaption>
 </figure>
@@ -178,15 +178,16 @@ Healing is automatic, and limited so it can't make things worse.
 
 ## Joining VPN, step by step {#connectivity-move}
 
-1. macOS reports a network change; the coordinator looks again **at once**.
+1. The OS reports a network change; the coordinator looks again **at once**.
+   (macOS and Linux report one; on Windows / WSL the 15 s poll notices.)
 2. It sees VPN and tells the LLM proxy to **re-decide its egress** now.
 3. If `:3128` does not forward, it **restarts it once**, then leaves it alone
    for 45 s, so one restart is never killed by the next.
-4. No Kerberos ticket? It **asks macOS for one** instead, because a restart
-   cannot help without a ticket.
+4. No Kerberos ticket? It **asks macOS for one** instead (on Linux / WSL it
+   shows `K:NO` until you `kinit`), because a restart cannot help without a ticket.
 
-Leaving VPN goes the other way. Without a change event from macOS, "open" has to
-be seen three times in a row first, so a short drop does not undo the route.
+Leaving VPN goes the other way. Without a change event from the OS, "open" has
+to be seen three times in a row first, so a short drop does not undo the route.
 
 </div>
 <figure class="overview-figure" markdown="1">
@@ -216,7 +217,9 @@ macOS fetched a new ticket by itself after **2 min 20 s**; restarting the local
 proxy in between changed nothing.
 
 Now the coordinator asks for the ticket as soon as it sees `K:NO`: **about
-12 s**, no dialog if your password is in the keychain.
+12 s**, no dialog if your password is in the keychain. That is macOS's Kerberos
+SSO extension; Linux and WSL have none, so there `K:NO` means run `kinit`.
+Windows renews the logon's ticket itself.
 
 </div>
 <figure class="overview-figure" markdown="1">
@@ -226,7 +229,7 @@ Now the coordinator asks for the ticket as soon as it sees `K:NO`: **about
 <figcaption>No ticket, no tunnel, however healthy the proxies are.</figcaption>
 </figure>
 <p class="overview-takeaway" markdown="1">
-`K:NO` in the bar? Wait ~15 s, or run `klist`.
+`K:NO` in the bar? macOS: wait ~15 s. Linux / WSL: run `kinit`.
 [Troubleshooting](reference/troubleshooting.md)
 </p>
 </section>

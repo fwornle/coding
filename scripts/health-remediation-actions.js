@@ -548,11 +548,28 @@ case 'restart_constraint_monitor':
   }
 
   /**
-   * Restart LLM CLI Proxy via launchctl kickstart -k.
+   * Restart LLM CLI Proxy via launchctl kickstart -k (macOS) or its systemd
+   * user unit (Linux / WSL).
    * Single path used by both the dashboard "Restart" button (Phase 33 33-15)
    * and the new auto-heal FSM (Plan 34-03) — one place to test.
    */
   async restartLLMCLIProxy(details) {
+    // Off macOS there is no launchctl: every wedge "restart" failed and the
+    // proxy stayed wedged. daemons.mjs holds the per-platform command, as it
+    // does for the coordinator's other LLM proxy restart.
+    if (process.platform !== 'darwin') {
+      const reason = details?.reason ?? 'unspecified';
+      try {
+        const { restart } = await import('../lib/features/daemons.mjs');
+        const r = await restart('llm-cli-proxy');
+        const ok = r.action === 'restarted' && r.ok;
+        this.log(`[HealthRemediationActions] LLM CLI Proxy restart (${process.platform}): ${r.action}${r.detail || r.reason ? ` — ${r.detail || r.reason}` : ''} (reason: ${reason})`, ok ? 'INFO' : 'ERROR');
+        return { success: ok, message: ok ? 'llm-cli-proxy restarted via its service manager' : `restart ${r.action}: ${r.detail || r.reason || 'failed'}`, reason };
+      } catch (error) {
+        this.log(`[HealthRemediationActions] restartLLMCLIProxy threw: ${error.message}`, 'ERROR');
+        return { success: false, message: error.message };
+      }
+    }
     // Phase 34 D-05: rewritten from raw port-kill+process-respawn to
     // launchctl kickstart -k. The previous implementation skipped
     // start-llm-proxy.sh, so PAC was never re-fetched and HTTPS_PROXY stayed

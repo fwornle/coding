@@ -94,9 +94,17 @@ proxy. [Connectivity](connectivity.md) is the same material as slides.
 | glass daemon `127.0.0.1:12445` | always | `glass <agent>` / `glass ui` probe `/health` (1.5 s) | started detached; if that fails, the agent runs unmeasured |
 | glass CA (`~/.glass/ca/`) | copilot, opencode, pi intercepted | the agent's TLS check | certificate error — `--no-intercept` |
 | Local proxy `:3128` | `HTTPS_PROXY` set (VPN, corporate) | network monitor: port, then a bare `CONNECT api.github.com:443`, every 15 s while a session is open | `P:OFF`; requests fail as "fetch failed" or 502 |
-| Kerberos ticket | the local proxy logs in with it | network monitor: `klist -s` | `K:NO`; the corporate proxy refuses every tunnel |
+| Kerberos ticket | the local proxy logs in with it | network monitor: `klist -s` (not on Windows) | `K:NO`; the corporate proxy refuses every tunnel |
 | Corporate proxy | VPN, corporate | egress, per request | 502 naming the proxy, the host and the status |
 | Model host | always | the forward, per request | the host's own error, passed through |
+
+The network monitor works the same on every platform; only its tools differ:
+
+| | macOS | Linux | WSL | Windows |
+|---|---|---|---|---|
+| VPN signal | Cisco `vpn state` | Cisco `vpn state` | the Windows host's `vpncli.exe`, through interop | `vpncli.exe state` |
+| Network-change events | `notifyutil` | `ip monitor` | `ip monitor` (the default NAT networking does not see the host join VPN) | none — every 15 s |
+| Kerberos ticket | `klist -s`; missing → asks the SSO extension | `klist -s`; missing → `K:NO`, run `kinit` | as Linux, with the distro's own cache | not checked; the logon renews it |
 
 The daemon starts with the proxy settings of the `glass` command that started it, and then
 follows each new session: `glass <agent>` sends its shell's `HTTPS_PROXY` / `NO_PROXY`, and when
@@ -111,7 +119,7 @@ started on VPN.
 |---|---|---|---|
 | Network error, or 502 / 503 / 504 from upstream | the forward | retried up to 3 times (0, 300, 900 ms; `LLM_PROXY_FORWARD_ATTEMPTS`), only before the first byte is written; then a 502 JSON error to the agent | `proxy-bridge/anthropic-forward.mjs` |
 | The upstream proxy refuses the tunnel | egress | the error names proxy, host and status; the same host fails at once for 10 s, so retries do not hammer the proxy; shown in the network popup | `lib/glass/egress.mjs` |
-| No Kerberos ticket on CN / VPN | network monitor | asks the macOS Kerberos SSO extension (`app-sso -a REALM -R -q`), at most every 2 minutes, without waiting; ~12 s measured, against 2 min 20 s for macOS on its own | `lib/glass/network.mjs` |
+| No Kerberos ticket on CN / VPN | network monitor | macOS: asks the Kerberos SSO extension (`app-sso -a REALM -R -q`), at most every 2 minutes, without waiting; ~12 s measured, against 2 min 20 s for macOS on its own. Linux / WSL: `K:NO` until you run `kinit`. Windows: not checked — the logon renews the ticket | `lib/glass/network.mjs` |
 | Daemon not running | the next `glass <agent>` / `glass ui` | starts it; live sessions are re-adopted from `run/sessions.json`, dead ones closed | `lib/glass/client.mjs`, `daemon.mjs` |
 | Daemon of another version | the next `glass <agent>` | replaced once it has no live session | `lib/glass/cli.mjs` |
 | A blind tunnel or an intercepted host cannot be dialled | interception | 502 to the agent, no retry | `proxy-bridge/intercept.mjs` |

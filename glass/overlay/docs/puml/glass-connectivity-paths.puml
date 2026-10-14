@@ -14,7 +14,7 @@ package "Your machine" {
   component "copilot · opencode · pi" as others <<agent>>
   component "glass daemon  127.0.0.1:12445\nmeasures · retries · names a refused tunnel\nnever routes, never changes the proxy" as glass <<core>>
   component "local proxy  :3128 (proxydetox)\nonly on the corporate network / VPN" as px <<infra>>
-  component "Kerberos ticket\nklist · macOS Kerberos SSO" as krb <<storage>>
+  component "Kerberos ticket\nklist · macOS: Kerberos SSO\nLinux / WSL: kinit · Windows: logon" as krb <<storage>>
   component "network monitor\nstatus line  N: · P: · K:NO" as mon <<util>>
 }
 
@@ -38,5 +38,5 @@ krb DATA_LINE px : ticket
 corp SYNC_LINE hosts : verified TLS
 glass OPTIONAL_LINE relayed : relay, loopback direct
 mon OPTIONAL_LINE px : probes :3128\nevery 15 s
-mon OPTIONAL_LINE krb : klist -s;\nmissing → asks SSO
+mon OPTIONAL_LINE krb : klist -s;\nmissing → macOS: asks SSO
 @enduml

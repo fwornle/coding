@@ -39,6 +39,7 @@ import { fileURLToPath } from 'node:url';
 import { runIfMain } from '../lib/utils/esm-cli.js';
 import { createRotatingLogger } from '../lib/utils/log-rotator.js';
 import { decideProxydetoxHeal, neededProbes } from '../lib/network/proxydetox-heal-decision.mjs';
+import { restartProxydetox } from '../lib/network/proxydetox-restart.mjs';
 import { startNetworkChangeWatcher, networkChangeRecent } from '../lib/network/network-change-watcher.mjs';
 import { settleLocation, OPEN_DEMOTION_CONFIRM_TICKS } from '../lib/network/location-hysteresis.mjs';
 import {
@@ -3302,12 +3303,16 @@ async function pollNetworkStatus() {
         // Stamped BEFORE the exec: a kickstart that times out has usually still
         // been dispatched, and the cooldown must cover it either way.
         netState.last_proxydetox_kick_at = Date.now();
-        log(`network: kickstarting proxydetox — cause=${healVerdict.cause}: ${healVerdict.reason}`, 'WARN');
         try {
-          // kickstart only works if the job is loaded; when the job was
-          // unloaded (old px-off behavior did launchctl unload) fall back to
-          // bootstrap so the socket-activated daemon comes back regardless.
-          await execFileAsync('bash', ['-c', 'launchctl kickstart -k gui/$(id -u)/cc.colorto.proxydetox 2>/dev/null || launchctl bootstrap gui/$(id -u) /Library/LaunchAgents/cc.colorto.proxydetox.plist 2>/dev/null || launchctl load /Library/LaunchAgents/cc.colorto.proxydetox.plist 2>/dev/null'], { timeout: 5000 });
+          // launchd on macOS, the systemd user unit on Linux / WSL. Not one we
+          // can restart (a cntlm, a hand-started binary): say so and leave it —
+          // the stamp above keeps this from repeating every poll.
+          const restart = await restartProxydetox();
+          if (restart.action !== 'restarted') {
+            log(`network: proxydetox heal wanted (cause=${healVerdict.cause}) but not possible here — ${restart.detail}`, 'WARN');
+            throw Object.assign(new Error(restart.detail), { unmanaged: true });
+          }
+          log(`network: restarting proxydetox (${restart.how}) — cause=${healVerdict.cause}: ${healVerdict.reason}`, 'WARN');
           // Re-check after kickstart (give it 2s to bind + initialize)
           await new Promise(r => setTimeout(r, 2000));
           // Re-probe: port check
@@ -3371,16 +3376,18 @@ async function pollNetworkStatus() {
           }
           effectivePortListening = portNow;
         } catch (e) {
-          // `kickstart -k` blocks until launchd has stopped the old daemon,
-          // which on a network change can outlast the 5s budget. The restart is
-          // still under way then — the cooldown in decideProxydetoxHeal() keeps
-          // the next polls from killing it — so that is not an error.
-          if (e.killed) {
-            log('network: proxydetox kickstart still landing after 5s — leaving it to finish', 'WARN');
-          } else {
-            log(`network: proxydetox kickstart error: ${e.message}`, 'ERROR');
+          // `kickstart -k` and `systemctl restart` both block until the old
+          // daemon has stopped, which on a network change can outlast the 5s
+          // budget. The restart is still under way then — the cooldown in
+          // decideProxydetoxHeal() keeps the next polls from killing it — so
+          // that is not an error. Unmanaged: nothing was done, so the port is
+          // as it was observed.
+          if (!e.unmanaged) {
+            log(e.killed
+              ? 'network: proxydetox restart still landing after 5s — leaving it to finish'
+              : `network: proxydetox restart error: ${e.message}`, e.killed ? 'WARN' : 'ERROR');
+            effectivePortListening = false;
           }
-          effectivePortListening = false;
         }
       }
     }

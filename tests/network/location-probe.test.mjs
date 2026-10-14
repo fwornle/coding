@@ -9,7 +9,7 @@ import { EventEmitter } from 'node:events';
 
 import {
   classifyLocation, observeLocation, networkBadge, countFunctionalFailures, publishedFunctional,
-  readProxyEnabledByUser, probePacResolves, probeProxyFunctional, probeKerberosTicket, requestKerberosTicket, networkProbeIntervalMs, probeVpnConnected, FUNCTIONAL_FAIL_THRESHOLD, PROXY_PROBE_HOST,
+  readProxyEnabledByUser, probePacResolves, probeProxyFunctional, probeKerberosTicket, requestKerberosTicket, networkProbeIntervalMs, probeVpnConnected, isWsl, FUNCTIONAL_FAIL_THRESHOLD, PROXY_PROBE_HOST,
 } from '../../lib/network/location-probe.mjs';
 
 describe('classifyLocation', () => {
@@ -134,6 +134,17 @@ describe('probes', () => {
     assert.equal(await probeVpnConnected({ platform: 'darwin', spawn: fake('>> state: Connected\n'), timeoutMs: 50 }), true);
     assert.equal(await probeVpnConnected({ platform: 'darwin', spawn: fake('>> state: Disconnected\n'), timeoutMs: 50 }), false);
     assert.equal(await probeVpnConnected({ platform: 'aix', spawn: () => assert.fail('no spawn') }), false);
+  });
+  it('VPN CLI on WSL: the Windows host\'s client, through interop', async () => {
+    const seen = [];
+    const spy = (bin) => { seen.push(bin); const c = new EventEmitter(); c.stdout = new EventEmitter(); c.kill = () => {}; setImmediate(() => c.emit('close', 0)); return c; };
+    await probeVpnConnected({ platform: 'linux', wsl: true, spawn: spy, timeoutMs: 50 });
+    await probeVpnConnected({ platform: 'linux', wsl: false, spawn: spy, timeoutMs: 50 });
+    assert.deepEqual(seen, ['/mnt/c/Program Files (x86)/Cisco/Cisco Secure Client/vpncli.exe', '/opt/cisco/secureclient/bin/vpn']);
+    assert.equal(isWsl({ platform: 'linux', release: '5.15.167.4-microsoft-standard-WSL2', env: {} }), true);
+    assert.equal(isWsl({ platform: 'linux', release: '6.8.0-45-generic', env: { WSL_DISTRO_NAME: 'Ubuntu' } }), true);
+    assert.equal(isWsl({ platform: 'linux', release: '6.8.0-45-generic', env: {} }), false);
+    assert.equal(isWsl({ platform: 'darwin', release: '25.6.0', env: { WSL_DISTRO_NAME: 'x' } }), false);
   });
 });
 

@@ -20,7 +20,7 @@ network.
     | At home or anywhere public | LLM proxy → direct |
 
     The **health coordinator is the single authority** on which one you are in. It probes every
-    15 seconds and at once when macOS reports a network change; the launcher, the status line and
+    15 seconds and at once when the OS reports a network change (macOS, Linux); the launcher, the status line and
     the LLM proxy all read its answer rather than detecting independently.
 
     ## Check where the system thinks you are
@@ -59,7 +59,7 @@ network.
     | The internal PAC host resolves, and answers on :80 in under 100 ms | `corporate` (slower: `vpn`) |
     | Nothing resolves | `open` |
 
-    Moving to `open` needs three readings in a row (unless macOS just reported a change), so a
+    Moving to `open` needs three readings in a row (unless the OS just reported a change), so a
     short DNS blip does not flip anything.
 
     ![Network Detection Flow](../images/network-detection-flow.png)

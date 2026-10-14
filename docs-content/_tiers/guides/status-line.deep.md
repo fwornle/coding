@@ -125,7 +125,7 @@ Two ASCII-only badges reflect the network environment detected by the coordinato
 | `P:ON` | Daemon running + functional AND user toggled `px` on | Normal on VPN/CN |
 | `P:AUTO` | Daemon running + functional, `px` toggle off — adaptive `--direct-fallback` mode; pinned sessions still routed | Normal off-CN state |
 | `P:OFF` | Daemon down, or it listens but cannot open a tunnel (`CONNECT api.github.com:443`) | Problem on VPN/CN (bar turns yellow); the coordinator restarts it — see [Connectivity & Recovery](../architecture/connectivity.md#recovery) |
-| `… K:NO` | On VPN/CN without a Kerberos ticket (`klist -s` fails); the corporate proxy refuses every tunnel until there is one | The coordinator asks macOS for a ticket at once; wait ~15 s, or run `klist` |
+| `… K:NO` | On VPN/CN without a Kerberos ticket (`klist -s` fails); the corporate proxy refuses every tunnel until there is one | macOS: the coordinator asks the Kerberos SSO extension for one at once — wait ~15 s. Linux / WSL: run `kinit` |
 
 !!! note "P: is three-state since 2026-07-26"
     Since the always-on proxy redesign (2026-07-25), the proxydetox daemon stays loaded on :3128 regardless of the `px` toggle — agent sessions are pinned to it and its `--direct-fallback` adapts routing per request. A daemon-truth-only badge would therefore read `ON` nearly always. The badge now combines daemon truth with user intent (`proxy_enabled_by_user` from the coordinator): `ON` (daemon healthy + `px` on), `AUTO` (daemon healthy, `px` off), `OFF` (daemon down/not functional — the only broken state). The former `P:ERR` state remains removed.
@@ -142,7 +142,7 @@ Two ASCII-only badges reflect the network environment detected by the coordinato
 
     **On-site latency:** only when the PAC host resolved and there is no VPN tunnel — a TCP connect to it on :80 in under 100 ms → `corporate`; slower → `vpn`.
 
-    Nothing resolves → `open`. Moving *to* VPN/CN is immediate; moving *to* `open` needs three readings in a row unless macOS reported a network change in the last minute, so a short DNS blip does not flip the badge. (`utun` interfaces are no longer a signal.)
+    Nothing resolves → `open`. Moving *to* VPN/CN is immediate; moving *to* `open` needs three readings in a row unless the OS reported a network change in the last minute (macOS, Linux), so a short DNS blip does not flip the badge. (`utun` interfaces are no longer a signal.)
 
 ### Routing & Execution Indicators
 

@@ -28,19 +28,19 @@ package "Who notices" {
   component "health coordinator\nsynthetic probes 60 s · 90 s · 5 min\n(paused while you are away)" as dLlm <<util>>
   component "LLM proxy, per request" as dReq <<core>>
   component "LLM proxy, every 60 s" as dQwen <<core>>
-  component "launchd" as dLd <<infra>>
+  component "launchd (macOS)\nsystemd (Linux / WSL)" as dLd <<infra>>
   component "coding launcher" as dLaunch <<cli>>
 }
 
 package "What happens" {
   component "LLM proxy re-decides egress now\n(direct ↔ :3128); restart :3128 once\nif it does not forward" as a1 <<core>>
   component "restart proxydetox, then 45 s\nhands off; never while the network\nis changing or the ticket is missing" as a2 <<core>>
-  component "ask macOS for a ticket (≤ every 2 min);\nK:NO until it lands" as a3 <<core>>
+  component "macOS: ask SSO for a ticket (≤ every 2 min);\nLinux / WSL: run kinit; K:NO until it lands" as a3 <<core>>
   component "retry up to 3× before the first byte;\nre-check the egress pin, retry once if it moved" as a4 <<core>>
   component "next provider in the fallback chain\n(background calls; foreground claude: none)" as a5 <<core>>
   component "dropped from every chain\nuntil it answers again" as a6 <<core>>
   component "restart the LLM proxy\n(60 s apart, at most 3 in 5 min)" as a7 <<core>>
-  component "restart the process\n(KeepAlive)" as a8 <<core>>
+  component "restart the process\n(KeepAlive · Restart=always)" as a8 <<core>>
   component "wait 5 × 2 s, then stop with\nthe command that restarts it" as a9 <<core>>
 }
 

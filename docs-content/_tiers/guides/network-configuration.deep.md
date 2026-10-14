@@ -20,8 +20,8 @@ DIRECT (`--direct-fallback`), so a session pinned to it is correct everywhere, i
 mid-session network changes.
 
 The **health coordinator** (`:3034`) is the single authority on where you are. It probes every
-15 s (5 s while the corporate path is broken), at once on a macOS network-change event and after
-sleep, and publishes the result at `GET /health/state` → `network`. The status line, the LLM
+15 s (5 s while the corporate path is broken), at once on an OS network-change event (macOS,
+Linux) and after sleep, and publishes the result at `GET /health/state` → `network`. The status line, the LLM
 proxy and the launcher read it rather than detecting independently.
 
 ![Network-Aware Agent Selection](../images/network-aware-agent-selection.png)
@@ -55,24 +55,28 @@ decides `location` from three probes:
 
 | Probe | Method | Result |
 |-------|--------|--------|
-| **Cisco VPN CLI** | `/opt/cisco/secureclient/bin/vpn state` reports `state: Connected` | `vpn` |
+| **Cisco VPN CLI** | `/opt/cisco/secureclient/bin/vpn state` reports `state: Connected` (WSL: the Windows host's `vpncli.exe`, through interop) | `vpn` |
 | **PAC host DNS** | `dig +short muc.proxy-pac.bmwgroup.net` (fresh subprocess; getaddrinfo fallback) | resolves → corporate or VPN, see below |
 | **On-site latency** | only if the PAC host resolved and there is no VPN tunnel: TCP connect to it on :80 | < 100 ms → `corporate`, else `vpn` |
 | — | nothing resolves | `open` |
 
 **Hysteresis** (`lib/network/location-hysteresis.mjs`): moving *to* VPN / CN is immediate; moving
-*to* `open` needs three consecutive readings (~45 s), unless macOS reported a network change in
+*to* `open` needs three consecutive readings (~45 s), unless the OS reported a network change in
 the last 60 s. A short DNS blip therefore does not flip the badge or the proxy's egress.
 
 **When it looks again** — besides the 15 s timer:
 
-- a macOS network-change event (`notifyutil`, `lib/network/network-change-watcher.mjs`);
+- an OS network-change event (`lib/network/network-change-watcher.mjs`): macOS `notifyutil`,
+  Linux / WSL `ip monitor` with container interfaces ignored. Windows has none, and WSL's default
+  NAT networking does not see the host join VPN — there the 15 s timer notices;
 - waking from sleep;
 - `POST /health/refresh` (what `px` sends).
 
 On a change between `open` and VPN / CN, the coordinator **nudges the LLM proxy** to re-decide
 its egress at once (`POST :12435/api/egress/reevaluate`). If `:3128` then still does not
-forward, it **restarts proxydetox once**, unless the Kerberos ticket is missing.
+forward, it **restarts proxydetox once**, unless the Kerberos ticket is missing — through launchd
+on macOS, the `.deb`'s `proxydetox.service` user unit on Linux / WSL
+(`lib/network/proxydetox-restart.mjs`). A local proxy that is neither is not restarted.
 
 !!! warning "Why `dig` instead of Node.js `dns.Resolver`"
     Node.js caches the system DNS servers at process start. If the coordinator starts on a hotspot (public DNS like `8.8.8.8`) and the user later connects to the office LAN (corporate DNS `160.50.x.x`), `dns.getServers()` returns the **stale startup servers** — BMW internal hostnames can't resolve, and the coordinator reports `open` indefinitely. Spawning `dig` as a subprocess reads the current OS DNS config on every probe, eliminating this class of bugs.
@@ -140,7 +144,7 @@ The status line reflects a toggle within **≤5 seconds**:
 | Step | Latency | Mechanism |
 |------|---------|-----------|
 | Shell env + `~/.bash_profile` intent | instant | `px` |
-| proxydetox loaded (`px` on only) | instant | `launchctl load` if not running |
+| proxydetox loaded (`px` on only) | instant | `launchctl load` if not running (macOS) |
 | Cache invalidation | instant | `rm .logs/combined-status-line-cache-*.txt` |
 | Coordinator re-probe | instant | `POST /health/refresh` |
 | tmux renders | ≤5s | `status-interval 5` picks up fresh state |
@@ -171,9 +175,17 @@ extension for one (`app-sso -a <realm> -R -q`, at most every 2 minutes) instead 
 proxydetox, which cannot help. Measured: ~12 s, against 2 min 20 s for macOS on its own. With
 no password in the keychain, the extension shows its own login dialog.
 
+That request is macOS only. Linux and WSL have no SSO extension and `kinit` needs your password,
+so there `K:NO` stays until you run `kinit`; WSL checks the distro's own credential cache, not
+the Windows logon's. On Windows (glass) the logon renews its ticket and `klist -s` does not
+exist, so the ticket is not checked.
+
+The other steps differ per platform too — service manager, VPN client, change events; see
+[Connectivity & Recovery → By platform](../architecture/connectivity.md#by-platform).
+
 ### Proxy Auto-Heal
 
-When the coordinator judges the LLM proxy unhealthy it can dispatch `launchctl kickstart`. Three rules constrain that, each added after an incident where the previous behaviour made things worse.
+When the coordinator judges the LLM proxy unhealthy it can restart it (`launchctl kickstart -k`, or `systemctl --user try-restart` on Linux / WSL). Three rules constrain that, each added after an incident where the previous behaviour made things worse.
 
 #### A failed probe is not a failed service
 
@@ -270,10 +282,10 @@ CODING_FORCE_CN=true  coding --opencode --dry-run   # simulate inside CN
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| `502 proxy forward failed after 3 attempts` right after joining VPN, `K:NO` | No Kerberos ticket (expired overnight) | Wait ~15 s for the automatic request, or run `klist` / the Kerberos SSO menu |
+| `502 proxy forward failed after 3 attempts` right after joining VPN, `K:NO` | No Kerberos ticket (expired overnight) | macOS: wait ~15 s for the automatic request, or use the Kerberos SSO menu. Linux / WSL: `kinit` |
 | Same 502, ticket present, `P:OFF` | proxydetox stale after the network change | The coordinator restarts it (once per change, 45 s apart); `tail .logs/health-coordinator.log` shows the cause |
 | Every call fails on VPN with "fetch failed", `egress DEGRADED` in the proxy log | No proxy answered the LLM proxy's egress test | Fix `:3128` (above); the pin follows within 30 s, or at once on the coordinator's nudge |
-| `N:OPEN` when on office LAN | Coordinator running old code, or the PAC host does not resolve | `launchctl kickstart -k gui/$(id -u)/com.coding.health-coordinator`; check `dig +short muc.proxy-pac.bmwgroup.net` |
+| `N:OPEN` when on office LAN | Coordinator running old code, or the PAC host does not resolve | Restart it: `launchctl kickstart -k gui/$(id -u)/com.coding.health-coordinator` (macOS), `systemctl --user restart health-coordinator.service` (Linux / WSL); check `dig +short muc.proxy-pac.bmwgroup.net` |
 | `P:AUTO` instead of `P:ON` | `px` is off — expected; proxydetox still serves every session | `px` if you want your shell's own commands proxied too |
 | Status line slow to show a `px` change | Caches not invalidated, or the coordinator not told | `px` does both; otherwise `curl -s -X POST localhost:3034/health/refresh` |
 | "Credit balance too low" | Using an API key instead of OAuth | `claude auth login` for the Max subscription |
@@ -327,9 +339,9 @@ The coordinator exposes live network state at `GET http://localhost:3034/health/
 | `proxy_port_listening` | `:3128` accepts TCP connections |
 | `proxy_functional` | a bare `CONNECT api.github.com:443` through `:3128` answered 200 (debounced over 3 failures) |
 | `proxy_enabled_by_user` | the `px` intent (`ON` vs `AUTO`) |
-| `kerberos_ticket` | `klist -s`: `true`, `false`, or `null` when it cannot be told |
+| `kerberos_ticket` | `klist -s`: `true`, `false`, or `null` when it cannot be told (no `klist`; Windows) |
 | `proxy_heal_cause` / `proxy_heal_reason` | the last proxydetox heal verdict: `healthy`, `restarting`, `daemon`, `no-ticket`, `stale-after-change`, `offline`, `upstream`, `network-change`, `indeterminate` |
-| `last_network_change_at` | last macOS network-change event (ms) |
+| `last_network_change_at` | last OS network-change event (ms; macOS and Linux only) |
 | `last_probe_end` | last completed network probe |
 
 `POST /health/refresh` triggers an immediate re-probe.

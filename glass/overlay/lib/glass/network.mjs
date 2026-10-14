@@ -19,7 +19,7 @@ export const NETWORK_PROBE_INTERVAL_MS = 15_000; // the coordinator's cadence
 /**
  * @param {object} [o]
  * @param {object} [o.probes]   { location, port, functional, enabled, kerberos, renewTicket } — injectable for tests
- * @param {boolean} [o.watch]   subscribe to the OS's network-change notification (macOS)
+ * @param {boolean} [o.watch]   subscribe to the OS's network changes (macOS, Linux / WSL; Windows polls)
  * @param {(line: string) => void} [o.log]
  */
 export function createNetworkMonitor({ probes = {}, watch = true, log = () => {} } = {}) {
