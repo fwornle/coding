@@ -32,6 +32,8 @@ cd "$(dirname "$0")/.."
   #
   # Paths are in the digest too, so a rename or deletion moves the hash even when the
   # surviving bytes do not.
-  git ls-files -z docs-content | LC_ALL=C sort -z | xargs -0 sha256sum
+  # glass/overlay/overrides is the theme's custom_dir (the header deck buttons):
+  # mkdocs renders it into every page, so it belongs in the digest too.
+  git ls-files -z docs-content glass/overlay/overrides | LC_ALL=C sort -z | xargs -0 sha256sum
   sha256sum mkdocs.yml
 } | sha256sum | cut -d' ' -f1

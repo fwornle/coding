@@ -1,7 +1,8 @@
 (() => {
   // The extractor also imports documentation scripts in its Node.js smoke check.
   if (typeof document === 'undefined') return;
-  const deck = document.getElementById('glass-overview');
+  // One deck per page; any page may carry one (glass and coding share this file).
+  const deck = document.querySelector('.overview-deck');
   if (!deck || deck.dataset.ready) return;
 
   const slides = [...deck.querySelectorAll('.overview-slide')];

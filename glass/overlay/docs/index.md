@@ -5,7 +5,9 @@ OpenCode, pi and Claude Code. Put `glass` in front of the agent you already use;
 records every model call and shows where your tokens go.
 
 **New to glass?** [See the ten-slide overview](overview.md): what it can do for you,
-how it works, and your first measured run.
+how it works, and your first measured run. [Connectivity](connectivity.md) shows every
+path a call takes to the model and how each failure is recovered. Both decks are also the
+buttons in the header.
 
 === "⚡ Quick (~3 min)"
 

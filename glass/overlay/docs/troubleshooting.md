@@ -13,6 +13,7 @@ Start with `glass doctor`; most problems show up there.
     | Certificate error in an agent | Try `--no-intercept`, then send the daemon log to the maintainers |
     | No status line | Install tmux, or use Claude Code's status line / `glass watch` |
     | "the upstream proxy … refused the tunnel to … (HTTP 502)", or `K:NO` in the status line | On the corporate network or VPN the local proxy needs a Kerberos ticket: run `klist`; if none is listed, renew it (`kinit`, or the Kerberos SSO menu). glass asks the macOS Kerberos SSO extension for a ticket as soon as it sees `K:NO` on CN / VPN, so after an overnight expiry it is usually back within ~15 s; if a login dialog appears, that is the extension asking for your password. Right after joining or leaving VPN the local proxy can also need a restart |
+    | Calls fail on VPN although `P:` and `K:` look fine, or work at home only | The daemon keeps the `HTTPS_PROXY` of the shell that first started it: `glass doctor` shows `egress proxy`. Close the glass sessions (`glass stop` once none is live) and start again from a shell with the proxy settings of the network you are on |
     | `glass doctor` warns about another local proxy | Start glass from a plain terminal; for pi add `--model <provider>/<model>` with one of pi's own providers (opencode is relayed and measured) — see *glass next to another local LLM proxy* |
 
 === "📚 Deep Dive (full)"

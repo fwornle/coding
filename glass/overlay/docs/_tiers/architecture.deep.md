@@ -80,6 +80,40 @@ graph TD
 
 Details: [Privacy & Data](privacy.md).
 
+## Network paths and recovery
+
+Every call leaves the agent, passes the daemon and reaches the model host directly (no
+`HTTPS_PROXY` in the daemon's environment) or through the local proxy and the corporate
+proxy. [Connectivity](connectivity.md) is the same material as slides.
+
+![Every path from the agent to the model host, and what each hop needs](images/glass-connectivity-paths.png)
+
+| Element | Needed when | Checked by | If it is missing |
+|---|---|---|---|
+| The agent's own login | always | the agent | the agent's sign-in error |
+| glass daemon `127.0.0.1:12445` | always | `glass <agent>` / `glass ui` probe `/health` (1.5 s) | started detached; if that fails, the agent runs unmeasured |
+| glass CA (`~/.glass/ca/`) | copilot, opencode, pi intercepted | the agent's TLS check | certificate error — `--no-intercept` |
+| Local proxy `:3128` | `HTTPS_PROXY` set (VPN, corporate) | network monitor: port, then a bare `CONNECT api.github.com:443`, every 15 s while a session is open | `P:OFF`; requests fail as "fetch failed" or 502 |
+| Kerberos ticket | the local proxy logs in with it | network monitor: `klist -s` | `K:NO`; the corporate proxy refuses every tunnel |
+| Corporate proxy | VPN, corporate | egress, per request | 502 naming the proxy, the host and the status |
+| Model host | always | the forward, per request | the host's own error, passed through |
+
+The daemon takes its proxy settings from the environment of the `glass` command that
+started it, and keeps them until it exits (30 idle minutes, `GLASS_IDLE_MIN`). A daemon
+started at home goes direct even after you join VPN.
+
+![What breaks, who notices it, what happens](images/glass-connectivity-recovery.png)
+
+| Failure | Noticed by | What happens | Where |
+|---|---|---|---|
+| Network error, or 502 / 503 / 504 from upstream | the forward | retried up to 3 times (0, 300, 900 ms; `LLM_PROXY_FORWARD_ATTEMPTS`), only before the first byte is written; then a 502 JSON error to the agent | `proxy-bridge/anthropic-forward.mjs` |
+| The upstream proxy refuses the tunnel | egress | the error names proxy, host and status; the same host fails at once for 10 s, so retries do not hammer the proxy; shown in the network popup | `lib/glass/egress.mjs` |
+| No Kerberos ticket on CN / VPN | network monitor | asks the macOS Kerberos SSO extension (`app-sso -a REALM -R -q`), at most every 2 minutes, without waiting; ~12 s measured, against 2 min 20 s for macOS on its own | `lib/glass/network.mjs` |
+| Daemon not running | the next `glass <agent>` / `glass ui` | starts it; live sessions are re-adopted from `run/sessions.json`, dead ones closed | `lib/glass/client.mjs`, `daemon.mjs` |
+| Daemon of another version | the next `glass <agent>` | replaced once it has no live session | `lib/glass/cli.mjs` |
+| A blind tunnel or an intercepted host cannot be dialled | interception | 502 to the agent, no retry | `proxy-bridge/intercept.mjs` |
+| Local proxy stale after a VPN change | network monitor | shown as `P:OFF` only: glass never restarts the local proxy and never changes proxy variables | — |
+
 ## Where glass comes from
 
 glass is generated from two source repositories by an extraction script — it is not a

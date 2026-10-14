@@ -1,0 +1,42 @@
+@startuml glass-connectivity-paths
+!include _standard-style.puml
+top to bottom direction
+skinparam defaultFontSize 15
+skinparam componentFontSize 15
+skinparam arrowFontSize 13
+skinparam shadowing false
+skinparam componentStyle rectangle
+hide stereotype
+title Every path from your agent to the model — and what each hop needs
+
+package "Your machine" {
+  component "claude" as claude <<agent>>
+  component "copilot · opencode · pi" as others <<agent>>
+  component "glass daemon  127.0.0.1:12445\nmeasures · retries · names a refused tunnel\nnever routes, never changes the proxy" as glass <<core>>
+  component "local proxy  :3128 (proxydetox)\nonly on the corporate network / VPN" as px <<infra>>
+  component "Kerberos ticket\nklist · macOS Kerberos SSO" as krb <<storage>>
+  component "network monitor\nstatus line  N: · P: · K:NO" as mon <<util>>
+}
+
+cloud "Corporate network / VPN" {
+  component "corporate proxy\nlogs you in with the ticket" as corp <<infra>>
+}
+
+cloud "Internet" {
+  component "Model hosts\napi.anthropic.com · api.openai.com\napi.githubcopilot.com · copilot-api.<tenant>.ghe.com" as hosts <<external>>
+}
+
+component "opencode plain-HTTP provider\n(e.g. a local model server)" as relayed <<external>>
+
+claude SYNC_LINE glass : ANTHROPIC_BASE_URL\n(plain HTTP, loopback)
+others SYNC_LINE glass : HTTPS_PROXY = glass\n(CONNECT, TLS by glass's CA)
+others OPTIONAL_LINE glass : opencode: /relay/<provider>
+glass SYNC_LINE hosts : at home: direct\n(no HTTPS_PROXY)
+glass SYNC_LINE px : on VPN / corporate:\nHTTPS_PROXY = :3128
+px SYNC_LINE corp : CONNECT + Negotiate
+krb DATA_LINE px : ticket
+corp SYNC_LINE hosts : verified TLS
+glass OPTIONAL_LINE relayed : relay, loopback direct
+mon OPTIONAL_LINE px : probes :3128\nevery 15 s
+mon OPTIONAL_LINE krb : klist -s;\nmissing → asks SSO
+@enduml

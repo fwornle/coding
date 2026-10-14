@@ -1,0 +1,50 @@
+@startuml agent-connectivity-paths
+!include _standard-style.puml
+top to bottom direction
+skinparam defaultFontSize 15
+skinparam componentFontSize 15
+skinparam arrowFontSize 13
+skinparam shadowing false
+skinparam componentStyle rectangle
+hide stereotype
+title Every path from a coding agent to a model — and what each hop needs
+
+package "Your machine" {
+  component "claude" as claude <<agent>>
+  component "copilot" as copilot <<agent>>
+  component "opencode · pi" as ocpi <<agent>>
+  component "LLM proxy  :12435  (launchd, KeepAlive)\nroutes · falls back · offloads · counts tokens\negress pin: direct  or  via :3128" as llm <<core>>
+  component "health coordinator  :3034  (launchd)\nwhere am I? · heals · nudges" as coord <<util>>
+  component "local proxy  :3128  proxydetox\n(launchd socket, started on demand)" as px <<infra>>
+  component "Kerberos ticket\nklist · macOS Kerberos SSO" as krb <<storage>>
+}
+
+cloud "Corporate network / VPN" {
+  component "corporate proxy\nlogs you in with the ticket" as corp <<infra>>
+  component "on-prem Qwen cluster\n(10.x, small calls)" as qwen <<external>>
+}
+
+cloud "Internet" {
+  component "api.anthropic.com\nClaude subscription" as anth <<external>>
+  component "copilot-api.<tenant>.ghe.com\nGitHub Copilot" as cop <<external>>
+  component "api.openai.com\nfallback" as oai <<external>>
+}
+
+claude SYNC_LINE llm : ANTHROPIC_BASE_URL\n/v1/messages
+copilot SYNC_LINE llm : BYOK\n/v1/copilot
+ocpi SYNC_LINE llm : provider config\n/v1/opencode · /v1
+
+llm SYNC_LINE anth : at home: direct\nto every host
+llm SYNC_LINE px : CN / VPN: pinned
+px SYNC_LINE corp : CONNECT + Negotiate
+krb DATA_LINE px : ticket
+corp SYNC_LINE anth
+corp SYNC_LINE cop
+corp SYNC_LINE oai
+llm SYNC_LINE qwen : CN / VPN only,\nprivate address → direct
+
+claude OPTIONAL_LINE px : the agent's own traffic\n(login, GitHub) via HTTPS_PROXY
+coord CONTROL_LINE llm : network mode ·\nre-check egress now
+coord CONTROL_LINE px : probe 15 s ·\nrestart when stale
+coord CONTROL_LINE krb : klist -s · missing →\nask macOS for one
+@enduml

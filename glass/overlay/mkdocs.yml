@@ -10,9 +10,12 @@ extra_css:
   - assets/overview.css
 extra_javascript:
   - assets/overview.js
+  - assets/header-decks.js
 
 theme:
   name: material
+  # Header deck buttons (extra.decks below).
+  custom_dir: overrides
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -79,7 +82,6 @@ validation:
 
 nav:
   - Home: index.md
-  - Overview: overview.md
   - Getting Started: getting-started.md
   - Using glass:
     - Token Usage: token-usage.md
@@ -96,6 +98,14 @@ nav:
     - Development & Releases: development.md
 
 extra:
+  # Presentations, opened from icon buttons in the header (overrides/main.html).
+  decks:
+    - title: glass overview — ten slides
+      link: overview/
+      icon: material/presentation
+    - title: Connectivity — every path, and how it recovers
+      link: connectivity/
+      icon: material/lan-connect
   social:
     - icon: fontawesome/brands/github
       link: https://bmw.ghe.com/AIMAAD/glass

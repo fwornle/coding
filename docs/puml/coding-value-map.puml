@@ -1,0 +1,26 @@
+@startuml coding-value-map
+!include _standard-style.puml
+top to bottom direction
+skinparam defaultFontSize 20
+skinparam componentFontSize 20
+skinparam arrowFontSize 16
+skinparam nodesep 35
+skinparam ranksep 45
+skinparam shadowing false
+skinparam componentStyle rectangle
+hide stereotype
+
+component "Your coding agent\nClaude Code · Copilot CLI · OpenCode · pi" as agent <<agent>>
+component "coding\nThe environment around the agent" as layer <<core>>
+component "Capture\nEvery session, logged" as capture <<storage>>
+component "Learn\nKnowledge from the history" as learn <<api>>
+component "Prevent\nBad tool calls blocked" as prevent <<api>>
+component "Measure\nTokens, cost, context" as measure <<api>>
+
+agent DATA_LINE layer
+layer DATA_LINE capture
+layer DATA_LINE learn
+layer DATA_LINE prevent
+layer DATA_LINE measure
+learn ..> agent : injected\nnext prompt
+@enduml

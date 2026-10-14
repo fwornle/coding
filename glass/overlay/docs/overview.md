@@ -5,7 +5,7 @@ hide:
   - toc
 ---
 
-<div class="glass-overview" id="glass-overview" role="region" aria-label="Glass overview presentation" markdown="1">
+<div class="overview-deck" id="glass-overview" role="region" aria-label="Glass overview presentation" markdown="1">
 
 <div class="overview-toolbar" hidden>
   <span class="overview-label">glass / in ten slides</span>

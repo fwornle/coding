@@ -1,28 +1,28 @@
-.md-main__inner:has(.glass-overview) {
+.md-main__inner:has(.overview-deck) {
   max-width: 100%;
   margin-top: 0;
 }
 
-.md-content:has(.glass-overview) {
+.md-content:has(.overview-deck) {
   min-width: 0;
 }
 
-.md-content__inner:has(.glass-overview) {
+.md-content__inner:has(.overview-deck) {
   margin: 0;
   padding: 0;
 }
 
-.md-content__inner:has(.glass-overview)::before,
-.md-content__inner:has(.glass-overview) > .md-content__button,
-.md-content__inner:has(.glass-overview) > h1 {
+.md-content__inner:has(.overview-deck)::before,
+.md-content__inner:has(.overview-deck) > .md-content__button,
+.md-content__inner:has(.overview-deck) > h1 {
   display: none;
 }
 
-.md-container:has(.glass-overview) > .md-footer {
+.md-container:has(.overview-deck) > .md-footer {
   display: none;
 }
 
-.glass-overview {
+.overview-deck {
   --overview-blue: #0066b1;
   --overview-surface: #f2f6fa;
   --overview-ink: #14283e;
@@ -32,18 +32,18 @@
   background: var(--md-default-bg-color);
 }
 
-[data-md-color-scheme="slate"] .glass-overview {
+[data-md-color-scheme="slate"] .overview-deck {
   --overview-blue: #72beef;
   --overview-surface: #253447;
   --overview-ink: #e4effa;
 }
 
-.glass-overview[data-ready] {
+.overview-deck[data-ready] {
   height: calc(100dvh - 4.8rem);
   min-height: 24rem;
 }
 
-.glass-overview [hidden] {
+.overview-deck [hidden] {
   display: none !important;
 }
 
@@ -71,7 +71,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.glass-overview button {
+.overview-deck button {
   padding: .35rem .7rem;
   border: 1px solid var(--md-default-fg-color--light);
   border-radius: .25rem;
@@ -82,19 +82,19 @@
   cursor: pointer;
 }
 
-.glass-overview button:hover:not(:disabled),
-.glass-overview button[aria-current] {
+.overview-deck button:hover:not(:disabled),
+.overview-deck button[aria-current] {
   border-color: var(--overview-blue);
   color: var(--md-default-bg-color);
   background: var(--overview-blue);
 }
 
-.glass-overview button:focus-visible {
+.overview-deck button:focus-visible {
   outline: 3px solid var(--overview-blue);
   outline-offset: 3px;
 }
 
-.glass-overview button:disabled {
+.overview-deck button:disabled {
   opacity: .4;
   cursor: default;
 }
@@ -124,7 +124,7 @@
   min-width: 0;
 }
 
-.glass-overview .overview-kicker {
+.overview-deck .overview-kicker {
   margin: 0 0 .6rem;
   color: var(--overview-blue);
   font-size: .65rem;
@@ -133,8 +133,8 @@
   text-transform: uppercase;
 }
 
-.glass-overview h1,
-.glass-overview h2 {
+.overview-deck h1,
+.overview-deck h2 {
   margin: 0 0 1rem;
   color: var(--overview-ink);
   font-size: clamp(1.4rem, 2.8vw, 2.2rem);
@@ -143,11 +143,11 @@
   line-height: 1.12;
 }
 
-.glass-overview h1 {
+.overview-deck h1 {
   font-size: clamp(1.8rem, 3.7vw, 3rem);
 }
 
-.glass-overview .headerlink {
+.overview-deck .headerlink {
   display: none;
 }
 
@@ -173,7 +173,7 @@
   background: var(--overview-surface);
 }
 
-.glass-overview .overview-figure {
+.overview-deck .overview-figure {
   min-width: 0;
   width: 100%;
   margin: 0;
@@ -212,7 +212,7 @@
   text-align: left;
 }
 
-.glass-overview .overview-takeaway {
+.overview-deck .overview-takeaway {
   grid-column: 1 / -1;
   margin: 0;
   padding: .65rem 1rem;
@@ -248,13 +248,13 @@
   font-size: .7rem;
 }
 
-.glass-overview:fullscreen {
+.overview-deck:fullscreen {
   height: 100dvh;
   max-width: none;
 }
 
 @media (max-width: 76.234375em) {
-  .glass-overview[data-ready] {
+  .overview-deck[data-ready] {
     height: calc(100dvh - 2.4rem);
   }
 }
@@ -309,15 +309,15 @@
     display: none !important;
   }
 
-  .glass-overview[data-ready],
+  .overview-deck[data-ready],
   .overview-stage {
     display: block;
     height: auto;
     overflow: visible;
   }
 
-  .glass-overview .overview-slide,
-  .glass-overview .overview-slide[hidden] {
+  .overview-deck .overview-slide,
+  .overview-deck .overview-slide[hidden] {
     display: grid !important;
     min-height: 0;
     break-after: page;
@@ -327,4 +327,19 @@
   .overview-figure img {
     max-height: none;
   }
+}
+
+/* Deck buttons in the header (overrides/main.html, assets/header-decks.js). */
+.md-header__button.header-deck {
+  margin: 0 0.1rem;
+  opacity: 0.85;
+}
+
+.md-header__button.header-deck:hover,
+.md-header__button.header-deck[aria-current] {
+  opacity: 1;
+}
+
+.md-header__button.header-deck[aria-current] {
+  border-bottom: 2px solid currentColor;
 }

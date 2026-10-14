@@ -1,0 +1,65 @@
+@startuml agent-connectivity-recovery
+!include _standard-style.puml
+left to right direction
+skinparam defaultFontSize 15
+skinparam componentFontSize 15
+skinparam arrowFontSize 13
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam nodesep 14
+skinparam ranksep 70
+hide stereotype
+title What breaks, who notices, what happens — coding
+
+package "What breaks" {
+  component "You move: home ↔ VPN ↔ office" as f1 <<external>>
+  component "Local proxy :3128 stale or dead" as f2 <<external>>
+  component "Kerberos ticket expired" as f3 <<external>>
+  component "Network blip, 502 / 503 / 504" as f4 <<external>>
+  component "A provider fails\n(quota, down, timeout)" as f5 <<external>>
+  component "On-prem Qwen unreachable" as f6 <<external>>
+  component "LLM proxy wedged\n(answers wrong or not at all)" as f7 <<external>>
+  component "LLM proxy or coordinator\nprocess dies" as f8 <<external>>
+  component "LLM proxy down when\nyou start an agent" as f9 <<external>>
+}
+
+package "Who notices" {
+  component "health coordinator\nOS change event · probe every 15 s ·\nwake from sleep" as dNet <<util>>
+  component "health coordinator\nsynthetic probes 60 s · 90 s · 5 min\n(paused while you are away)" as dLlm <<util>>
+  component "LLM proxy, per request" as dReq <<core>>
+  component "LLM proxy, every 60 s" as dQwen <<core>>
+  component "launchd" as dLd <<infra>>
+  component "coding launcher" as dLaunch <<cli>>
+}
+
+package "What happens" {
+  component "LLM proxy re-decides egress now\n(direct ↔ :3128); restart :3128 once\nif it does not forward" as a1 <<core>>
+  component "restart proxydetox, then 45 s\nhands off; never while the network\nis changing or the ticket is missing" as a2 <<core>>
+  component "ask macOS for a ticket (≤ every 2 min);\nK:NO until it lands" as a3 <<core>>
+  component "retry up to 3× before the first byte;\nre-check the egress pin, retry once if it moved" as a4 <<core>>
+  component "next provider in the fallback chain\n(background calls; foreground claude: none)" as a5 <<core>>
+  component "dropped from every chain\nuntil it answers again" as a6 <<core>>
+  component "restart the LLM proxy\n(60 s apart, at most 3 in 5 min)" as a7 <<core>>
+  component "restart the process\n(KeepAlive)" as a8 <<core>>
+  component "wait 5 × 2 s, then stop with\nthe command that restarts it" as a9 <<core>>
+}
+
+f1 SYNC_LINE dNet
+f2 SYNC_LINE dNet
+f3 SYNC_LINE dNet
+dNet CONTROL_LINE a1
+dNet CONTROL_LINE a2
+dNet CONTROL_LINE a3
+f4 SYNC_LINE dReq
+f5 SYNC_LINE dReq
+dReq CONTROL_LINE a4
+dReq CONTROL_LINE a5
+f6 SYNC_LINE dQwen
+dQwen CONTROL_LINE a6
+f7 SYNC_LINE dLlm
+dLlm CONTROL_LINE a7
+f8 SYNC_LINE dLd
+dLd CONTROL_LINE a8
+f9 SYNC_LINE dLaunch
+dLaunch CONTROL_LINE a9
+@enduml

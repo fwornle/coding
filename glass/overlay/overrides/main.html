@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{#
+  Presentation decks as icon buttons in the header, next to the theme toggle,
+  instead of a nav tab. The list is `extra.decks` in mkdocs.yml:
+    - title: shown as the tooltip and the accessible name
+      link:  the deck's built page URL, relative to the site root
+             (e.g. overview/ — not overview.md: `url` does not map .md files)
+      icon:  a bundled Material icon path, e.g. material/presentation
+  assets/header-decks.js moves the rendered links into the header bar.
+  Overriding the whole header partial would pin this site to one Material
+  release; extending the block does not.
+#}
+{% block header %}
+  {{ super() }}
+  {% if config.extra.decks %}
+    <template id="header-decks">
+      {% for deck in config.extra.decks %}
+        <a href="{{ deck.link | url }}" class="md-header__button md-icon header-deck" title="{{ deck.title }}" aria-label="{{ deck.title }}">
+          {% include ".icons/" ~ deck.icon ~ ".svg" %}
+        </a>
+      {% endfor %}
+    </template>
+  {% endif %}
+{% endblock %}

@@ -1,5 +1,11 @@
 # Network Configuration
 
+!!! tip "Every path, and how it recovers"
+    [Connectivity & Recovery](../architecture/connectivity.md) maps every path from an agent
+    to a model, what has to be up, and each automatic recovery, with the current rules
+    (Kerberos ticket requests, the 45 s restart cooldown, the egress pin).
+    [Connectivity](../connectivity.md) is the same as slides.
+
 Corporate VPN, proxy detection, and how each agent's API traffic is routed on either
 network.
 

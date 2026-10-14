@@ -13,7 +13,7 @@ Context gauge and session tokens, live, in the terminal you work in.
     | `glass ●` | daemon running (✗ = down) | opens the UI |
     | `ctx` | latest turn's size vs. the model's window | context report |
     | `↑ ↓ ⚡` | session tokens sent / received, cache share | the session in the UI |
-    | `N:` | egress: `direct` or via `proxy` | network report |
+    | `N:` `P:` `K:NO` | network (`CN` · `VPN` · `OPEN`), the local proxy (`ON` · `AUTO` · `OFF`), `K:NO` when the Kerberos ticket is missing on CN / VPN | network report |
 
     ![Status line in tmux, with the popup a click on ctx opens](images/terminal-statusline-tmux.png)
 

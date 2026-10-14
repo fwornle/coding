@@ -8,6 +8,8 @@ docs_dir: docs-content
 
 theme:
   name: material
+  # Header deck buttons (extra.decks below) — shared with the glass docs.
+  custom_dir: glass/overlay/overrides
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -88,9 +90,12 @@ validation:
 
 extra_css:
   - stylesheets/extra.css
+  - assets/overview.css
 
 extra_javascript:
   - javascripts/tabbed-toc.js
+  - assets/overview.js
+  - assets/header-decks.js
 
 nav:
   - Home: index.md
@@ -111,6 +116,7 @@ nav:
     - Per-Repo Tenancy: architecture/tenancy.md
     - Knowledge Injection: architecture/knowledge-injection.md
     - LLM Routing: architecture/llm-routing.md
+    - Connectivity & Recovery: architecture/connectivity.md
     - LLM Architecture: architecture/llm-architecture.md
     - Health Monitoring: architecture/health-monitoring.md
     - Token Usage: architecture/token-usage.md
@@ -160,6 +166,14 @@ nav:
     - Self-Learning Layer: reference/articles/self-learning-layer.md
 
 extra:
+  # Presentations, opened from icon buttons in the header (glass/overlay/overrides/main.html).
+  decks:
+    - title: coding overview — the layer in ten slides
+      link: overview/
+      icon: material/presentation
+    - title: Connectivity — every path, and how it recovers
+      link: connectivity/
+      icon: material/lan-connect
   social:
     - icon: fontawesome/brands/github
       link: https://github.com/fwornle/coding
