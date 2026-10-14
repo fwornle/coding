@@ -220,11 +220,28 @@ ensure_proxydetox_up() {
   # long enough for it to still say `healthy` about a daemon that has just died.
   # Same rule ordering as decideProxydetoxHeal(), for the same reason.
   local cause=""
-  if [ "$bound" -eq 0 ]; then
-    cause=$(curl -s -m 3 http://localhost:3034/health/state 2>/dev/null \
-              | jq -r '.network.proxy_heal_cause // empty' 2>/dev/null) || cause=""
-  else
-    log "proxydetox: nothing bound on :3128 — unambiguously the daemon"
+  cause=$(curl -s -m 3 http://localhost:3034/health/state 2>/dev/null \
+            | jq -r '.network.proxy_heal_cause // empty' 2>/dev/null) || cause=""
+  if [ "$bound" -ne 0 ]; then
+    # The one exception to "a dead socket is always the daemon": the
+    # coordinator restarted it seconds ago and launchd has not re-bound it yet.
+    # A bootout here tears down that restart — on 2026-10-13 a VPN join left
+    # :3128 unbound 16:23:30–:42 for exactly that reason. Wait it out instead.
+    if [ "$cause" = "restarting" ]; then
+      log "proxydetox: :3128 not bound yet — the coordinator is restarting it, waiting"
+      local i
+      for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+        timeout 2 bash -c 'exec 3<>/dev/tcp/127.0.0.1/3128' 2>/dev/null && {
+          log "proxydetox: :3128 bound again after the coordinator's restart"
+          return 0
+        }
+        sleep 1
+      done
+      log "proxydetox: still not bound 20s into the coordinator's restart — healing locally"
+    else
+      log "proxydetox: nothing bound on :3128 — unambiguously the daemon"
+    fi
+    cause=""
   fi
 
   if [ -n "$cause" ]; then
@@ -247,8 +264,12 @@ ensure_proxydetox_up() {
         log "proxydetox is up but egress is failing (cause=${cause}) — keeping the pin, not healing"
         return 0
         ;;
-      indeterminate)
-        log "proxydetox probe failed but the cause is not yet attributable — deferring to the coordinator"
+      indeterminate|network-change|restarting|no-ticket)
+        # network-change: the coordinator ruled this a network in transition,
+        # which a kickstart cannot fix. restarting: it kicked the daemon moments
+        # ago. no-ticket: the corporate proxy wants a Kerberos ticket, which the
+        # coordinator has asked the SSO extension for. None is a daemon fault.
+        log "proxydetox probe failed (cause=${cause}) — deferring to the coordinator"
         [ "$bound" -eq 0 ] && return 0
         return 1
         ;;
@@ -256,7 +277,7 @@ ensure_proxydetox_up() {
     log "proxydetox heal needed (cause=${cause}) — attempting one local kickstart"
   elif [ "$bound" -eq 0 ]; then
     # We asked and got nothing back. Only reachable when the socket IS bound —
-    # a dead socket skips the query above, and must not be reported as though
+    # a dead socket clears the cause above, and must not be reported as though
     # the coordinator had been consulted and stayed silent.
     log "health coordinator did not answer — one local heal attempt"
   fi

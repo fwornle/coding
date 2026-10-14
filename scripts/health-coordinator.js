@@ -43,7 +43,7 @@ import { startNetworkChangeWatcher, networkChangeRecent } from '../lib/network/n
 import { settleLocation, OPEN_DEMOTION_CONFIRM_TICKS } from '../lib/network/location-hysteresis.mjs';
 import {
   REACHABILITY_HOST, PAC_HOST, FUNCTIONAL_FAIL_THRESHOLD,
-  probePortListening, readProxyEnabledByUser, probeProxyFunctional, probeKerberosTicket, countFunctionalFailures,
+  probePortListening, readProxyEnabledByUser, probeProxyFunctional, probeKerberosTicket, requestKerberosTicket, countFunctionalFailures,
   publishedFunctional, probeVpnConnected, probePacResolves, probePacOnSite, classifyLocation,
 } from '../lib/network/location-probe.mjs';
 import { settleModeFlip, classifyNetClass } from '../lib/network/proxy-mode-flip.mjs';
@@ -3281,6 +3281,11 @@ async function pollNetworkStatus() {
         staleAfterChange: netState.class_change_heal_due
           && (netState.location_demotion_pending || 0) === 0
           && Number.isFinite(netState.class_change_at) && Date.now() - netState.class_change_at < 3 * 60_000,
+        // Fresh, not last poll's: klist -s is local and instant, and a ticket
+        // that has just landed must stop this rule at once.
+        kerberosTicket: await probeKerberosTicket(),
+        sinceLastKickMs: Number.isFinite(netState.last_proxydetox_kick_at)
+          ? Date.now() - netState.last_proxydetox_kick_at : null,
         consecutiveFailures: netState.consecutive_functional_failures || 0,
         failureThreshold: FUNCTIONAL_FAIL_THRESHOLD,
       });
@@ -3293,6 +3298,9 @@ async function pollNetworkStatus() {
       }
       if (needsKickstart) {
         netState.class_change_heal_due = false;
+        // Stamped BEFORE the exec: a kickstart that times out has usually still
+        // been dispatched, and the cooldown must cover it either way.
+        netState.last_proxydetox_kick_at = Date.now();
         log(`network: kickstarting proxydetox — cause=${healVerdict.cause}: ${healVerdict.reason}`, 'WARN');
         try {
           // kickstart only works if the job is loaded; when the job was
@@ -3362,7 +3370,15 @@ async function pollNetworkStatus() {
           }
           effectivePortListening = portNow;
         } catch (e) {
-          log(`network: proxydetox kickstart error: ${e.message}`, 'ERROR');
+          // `kickstart -k` blocks until launchd has stopped the old daemon,
+          // which on a network change can outlast the 5s budget. The restart is
+          // still under way then — the cooldown in decideProxydetoxHeal() keeps
+          // the next polls from killing it — so that is not an error.
+          if (e.killed) {
+            log('network: proxydetox kickstart still landing after 5s — leaving it to finish', 'WARN');
+          } else {
+            log(`network: proxydetox kickstart error: ${e.message}`, 'ERROR');
+          }
           effectivePortListening = false;
         }
       }
@@ -3436,10 +3452,24 @@ async function pollNetworkStatus() {
   // The corporate proxy's login. Cheap (klist -s, no network), so every poll;
   // shown only on CN / VPN (networkBadge K:NO).
   const kerberosTicket = await probeKerberosTicket();
-  if (netState.kerberos_ticket !== kerberosTicket && (netState.location === 'corporate' || netState.location === 'vpn')) {
+  const onCorp = netState.location === 'corporate' || netState.location === 'vpn';
+  // Also on arrival: a ticket that expired overnight off-corp was already
+  // `false` before VPN came up, so a change-only log never said so.
+  const justArrived = onCorp && !(previousLocation === 'corporate' || previousLocation === 'vpn');
+  if ((netState.kerberos_ticket !== kerberosTicket || justArrived) && onCorp) {
     log(`network: Kerberos ticket ${kerberosTicket === true ? 'present' : kerberosTicket === false ? 'MISSING — the corporate proxy will refuse tunnels (renew: kinit or the Kerberos SSO menu)' : 'unknown'}`, kerberosTicket === false ? 'WARN' : 'INFO');
   }
   netState.kerberos_ticket = kerberosTicket;
+  // No ticket on CN / VPN: ask the SSO extension for one now rather than wait
+  // the ~2 min it took on its own (2026-10-14). Every 2 min at most — a
+  // request either lands in ~12s or is showing the user a login dialog.
+  if (onCorp && kerberosTicket === false
+      && !(Date.now() - (netState.last_kerberos_request_at || 0) < 120_000)) {
+    netState.last_kerberos_request_at = Date.now();
+    requestKerberosTicket().then((realms) => {
+      if (realms.length) log(`network: asked the Kerberos SSO extension for a ticket (${realms.join(', ')})`, 'INFO');
+    }).catch(() => {});
+  }
 
    log(`network: location=${netState.location} (vpnCli=${vpnConnected}, pac=${pacResolved}, physCN=${onPhysicalCN}, px=${effectivePortListening}, envSet=${proxyEnvSet})`, 'DEBUG');
 

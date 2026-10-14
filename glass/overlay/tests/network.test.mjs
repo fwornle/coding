@@ -16,6 +16,8 @@ function monitor(seq) {
       functional: async () => s.functional.shift() ?? true,
       enabled: () => s.enabled ?? false,
       kerberos: async () => s.kerberos ?? null,
+      renewTicket: s.renewTicket || (async () => []),
+      now: s.now,
     },
   });
 }
@@ -67,6 +69,28 @@ test('Kerberos: the monitor publishes the ticket, the badge says K:NO only on CN
   await m.tick();
   assert.equal(m.facts().kerberos_ticket, false);
   assert.equal(networkBadge(m.facts()).text, 'N:CN P:AUTO K:NO');
+});
+
+test('Kerberos: no ticket on CN / VPN asks the SSO extension for one, at most every 2 min', async () => {
+  let asked = 0;
+  let t = 1_000_000;
+  const m = monitor({
+    location: ['vpn', 'vpn', 'vpn', 'open'], port: [true, true, true, true], functional: [false, false, false, false],
+    kerberos: false, renewTicket: async () => { asked += 1; return ['EXAMPLE.CORP']; }, now: () => t,
+  });
+  await m.tick();
+  assert.equal(asked, 1);
+  t += 30_000; await m.tick();
+  assert.equal(asked, 1, 'not again within 2 min');
+  t += 120_000; await m.tick();
+  assert.equal(asked, 2);
+});
+
+test('Kerberos: off the corporate network a missing ticket is not chased', async () => {
+  let asked = 0;
+  const m = monitor({ location: ['open'], port: [true], functional: [true], kerberos: false, renewTicket: async () => { asked += 1; return []; } });
+  await m.tick();
+  assert.equal(asked, 0);
 });
 
 test('egress: a refused tunnel names the proxy and the host, and is not asked again for 10 s', async () => {

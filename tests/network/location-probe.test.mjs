@@ -9,7 +9,7 @@ import { EventEmitter } from 'node:events';
 
 import {
   classifyLocation, observeLocation, networkBadge, countFunctionalFailures, publishedFunctional,
-  readProxyEnabledByUser, probePacResolves, probeProxyFunctional, probeKerberosTicket, probeVpnConnected, FUNCTIONAL_FAIL_THRESHOLD, PROXY_PROBE_HOST,
+  readProxyEnabledByUser, probePacResolves, probeProxyFunctional, probeKerberosTicket, requestKerberosTicket, probeVpnConnected, FUNCTIONAL_FAIL_THRESHOLD, PROXY_PROBE_HOST,
 } from '../../lib/network/location-probe.mjs';
 
 describe('classifyLocation', () => {
@@ -134,5 +134,36 @@ describe('probes', () => {
     assert.equal(await probeVpnConnected({ platform: 'darwin', spawn: fake('>> state: Connected\n'), timeoutMs: 50 }), true);
     assert.equal(await probeVpnConnected({ platform: 'darwin', spawn: fake('>> state: Disconnected\n'), timeoutMs: 50 }), false);
     assert.equal(await probeVpnConnected({ platform: 'aix', spawn: () => assert.fail('no spawn') }), false);
+  });
+});
+
+describe('requestKerberosTicket — asks the SSO extension, never waits for it', () => {
+  const fake = (listOut, listErr = null) => {
+    const calls = [];
+    const fn = (cmd, args, opts, cb) => {
+      calls.push([cmd, ...args]);
+      if (args[0] === '-l') return cb(listErr, listOut);
+      // the refresh itself: never call back, as a 12s request would not yet have
+    };
+    fn.calls = calls;
+    return fn;
+  };
+
+  it('requests a refresh for every configured realm and resolves without waiting', async () => {
+    const ex = fake('[\n  "EUROPE.EXAMPLE.CORP"\n]');
+    assert.deepEqual(await requestKerberosTicket({ execFile: ex, platform: 'darwin' }), ['EUROPE.EXAMPLE.CORP']);
+    assert.deepEqual(ex.calls[1], ['app-sso', '-a', 'EUROPE.EXAMPLE.CORP', '-R', '-q']);
+  });
+
+  it('does nothing where there is no extension or no realm', async () => {
+    assert.deepEqual(await requestKerberosTicket({ execFile: fake('', new Error('ENOENT')), platform: 'darwin' }), []);
+    assert.deepEqual(await requestKerberosTicket({ execFile: fake('[]'), platform: 'darwin' }), []);
+    assert.deepEqual(await requestKerberosTicket({ execFile: fake('not json'), platform: 'darwin' }), []);
+  });
+
+  it('is macOS only', async () => {
+    const ex = fake('["R"]');
+    assert.deepEqual(await requestKerberosTicket({ execFile: ex, platform: 'linux' }), []);
+    assert.equal(ex.calls.length, 0);
   });
 });

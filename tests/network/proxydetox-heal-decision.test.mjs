@@ -14,7 +14,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { decideProxydetoxHeal, neededProbes, CAUSES }
+import { decideProxydetoxHeal, neededProbes, CAUSES, KICK_COOLDOWN_MS }
   from '../../lib/network/proxydetox-heal-decision.mjs';
 
 /** The steady state: bound socket, working egress. */
@@ -269,5 +269,79 @@ describe('decideProxydetoxHeal — a stale daemon right after a network-class ch
     const d = decideProxydetoxHeal({ ...vpnUp, proxiedExternalOk: true, staleAfterChange: true });
     assert.equal(d.heal, false);
     assert.equal(d.cause, CAUSES.HEALTHY);
+  });
+});
+
+describe('2026-10-13, joining VPN: kickstarts five seconds apart killed each restart', () => {
+  // 16:23:22 kickstart, then 16:23:27 and 16:23:34 — each `kickstart -k` timed
+  // out waiting for the old daemon to exit, the failure count stayed above the
+  // threshold, and the next poll kicked again. :3128 was unbound 16:23:30–:42.
+  const midRestart = { portListening: false, proxiedExternalOk: false, consecutiveFailures: 7 };
+
+  it('a dead port seconds after a kick is the kick, not a new fault', () => {
+    const d = decideProxydetoxHeal({ ...midRestart, sinceLastKickMs: 5_000 });
+    assert.equal(d.heal, false);
+    assert.equal(d.cause, CAUSES.RESTARTING);
+  });
+
+  it('the cooldown outranks the class-change heal and the debounce too', () => {
+    const d = decideProxydetoxHeal({
+      portListening: true, proxiedExternalOk: false, staleAfterChange: true,
+      consecutiveFailures: 9, sinceLastKickMs: 12_000,
+    });
+    assert.equal(d.heal, false);
+    assert.equal(d.cause, CAUSES.RESTARTING);
+  });
+
+  it('heals again once the cooldown has run out and the port is still dead', () => {
+    const d = decideProxydetoxHeal({ ...midRestart, sinceLastKickMs: KICK_COOLDOWN_MS });
+    assert.equal(d.heal, true);
+    assert.equal(d.cause, CAUSES.DAEMON);
+  });
+
+  it('no kick yet (null) leaves every other rule as it was', () => {
+    const d = decideProxydetoxHeal({ ...midRestart, sinceLastKickMs: null });
+    assert.equal(d.heal, true);
+  });
+
+  it('a working proxy mid-cooldown is healthy, not restarting', () => {
+    const d = decideProxydetoxHeal({ ...healthy, sinceLastKickMs: 1_000 });
+    assert.equal(d.cause, CAUSES.HEALTHY);
+  });
+});
+
+describe('2026-10-14, joining VPN with an expired ticket: restarts cannot help', () => {
+  // VPN at 05:27:52, TGT issued 05:30:12; :3128 refused every tunnel in
+  // between, through three restarts, and forwarded at the next probe after.
+  const noTicket = {
+    portListening: true, proxiedExternalOk: false, directExternalOk: false,
+    location: 'vpn', kerberosTicket: false, staleAfterChange: true, consecutiveFailures: 11,
+  };
+
+  it('does not restart a bound daemon that is only missing its ticket', () => {
+    const d = decideProxydetoxHeal(noTicket);
+    assert.equal(d.heal, false);
+    assert.equal(d.cause, CAUSES.NO_TICKET);
+  });
+
+  it('keeps the one class-change restart for when the ticket is there', () => {
+    const d = decideProxydetoxHeal({ ...noTicket, kerberosTicket: true });
+    assert.equal(d.cause, CAUSES.STALE_AFTER_CHANGE);
+  });
+
+  it('off the corporate network a missing ticket proves nothing', () => {
+    const d = decideProxydetoxHeal({ ...noTicket, location: 'open' });
+    assert.notEqual(d.cause, CAUSES.NO_TICKET);
+  });
+
+  it('a dead port is still the daemon, ticket or not', () => {
+    const d = decideProxydetoxHeal({ ...noTicket, portListening: false });
+    assert.equal(d.heal, true);
+    assert.equal(d.cause, CAUSES.DAEMON);
+  });
+
+  it('cannot tell (null) leaves the old rules in charge', () => {
+    const d = decideProxydetoxHeal({ ...noTicket, kerberosTicket: null });
+    assert.equal(d.cause, CAUSES.STALE_AFTER_CHANGE);
   });
 });

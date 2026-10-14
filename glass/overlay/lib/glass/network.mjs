@@ -8,7 +8,7 @@
 // only observes: it never restarts proxydetox and never changes proxy
 // variables.
 import {
-  observeLocation, probePortListening, probeProxyFunctional, probeKerberosTicket, readProxyEnabledByUser,
+  observeLocation, probePortListening, probeProxyFunctional, probeKerberosTicket, requestKerberosTicket, readProxyEnabledByUser,
   countFunctionalFailures, publishedFunctional, FUNCTIONAL_FAIL_THRESHOLD,
 } from '../network/location-probe.mjs';
 import { settleLocation } from '../network/location-hysteresis.mjs';
@@ -18,7 +18,7 @@ export const NETWORK_PROBE_INTERVAL_MS = 15_000; // the coordinator's cadence
 
 /**
  * @param {object} [o]
- * @param {object} [o.probes]   { location, port, functional, enabled, kerberos } — injectable for tests
+ * @param {object} [o.probes]   { location, port, functional, enabled, kerberos, renewTicket } — injectable for tests
  * @param {boolean} [o.watch]   subscribe to the OS's network-change notification (macOS)
  * @param {(line: string) => void} [o.log]
  */
@@ -28,6 +28,9 @@ export function createNetworkMonitor({ probes = {}, watch = true, log = () => {}
   const functional = probes.functional || probeProxyFunctional;
   const enabled = probes.enabled || readProxyEnabledByUser;
   const kerberos = probes.kerberos || probeKerberosTicket;
+  const renewTicket = probes.renewTicket || requestKerberosTicket;
+  const now = probes.now || Date.now;
+  let lastTicketRequest = 0;
   const state = {
     location: 'unknown', proxy_running: false, proxy_functional: false, proxy_enabled_by_user: false, kerberos_ticket: null,
     location_demotion_pending: 0, consecutive_functional_failures: 0, last_network_change_at: null, last_probe_end: null,
@@ -56,6 +59,16 @@ export function createNetworkMonitor({ probes = {}, watch = true, log = () => {}
     state.location = settled.location;
     state.location_demotion_pending = settled.pending;
     state.kerberos_ticket = await kerberos();
+    // On CN / VPN without a ticket the corporate proxy refuses every tunnel,
+    // and macOS can take minutes to fetch one on its own (2m20s measured after
+    // an overnight expiry). Ask for it now; every 2 min at most.
+    if (state.kerberos_ticket === false && (state.location === 'corporate' || state.location === 'vpn')
+        && now() - lastTicketRequest >= 120_000) {
+      lastTicketRequest = now();
+      renewTicket().then((realms) => {
+        if (realms?.length) log(`network: asked the Kerberos SSO extension for a ticket (${realms.join(', ')})`);
+      }).catch(() => {});
+    }
     state.last_probe_end = new Date().toISOString();
   }
 
