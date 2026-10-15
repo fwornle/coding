@@ -13,6 +13,8 @@
 //   GET  /health, POST /stop
 //   GET  /, /assets/*, /api/experiments/runs[/<id>/…]   the UI (ui-api.mjs)
 //   GET  /api/statusline[?task_id=]   status-line facts of a live session (statusline.mjs)
+//   GET|PATCH /api/offload, PUT /api/offload/key, POST /api/offload/test
+//                           the opt-in offload (offload-store.mjs), from the UI
 //
 // Every `glass <agent>` run is a session with its own task id; its rows, context
 // turns and breakdown are keyed by it, and closing it archives the span and lets
@@ -20,8 +22,10 @@
 // run/sessions.json: a daemon that stops (an update, `glass stop`) leaves the
 // running ones there, and the next daemon re-adopts every one whose `glass
 // <agent>` process still runs — its agent keeps the same token, task and status
-// line across the restart. No routing, no providers:
-// each call goes where the agent sent it, with the agent's own credentials.
+// line across the restart. No routing, no providers: each call goes where the
+// agent sent it, with the agent's own credentials — unless the user switched the
+// opt-in offload on for that agent, and then only easy chat calls go to the
+// endpoint the user named, falling back to exactly that forward.
 //
 // The caller (bin/glass.mjs) sets daemonEnv() on process.env BEFORE importing this
 // module — the extracted measurement modules read it at import time.
@@ -46,6 +50,8 @@ import { createEgressFetch, upstreamProxy, proxyEnvOf, noProxyOf } from './egres
 import { createUiApi } from './ui-api.mjs';
 import { statuslineData, renderReport, TAGS } from './statusline.mjs';
 import { createNetworkMonitor } from './network.mjs';
+import { createOffloadStore } from './offload-store.mjs';
+import { createOffloader, createTargetHealth, OFFLOAD_AGENTS } from '../../proxy/proxy-bridge/offload.mjs';
 
 export const VERSION = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version;
 
@@ -67,6 +73,33 @@ const json = (res, status, body) => {
   res.writeHead(status, { 'content-type': 'application/json' });
   res.end(JSON.stringify(body));
 };
+
+/**
+ * The offload endpoint is on the user's own network (a model server on this
+ * machine, a cluster on the LAN or VPN) unless it is a public host: those go
+ * direct, since a corporate proxy cannot reach a private address anyway.
+ */
+export function isPrivateHost(hostname) {
+  const h = String(hostname || '').replace(/^\[|\]$/g, '').toLowerCase();
+  if (h === 'localhost' || h === '::1' || !h.includes('.') || h.endsWith('.local') || h.endsWith('.internal')) return true;
+  const m = /^(\d+)\.(\d+)\.\d+\.\d+$/.exec(h);
+  if (!m) return /^f[cd][0-9a-f]{2}:/.test(h);
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  return a === 10 || a === 127 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168) || (a === 169 && b === 254) || (a === 100 && b >= 64 && b <= 127);
+}
+
+/**
+ * A browser page may not drive the daemon's write routes: a cross-site form or
+ * fetch cannot set a custom header without a CORS preflight, which the daemon
+ * never answers, and an Origin other than the daemon's own is refused outright.
+ */
+export function uiWriteAllowed(req, port) {
+  if (req.headers['x-glass-ui'] !== '1') return false;
+  if (!String(req.headers['content-type'] || '').startsWith('application/json')) return false;
+  const origin = req.headers.origin;
+  if (!origin) return true;
+  return [`http://127.0.0.1:${port}`, `http://localhost:${port}`].includes(origin);
+}
 
 async function readJson(req) {
   let raw = '';
@@ -180,6 +213,32 @@ export async function startDaemon({
     logErr,
   });
   const usageRead = createUsageApi({ tokenDb: () => tokenDb, measurement });
+
+  // ── opt-in offload ──
+  const offloadStore = createOffloadStore(home);
+  const targetFetch = (url, init) => {
+    let host = '';
+    try { host = new URL(url).hostname; } catch { /* egress */ }
+    return (isPrivateHost(host) ? direct : egress)(url, init);
+  };
+  const offloadHealth = createTargetHealth({
+    fetch: targetFetch, getConfig: offloadStore.getConfig, getKey: offloadStore.getKey, setTimer: () => null, clearTimer: () => {},
+  });
+  const offloader = createOffloader({ fetch: targetFetch, getConfig: offloadStore.getConfig, getKey: offloadStore.getKey, health: offloadHealth });
+  const offload = { offloader, getConfig: offloadStore.getConfig };
+  // Probed only while offload is on: a switched-off feature makes no network call.
+  const probeIfOn = () => (offloadStore.getConfig().enabled ? offloadHealth.probe() : Promise.resolve(offloadHealth.state));
+  probeIfOn().catch(() => {});
+  const offloadTimer = setInterval(() => { probeIfOn().catch(() => {}); }, 60_000);
+  offloadTimer.unref();
+  const offloadView = () => {
+    const cfg = offloadStore.getConfig();
+    return {
+      config: cfg, keySet: offloadStore.hasKey(), agents: OFFLOAD_AGENTS,
+      health: { ...offloadHealth.state, current: offloadHealth.state.url === cfg.target.url },
+      counters: { ...offloader.counters }, inFlight: offloader.inFlight(),
+    };
+  };
 
   // ── sessions ──
   const sessions = new Map(); // token → session
@@ -295,7 +354,7 @@ export async function startDaemon({
     }
     if (req.method === 'POST' && openAIWireOf(req.url)) {
       return handleOpenAIPassthrough(req, res, {
-        measurement, fetch: egress, upstreamBase, provider, agent, taskId, project: s?.project || '', logErr,
+        measurement, fetch: egress, upstreamBase, provider, agent, taskId, project: s?.project || '', logErr, offload,
       });
     }
     return forwardPlain(req, res, { fetch: egress, upstreamBase, logErr });
@@ -320,7 +379,7 @@ export async function startDaemon({
       });
     }
     return handleOpenAIPassthrough(req, res, {
-      measurement, fetch: via, upstreamBase, provider, agent: s.agent, taskId: s.taskId, project: s.project, logErr,
+      measurement, fetch: via, upstreamBase, provider, agent: s.agent, taskId: s.taskId, project: s.project, logErr, offload,
     });
   }
 
@@ -389,6 +448,31 @@ export async function startDaemon({
         return handleAnthropicMessages(req, res, {
           measurement, fetch: egress, upstreamBase, provider, subscription: '', logErr,
         });
+      }
+      if (url === '/api/offload' && req.method === 'GET') return json(res, 200, offloadView());
+      if (url.startsWith('/api/offload') && req.method !== 'GET') {
+        if (!uiWriteAllowed(req, selfPort)) return json(res, 403, { error: 'offload settings change only from the glass UI or CLI' });
+        const body = await readJson(req);
+        if (!body) return json(res, 400, { error: 'body must be JSON' });
+        if (url === '/api/offload' && req.method === 'PATCH') {
+          const before = offloadStore.getConfig();
+          const next = offloadStore.update(body);
+          log(`offload settings changed: ${next.enabled ? 'on' : 'off'} for ${OFFLOAD_AGENTS.filter((a) => next.agents[a]).join(', ') || 'no agent'}`);
+          if (next.enabled && (!before.enabled || before.target.url !== next.target.url)) await probeIfOn();
+          return json(res, 200, offloadView());
+        }
+        if (url === '/api/offload/key' && req.method === 'PUT') {
+          offloadStore.setKey(body.key);
+          await probeIfOn();
+          return json(res, 200, offloadView());
+        }
+        if (url === '/api/offload/test' && req.method === 'POST') {
+          // An explicit test probes even while offload is off: it is how the user
+          // checks an endpoint before switching it on.
+          await offloadHealth.probe();
+          return json(res, 200, offloadView());
+        }
+        return json(res, 404, { error: `no route for ${req.method} ${url}` });
       }
       if (url.startsWith('/relay/')) return onRelay(req, res);
       if (usageRead(req, res)) return undefined;
@@ -461,6 +545,7 @@ export async function startDaemon({
     log(`shutting down: ${reason}`);
     clearInterval(sweepTimer);
     clearInterval(idleTimer);
+    clearInterval(offloadTimer);
     netMonitor.stop();
     // Sessions whose agent still runs stay in sessions.json for the next daemon.
     for (const s of [...sessions.values()]) if (!alive(s.pid)) await closeSession(s.token);

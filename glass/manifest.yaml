@@ -71,6 +71,10 @@ select:
       - proxy-bridge/raw-bodies.mjs
       - proxy-bridge/shim-tools.mjs
       - proxy-bridge/db-open.cjs
+      # opt-in offload (G8): the decision, the downgrade-only classifier, the trail column
+      - proxy-bridge/offload.mjs
+      - proxy-bridge/prompt-classifier.mjs
+      - proxy-bridge/routing-trail.mjs
 
 # TypeScript compiled with the proxy's own tsc and compilerOptions (no maps, no
 # declarations). The proxy's dist/ is never copied — it can be stale.

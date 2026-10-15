@@ -909,6 +909,91 @@ Uses coding's own install unchanged — no glass code yet. On VPN:
    the result here. Expected: (a)(b) demoted to dual-fast; (c)(d) first call possibly demoted, the
    tool-result turns never classified; (e) vetoed as code → stays on the paid account.
 
+## G8 build plan (2026-10-15) — runtime switch, all three OpenAI-wire agents, routing in glass's UI
+
+**User decisions (2026-10-15):** (1) the cluster URL is per user, not shipped; (2) offload must cover **pi and
+copilot too**, not only opencode — as in coding; (3) go; **no corporate knowledge in code** (the public target is on
+github.com and coding itself is public); switching happens **at runtime in the UI**, in a routing panel taken from
+coding's LLM Routing dialog (only what makes sense in glass); the Flow graph's cluster node should be a way to switch.
+
+### What changes against the G8 design
+
+- **pi and copilot offload on the intercept, not by configuration.** Both already reach glass through the TLS
+  intercept carrying the user's own login, and every one of their chat calls lands in `handleOpenAIPassthrough`
+  with the body fully buffered. So the one offload branch in `openai-passthrough.mjs` serves opencode (relay),
+  pi and copilot (intercept) alike, and the fallback stays "forward the held original with the agent's own
+  credentials". coding's way (BYOK / `rapid-proxy-pi` → proxy answers with OpenCode's `auth.json` token) is NOT
+  taken: it needs the subscription code G3 cut, and a copilot-only user has no `auth.json`. pi's extension seam
+  (`registerProvider('github-copilot', {oauth})`) stays unneeded.
+  - This IS answering on an intercepted connection — the IT-security point from G0. It is an explicit, per-agent,
+    default-off user choice in the UI, and the panel says so. claude: not offloaded (Anthropic wire; coding refuses
+    it too).
+- **No routing yaml, no `routing-config.mjs`.** coding's router is 1.5k lines of route tables for 39 routes glass
+  does not have, and its yaml is where the cluster's corporate details live. glass gets a small `offload.mjs`
+  (rapid-llm-proxy, shipped to glass): `decide()` + target call + fallback, plus `classifier-client.mjs` and
+  `routing-trail.mjs` as they are.
+- **Config is glass's own file**, `~/.glass/offload.json` (0600): `enabled`, per-agent switches, `target {name,
+  url, models{small,medium,high}}`, `bands`, `classifier`, gates. The key is in `~/.glass/offload.key` (0600), never
+  returned by any endpoint. Nothing about any cluster is in code: no default URL, no model ids, no node history —
+  the user types the URL; the model list comes from the target's `/v1/models`; the target's display name is what the
+  user calls it (default "local cluster").
+
+### Decision per call (`decide()`)
+
+Inputs: agent, wire, requested model, body (tools / tool results / size), config, target health. In order — the
+first that fails keeps the call on its own provider (`forward`), and the reason is recorded:
+1. offload on, this agent switched on, target configured and **reachable** (probe every 60 s; unreachable = out of
+   every decision, no per-call timeout).
+2. not a tool-result turn (as coding).
+3. band: the caller's (`reasoning_effort` / model tier: mini / haiku / flash = small, sonnet / gpt-5 = medium,
+   opus = high), lowered by the classifier when it is on (downgrade-only, coding's rubric, judged on the target
+   itself) → `[D:n]`.
+4. band in `bands` (default `small` only).
+5. size gate: estimated input ≤ `maxInputTokens` (default 3000 — measured: ≈7 s uncached prefill).
+6. in-flight gate: at most `maxInFlight` (1) calls on the target; a second goes to its own provider, never queues.
+Offload: model by band, agent credentials and org headers stripped, target key added, budget `timeoutMs` (8 s).
+Error / non-2xx / timeout before the first byte → forward the held original. Rows: provider = the target name,
+`offloaded_from`, `route_band`, `complexity_source`, `attempt_trail` → `[L:n]` counts only target-answered rows.
+
+### UI — one "Routing" panel, the switch where the user looks
+
+coding's dialog is built for 39 routes, eight providers and per-route provider selects; glass has four agents,
+the agent's own account, and one optional target. Extract only:
+- **Token Usage → settings (gear), "Routing" panel**: master switch "Offload easy calls"; target card (name, URL,
+  key set / not, reachability + latency, "Test"); bands (small / medium / high, model per band from the target's
+  list); per agent switch (opencode / pi / copilot; claude shown disabled with the reason); classifier switch;
+  gates (max input tokens, timeout) under "Advanced". Plain sentences, no yaml paths, no route keys.
+- **Not taken**: per-route provider/complexity tables, background routes, fallback chains tab, provider chips
+  (glass never picks a paid provider), network-scoped targets (the reachability probe is the gate; a URL that only
+  resolves on the office network is simply unreachable elsewhere).
+- **Models → Flow**: the target appears as an account node (dashed when off/unreachable). **Clicking it opens a
+  small popover** (status, last 24 h calls, the switch, "Settings…") — not a toggle on click: a canvas click is easy
+  to misfire and a silent behaviour change is the worst outcome. Agents that are switched on get a decision column
+  ("easy → target, else → own account") between agent and model.
+- Writes: `PATCH /api/offload` on the daemon (127.0.0.1 only, requires `content-type: application/json` + an
+  `x-glass-ui` header so a web page cannot fire it cross-origin); `GET /api/offload` (config minus key, + health);
+  `PUT /api/offload/key`; `POST /api/offload/test`. Takes effect on the next call — no restart, no relaunch.
+- **Status line**, only with offload on: `[D:n]` `[L:n]` per session from the token DB; `net` popup gains
+  "where a turn goes now" per agent. Off = unchanged.
+
+### No corporate knowledge — enforced, not promised
+
+- Public deny list gains: `qwen`, `V100`, `on-prem`, `\b10/8\b`, `nodes? [0-9]\+`, `a2a-xpr`, `nl-realm`, and the
+  scan covers `ui/` (the bundle) too. Existing hits fixed at the source, not rewritten: coding's
+  `providers.ts` labels ("On-prem Qwen") come from data, `repo-router.mjs`'s example names become neutral.
+- Tests use `http://cluster.example:8000/v1` and model ids `m-small` / `m-medium`.
+
+### Work packages
+
+| WP | Content | Accept |
+|---|---|---|
+| 1 | rapid-llm-proxy `offload.mjs` + branch in `openai-passthrough.mjs` (decide, target call incl. SSE, fallback before first byte, row fields); unit tests with a fake target (offload, each gate, timeout → fallback, credentials never reach the target) | proxy tests green |
+| 2 | daemon: config + key store, health probe, `/api/offload*` endpoints, hot apply; manifest selects the new modules | glass tests green, closure verified |
+| 3 | UI Routing panel + Flow node popover + decision column (glass-ui) | gsd-browser: switch on/off, test target, Flow popover |
+| 4 | status line `[D:n]` `[L:n]` + net popup section | statusline tests; tmux check |
+| 5 | deny list + source fixes + docs (Routing page, privacy: "what leaves your machine when offload is on") | public extract deny-clean incl. ui/ |
+| 6 | live run on the cluster: opencode, pi, copilot — five prompts each, assert provider per row, kill target mid-run | rows show target / fallback as designed |
+
 ## Session log
 - **2026-10-14 (0.1.29 — the network heal on Linux / WSL / Windows, not only macOS)** — Audit of every network step by platform (coding: macOS, Linux, WSL 2; glass: also native Windows). macOS-only and broken elsewhere: (1) the coordinator's proxydetox restart was a hard-coded `launchctl` line → `lib/network/proxydetox-restart.mjs`: launchd on macOS, the `.deb`'s `proxydetox.service` systemd user unit on Linux / WSL, anything else on :3128 left alone (`unmanaged`). (2) The LLM-proxy wedge restart (`health-remediation-actions.js`) was `launchctl`-only → daemons.mjs `restart()` off macOS. (3) The launcher never healed :3128 off macOS and, giving up, unset EVERY proxy variable — a Linux user's own proxy too → systemd restart, and only its own :3128 pin is dropped. (4) Network-change events: Linux / WSL `ip -o monitor address route`, container interfaces (veth, docker, br-, cni, virbr) ignored; Windows polls. (5) WSL's VPN signal is the Windows host's `vpncli.exe` via interop. (6) Kerberos request stays macOS-only by design (Linux/WSL: `K:NO` → `kinit`; Windows renews at logon). Also: the change watcher now runs under an sh parent guard — 11 orphaned `notifyutil -w` had piled up under launchd, one per parent exit that skipped stop() (glass's daemon test leaked one per run). rapid-llm-proxy (PR #56): the claude OAuth token is read from `~/.claude/.credentials.json` off macOS, so the direct-API fast path works on Linux / WSL. Docs: "By platform" table in Connectivity & Recovery; deck, guides, glass docs and six diagrams platform-neutral; 9 unreferenced network diagram sources deleted. undici `^8` → `^7.30`: every undici 8 requires Node ≥ 22.19 and 8.12 (2026-10-14) calls `zlib.createZstdDecompress`, which 22.13 lacks — the 22.13.0 CI legs crashed on import; undici 7 has `fetch`, `EnvHttpProxyAgent` and `ProxyAgent`, all glass uses, and supports Node ≥ 20.18.1, so the documented minimum stays 22.13.
 - **2026-10-14 (0.1.28 — the VPN outage was the Kerberos ticket, not proxydetox)** — On VPN at 05:27:52 UTC every tunnel through :3128 was refused until 05:30:12, when macOS's Kerberos SSO extension issued a TGT (the overnight one had expired off-corp); `coding --claude` showed "502 proxy forward failed after 3 attempts" throughout, the status line `K:NO`. Three proxydetox restarts in between changed nothing; :3128 forwarded at the first probe after the ticket landed. Same shape on 10-13 (restarts 16:23:22/:27/:34 killing each other: `kickstart -k` outlived its 5 s exec timeout, the failure count stayed over threshold, the next 5 s poll kicked again). Fixes: (1) `requestKerberosTicket()` — `app-sso -a REALM -R -q`, fire-and-forget, ≤ every 2 min, on CN/VPN with `klist -s` failing; measured 11.7 s to a fresh TGT, no dialog with a keychain password. glass's network monitor calls it too. (2) heal rule 3a `no-ticket` — no proxydetox restart on CN/VPN without a ticket. (3) rule 1b `restarting` — 45 s cooldown after a dispatched restart, ahead of the dead-port rule; a timed-out kickstart logs "still landing", not ERROR. (4) launcher defers on `network-change`/`restarting`/`no-ticket` and waits up to 20 s for a restart in progress instead of bootout. (5) `K:NO` now logged on arrival on CN/VPN, not only on change.

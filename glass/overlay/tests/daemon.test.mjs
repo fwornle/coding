@@ -353,6 +353,87 @@ test('UI reads: a session\'s model mix (by model, account, host, kind) and the u
 });
 
 // A daemon of its own: these depend on exactly which sessions are live.
+// ── opt-in offload (G8) ──
+const offloadTarget = { seen: [], status: 200 };
+let targetSrv;
+async function startTarget() {
+  targetSrv = http.createServer(async (req, res) => {
+    let body = '';
+    for await (const c of req) body += c;
+    if (req.url === '/v1/models') {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ data: [{ id: 'm-small' }] }));
+    }
+    const j = JSON.parse(body || '{}');
+    offloadTarget.seen.push({ headers: req.headers, body: j });
+    res.writeHead(offloadTarget.status, { 'content-type': 'application/json' });
+    return res.end(JSON.stringify({ model: j.model, choices: [{ index: 0, message: { role: 'assistant', content: 'from target' } }], usage: { prompt_tokens: 9, completion_tokens: 2 } }));
+  });
+  await new Promise((r) => targetSrv.listen(0, '127.0.0.1', r));
+  return `http://127.0.0.1:${targetSrv.address().port}/v1`;
+}
+const uiWrite = async (method, route, body, headers = {}) => {
+  const res = await fetch(`${daemon.url}${route}`, {
+    method, headers: { 'content-type': 'application/json', 'x-glass-ui': '1', ...headers }, body: JSON.stringify(body),
+  });
+  return { status: res.status, body: await res.json() };
+};
+
+test('offload settings: off by default; writes only from the UI; the key is stored apart and never read back', async () => {
+  const v = (await api('GET', '/api/offload')).body;
+  assert.equal(v.config.enabled, false);
+  assert.equal(v.config.target.url, '');
+  assert.deepEqual(v.agents, ['opencode', 'pi', 'copilot']);
+  assert.equal((await api('PATCH', '/api/offload', { enabled: true })).status, 403, 'no x-glass-ui header');
+  assert.equal((await uiWrite('PATCH', '/api/offload', { enabled: true }, { origin: 'https://evil.example' })).status, 403);
+  const url = await startTarget();
+  const on = await uiWrite('PATCH', '/api/offload', {
+    enabled: true, agents: { copilot: true }, target: { name: 'Team Box', url, models: { small: 'm-small' } },
+  });
+  assert.equal(on.status, 200);
+  assert.equal(on.body.config.agents.copilot, true);
+  assert.equal(on.body.health.reachable, true);
+  assert.deepEqual(on.body.health.models, ['m-small']);
+  const k = await uiWrite('PUT', '/api/offload/key', { key: 'target-secret' });
+  assert.equal(k.body.keySet, true);
+  assert.equal(JSON.stringify((await api('GET', '/api/offload')).body).includes('target-secret'), false);
+  if (process.platform !== 'win32') {
+    assert.equal(fs.statSync(path.join(home, 'offload.key')).mode & 0o777, 0o600);
+    assert.equal(fs.statSync(path.join(home, 'offload.json')).mode & 0o777, 0o600);
+  }
+});
+
+test('offload: an easy intercepted copilot call is answered by the target; pi (left off) and a switch-off go upstream', async () => {
+  const s = await open('copilot');
+  const easy = { model: 'claude-haiku-4.5', messages: [{ role: 'user', content: 'capital of Portugal?' }] };
+  const before = upSeen.length;
+  const r = await intercepted({ host: 'copilot-api.acme.ghe.com', token: s.token, route: '/chat/completions', body: easy });
+  assert.match(r.text, /from target/);
+  assert.equal(upSeen.length, before, 'the Copilot API was not called');
+  const t = offloadTarget.seen.at(-1);
+  assert.equal(t.headers.authorization, 'Bearer target-secret');
+  assert.equal(t.body.model, 'm-small');
+  const [row] = await eventually(() => rowsFor(s.taskId), (rows) => rows.length === 1);
+  assert.equal(row.provider, 'team-box');
+  assert.equal(row.offloaded_from, 'github-copilot');
+
+  const p = await open('pi');
+  await intercepted({ host: 'api.githubcopilot.com', token: p.token, route: '/chat/completions', body: easy });
+  assert.equal(upSeen.at(-1).headers.authorization, 'Bearer agent-own-login');
+
+  await uiWrite('PATCH', '/api/offload', { enabled: false });
+  const n = offloadTarget.seen.length;
+  await intercepted({ host: 'copilot-api.acme.ghe.com', token: s.token, route: '/chat/completions', body: easy });
+  assert.equal(offloadTarget.seen.length, n, 'off applies to the next call, no restart');
+  targetSrv.close();
+});
+
+test('offload endpoint on a private address goes direct; a public one takes the egress proxy', async () => {
+  const { isPrivateHost } = await import('../lib/glass/daemon.mjs');
+  for (const h of ['localhost', '127.0.0.1', '10.1.2.3', '172.20.0.1', '192.168.1.5', 'gpu-box', 'box.local', '[::1]']) assert.equal(isPrivateHost(h), true, h);
+  for (const h of ['8.8.8.8', '172.32.0.1', 'api.example.com']) assert.equal(isPrivateHost(h), false, h);
+});
+
 async function ownDaemon(dir) {
   return startDaemon({ home: dir, port: 0, fetch: stubFetch, log: () => {}, network: stubNetwork });
 }
