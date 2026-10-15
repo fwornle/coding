@@ -64,7 +64,8 @@ model hosts.
 Rows the endpoint answered carry its name as the account, `offloaded_from` = the provider
 the agent addressed, and the band. Models → Flow draws them in green to the endpoint's
 node; the node is dashed while offload is off or has no calls in the window, and a click
-on it opens its card with the switch.
+on it opens its card with the switch. With no endpoint set up, a dashed **Your endpoint —
+not set up** node stands in its place; a click on it opens the settings.
 
 ## API
 

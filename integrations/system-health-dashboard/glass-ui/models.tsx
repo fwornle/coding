@@ -304,7 +304,7 @@ export function ModelsPage() {
             <CardDescription>
               The same calls as the table below, drawn from the agent to the model it chose to the account that answered.
               glass forwards every call to the host the agent addressed, with the agent&apos;s own login — unless offload is on
-              for that agent: then its easy calls go to your endpoint. Click the endpoint&apos;s node to switch it.
+              for that agent: then its easy calls go to your endpoint. Click the endpoint&apos;s node to set it up or switch it.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -312,8 +312,10 @@ export function ModelsPage() {
               groups={rows}
               answeredBy={answered}
               agentLabel={agentLabel}
-              offload={cfg?.target.url ? {
-                label: cfg.target.name,
+              offload={cfg ? {
+                // No URL yet: a placeholder node that opens the settings.
+                label: cfg.target.url ? cfg.target.name : 'Your endpoint',
+                configured: Boolean(cfg.target.url),
                 enabled: cfg.enabled,
                 status: offloadStatus(off.view),
                 agentsOn: OFFLOAD_AGENTS.filter((a) => cfg.agents[a]),

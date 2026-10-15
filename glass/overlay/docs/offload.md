@@ -18,7 +18,8 @@ opt-in, off by default, switched in the UI at any time.
 
     ## Switch it on
 
-    1. `glass ui` → the **Offload** pill top right (or Token Usage → **Settings**).
+    1. `glass ui` → the **Offload** pill top right (or Token Usage → **Settings**, or the dashed
+       **Your endpoint — not set up** node in **Models → Flow**).
     2. Enter the endpoint's **URL** (e.g. `http://host:8000/v1`) and, if it needs one, its
        **API key**. **Test** checks it and lists its models.
     3. Pick a model for the **small** band (and more bands if you want).

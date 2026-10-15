@@ -13,7 +13,9 @@ import { normalizeModel } from '@/components/performance/models'
  * it has no calls in the window or offload is off — and the one clickable node:
  * a click opens a small card with its state, the switch and the settings. Not a
  * toggle on click: a canvas click is easy to misfire, and a silent change of
- * where calls go is the worst outcome of a misfire.
+ * where calls go is the worst outcome of a misfire. With none configured, a dashed
+ * "Your endpoint — not set up" node stands in its place and opens the settings, so
+ * the feature can be found where its traffic would show.
  */
 
 export interface FlowGroup {
@@ -32,6 +34,8 @@ export interface FlowGroup {
 export interface FlowOffload {
   /** The endpoint's name — its account node's label. */
   label: string
+  /** false: no endpoint URL yet — the node is a placeholder that opens the settings. */
+  configured: boolean
   enabled: boolean
   status: { label: string; tone: 'off' | 'ok' | 'warn' }
   agentsOn: string[]
@@ -155,7 +159,8 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
     // A configured endpoint with no calls in the window still gets its node: it is
     // where the switch is.
     if (offload && !accounts.some((a) => a.label === offload.label)) {
-      accounts.push({ id: `p:${offload.label}`, label: offload.label, sub: 'offload endpoint · no calls in this window', tokens: 0, color: getProviderColor(''), ghost: true })
+      const sub = offload.configured ? 'offload endpoint · no calls in this window' : 'not set up · click to add'
+      accounts.push({ id: `p:${offload.label}`, label: offload.label, sub, tokens: 0, color: getProviderColor(''), ghost: true })
     }
     const max = Math.max(1, ...[...left.values()].map((e) => e.tokens))
     return { agents, models, accounts, left: [...left.values()], right: [...right.values()], max }
@@ -205,10 +210,14 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
     return (
       <g key={n.id} data-node={n.id} data-offload-target={isTarget ? '1' : undefined}
         onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)}
-        onClick={isTarget ? () => { setCard((c) => !c); setToggle({ busy: false, error: '' }) } : undefined}
+        onClick={!isTarget ? undefined : offload!.configured
+          ? () => { setCard((c) => !c); setToggle({ busy: false, error: '' }) }
+          : offload!.onSettings}
         style={{ cursor: isTarget ? 'pointer' : 'default' }}
         opacity={hover === null || hover === n.id || g.left.concat(g.right).some((e) => touches(e) && (e.from === n.id || e.to === n.id)) ? 1 : 0.4}>
-        {isTarget && <title>{`${n.label} — offload ${offload!.status.label}. Click to switch or change it.`}</title>}
+        {isTarget && <title>{offload!.configured
+          ? `${n.label} — offload ${offload!.status.label}. Click to switch or change it.`
+          : 'No offload endpoint set up. Click to add one: easy calls of opencode, pi and copilot can go to a model server of your own.'}</title>}
         <rect x={x} y={y} width={w} height={NODE_H} rx={5} className="fill-background stroke-border" strokeWidth={isTarget ? 1.5 : 1}
           strokeDasharray={n.ghost ? '4 3' : undefined} />
         {/* Selected (its card open): a faint wash of the offloaded colour marks which node the card belongs to. */}
@@ -223,7 +232,7 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
           {clip(n.label, opts.total ? 26 : 30)}
         </text>
         <text x={x + 10} y={y + 28} className="fill-muted-foreground" fontSize={9.5}>{clip(n.sub, opts.total ? 34 : 40)}</text>
-        {opts.total && (
+        {opts.total && n.tokens > 0 && (
           <text x={x + w - 10} y={y + 22} textAnchor="end" fontSize={10.5} fontWeight={600} fill={n.color}>{fmtTokens(n.tokens)}</text>
         )}
       </g>
@@ -244,7 +253,7 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
               </marker>
             </defs>
             <text x={COL_AGENT} y={26} className="fill-muted-foreground" fontSize={11} fontWeight={600}>AGENTS — who asked</text>
-            <text x={COL_MODEL} y={26} className="fill-muted-foreground" fontSize={11} fontWeight={600}>MODELS — what the agent chose{offload ? ', or your endpoint\u2019s' : ''}</text>
+            <text x={COL_MODEL} y={26} className="fill-muted-foreground" fontSize={11} fontWeight={600}>MODELS — what the agent chose{offload?.configured ? ', or your endpoint\u2019s' : ''}</text>
             <text x={COL_ACCT} y={26} className="fill-muted-foreground" fontSize={11} fontWeight={600}>ACCOUNTS — who answered</text>
             {g.left.map((e) => edge(e, COL_AGENT + AGENT_W, COL_MODEL))}
             {g.right.map((e) => edge(e, COL_MODEL + MODEL_W, COL_ACCT))}
@@ -253,7 +262,7 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
             {g.accounts.map((n) => node(n, COL_ACCT, ACCT_W, { total: true }))}
           </svg>
         </div>
-        {card && offload && (() => {
+        {card && offload?.configured && (() => {
           const y = ys.get(`p:${offload.label}`) ?? 0
           const dot = { off: 'bg-muted-foreground/40', ok: 'bg-emerald-500', warn: 'bg-amber-500' }[offload.status.tone]
           return (
@@ -312,7 +321,9 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
           side calls (titles, summaries — no tools)
         </span>
         <span>thickness = tokens · colour = the account that answered</span>
-        {offload && <span>dashed node = your offload endpoint while it is off or has no calls · click it to switch</span>}
+        {offload && <span>{offload.configured
+          ? 'dashed node = your offload endpoint while it is off or has no calls · click it to switch'
+          : 'dashed node = an offload endpoint of your own, not set up yet · click it to add one'}</span>}
       </div>
     </div>
   )
