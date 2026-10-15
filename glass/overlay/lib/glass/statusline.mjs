@@ -23,7 +23,7 @@ import gauge from '../statusline/context-gauge.cjs';
 import { networkBadge } from '../network/location-probe.mjs';
 import { totalsByTask } from './ui-api.mjs';
 
-export const TAGS = Object.freeze({ health: 'g:health', ctx: 'g:ctx', tok: 'g:tok', net: 'g:net' });
+export const TAGS = Object.freeze({ health: 'g:health', ctx: 'g:ctx', tok: 'g:tok', off: 'g:off', net: 'g:net' });
 
 /** Prompt tokens of one context turn: fresh input + cache read + cache write. */
 export function promptTokens(turn) {
@@ -53,8 +53,9 @@ export function conversationTurn(turns) {
  * @param {{ readContextTurns: Function }} o.measurement
  * @param {string} o.egress         upstream proxy URL, '' when direct
  * @param {object} [o.network]      network facts (network.mjs facts())
+ * @param {object} [o.offload]      { config, reachable } of the opt-in offload
  */
-export function statuslineData({ session, db, measurement, egress, network = null, glass, refusal = null }) {
+export function statuslineData({ session, db, measurement, egress, network = null, glass, refusal = null, offload = null }) {
   const taskId = session.taskId;
   const t = totalsByTask(db, [taskId]).get(taskId);
   let turns = [];
@@ -68,6 +69,7 @@ export function statuslineData({ session, db, measurement, egress, network = nul
   }
   const prompt = t ? t.input + t.cache_read + t.cache_write : 0;
   return {
+    offload: offloadFacts(db, taskId, session.agent, offload),
     glass,
     task_id: taskId,
     agent: session.agent,
@@ -91,6 +93,25 @@ export function statuslineData({ session, db, measurement, egress, network = nul
   };
 }
 
+/**
+ * The offload's part of one session's line, or null while it is off for this
+ * agent — then the line is exactly what it was before offload existed.
+ * D = calls the classifier demoted, L = calls the endpoint answered (a call that
+ * fell back to the agent's provider is not one).
+ */
+export function offloadFacts(db, taskId, agent, offload) {
+  const cfg = offload?.config;
+  if (!cfg?.enabled || !cfg.agents?.[agent]) return null;
+  let demoted = 0;
+  let local = 0;
+  try {
+    const r = db?.prepare(`SELECT SUM(band_source = 'classifier') AS d, SUM(offloaded_from != '') AS l FROM token_usage WHERE task_id = ?`).get(taskId);
+    demoted = Number(r?.d) || 0;
+    local = Number(r?.l) || 0;
+  } catch { /* an older DB without the columns: nothing to count */ }
+  return { name: cfg.target.name, reachable: Boolean(offload.reachable), demoted, local };
+}
+
 export function fmtTokens(n) {
   const v = Number(n) || 0;
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
@@ -107,7 +128,7 @@ export function uiLinks(port, taskId) {
   const root = `http://127.0.0.1:${port}/`;
   const q = taskId ? `?task=${encodeURIComponent(taskId)}` : '';
   return {
-    root, session: `${root}#/sessions${q}`, explain: `${root}#/sessions${q}${q ? '&' : '?'}explain=1`, network: `${root}report/net${q}`,
+    root, session: `${root}#/sessions${q}`, models: `${root}#/models`, explain: `${root}#/sessions${q}${q ? '&' : '?'}explain=1`, network: `${root}report/net${q}`,
   };
 }
 
@@ -154,6 +175,9 @@ export function renderStatusline(d, { format = 'plain', port }) {
   const t = d.tokens;
   const cache = t.cache_pct == null ? '' : ` ⚡${t.cache_pct}%`;
   parts.push(field(TAGS.tok, `↑${fmtTokens(t.prompt)} ↓${fmtTokens(t.output)}${cache}`, links.session));
+  // Offload counts, as coding's: hidden at 0, never colouring the line.
+  if (d.offload?.demoted) parts.push(field(TAGS.off, `D:${d.offload.demoted}`, links.models));
+  if (d.offload?.local) parts.push(field(TAGS.off, `L:${d.offload.local}`, links.models));
 
   // A daemon from before the badge (left running across an update) sends no
   // network facts: show what it does know, never a made-up ?? / OFF.
@@ -183,6 +207,12 @@ export function renderReport(tag, { d, turns = [], port, caPath = '' }) {
     lines.push(`egress (glass daemon): ${d.egress === 'proxy' ? `via ${d.egress_url}` : 'direct'}`);
     if (d.egress_refused) lines.push(`  last refused tunnel: ${d.egress_refused.host} (HTTP ${d.egress_refused.status}) at ${d.egress_refused.at}`);
     if (caPath) lines.push(`interception CA: ${caPath}`);
+    if (d.offload) {
+      lines.push(`offload: on for ${d.agent} → ${d.offload.name} (${d.offload.reachable ? 'reachable' : 'NOT reachable — calls go to the agent\'s provider'})`);
+      lines.push(`  this session: ${d.offload.local} answered by ${d.offload.name} [L] · ${d.offload.demoted} demoted by the classifier [D]`);
+    } else {
+      lines.push(`offload: off for ${d.agent} — every call goes to the agent's own provider`);
+    }
     lines.push(`last measured call: ${d.last_at || '—'}`);
     return lines.join('\n');
   }

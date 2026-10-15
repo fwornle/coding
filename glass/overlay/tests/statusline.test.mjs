@@ -25,13 +25,31 @@ test('plain, tmux and ansi carry the same fields', () => {
   const plain = renderStatusline(D, { format: 'plain', port: 12445 });
   assert.match(plain, /^\[glass ●\] \[ctx .*5%\] \[↑51\.3K ↓1\.2K ⚡49%\] \[N:CN P:ON\]$/);
   const tmux = renderStatusline(D, { format: 'tmux', port: 12445 });
-  for (const tag of Object.values(TAGS)) assert.ok(tmux.includes(`#[range=user|${tag}]`), tag);
+  // g:off appears only with offload on for the agent (tested below).
+  for (const tag of Object.values(TAGS).filter((t) => t !== TAGS.off)) assert.ok(tmux.includes(`#[range=user|${tag}]`), tag);
   assert.equal(strip(tmux), plain);
   const ansi = renderStatusline(D, { format: 'ansi', port: 12445 });
   assert.ok(ansi.includes(`\x1b]8;;${uiLinks(12445, D.task_id).explain}\x1b\\`), 'ctx links to the explainer');
   assert.ok(ansi.includes(`\x1b]8;;${uiLinks(12445, D.task_id).session}\x1b\\`), 'tokens link to the session');
   assert.ok(ansi.includes(`\x1b]8;;${uiLinks(12445, D.task_id).network}\x1b\\`), 'network links to the report page: no popup outside tmux');
   assert.equal(strip(ansi), plain);
+});
+
+test('offload: [D:n] [L:n] only while it is on for the agent, hidden at 0; the network report says where calls go', async () => {
+  const { offloadFacts } = await import('../lib/glass/statusline.mjs');
+  const on = { ...D, agent: 'opencode', offload: { name: 'Team Box', reachable: true, demoted: 2, local: 5 } };
+  assert.match(renderStatusline(on, { port: 1 }), /\[↑51\.3K ↓1\.2K ⚡49%\] \[D:2\] \[L:5\] \[N:CN P:ON\]$/);
+  const tmux = renderStatusline(on, { format: 'tmux', port: 1 });
+  assert.ok(tmux.includes(`#[range=user|${TAGS.off}]`));
+  assert.deepEqual(clickTarget(TAGS.off, uiLinks(1, on.task_id)), { open: uiLinks(1, on.task_id).models });
+  assert.doesNotMatch(renderStatusline({ ...on, offload: { ...on.offload, demoted: 0, local: 0 } }, { port: 1 }), /\[[DL]:/);
+  assert.match(renderReport(TAGS.net, { d: on, port: 1 }), /offload: on for opencode → Team Box \(reachable\)\n {2}this session: 5 answered by Team Box \[L\] · 2 demoted/);
+  assert.match(renderReport(TAGS.net, { d: D, port: 1 }), /offload: off for claude/);
+  // Off, or on for other agents only: no facts at all, so the line is as before.
+  const cfg = { enabled: true, agents: { opencode: true }, target: { name: 'Team Box' } };
+  assert.equal(offloadFacts(null, 't', 'claude', { config: cfg }), null);
+  assert.equal(offloadFacts(null, 't', 'opencode', { config: { ...cfg, enabled: false } }), null);
+  assert.deepEqual(offloadFacts(null, 't', 'opencode', { config: cfg, reachable: true }), { name: 'Team Box', reachable: true, demoted: 0, local: 0 });
 });
 
 test('the gauge follows the conversation, not side calls', async () => {

@@ -389,7 +389,7 @@ export async function startDaemon({
 
   const lineData = (session) => statuslineData({
     session, db: tokenDb?.db, measurement, egress: upstreamProxy(egressEnv, selfPort), network: netMonitor.facts(), glass: VERSION,
-    refusal: lastRefusal,
+    refusal: lastRefusal, offload: { config: offloadStore.getConfig(), reachable: offloadHealth.usable(offloadStore.getConfig()) },
   });
 
   const server = http.createServer(async (req, res) => {
