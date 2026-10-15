@@ -49,10 +49,11 @@ export function targetProviderId(name: string): string {
 }
 
 const write = async (method: string, route: string, body: unknown): Promise<OffloadView> => {
+  // A daemon that stopped answers nothing: say that, not the browser's "Failed to fetch".
   const r = await fetch(route, {
     method, headers: { 'content-type': 'application/json', 'x-glass-ui': '1' }, body: JSON.stringify(body),
-  })
-  const j = await r.json()
+  }).catch(() => { throw new Error('glass is not running — `glass ui` starts it') })
+  const j = await r.json().catch(() => null)
   if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`)
   return j as OffloadView
 }

@@ -35,7 +35,8 @@ export interface FlowOffload {
   enabled: boolean
   status: { label: string; tone: 'off' | 'ok' | 'warn' }
   agentsOn: string[]
-  onToggle: () => void
+  /** Rejects when glass refused or could not be reached. */
+  onToggle: () => Promise<void>
   onSettings: () => void
 }
 
@@ -83,6 +84,7 @@ function addTo<K>(m: Map<K, number>, k: K, v: number) { m.set(k, (m.get(k) ?? 0)
 export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
   const [hover, setHover] = useState<string | null>(null)
   const [card, setCard] = useState(false)
+  const [toggle, setToggle] = useState<{ busy: boolean; error: string }>({ busy: false, error: '' })
 
   const g = useMemo(() => {
     const agentTok = new Map<string, number>()
@@ -203,7 +205,7 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
     return (
       <g key={n.id} data-node={n.id} data-offload-target={isTarget ? '1' : undefined}
         onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)}
-        onClick={isTarget ? () => setCard((c) => !c) : undefined}
+        onClick={isTarget ? () => { setCard((c) => !c); setToggle({ busy: false, error: '' }) } : undefined}
         style={{ cursor: isTarget ? 'pointer' : 'default' }}
         opacity={hover === null || hover === n.id || g.left.concat(g.right).some((e) => touches(e) && (e.from === n.id || e.to === n.id)) ? 1 : 0.4}>
         {isTarget && <title>{`${n.label} — offload ${offload!.status.label}. Click to switch or change it.`}</title>}
@@ -270,11 +272,28 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
                 Offload {offload.status.label}.{' '}
                 {offload.agentsOn.length ? `Easy calls of ${offload.agentsOn.join(', ')} go here; the rest, and anything it cannot answer in time, go to the agent's own provider.` : 'No agent is chosen yet.'}
               </p>
+              {toggle.error && (
+                <p data-testid="offload-card-error" className="mt-2 text-xs text-destructive">Could not switch: {toggle.error}</p>
+              )}
               <div className="mt-3 flex gap-2">
-                <button data-testid="offload-card-toggle" onClick={() => { offload.onToggle(); setCard(false) }}
-                  className="rounded-md border px-2.5 py-1 text-xs hover:bg-muted">
-                  {offload.enabled ? 'Turn offload off' : 'Turn offload on'}
-                </button>
+                {/* Turning on with no agent chosen would change nothing: the button says so and opens the settings. */}
+                {!offload.enabled && !offload.agentsOn.length ? (
+                  <button data-testid="offload-card-toggle" onClick={() => { offload.onSettings(); setCard(false) }}
+                    className="rounded-md border px-2.5 py-1 text-xs hover:bg-muted">
+                    Choose agents…
+                  </button>
+                ) : (
+                  <button data-testid="offload-card-toggle" disabled={toggle.busy}
+                    onClick={() => {
+                      setToggle({ busy: true, error: '' })
+                      offload.onToggle()
+                        .then(() => { setToggle({ busy: false, error: '' }); setCard(false) })
+                        .catch((e) => setToggle({ busy: false, error: String(e?.message || e) }))
+                    }}
+                    className="rounded-md border px-2.5 py-1 text-xs hover:bg-muted disabled:opacity-50">
+                    {toggle.busy ? 'Switching…' : offload.enabled ? 'Turn offload off' : 'Turn offload on'}
+                  </button>
+                )}
                 <button onClick={() => { offload.onSettings(); setCard(false) }} className="rounded-md px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted">
                   Settings…
                 </button>

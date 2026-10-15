@@ -317,11 +317,8 @@ export function ModelsPage() {
                 enabled: cfg.enabled,
                 status: offloadStatus(off.view),
                 agentsOn: OFFLOAD_AGENTS.filter((a) => cfg.agents[a]),
-                onToggle: () => {
-                  // Turning on with nothing chosen would change nothing: open the settings instead.
-                  if (!cfg.enabled && !OFFLOAD_AGENTS.some((a) => cfg.agents[a])) off.openSettings()
-                  else off.patch({ enabled: !cfg.enabled }).catch(() => off.openSettings())
-                },
+                // A failed write rejects: the card says why rather than opening something else.
+                onToggle: () => off.patch({ enabled: !cfg.enabled }),
                 onSettings: off.openSettings,
               } : undefined}
             />
