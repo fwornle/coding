@@ -5,9 +5,15 @@ import { normalizeModel } from '@/components/performance/models'
 /**
  * The Models tab drawn as flow: agent → the model it chose → the account that
  * answered. The same visual language as the dashboard's Token Usage → Flow, minus
- * its middle column: coding's proxy decides where a call goes, glass decides
- * nothing, so there is no decision to draw — every edge is the agent's own choice.
- * Read-only, from the rows the Models table already shows (/api/models).
+ * its middle column: glass decides nothing by default, so every edge is the
+ * agent's own choice. Drawn from the rows the Models table already shows
+ * (/api/models).
+ *
+ * With an offload endpoint configured, it is an account node too — dashed while
+ * it has no calls in the window or offload is off — and the one clickable node:
+ * a click opens a small card with its state, the switch and the settings. Not a
+ * toggle on click: a canvas click is easy to misfire, and a silent change of
+ * where calls go is the worst outcome of a misfire.
  */
 
 export interface FlowGroup {
@@ -23,8 +29,19 @@ export interface FlowGroup {
   cache_write: number
 }
 
+export interface FlowOffload {
+  /** The endpoint's name — its account node's label. */
+  label: string
+  enabled: boolean
+  status: { label: string; tone: 'off' | 'ok' | 'warn' }
+  agentsOn: string[]
+  onToggle: () => void
+  onSettings: () => void
+}
+
 interface Props {
   groups: FlowGroup[]
+  offload?: FlowOffload
   /** The account's display name — the Models table's "Answered by". */
   answeredBy: (provider: string) => string
   /** The agent's display name — the Models table's "Agent". */
@@ -56,13 +73,14 @@ function fmtTokens(n: number): string {
 // column reads as part of it.
 const clip = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1)}…` : s)
 
-interface Node { id: string; label: string; sub: string; tokens: number; color: string }
+interface Node { id: string; label: string; sub: string; tokens: number; color: string; ghost?: boolean }
 interface Edge { from: string; to: string; tokens: number; side: boolean; color: string }
 
 function addTo<K>(m: Map<K, number>, k: K, v: number) { m.set(k, (m.get(k) ?? 0) + v) }
 
-export function ModelFlow({ groups, answeredBy, agentLabel }: Props) {
+export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
   const [hover, setHover] = useState<string | null>(null)
+  const [card, setCard] = useState(false)
 
   const g = useMemo(() => {
     const agentTok = new Map<string, number>()
@@ -109,7 +127,8 @@ export function ModelFlow({ groups, answeredBy, agentLabel }: Props) {
     const agents: Node[] = byTokens(agentTok).map((id) => {
       const top = [...(agentAcct.get(id) ?? new Map()).entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
       const n = agentCalls.get(id) ?? 0
-      return { id, label: id.slice(2), sub: `${n} call${n === 1 ? '' : 's'}`, tokens: agentTok.get(id) ?? 0, color: getProviderColor(top) }
+      const on = offload?.enabled && offload.agentsOn.includes(id.slice(2))
+      return { id, label: id.slice(2), sub: `${n} call${n === 1 ? '' : 's'}${on ? ' · offload on' : ''}`, tokens: agentTok.get(id) ?? 0, color: getProviderColor(top) }
     })
     const models: Node[] = byTokens(modelTok).map((id) => {
       const c = modelCalls.get(id) ?? { main: 0, side: 0 }
@@ -123,10 +142,16 @@ export function ModelFlow({ groups, answeredBy, agentLabel }: Props) {
       sub: [...(acctHosts.get(id) ?? [])].join(', ') || 'host not recorded',
       tokens: acctTok.get(id) ?? 0,
       color: acctColor.get(id) ?? getProviderColor(''),
+      ghost: Boolean(offload && id.slice(2) === offload.label && !offload.enabled),
     }))
+    // A configured endpoint with no calls in the window still gets its node: it is
+    // where the switch is.
+    if (offload && !accounts.some((a) => a.label === offload.label)) {
+      accounts.push({ id: `p:${offload.label}`, label: offload.label, sub: 'offload endpoint · no calls in this window', tokens: 0, color: getProviderColor(''), ghost: true })
+    }
     const max = Math.max(1, ...[...left.values()].map((e) => e.tokens))
     return { agents, models, accounts, left: [...left.values()], right: [...right.values()], max }
-  }, [groups, answeredBy, agentLabel])
+  }, [groups, answeredBy, agentLabel, offload])
 
   if (!groups.length) return null
 
@@ -168,10 +193,16 @@ export function ModelFlow({ groups, answeredBy, agentLabel }: Props) {
 
   const node = (n: Node, x: number, w: number, opts: { mono?: boolean; total?: boolean }) => {
     const y = ys.get(n.id) ?? 0
+    const isTarget = Boolean(offload && n.id === `p:${offload.label}`)
     return (
-      <g key={n.id} data-node={n.id} onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)} style={{ cursor: 'default' }}
+      <g key={n.id} data-node={n.id} data-offload-target={isTarget ? '1' : undefined}
+        onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)}
+        onClick={isTarget ? () => setCard((c) => !c) : undefined}
+        style={{ cursor: isTarget ? 'pointer' : 'default' }}
         opacity={hover === null || hover === n.id || g.left.concat(g.right).some((e) => touches(e) && (e.from === n.id || e.to === n.id)) ? 1 : 0.4}>
-        <rect x={x} y={y} width={w} height={NODE_H} rx={5} className="fill-background stroke-border" strokeWidth={1} />
+        {isTarget && <title>{`${n.label} — offload ${offload!.status.label}. Click to switch or change it.`}</title>}
+        <rect x={x} y={y} width={w} height={NODE_H} rx={5} className="fill-background stroke-border" strokeWidth={isTarget ? 1.5 : 1}
+          strokeDasharray={n.ghost ? '4 3' : undefined} />
         <rect x={x} y={y} width={3} height={NODE_H} rx={1.5} fill={n.color} />
         <text x={x + 10} y={y + 15} className="fill-foreground" fontSize={11} fontWeight={600}
           fontFamily={opts.mono ? 'ui-monospace, monospace' : undefined}>
@@ -187,25 +218,55 @@ export function ModelFlow({ groups, answeredBy, agentLabel }: Props) {
 
   return (
     <div className="space-y-3" data-testid="models-flow">
-      <div className="border rounded-md overflow-x-auto bg-muted/10">
-        <svg viewBox={`0 0 ${W} ${height}`} width="100%" style={{ minWidth: 760, display: 'block' }}
-          role="img" aria-label="Measured calls as flow: agents to the models they chose to the accounts that answered">
-          <defs>
-            {/* userSpaceOnUse: a head sized by strokeWidth would blot out the card on a thick edge. */}
-            <marker id="glass-flow-arrow" viewBox="0 0 10 10" refX="8" refY="5"
-              markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
-              <path d="M 0 1 L 9 5 L 0 9 z" fill="context-stroke" />
-            </marker>
-          </defs>
-          <text x={COL_AGENT} y={26} className="fill-muted-foreground" fontSize={11} fontWeight={600}>AGENTS — who asked</text>
-          <text x={COL_MODEL} y={26} className="fill-muted-foreground" fontSize={11} fontWeight={600}>MODELS — what the agent chose</text>
-          <text x={COL_ACCT} y={26} className="fill-muted-foreground" fontSize={11} fontWeight={600}>ACCOUNTS — who answered</text>
-          {g.left.map((e) => edge(e, COL_AGENT + AGENT_W, COL_MODEL))}
-          {g.right.map((e) => edge(e, COL_MODEL + MODEL_W, COL_ACCT))}
-          {g.agents.map((n) => node(n, COL_AGENT, AGENT_W, { total: true }))}
-          {g.models.map((n) => node(n, COL_MODEL, MODEL_W, { mono: true }))}
-          {g.accounts.map((n) => node(n, COL_ACCT, ACCT_W, { total: true }))}
-        </svg>
+      <div className="relative">
+        <div className="border rounded-md overflow-x-auto bg-muted/10">
+          <svg viewBox={`0 0 ${W} ${height}`} width="100%" style={{ minWidth: 760, display: 'block' }}
+            role="img" aria-label="Measured calls as flow: agents to the models they chose to the accounts that answered">
+            <defs>
+              {/* userSpaceOnUse: a head sized by strokeWidth would blot out the card on a thick edge. */}
+              <marker id="glass-flow-arrow" viewBox="0 0 10 10" refX="8" refY="5"
+                markerUnits="userSpaceOnUse" markerWidth="9" markerHeight="9" orient="auto-start-reverse">
+                <path d="M 0 1 L 9 5 L 0 9 z" fill="context-stroke" />
+              </marker>
+            </defs>
+            <text x={COL_AGENT} y={26} className="fill-muted-foreground" fontSize={11} fontWeight={600}>AGENTS — who asked</text>
+            <text x={COL_MODEL} y={26} className="fill-muted-foreground" fontSize={11} fontWeight={600}>MODELS — what the agent chose{offload ? ', or your endpoint\u2019s' : ''}</text>
+            <text x={COL_ACCT} y={26} className="fill-muted-foreground" fontSize={11} fontWeight={600}>ACCOUNTS — who answered</text>
+            {g.left.map((e) => edge(e, COL_AGENT + AGENT_W, COL_MODEL))}
+            {g.right.map((e) => edge(e, COL_MODEL + MODEL_W, COL_ACCT))}
+            {g.agents.map((n) => node(n, COL_AGENT, AGENT_W, { total: true }))}
+            {g.models.map((n) => node(n, COL_MODEL, MODEL_W, { mono: true }))}
+            {g.accounts.map((n) => node(n, COL_ACCT, ACCT_W, { total: true }))}
+          </svg>
+        </div>
+        {card && offload && (() => {
+          const y = ys.get(`p:${offload.label}`) ?? 0
+          const dot = { off: 'bg-muted-foreground/40', ok: 'bg-emerald-500', warn: 'bg-amber-500' }[offload.status.tone]
+          return (
+            <div data-testid="offload-card" role="dialog" aria-label={`${offload.label} offload`}
+              className="absolute z-10 w-72 rounded-md border bg-popover p-3 text-sm shadow-md"
+              style={{ right: 12, top: `${((y + NODE_H + 6) / height) * 100}%` }}>
+              <div className="flex items-center gap-2 font-medium">
+                <span className={`h-2 w-2 rounded-full ${dot}`} />
+                {offload.label}
+                <button className="ml-auto text-muted-foreground hover:text-foreground" aria-label="Close" onClick={() => setCard(false)}>×</button>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Offload {offload.status.label}.{' '}
+                {offload.agentsOn.length ? `Easy calls of ${offload.agentsOn.join(', ')} go here; the rest, and anything it cannot answer in time, go to the agent's own provider.` : 'No agent is chosen yet.'}
+              </p>
+              <div className="mt-3 flex gap-2">
+                <button data-testid="offload-card-toggle" onClick={() => { offload.onToggle(); setCard(false) }}
+                  className="rounded-md border px-2.5 py-1 text-xs hover:bg-muted">
+                  {offload.enabled ? 'Turn offload off' : 'Turn offload on'}
+                </button>
+                <button onClick={() => { offload.onSettings(); setCard(false) }} className="rounded-md px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted">
+                  Settings…
+                </button>
+              </div>
+            </div>
+          )
+        })()}
       </div>
       <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-muted-foreground">
         <span className="flex items-center gap-1.5">
@@ -217,6 +278,7 @@ export function ModelFlow({ groups, answeredBy, agentLabel }: Props) {
           side calls (titles, summaries — no tools)
         </span>
         <span>thickness = tokens · colour = the account that answered</span>
+        {offload && <span>dashed node = your offload endpoint while it is off or has no calls · click it to switch</span>}
       </div>
     </div>
   )

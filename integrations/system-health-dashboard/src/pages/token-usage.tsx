@@ -468,12 +468,14 @@ const ALL_TABS: TokenUsageTab[] = ['overview', 'evolution', 'cost', 'recent', 'r
 /**
  * proxyBase: where the token-usage reads live — '' for same-origin (glass's daemon
  * serves the page itself). tabs / settings: glass shows a subset (no Cost, no
- * routing — it routes nothing).
+ * routing tab). onSettings: the Settings button opens the caller's own dialog
+ * instead of this proxy's LLM Routing one (glass: its offload settings).
  */
-export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settings = true }: {
+export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settings = true, onSettings }: {
   proxyBase?: string
   tabs?: TokenUsageTab[]
   settings?: boolean
+  onSettings?: () => void
 } = {}) {
   const has = (tab: TokenUsageTab) => tabs.includes(tab)
   const [summary, setSummary] = useState<TokenSummary | null>(null)
@@ -761,12 +763,12 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
               ))}
             </SelectContent>
           </Select>
-          {settings && (
+          {(settings || onSettings) && (
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setSettingsOpen(true)}
-              title="Provider/model routing per service"
+              onClick={() => (onSettings ? onSettings() : setSettingsOpen(true))}
+              title={onSettings ? 'Where calls go: offload easy calls to your own endpoint' : 'Provider/model routing per service'}
             >
               <Settings className="h-4 w-4 mr-2" />
               Settings

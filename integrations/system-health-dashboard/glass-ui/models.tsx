@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -6,6 +6,7 @@ import { normalizeModel } from '@/components/performance/models'
 import { accountLabel } from '@/lib/providers'
 import { cn } from '@/lib/utils'
 import { ModelFlow } from './flow'
+import { OFFLOAD_AGENTS, offloadStatus, useOffload, useTargetLabel } from './offload'
 
 const POLL_MS = 10_000
 
@@ -61,6 +62,11 @@ const answeredBy = (provider: string) =>
   (CLAUDE_SUBSCRIPTION.has(provider) ? 'Claude subscription' : accountLabel(provider))
 
 // A call the daemon measured but could not tie to a glass session has no agent.
+/** answeredBy, plus the offload endpoint's own name for its rows. */
+function useAnsweredBy() {
+  const target = useTargetLabel()
+  return useCallback((provider: string) => target(provider) ?? answeredBy(provider), [target])
+}
 const agentLabel = (agent: string) => (!agent || agent === 'unknown' ? 'no session' : agent)
 
 const KIND: Record<CallKind, { label: string; title: string; className: string }> = {
@@ -90,6 +96,7 @@ const tokensOf = (r: { input: number; output: number; cache_read: number; cache_
  * chose every model; glass forwards and measures, it never re-routes a call.
  */
 export function SessionModels({ taskId }: { taskId: string }) {
+  const answered = useAnsweredBy()
   const [data, setData] = useState<{ groups: Group[]; calls: Call[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -118,7 +125,7 @@ export function SessionModels({ taskId }: { taskId: string }) {
       <CardHeader>
         <CardTitle className="text-base">Models</CardTitle>
         <CardDescription>
-          What the agent chose and who answered. glass routes nothing — every call goes to the agent&apos;s own provider.
+          What the agent chose and who answered — the agent&apos;s own provider, or your offload endpoint where offload is on.
           {data && calls > 0 && (
             <span className="block mt-1" data-testid="models-headline">
               {calls} call{calls === 1 ? '' : 's'} on {models} model{models === 1 ? '' : 's'}
@@ -150,7 +157,7 @@ export function SessionModels({ taskId }: { taskId: string }) {
                 <TableRow key={`${g.model}|${g.provider}|${g.upstream}|${g.call_kind}`} data-kind={g.call_kind || 'unrecorded'}>
                   <TableCell className="font-mono text-xs">{normalizeModel(g.model)}</TableCell>
                   <TableCell><KindBadge kind={g.call_kind} /></TableCell>
-                  <TableCell className="text-xs">{answeredBy(g.provider)}</TableCell>
+                  <TableCell className="text-xs">{answered(g.provider)}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{g.upstream || '—'}</TableCell>
                   <TableCell className="text-right font-mono text-xs">{g.calls}</TableCell>
                   <TableCell className="text-right font-mono text-xs">{fmtTokens(g.input)}</TableCell>
@@ -184,7 +191,7 @@ export function SessionModels({ taskId }: { taskId: string }) {
                     <TableCell className="text-xs whitespace-nowrap">{new Date(c.timestamp).toLocaleTimeString()}</TableCell>
                     <TableCell className="font-mono text-xs">{normalizeModel(c.model)}</TableCell>
                     <TableCell><KindBadge kind={c.call_kind} /></TableCell>
-                    <TableCell className="text-xs">{answeredBy(c.provider)}</TableCell>
+                    <TableCell className="text-xs">{answered(c.provider)}</TableCell>
                     <TableCell className="text-right font-mono text-xs">{fmtTokens(tokensOf(c))}</TableCell>
                     <TableCell className="text-right font-mono text-xs">{c.latency_ms ? `${(c.latency_ms / 1000).toFixed(1)} s` : '—'}</TableCell>
                   </TableRow>
@@ -239,6 +246,9 @@ const WINDOWS: Array<{ hours: number; label: string }> = [
  * card under Sessions (SessionModels).
  */
 export function ModelsPage() {
+  const answered = useAnsweredBy()
+  const off = useOffload()
+  const cfg = off.view?.config
   const [hours, setHours] = useState(24)
   const [groups, setGroups] = useState<MixGroup[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -270,7 +280,7 @@ export function ModelsPage() {
           <h1 className="text-2xl font-bold">Models</h1>
           <p className="text-sm text-muted-foreground">
             Which models your agents used, who answered, and which calls were the agent&apos;s loop or a side call.
-            glass routes nothing — every model here is one the agent chose.
+            Every call goes to the agent&apos;s own provider unless offload is on for that agent (header, top right).
           </p>
         </div>
         <div className="flex shrink-0 gap-1" role="group" aria-label="Time window">
@@ -293,11 +303,28 @@ export function ModelsPage() {
             <CardTitle className="text-base">Flow</CardTitle>
             <CardDescription>
               The same calls as the table below, drawn from the agent to the model it chose to the account that answered.
-              There is no decision in the middle: glass forwards every call to the host the agent addressed, with the agent&apos;s own login.
+              glass forwards every call to the host the agent addressed, with the agent&apos;s own login — unless offload is on
+              for that agent: then its easy calls go to your endpoint. Click the endpoint&apos;s node to switch it.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ModelFlow groups={rows} answeredBy={answeredBy} agentLabel={agentLabel} />
+            <ModelFlow
+              groups={rows}
+              answeredBy={answered}
+              agentLabel={agentLabel}
+              offload={cfg?.target.url ? {
+                label: cfg.target.name,
+                enabled: cfg.enabled,
+                status: offloadStatus(off.view),
+                agentsOn: OFFLOAD_AGENTS.filter((a) => cfg.agents[a]),
+                onToggle: () => {
+                  // Turning on with nothing chosen would change nothing: open the settings instead.
+                  if (!cfg.enabled && !OFFLOAD_AGENTS.some((a) => cfg.agents[a])) off.openSettings()
+                  else off.patch({ enabled: !cfg.enabled }).catch(() => off.openSettings())
+                },
+                onSettings: off.openSettings,
+              } : undefined}
+            />
           </CardContent>
         </Card>
       )}
@@ -338,7 +365,7 @@ export function ModelsPage() {
                     <TableCell><Badge variant="secondary" className="text-xs" title={agentLabel(g.agent) === 'no session' ? 'Measured, but not tied to a glass session — see the note below the table' : undefined}>{agentLabel(g.agent)}</Badge></TableCell>
                     <TableCell className="font-mono text-xs">{normalizeModel(g.model)}</TableCell>
                     <TableCell><KindBadge kind={g.call_kind} /></TableCell>
-                    <TableCell className="text-xs">{answeredBy(g.provider)}</TableCell>
+                    <TableCell className="text-xs">{answered(g.provider)}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">{g.upstream || '—'}</TableCell>
                     <TableCell className="text-right font-mono text-xs">{g.sessions || '—'}</TableCell>
                     <TableCell className="text-right font-mono text-xs">{g.calls}</TableCell>
