@@ -29,16 +29,18 @@ agent's own loop rather than side requests.
 
     ![Flow over 7 days: claude to claude-opus-5.5 to the Claude subscription; opencode, copilot and pi to several models, all answered by GitHub Copilot; side calls dashed](images/ui-models-flow.png)
 
-    There is no decision in the middle: every edge is a choice the agent made, and glass
-    forwarded the call to the host the agent addressed.
+    By default there is no decision in the middle: every edge is a choice the agent made,
+    and glass forwarded the call to the host the agent addressed. With
+    [offload](offload.md) on, your endpoint is an account too — its calls in green — and a
+    click on its node opens the switch.
 
     For **one session**, open **Sessions** and select its row: the same columns appear in a
     Models card above the session's timeline, with its calls one by one.
 
     ![Models card of an OpenCode session](images/ui-session-models.png)
 
-    glass **routes nothing**: every model on this card is one the agent chose, and every call
-    went to the agent's own provider. **Next:** what filled the main calls —
+    Unless [offload](offload.md) is on, every model on this card is one the agent chose, and
+    every call went to the agent's own provider. **Next:** what filled the main calls —
     [Context Window](context-window.md).
 
 === "📚 Deep Dive (full)"

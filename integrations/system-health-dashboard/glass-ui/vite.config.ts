@@ -8,10 +8,30 @@ import tailwindcss from 'tailwindcss'
 import autoprefixer from 'autoprefixer'
 import tailwindConfig from '../tailwind.config'
 
+// Modules glass builds WITHOUT, each swapped for a glass-ui stand-in: coding's own
+// site providers, and the Token Usage parts glass never renders (see omitted.tsx).
+// Matched on the resolved file, so relative and '@/' imports alike are caught.
+const SWAPPED: Array<[RegExp, string]> = [
+  [/src\/lib\/provider-site\.ts$/, 'provider-site.ts'],
+  [/src\/pages\/token-usage-settings-dialog\.tsx$/, 'omitted.tsx'],
+  [/src\/pages\/token-usage-routing-tab\.tsx$/, 'omitted.tsx'],
+  [/src\/components\/cost\/CostTab\.tsx$/, 'omitted.tsx'],
+]
+const swapForGlass = {
+  name: 'glass-swap',
+  enforce: 'pre' as const,
+  async resolveId(this: { resolve: (s: string, i?: string, o?: object) => Promise<{ id: string } | null> }, source: string, importer?: string) {
+    if (!importer) return null
+    const r = await this.resolve(source, importer, { skipSelf: true })
+    const hit = r && SWAPPED.find(([re]) => re.test(r.id.split('?')[0]))
+    return hit ? path.resolve(__dirname, hit[1]) : null
+  },
+}
+
 export default defineConfig({
   root: __dirname,
   base: './',
-  plugins: [react()],
+  plugins: [swapForGlass, react()],
   resolve: {
     // '@/store' first: the exact module only, everything else under '@' as usual.
     alias: [

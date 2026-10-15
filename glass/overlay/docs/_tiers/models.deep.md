@@ -49,22 +49,12 @@ coding's dashboard has a flow with the same left and right columns and a decisio
 the middle — the router choosing an account per call. glass has no router, so the middle
 column is the models the agent itself picked.
 
-## On-prem offload — planned, not in this release
+## Offloaded calls
 
-Where an on-prem Qwen3.8-27B cluster is available, the next phase (G8)
-lets glass hand **some** calls to it — **opt-in, off by default**. What is decided so far,
-from measurements with coding's own router against that cluster:
-
-| | |
-|---|---|
-| Which calls | Small ones only: opencode's session titles and side calls. An agent's first turn carries 20–28k tokens of system prompt and tools; uncached, the cluster needs ~40–55 s for that, so it stays on the paid account. |
-| Which agents | opencode first: its calls already reach glass by configuration (the relay), so glass can answer them without decrypting anything. Copilot CLI and pi stay measure-only. |
-| Gates | at most a few thousand input tokens, a short time budget (~8 s), one call in flight to the cluster; a dead cluster is skipped without a per-call timeout |
-| Fallback | the original call, unchanged, to the host the agent addressed, with the agent's own login — what glass does today. Your GitHub or Anthropic credentials never reach the cluster. |
-| Trade-off | Qwen answers small calls in ~2–10 s against ~1–2 s on Copilot: offload saves paid tokens, not time. |
-
-With the option on, the Models flow would show offloaded calls arriving at an on-prem account
-node; with it off, glass stays exactly as described on this page.
+With [offload](offload.md) on, calls your endpoint answered appear with its name as the
+account and its model in the model column; the flow draws them in green to the endpoint's
+node. A call the endpoint could not answer in time is a row of the agent's own provider —
+the attempt is on the row (`attempt_trail`), not a node of its own.
 
 ## Calls without a session
 
@@ -78,8 +68,9 @@ agent shows as **no session**.
 
 coding, the project glass is extracted from, has a router that moves calls between accounts
 and to local models. glass leaves that out on purpose: the agent keeps its own login, model
-catalogue and routing, and glass only measures. This card shows the agent's own choices
-for the same reason. The one planned exception is the opt-in on-prem offload above.
+catalogue and routing, and glass only measures. The one exception is opt-in and yours to
+switch: [offload](offload.md) of easy calls to an endpoint you name — never to an account
+glass picks.
 
 ## Reading it programmatically
 

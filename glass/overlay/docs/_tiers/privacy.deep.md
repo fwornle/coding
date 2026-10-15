@@ -26,6 +26,13 @@ secrets into prompts.
 Your agents' bearer tokens pass through the daemon's memory on the way to the model host.
 They are forwarded, never logged and never stored.
 
+## With offload on
+
+Only if you switch [offload](offload.md) on, and only for the agents you tick: an easy call's
+request body goes to the endpoint you named, with that endpoint's key — never your agent's
+login or headers. Everything else, and any call the endpoint fails, goes where it went before.
+The endpoint key is kept owner-only in `~/.glass/offload.key` and no API returns it.
+
 ## The interception CA
 
 | | |

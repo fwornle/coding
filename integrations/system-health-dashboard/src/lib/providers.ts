@@ -12,6 +12,8 @@
 // meant Max, which is what the overwhelming majority of those rows are, so it
 // maps to claude-code-max. Direct API-key traffic now writes `anthropic-api`
 // explicitly.
+import { SITE_PROVIDER_COLORS, SITE_PROVIDER_LABELS } from './provider-site'
+
 export const PROVIDER_ALIASES: Record<string, string> = {
   'copilot': 'gh-copilot',
   'github-copilot': 'gh-copilot',
@@ -36,8 +38,7 @@ export const PROVIDER_COLORS: Record<string, string> = {
   'anthropic-api': '#be185d',    // metered Anthropic key — deliberately distinct from Max
   'groq': '#7c3aed',
   'openai': '#059669',
-  'qwen-local': '#0891b2',       // on-prem V100 cluster — unmetered
-  'qwen-laptop': '#c026d3',      // llama.cpp on this machine — unmetered
+  ...SITE_PROVIDER_COLORS,       // self-hosted servers of this installation (provider-site.ts)
 }
 
 /**
@@ -106,8 +107,7 @@ export const PROVIDER_ACCOUNT_LABEL: Record<string, string> = {
   'gh-copilot': 'GitHub Copilot',
   'claude-code-max': 'Claude Max',
   'anthropic-api': 'Anthropic API (metered)',
-  'qwen-local': 'On-prem Qwen',
-  'qwen-laptop': 'This laptop',
+  ...SITE_PROVIDER_LABELS,
   'groq': 'Groq',
   'openai': 'OpenAI',
 }

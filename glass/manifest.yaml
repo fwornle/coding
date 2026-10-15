@@ -11,8 +11,6 @@ sources:
 select:
   - source: coding
     files:
-      # agent → proxy wiring (G1 WP6)
-      - lib/agents/proxy-routing.mjs
       # token rows for traffic that bypasses the proxy, and the writer
       - lib/lsl/token/stop-adapter-registry.mjs
       - lib/lsl/token/claude-token-rows.mjs
@@ -99,10 +97,6 @@ rewrite:
     find: "path.resolve(codingRepo(), '..', '_work', 'rapid-llm-proxy', 'dist')"
     replace: "path.resolve(CODING_CHECKOUT, 'proxy', 'dist')"
     count: 1
-  - file: lib/agents/proxy-routing.mjs
-    find: "'12435'"
-    replace: "'12445'"
-    count: 6
 
 # Non-literal import()/require() sites, per file, by count. Each either names the
 # files it reaches (they must be in the tree) or says why glass never reaches it.
@@ -286,6 +280,15 @@ targets:
       - '\bgaia\b'
       - 'Q284340'
       - '\bwiz\b'
+      # coding's own model servers and its internal projects: an offload endpoint is
+      # the user's to name (G8), never something glass ships
+      - 'qwen-(local|laptop)'
+      - 'qwen3\.8-27b-(dual|hga)'
+      - '\bV100\b'
+      - 'on-prem'
+      - '\bnodes? [0-9]+ ?\+'
+      - 'a2a-?xpr'
+      - 'nl-realm'
     allow:
       # a list of company names the redaction step masks — generic, not a BMW reference
       - file: config/redaction/redaction-patterns.json

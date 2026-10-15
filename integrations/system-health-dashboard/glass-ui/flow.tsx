@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { getProviderColor } from '@/lib/providers'
+import { getOutcomeColor, getProviderColor } from '@/lib/providers'
 import { normalizeModel } from '@/components/performance/models'
 
 /**
@@ -59,6 +59,8 @@ const ROW_H = 46
 const NODE_H = 36
 const TOP = 56
 
+const OFFLOADED = getOutcomeColor('offloaded', false)
+
 const tokensOf = (r: FlowGroup) => r.input + r.output + r.cache_read + r.cache_write
 
 function fmtTokens(n: number): string {
@@ -103,7 +105,8 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
       // `github-copilot` and `gh-copilot` for one Copilot login.
       const acct = `p:${answeredBy(r.provider) || '—'}`
       const side = r.call_kind === 'side'
-      const color = getProviderColor(r.provider)
+      // The endpoint's calls take coding's "offloaded" colour, not a grey unknown account.
+      const color = offload && acct === `p:${offload.label}` ? OFFLOADED : getProviderColor(r.provider)
       addTo(agentTok, agent, t)
       addTo(agentCalls, agent, r.calls)
       addTo(modelTok, model, t)
@@ -135,7 +138,10 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
       const parts = [c.main && `${c.main} loop`, c.side && `${c.side} side`].filter(Boolean)
       return { id, label: id.slice(2), sub: `${parts.join(' · ')} call${c.main + c.side === 1 ? '' : 's'}`, tokens: modelTok.get(id) ?? 0, color: '#64748b' }
     })
-    const acctColor = new Map(groups.map((r) => [`p:${answeredBy(r.provider) || '—'}`, getProviderColor(r.provider)]))
+    const acctColor = new Map(groups.map((r) => {
+      const id = `p:${answeredBy(r.provider) || '—'}`
+      return [id, offload && id === `p:${offload.label}` ? OFFLOADED : getProviderColor(r.provider)]
+    }))
     const accounts: Node[] = byTokens(acctTok).map((id) => ({
       id,
       label: id.slice(2),
@@ -245,7 +251,10 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
           return (
             <div data-testid="offload-card" role="dialog" aria-label={`${offload.label} offload`}
               className="absolute z-10 w-72 rounded-md border bg-popover p-3 text-sm shadow-md"
-              style={{ right: 12, top: `${((y + NODE_H + 6) / height) * 100}%` }}>
+              // Below the node, or above it when the node sits in the lower half.
+              style={y > height / 2
+                ? { right: 12, bottom: `${(1 - (y - 6) / height) * 100}%` }
+                : { right: 12, top: `${((y + NODE_H + 6) / height) * 100}%` }}>
               <div className="flex items-center gap-2 font-medium">
                 <span className={`h-2 w-2 rounded-full ${dot}`} />
                 {offload.label}

@@ -86,6 +86,7 @@ nav:
   - Using glass:
     - Token Usage: token-usage.md
     - Models & Accounts: models.md
+    - Offload Easy Calls: offload.md
     - Context Window: context-window.md
     - Comparing Runs (A/B): comparing-runs.md
     - Status Line: status-line.md

@@ -231,12 +231,16 @@ const builtPrefixes = (manifest) => manifest.build.map((b) => `${posix(b.to).rep
  * Every text file of the tree against the target's deny patterns (case-insensitive),
  * minus its allowlist ({file, pattern}). Returns the hits.
  */
+const TEXT_EXT = /\.(m?js|cjs|ts|tsx|json|ya?ml|md|html|css|puml|txt|sh|svg)$/i;
+
 export function denyScan(out, target) {
   if (!target?.deny.length) return [];
   const hits = [];
   for (const rel of listTree(out)) {
     const buf = fs.readFileSync(path.join(out, rel));
-    if (buf.subarray(0, 8000).includes(0)) continue; // binary
+    // A NUL marks a binary file — except in source and docs, where one stray byte
+    // (a literal NUL in a string) would otherwise hide the whole file from the scan.
+    if (!TEXT_EXT.test(rel) && buf.subarray(0, 8000).includes(0)) continue;
     buf.toString('utf8').split('\n').forEach((line, i) => {
       for (const re of target.deny) {
         if (!re.test(line)) continue;

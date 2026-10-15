@@ -251,37 +251,37 @@ Know which model you are paying for before you switch one.
 <section class="overview-slide" id="slide-8" aria-labelledby="overview-offload" markdown="1">
 <div class="overview-copy" markdown="1">
 
-<p class="overview-kicker">Planned / Opt-in, off by default</p>
+<p class="overview-kicker">Opt-in, off by default</p>
 
-## Small calls to the on-prem Qwen cluster {#overview-offload}
+## Easy calls to your own endpoint {#overview-offload}
 
-Next, glass can hand **some** calls to an on-prem Qwen3.8-27B cluster instead of a paid account.
+glass can hand **some** calls to an OpenAI-compatible endpoint you name — a model server on
+your machine or your network — instead of a paid account. Switched in the UI, any time.
 
-**What moves:** small calls only, such as session titles and side calls. An agent's first
-turn carries 20–28k tokens of tools and instructions; the cluster needs ~40–55 s for
-that uncached, so it stays paid.
+**What moves:** easy chat calls only, such as session titles, side calls and short first
+turns. An agent's first turn with all its tools carries 20–28k tokens; a shared server
+needs tens of seconds for that, so it stays paid.
 
-**Who first:** opencode, whose calls already reach glass by configuration. Copilot CLI and pi
-stay measured only.
+**Which agents:** opencode, pi and Copilot CLI, each switched on separately.
 
-**If the cluster is busy, slow or down:** the original call goes to your own provider with
-your own login. Your credentials never reach the cluster.
+**If the endpoint is busy, slow or down:** the original call goes to your own provider with
+your own login. Your credentials never reach the endpoint.
 
 </div>
 <figure class="overview-figure" markdown="1">
 
-| Measured on the cluster | |
+| Measured on a shared 27B model server | |
 |---|---|
 | Small call (≈2k tokens) | 2–7 s |
 | First turn (≈20k tokens, uncached) | ~39 s |
 | Same call on Copilot | 1–2 s |
-| Gates | ≤ a few k tokens · ~8 s budget · 1 call in flight |
+| Gates | ≤ 3k tokens · 8 s to answer · 1 call in flight |
 
-<figcaption>Measured with coding's router on the office network. Offload saves paid tokens, not time.</figcaption>
+<figcaption>Offload saves paid tokens, not time.</figcaption>
 </figure>
 <p class="overview-takeaway" markdown="1">
-Not in this release. With it off, glass is exactly what the previous slides show.
-[Models & Accounts → On-prem offload](models.md)
+Off, glass is exactly what the previous slides show.
+[Offload Easy Calls](offload.md)
 </p>
 </section>
 

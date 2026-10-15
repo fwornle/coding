@@ -8,7 +8,8 @@ call's tokens (input, output, cache read / write) and what filled the context wi
 (system prompt, tools, history), and shows both in a local UI and a status line.
 
 Everything stays on your machine. Nothing is sent anywhere except the agent's own
-model calls, which go exactly where they went before.
+model calls, which go exactly where they went before — unless you switch on the opt-in
+offload of easy calls to an endpoint you name (`glass ui` → Offload).
 
 ## Requirements
 

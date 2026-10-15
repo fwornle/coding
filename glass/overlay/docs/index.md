@@ -21,6 +21,8 @@ buttons in the header.
       tools, history, your input) and how much the provider served from its prompt cache.
     - **A status line** — context gauge and session tokens live in your terminal.
     - **Run comparisons** — the same task with two agents or models, side by side.
+    - **Offload, opt-in** — easy calls answered by a model server you name, switched in the UI;
+      anything it cannot answer goes to your own provider as before.
 
     ```sh
     glass claude          # or: glass copilot · glass opencode · glass pi
