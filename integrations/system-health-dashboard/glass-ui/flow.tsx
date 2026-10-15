@@ -209,6 +209,12 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
         {isTarget && <title>{`${n.label} — offload ${offload!.status.label}. Click to switch or change it.`}</title>}
         <rect x={x} y={y} width={w} height={NODE_H} rx={5} className="fill-background stroke-border" strokeWidth={isTarget ? 1.5 : 1}
           strokeDasharray={n.ghost ? '4 3' : undefined} />
+        {/* Selected (its card open): a faint wash of the offloaded colour marks which node the card belongs to. */}
+        {isTarget && card && (
+          <rect data-testid="offload-node-selected" x={x} y={y} width={w} height={NODE_H} rx={5}
+            fill={OFFLOADED} fillOpacity={0.12} stroke={OFFLOADED} strokeOpacity={0.6} strokeWidth={1.5}
+            strokeDasharray={n.ghost ? '4 3' : undefined} pointerEvents="none" />
+        )}
         <rect x={x} y={y} width={3} height={NODE_H} rx={1.5} fill={n.color} />
         <text x={x + 10} y={y + 15} className="fill-foreground" fontSize={11} fontWeight={600}
           fontFamily={opts.mono ? 'ui-monospace, monospace' : undefined}>
