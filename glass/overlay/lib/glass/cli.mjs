@@ -18,7 +18,7 @@ import { upstreamProxy, proxyEnvOf } from './egress.mjs';
 import { coexistWarnings, opencodeCopilotUpstream, opencodeHttpProviders } from './coexist.mjs';
 import { openUrl } from './open-url.mjs';
 import { renderStatusline, renderReport, uiLinks, TAGS } from './statusline.mjs';
-import { tmuxWanted, launchInTmux, configureStatus, popup, selfCommand } from './tmux.mjs';
+import { tmuxWanted, launchInTmux, configureStatus, popup, message, selfCommand } from './tmux.mjs';
 import { update } from './update.mjs';
 
 const out = (line = '') => process.stdout.write(`${line}\n`);
@@ -268,24 +268,33 @@ export function clickTarget(tag, links) {
   return null;
 }
 
-/** A status-line click (tmux run-shell). */
+/**
+ * A status-line click (tmux run-shell). Always exits 0: tmux shows a failing
+ * run-shell as a view the user must dismiss, with the bare command line in it.
+ * No browser opener → the URL on the status line instead.
+ */
 async function click(argv) {
+  const client = opt(argv, '--client');
+  const open = async (url, origin) => {
+    if (!(await openUrl(url, origin))) message({ client, text: `glass: no browser to open ${url} — set BROWSER (or install wslu on WSL)` });
+    return 0;
+  };
   const tag = argv[0];
   const port = Number(opt(argv, '--port')) || glassPort();
   const task = opt(argv, '--task') || undefined;
   const links = uiLinks(port, task);
   const target = clickTarget(tag, links);
-  if (!target) { err(`glass click: unknown field ${tag}`); return 2; }
+  if (!target) { message({ client, text: `glass: unknown status field ${tag}` }); return 0; }
   // Any open glass UI tab is re-used and navigated (macOS), as coding's
   // dashboards are: the origin is the reuse prefix.
   const origin = links.root;
-  if (target.open) return (await openUrl(target.open, origin)) ? 0 : 1;
+  if (target.open) return open(target.open, origin);
   const shown = popup({
-    client: opt(argv, '--client'), pane: opt(argv, '--pane'), title: target.title,
+    client, pane: opt(argv, '--pane'), title: target.title,
     argv: [...selfCommand(), 'report', target.popup, '--port', String(port), ...(task ? ['--task', task] : []), '--hold'],
   });
   if (shown) return 0;
-  return (await openUrl(target.fallback, origin)) ? 0 : 1;
+  return open(target.fallback, origin);
 }
 
 /** A live one-line status bar in this terminal (no tmux: a split pane next to the agent). */

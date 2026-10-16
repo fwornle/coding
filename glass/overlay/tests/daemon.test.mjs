@@ -604,7 +604,12 @@ test('glass ui: one opener chain per platform, no shell', async () => {
   const u = 'http://127.0.0.1:12445/?a=1&b=2';
   assert.deepEqual(openers(u, 'darwin', false), [['open', [u]]]);
   assert.deepEqual(openers(u, 'win32', false)[0], ['cmd', ['/c', 'start', '""', 'http://127.0.0.1:12445/?a=1^&b=2']]);
-  assert.equal(openers(u, 'linux', true)[0][0], 'wslview');
+  assert.equal(openers(u, 'linux', true, {})[0][0], 'wslview');
+  // WSL: $BROWSER first (shell-escaped spaces undone), cmd.exe also by absolute path.
+  const chrome = '/mnt/c/Program Files/Google/Chrome/Application/chrome.exe';
+  const wsl = openers(u, 'linux', true, { BROWSER: '/mnt/c/Program\\ Files/Google/Chrome/Application/chrome.exe' });
+  assert.deepEqual(wsl[0], [chrome, [u]]);
+  assert.deepEqual(wsl.map(([c]) => c).slice(1), ['wslview', 'cmd.exe', '/mnt/c/Windows/System32/cmd.exe']);
   assert.equal(openers(u, 'linux', false)[0][0], 'xdg-open');
   // macOS: coding's tab reuse (lib/statusline/browser-tab.mjs), keyed on the given prefix.
   const { openUrl } = await import('../lib/glass/open-url.mjs');

@@ -153,6 +153,11 @@ export function configureStatus({ taskId, port, env = process.env, tmpDir = os.t
   };
 }
 
+/** A one-line message on the clicked client's status line. */
+export function message({ client, text }) {
+  return tmux(['display-message', ...(client ? ['-c', client] : []), '-d', '8000', text]).status === 0;
+}
+
 /** A report in a popup over the clicked pane (tmux ≥ 3.2). */
 export function popup({ client, pane, argv, title }) {
   const r = tmux(['display-popup', '-E', '-w', '90%', '-h', '80%', '-T', ` ${title} `,
