@@ -121,7 +121,7 @@ export function CostTab({ proxyBase }: Props) {
    * offloads — so pricing it against sonnet or opus would flatter the figure.
    */
   const savings: LocalSavings = useMemo(
-    () => localSavings(rows.filter(r => r.month === activeMonth), cfg, 'claude-haiku-4.5'),
+    () => localSavings(rows.filter(r => r.month === activeMonth), cfg, 'claude-haiku-5.5'),
     [rows, cfg, activeMonth],
   )
 
@@ -472,7 +472,7 @@ export function CostTab({ proxyBase }: Props) {
                     <TableCell className="text-right">
                       {c.key && !c.key.startsWith('token-adapter-') && !['claude', 'opencode', 'copilot', 'unknown'].includes(c.key) && (
                         <Button size="sm" variant="ghost" className="h-7 text-xs"
-                          onClick={() => applyRoute(c.key, 'copilot', 'claude-haiku-4.5')}>→ Haiku</Button>
+                          onClick={() => applyRoute(c.key, 'copilot', 'claude-haiku-5.5')}>→ Haiku</Button>
                       )}
                     </TableCell>
                   )}

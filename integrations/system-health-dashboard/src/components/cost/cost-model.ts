@@ -125,7 +125,7 @@ export function modelFamily(model: string): ModelFamily {
 // One representative modelPrices key per family — used for the fallback when
 // an exact model key is absent (e.g. claude-opus-4-8 → the opus row).
 const FAMILY_REPRESENTATIVE: Record<ModelFamily, string[]> = {
-  haiku: ['claude-haiku-4.5'],
+  haiku: ['claude-haiku-5.5', 'claude-haiku-4.5'],
   sonnet: ['claude-sonnet-5', 'claude-sonnet-4.6'],
   opus: ['claude-opus-5', 'claude-opus-4.8', 'claude-opus-4.6'],
   fable: ['claude-fable-5'],

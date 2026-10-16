@@ -68,7 +68,7 @@ glass treats the two agents differently:
   providers for the run:
 
 ```sh
-glass pi --model github-copilot/claude-haiku-4.5
+glass pi --model github-copilot/claude-haiku-5.5
 ```
 
 On a machine without such a proxy, the agents' defaults are their own providers and

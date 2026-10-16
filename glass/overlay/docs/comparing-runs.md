@@ -10,7 +10,7 @@ each cost and how it used its context.
     ```sh
     P="Read cart.js and cart.test.js, run 'node cart.test.js', and suggest one improvement."
     glass claude -p "$P"
-    glass opencode run --model github-copilot/claude-haiku-4.5 "$P"
+    glass opencode run --model github-copilot/claude-haiku-5.5 "$P"
     ```
 
     Then `glass ui` → **Sessions**: both runs side by side — calls, tokens, model — and

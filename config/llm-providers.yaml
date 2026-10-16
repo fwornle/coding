@@ -9,7 +9,7 @@ providers:
     method: "cli"                       # claude -p --output-format json (Max OAuth)
     timeout: 120000                     # CLI needs longer timeout (~12s typical)
     models:
-      fast: "haiku"
+      fast: "claude-haiku-5-5"         # the CLI's own `haiku` alias still means 4.5 (probed 2026-10-16)
       standard: "sonnet"
       premium: "opus"
     quotaTracking:
@@ -20,7 +20,7 @@ providers:
     method: "http"                      # Direct HTTP POST to Copilot API (~2s)
     timeout: 120000
     models:
-      fast: "claude-haiku-4.5"
+      fast: "claude-haiku-5.5"         # probed 2026-10-16: Copilot serves the dotted id
       standard: "claude-sonnet-5"      # 4.6 retired by the enterprise endpoint (400 model_not_available)
       premium: "claude-opus-5"
     defaultModel: "claude-sonnet-5"   # tier=default bypasses models{}; without this the
@@ -38,7 +38,7 @@ providers:
 
   anthropic:
     apiKeyEnvVar: ANTHROPIC_API_KEY
-    fast: "claude-haiku-4-5"            # $1/$5 per MTok, fastest
+    fast: "claude-haiku-5-5"            # fastest; the API takes the hyphenated id only
     standard: "claude-sonnet-4-5"       # $3/$15 per MTok, fast + intelligent
     premium: "claude-opus-4-6"          # $5/$25 per MTok, most intelligent
 

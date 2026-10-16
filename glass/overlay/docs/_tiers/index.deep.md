@@ -20,7 +20,7 @@ login, model choice and configuration.
 glass claude
 glass copilot -p "explain this repo"
 glass opencode run "add a test for cart.js"
-glass pi --model github-copilot/claude-haiku-4.5
+glass pi --model github-copilot/claude-haiku-5.5
 ```
 
 The first command starts a small background process — the glass daemon — on
