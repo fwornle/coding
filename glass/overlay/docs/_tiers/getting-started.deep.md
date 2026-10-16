@@ -29,6 +29,10 @@ npm install -g ./glass-<version>.tgz          # macOS, Linux, WSL
 npm install -g .\glass-<version>.tgz          # PowerShell / cmd
 ```
 
+In WSL, install with WSL's own Node: `which node npm` must show Linux paths, not
+`/mnt/c/…`. Otherwise Windows' npm installs a Windows glass. The agents must be installed
+inside WSL too.
+
 The tarball contains its two dependencies, so the install needs **no npm registry**,
 runs **no install scripts** and needs **no build tools** — it works offline.
 
