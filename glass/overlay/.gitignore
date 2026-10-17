@@ -1,0 +1,13 @@
+# Machine-local files that appear in a glass checkout but are never part of the
+# generated tree. glass is produced by coding/scripts/glass/extract.mjs and must not
+# be hand-edited, so anything that shows up here was made on this machine.
+node_modules/
+# smoke-check output (one JSONL per platform/node version)
+results/
+# coding's per-project session state
+.coding/
+# editor workspaces
+*.code-workspace
+# regenerated per machine from CLAUDE.md by coding's generate-agent-instructions.sh
+.github/copilot-instructions.md
+.DS_Store
