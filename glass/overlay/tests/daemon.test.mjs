@@ -147,6 +147,8 @@ const msgs = [{ role: 'user', content: 'ping' }];
 test('health, sessions open with a task id + token + the CA', async () => {
   const h = await api('GET', '/health');
   assert.equal(h.body.ok, true);
+  const { homepage } = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal(h.body.docs, new URL('overview/', homepage).href, 'the header links the docs presentation');
   const s = await open('claude');
   assert.match(s.taskId, /^glass-claude-\d{8}-\d{6}-[0-9a-f]{6}$/);
   assert.ok(s.token.length >= 20);

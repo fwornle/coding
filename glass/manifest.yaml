@@ -189,6 +189,10 @@ targets:
         find: "\"license\": \"UNLICENSED\""
         replace: "\"license\": \"MIT\""
         count: 1
+      - file: package.json
+        find: "\"homepage\": \"https://aimaad-glass.pages.bmw.ghe.com/\""
+        replace: "\"homepage\": \"https://fwornle.github.io/glass/\""
+        count: 1
       - file: lib/glass/update.mjs
         find: "'bmw.ghe.com/AIMAAD/glass'"
         replace: "'github.com/fwornle/glass'"

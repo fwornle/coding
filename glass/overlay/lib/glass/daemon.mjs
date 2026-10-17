@@ -53,7 +53,10 @@ import { createNetworkMonitor } from './network.mjs';
 import { createOffloadStore } from './offload-store.mjs';
 import { createOffloader, createTargetHealth, OFFLOAD_AGENTS } from '../../proxy/proxy-bridge/offload.mjs';
 
-export const VERSION = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version;
+const PKG = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8'));
+export const VERSION = PKG.version;
+// The online docs' presentation, linked from the UI's header (each target's own site).
+const DOCS = PKG.homepage ? new URL('overview/', PKG.homepage).href : null;
 
 // Model hosts decrypted by default; ~/.glass/config.json { "interceptHosts": [...] } replaces the list.
 export const DEFAULT_INTERCEPT_HOSTS = Object.freeze([
@@ -397,7 +400,7 @@ export async function startDaemon({
     try {
       const url = req.url || '';
       if (req.method === 'GET' && url === '/health') {
-        return json(res, 200, { ok: true, glass: VERSION, pid: process.pid, port, sessions: sessions.size, data: p.data });
+        return json(res, 200, { ok: true, glass: VERSION, docs: DOCS, pid: process.pid, port, sessions: sessions.size, data: p.data });
       }
       if (url === '/sessions' && req.method === 'POST') {
         const body = await readJson(req);

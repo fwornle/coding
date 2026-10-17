@@ -356,7 +356,7 @@ A fix in coding reaches glass on the next extract.
   <button type="button" data-prev>Previous</button>
   <div class="overview-dots" aria-label="Choose a slide"></div>
   <button type="button" data-next>Next</button>
-  <span class="overview-help">Arrow keys to navigate / F for fullscreen</span>
+  <span class="overview-help">Arrow keys to navigate / F for fullscreen / Esc for home</span>
 </nav>
 <p class="overview-message" role="status" aria-live="polite"></p>
 

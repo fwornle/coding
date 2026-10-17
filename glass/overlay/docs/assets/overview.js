@@ -67,8 +67,8 @@
   });
   document.addEventListener('keydown', (event) => {
     if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    // The deck owns the arrow keys wherever focus is on its page, except while typing.
     const target = event.target;
-    if (target !== document.body && !deck.contains(target)) return;
     if (target.closest('input, textarea, select, [contenteditable="true"]')) return;
     if (event.key === ' ' && target.closest('button, a')) return;
     switch (event.key) {
@@ -90,6 +90,13 @@
       case 'End':
         event.preventDefault();
         go(slides.length - 1);
+        break;
+      case 'Escape':
+        // Back to the documentation home (the header logo's link). In fullscreen the
+        // browser takes Escape to leave fullscreen, so this needs a second press.
+        if (document.fullscreenElement) break;
+        event.preventDefault();
+        window.location.href = document.querySelector('a.md-logo')?.href || new URL('..', window.location.href).href;
         break;
       case 'f':
       case 'F':

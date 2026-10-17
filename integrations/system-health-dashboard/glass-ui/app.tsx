@@ -24,12 +24,21 @@ function ThemeToggle() {
   )
 }
 
-function Version() {
-  const [v, setV] = useState('')
+// "glass" links to the online docs' presentation once the daemon names it (/health docs).
+function Brand() {
+  const [h, setH] = useState<{ glass?: string; docs?: string | null }>({})
   useEffect(() => {
-    fetch('/health').then((r) => r.json()).then((h) => setV(h?.glass ?? '')).catch(() => setV(''))
+    fetch('/health').then((r) => r.json()).then((x) => setH(x ?? {})).catch(() => setH({}))
   }, [])
-  return v ? <span className="text-xs text-muted-foreground">v{v}</span> : null
+  const name = <span className="font-semibold tracking-tight">glass</span>
+  return (
+    <>
+      {h.docs
+        ? <a href={h.docs} target="_blank" rel="noopener noreferrer" title="glass documentation" className="hover:underline underline-offset-4">{name}</a>
+        : name}
+      {h.glass ? <span className="text-xs text-muted-foreground">v{h.glass}</span> : null}
+    </>
+  )
 }
 
 const tab = ({ isActive }: { isActive: boolean }) =>
@@ -46,8 +55,7 @@ export function GlassApp() {
       <HashRouter>
         <div className="min-h-screen bg-background text-foreground">
           <header className="flex items-center gap-4 border-b px-6 h-12">
-            <span className="font-semibold tracking-tight">glass</span>
-            <Version />
+            <Brand />
             <nav className="flex gap-1">
               <NavLink to="/token-usage" className={tab}>Token Usage</NavLink>
               <NavLink to="/models" className={tab}>Models</NavLink>
