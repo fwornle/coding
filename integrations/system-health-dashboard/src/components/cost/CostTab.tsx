@@ -26,6 +26,47 @@ interface Props {
   proxyBase: string
   /** €/$ — chosen once for the whole Token Usage page. */
   currency: Currency
+  /** Sets the page's unit. The page-wide switch sits above the tabs, out of
+   *  view once this tab is scrolled, so the tab offers €/$ in its own toolbar. */
+  onCurrency?: (c: Currency) => void
+}
+
+/** Recharts colours each tooltip line in its series colour — pale pinks and
+ *  greens on white were unreadable, and the default box has no z-order over
+ *  the Legend, which drew through it. A popover card: swatch, name, value,
+ *  largest first, zeros dropped, total at the foot. */
+function CostTooltip({ active, payload, label, money }: {
+  active?: boolean
+  payload?: Array<{ name?: string | number; value?: number | string | null; color?: string }>
+  label?: string | number
+  money: (v: number) => string
+}) {
+  if (!active || !payload?.length) return null
+  const items = payload
+    .map(p => ({ name: String(p.name ?? ''), value: Number(p.value) || 0, color: p.color || '#888' }))
+    .filter(p => p.value > 0)
+    .sort((a, b) => b.value - a.value)
+  if (!items.length) return null
+  const total = items.reduce((a, p) => a + p.value, 0)
+  return (
+    <div className="rounded-md border bg-popover text-popover-foreground shadow-md px-3 py-2 text-xs min-w-[200px]">
+      <div className="font-medium mb-1">{label}</div>
+      {items.map(p => (
+        <div key={p.name} className="flex items-center justify-between gap-4 py-0.5">
+          <span className="flex items-center gap-1.5 min-w-0">
+            <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ backgroundColor: p.color }} />
+            <span className="truncate">{p.name}</span>
+          </span>
+          <span className="tabular-nums">{money(p.value)}</span>
+        </div>
+      ))}
+      {items.length > 1 && (
+        <div className="flex justify-between gap-4 border-t mt-1 pt-1 font-medium">
+          <span>Total</span><span className="tabular-nums">{money(total)}</span>
+        </div>
+      )}
+    </div>
+  )
 }
 
 interface CadenceCfg { enabled: boolean; checkIntervalMinutes: number; undigestedThreshold: number }
@@ -57,7 +98,7 @@ interface AccountTile {
   savings?: LocalSavings
 }
 
-export function CostTab({ proxyBase, currency }: Props) {
+export function CostTab({ proxyBase, currency, onCurrency }: Props) {
   const [rows, setRows] = useState<CostRow[]>([])
   const [savedCfg, setSavedCfg] = useState<CostConfig>(DEFAULT_COST_CONFIG)
   // glass's daemon has no /api/llm/settings: prices stay the calibrated
@@ -69,6 +110,10 @@ export function CostTab({ proxyBase, currency }: Props) {
   const [months, setMonths] = useState(6)
   const [pivotDim, setPivotDim] = useState<PivotDim>('process')
   const [chartDim, setChartDim] = useState<'provider' | 'model'>('provider')
+  // Linear hides a cent-sized model next to a €100 one. Log cannot stack — a
+  // stack encodes value as band height, which log does not preserve — so log
+  // draws the bars side by side.
+  const [chartLog, setChartLog] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -141,6 +186,13 @@ export function CostTab({ proxyBase, currency }: Props) {
     }
     return { chartData: data, chartKeys: ordered, keyColor: colors }
   }, [rows, cfg, chartDim])
+  // log(0) is undefined: a zero (or sub-cent) month draws no bar rather than a
+  // floor value that would read as "a little spend".
+  const chartDataLog = useMemo(() => chartData.map(row => {
+    const out: Record<string, number | string | null> = {}
+    for (const [k, v] of Object.entries(row)) out[k] = typeof v === 'number' && v < 0.01 ? null : v
+    return out
+  }), [chartData])
 
   const pivot = useMemo(() => pivotForMonth(rows, cfg, pivotDim, activeMonth), [rows, cfg, pivotDim, activeMonth])
   const suggestions = useMemo(
@@ -244,6 +296,20 @@ export function CostTab({ proxyBase, currency }: Props) {
           </Select>
         </div>
         <div className="flex items-center gap-2">
+          {onCurrency && (
+            <div className="flex items-center rounded border h-9 p-0.5 text-xs" role="radiogroup" aria-label="Currency">
+              {(['EUR', 'USD'] as Currency[]).map(c => (
+                <button
+                  key={c}
+                  role="radio"
+                  aria-checked={currency === c}
+                  onClick={() => onCurrency(c)}
+                  title={c === 'EUR' ? 'Cost in EUR — token $ × contract discount ÷ FX' : 'Cost in USD — token $ × contract discount (no FX)'}
+                  className={`px-2.5 h-full rounded-sm ${currency === c ? 'bg-muted font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+                >{c === 'EUR' ? '€' : '$'}</button>
+              ))}
+            </div>
+          )}
           {toast && <span className="text-xs text-muted-foreground">{toast}</span>}
           {/* Wrapped, not passed directly: onClick hands the handler a
               MouseEvent, which as `isAuto` is truthy and would suppress the
@@ -380,26 +446,41 @@ export function CostTab({ proxyBase, currency }: Props) {
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base flex items-center gap-2"><TrendingUp className="h-4 w-4" />Cost by month</CardTitle>
-            <Select value={chartDim} onValueChange={v => setChartDim(v as 'provider' | 'model')}>
-              <SelectTrigger className="w-40 h-8"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="provider">By account</SelectItem>
-                <SelectItem value="model">By model</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={() => setChartLog(v => !v)}
+                title={chartLog ? 'Back to a linear axis (stacked)' : 'Log axis — reads cent-sized series next to large ones; bars side by side'}
+              >{chartLog ? 'Log' : 'Linear'}</Button>
+              <Select value={chartDim} onValueChange={v => setChartDim(v as 'provider' | 'model')}>
+                <SelectTrigger className="w-40 h-8"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="provider">By account</SelectItem>
+                  <SelectItem value="model">By model</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <CardDescription>Stacked {currency === 'USD' ? '$' : '€'}-cost per calendar month. Estimated-token rows included.</CardDescription>
+          <CardDescription>{chartLog ? 'Side by side, log axis' : 'Stacked'} {currency === 'USD' ? '$' : '€'}-cost per calendar month. Estimated-token rows included.</CardDescription>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={320}>
-            <BarChart data={chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+            <BarChart data={chartLog ? chartDataLog : chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" opacity={0.4} />
               <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${currency === 'USD' ? '$' : '€'}${v}`} />
-              <Tooltip formatter={(v: any) => money(Number(v))} />
+              <YAxis
+                tick={{ fontSize: 12 }}
+                scale={chartLog ? 'log' : 'auto'}
+                domain={chartLog ? ['auto', 'auto'] : [0, 'auto']}
+                allowDataOverflow={chartLog}
+                tickFormatter={(v) => `${currency === 'USD' ? '$' : '€'}${v}`}
+              />
+              <Tooltip content={<CostTooltip money={money} />} wrapperStyle={{ zIndex: 10 }} cursor={{ fill: 'rgba(148,163,184,0.15)' }} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               {chartKeys.map((k, i) => (
-                <Bar key={k} dataKey={k} stackId="cost"
+                <Bar key={k} dataKey={k} stackId={chartLog ? undefined : 'cost'}
                   fill={keyColor.get(k) || MODEL_PALETTE[i % MODEL_PALETTE.length]} />
               ))}
             </BarChart>

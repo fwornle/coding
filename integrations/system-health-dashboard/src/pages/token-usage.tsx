@@ -1492,7 +1492,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
         {has('cost') && (
           <TabsContent value="cost">
             <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
-              <CostTab proxyBase={proxyBase} currency={unit === 'USD' ? 'USD' : 'EUR'} />
+              <CostTab proxyBase={proxyBase} currency={unit === 'USD' ? 'USD' : 'EUR'} onCurrency={setUnit} />
             </Suspense>
           </TabsContent>
         )}
