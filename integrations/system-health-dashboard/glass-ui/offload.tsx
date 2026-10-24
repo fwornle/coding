@@ -298,10 +298,11 @@ function OffloadDialog({ open, onOpenChange, view, onSaved }: {
               <span className="text-xs text-muted-foreground">{AGENT_NOTE[a]}</span>
             </label>
           ))}
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Checkbox checked={false} disabled />
-            <span className="w-20">claude</span>
-            <span className="text-xs">not offloaded — Claude Code speaks the Anthropic wire</span>
+          {/* No checkbox: a greyed-out unticked box read as "Claude is switched off",
+              when only offloading is unavailable to it. */}
+          <div className="text-xs text-muted-foreground" data-testid="offload-claude-note">
+            claude always goes to Anthropic: an offload endpoint speaks the OpenAI wire, Claude Code
+            the Anthropic one. Its calls are measured and priced as usual.
           </div>
         </Section>
 
