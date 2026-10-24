@@ -4,7 +4,7 @@
 //   --target bmw|public is required (glass/manifest.yaml targets:) with each of:
 //   node scripts/glass/extract.mjs --out <dir>              extract + verify into an empty dir
 //   node scripts/glass/extract.mjs --check <glass checkout> extract to a temp dir, diff (exit 1 on drift)
-//   node scripts/glass/extract.mjs --publish <glass checkout or remote URL>
+//   node scripts/glass/extract.mjs --publish <glass checkout, remote URL or host/owner/repo>
 //        extract, then commit on a fresh branch from origin/main (in a temporary clone
 //        of that checkout's origin — the checkout itself is untouched), push, open a PR;
 //        when an extract PR is already open, update that one instead (one per target)
@@ -509,6 +509,16 @@ export function parseRemote(url) {
 }
 
 /**
+ * `host/owner/repo` with no scheme and no `user@host:` — the form the manifest
+ * names targets in. git cannot clone it; `gh repo clone` can, with the protocol
+ * and login gh holds for that host (github.com: ssh, bmw.ghe.com: https here).
+ */
+export function isShortRemote(url) {
+  const u = url.trim();
+  return !/^[a-z+]+:\/\//.test(u) && !/^[^@/]+@[^:/]+:/.test(u) && parseRemote(u) != null;
+}
+
+/**
  * A tree goes only to its own target's repository: never a BMW tree to the public
  * repository, or the other way round. Throws when `remote` is not `target.remote`.
  */
@@ -579,7 +589,13 @@ function publish(target, tree, prov, t) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-publish-'));
   try {
     const dir = path.join(tmp, 'glass');
-    execFileSync('git', ['clone', '--quiet', '--branch', 'main', remote, dir], { encoding: 'utf8' });
+    if (isShortRemote(remote)) {
+      execFileSync('gh', ['repo', 'clone', repo, dir, '--', '--quiet', '--branch', 'main'], {
+        encoding: 'utf8', env: { ...process.env, GH_HOST: gh.host },
+      });
+    } else {
+      execFileSync('git', ['clone', '--quiet', '--branch', 'main', remote, dir], { encoding: 'utf8' });
+    }
     const c = commitExtract(dir, tree, {
       branch: `extract/${short(prov.sources.coding.sha)}-${short(prov.sources.proxy.sha)}`,
       subject, body, onto: current?.headRefName,
@@ -625,7 +641,7 @@ function main() {
   const args = parseArgs(process.argv.slice(2));
   const manifestFile = args.manifest ? path.resolve(args.manifest) : DEFAULT_MANIFEST;
   if ([args.out, args.check, args.publish].filter(Boolean).length !== 1) {
-    process.stderr.write('usage: extract.mjs --target <name> --out <dir> | --check <glass checkout> | --publish <glass checkout|remote URL> [--node <bin>]\n');
+    process.stderr.write('usage: extract.mjs --target <name> --out <dir> | --check <glass checkout> | --publish <glass checkout|remote URL|host/owner/repo> [--node <bin>]\n');
     process.exit(2);
   }
   const tmp = args.out ? null : fs.mkdtempSync(path.join(os.tmpdir(), 'glass-extract-'));

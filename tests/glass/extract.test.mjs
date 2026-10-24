@@ -13,7 +13,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 import { scanSource } from '../../scripts/glass/import-graph.mjs';
-import { extract, defaultRoots, diffTrees, parseRemote, checkTargetRemote, commitExtract, ExtractError } from '../../scripts/glass/extract.mjs';
+import { extract, defaultRoots, diffTrees, parseRemote, isShortRemote, checkTargetRemote, commitExtract, ExtractError } from '../../scripts/glass/extract.mjs';
 
 test('scanner: static, dynamic, require and createRequire edges; computed sites', () => {
   const src = [
@@ -310,4 +310,14 @@ test('real manifest, public target: passes its deny scan and differs from bmw on
   const update = fs.readFileSync(path.join(base, 'pub', 'lib', 'glass', 'update.mjs'), 'utf8');
   assert.match(update, /RELEASE_REPO = 'github\.com\/fwornle\/glass'/);
   assert.ok(fs.existsSync(path.join(base, 'pub', 'LICENSE')));
+});
+
+test('publish: host/owner/repo (the manifest\'s own form) is cloned through gh, URLs through git', () => {
+  assert.equal(isShortRemote('github.com/fwornle/glass'), true);
+  assert.equal(isShortRemote('bmw.ghe.com/AIMAAD/glass'), true);
+  assert.equal(isShortRemote('git@github.com:fwornle/glass.git'), false);
+  assert.equal(isShortRemote('bmw@bmw.ghe.com:AIMAAD/glass.git'), false);
+  assert.equal(isShortRemote('https://github.com/fwornle/glass'), false);
+  assert.equal(isShortRemote('ssh://git@host:22/o/r.git'), false);
+  assert.deepEqual(parseRemote('github.com/fwornle/glass'), { host: 'github.com', repo: 'fwornle/glass' });
 });
