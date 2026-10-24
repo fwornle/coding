@@ -584,29 +584,28 @@ function publish(target, tree, prov, t) {
       branch: `extract/${short(prov.sources.coding.sha)}-${short(prov.sources.proxy.sha)}`,
       subject, body, onto: current?.headRefName,
     });
+    // The branch is named for the shas it holds. An open PR whose branch names an
+    // older extract is SUPERSEDED, not updated in place: its title would say
+    // "coding@8b46555" over "from extract/6e1d1cd-…". Renaming the branch is no
+    // way out — GitHub closes a PR whose HEAD branch is renamed (it only
+    // retargets PRs that use it as their base); that is how fwornle/glass#29 died.
+    const fresh = `extract/${short(prov.sources.coding.sha)}-${short(prov.sources.proxy.sha)}`;
+    const inPlace = Boolean(c && current && current.headRefName === fresh);
+    const superseded = c && current && !inPlace ? [current, ...older] : current ? older : [];
     let pr = current?.url ?? null;
-    let branch = c?.branch ?? current?.headRefName ?? null;
-    if (c && current) {
-      git(dir, ['push', '--quiet', 'origin', `${c.sha}:refs/heads/${c.branch}`]);
+    if (inPlace) {
+      git(dir, ['push', '--quiet', 'origin', `${c.sha}:refs/heads/${fresh}`]);
       ghRun(['pr', 'edit', String(current.number), '--title', subject, '--body', prBody]);
-      // The branch is named for the shas it was FIRST extracted from; left alone,
-      // the PR reads "coding@8b46555 … from extract/6e1d1cd-…". GitHub's rename
-      // retargets open PRs, so the head moves with it.
-      const fresh = `extract/${short(prov.sources.coding.sha)}-${short(prov.sources.proxy.sha)}`;
-      if (fresh !== c.branch) {
-        execFileSync('gh', ['api', '--method', 'POST', `repos/${gh.repo}/branches/${c.branch}/rename`, '-f', `new_name=${fresh}`], {
-          encoding: 'utf8', env: { ...process.env, GH_HOST: gh.host },
-        });
-        branch = fresh;
-      }
     } else if (c) {
-      git(dir, ['push', '--quiet', '-u', 'origin', c.branch]);
-      pr = ghRun(['pr', 'create', '--base', 'main', '--head', c.branch, '--title', subject, '--body', prBody]);
+      git(dir, ['push', '--quiet', 'origin', `${c.sha}:refs/heads/${fresh}`]);
+      pr = ghRun(['pr', 'create', '--base', 'main', '--head', fresh, '--title', subject, '--body', prBody]);
     }
-    for (const o of current ? older : []) {
-      ghRun(['pr', 'close', String(o.number), '--delete-branch', '--comment', `Superseded by #${current.number} — one open extract PR per target.`]);
+    const prNumber = pr ? pr.split('/').pop() : null;
+    for (const o of superseded) {
+      ghRun(['pr', 'close', String(o.number), '--delete-branch', '--comment', `Superseded by #${prNumber} — one open extract PR per target.`]);
     }
-    return { branch, pr, unchanged: !c, updated: Boolean(c && current), closed: current ? older.map((o) => o.number) : [] };
+    const branch = c ? fresh : current?.headRefName ?? null;
+    return { branch, pr, unchanged: !c, updated: inPlace, closed: superseded.map((o) => o.number) };
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
