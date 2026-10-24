@@ -35,6 +35,12 @@ interface Props {
    *  machines). Without saying so, a small figure against a budget GitHub says is a third used reads as
    *  a bug. */
   coverage?: { short: string; long: string }
+  /** Changes when the account selection is saved: reload with the new filter. */
+  accountsRev?: number
+  /** How many accounts the selection leaves out, for the toolbar button. */
+  hiddenAccounts?: number
+  /** Opens the page's Accounts dialog (absent on a proxy without a selection). */
+  onAccounts?: () => void
 }
 
 /** Recharts colours each tooltip line in its series colour — pale pinks and
@@ -104,7 +110,7 @@ interface AccountTile {
   savings?: LocalSavings
 }
 
-export function CostTab({ proxyBase, currency, onCurrency, coverage }: Props) {
+export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev = 0, hiddenAccounts = 0, onAccounts }: Props) {
   const [rows, setRows] = useState<CostRow[]>([])
   const [savedCfg, setSavedCfg] = useState<CostConfig>(DEFAULT_COST_CONFIG)
   // glass's daemon has no /api/llm/settings: prices stay the calibrated
@@ -157,7 +163,8 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage }: Props) {
     } finally { setLoading(false) }
   }, [proxyBase, months])
 
-  useEffect(() => { void load(false) }, [load])
+  // accountsRev: the account selection was saved — reload under the new filter.
+  useEffect(() => { void load(false) }, [load, accountsRev])
 
   // Cost is a running total, so a tab left open under-reports indefinitely.
   // Paused while the settings dialog is open: that dialog edits the very
@@ -302,6 +309,15 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage }: Props) {
           </Select>
         </div>
         <div className="flex items-center gap-2">
+          {onAccounts && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onAccounts}
+              className={hiddenAccounts ? 'border-amber-400 text-amber-700' : ''}
+              title="Which accounts count"
+            >Accounts{hiddenAccounts ? ` · ${hiddenAccounts} hidden` : ''}</Button>
+          )}
           {onCurrency && (
             <div className="flex items-center rounded border h-9 p-0.5 text-xs" role="radiogroup" aria-label="Currency">
               {(['EUR', 'USD'] as Currency[]).map(c => (

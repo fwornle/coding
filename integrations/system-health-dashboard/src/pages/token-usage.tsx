@@ -27,6 +27,8 @@ import {
 const TokenUsageSettingsDialog = lazy(() => import('./token-usage-settings-dialog').then((m) => ({ default: m.TokenUsageSettingsDialog })))
 const TokenUsageRoutingTab = lazy(() => import('./token-usage-routing-tab').then((m) => ({ default: m.TokenUsageRoutingTab })))
 const CostTab = lazy(() => import('@/components/cost/CostTab').then((m) => ({ default: m.CostTab })))
+import { AccountsDialog } from '@/components/cost/AccountsDialog'
+import { fetchAccountSelection, type AccountSelection } from '@/components/cost/account-selection'
 
 /**
  * What every figure on the page is measured in. Tokens are what was consumed;
@@ -545,6 +547,12 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // Which accounts count (saved per machine, applied by the proxy to every read).
+  // Bumping accountsRev refetches this page and the Cost tab after a change.
+  const [accountSel, setAccountSel] = useState<AccountSelection | null>(null)
+  const [accountsOpen, setAccountsOpen] = useState(false)
+  const [accountsRev, setAccountsRev] = useState(0)
+  const hiddenAccounts = accountSel?.excluded.length ?? 0
   const [unit, setUnitState] = useState<TokenUsageUnit>(storedUnit)
   const setUnit = (u: TokenUsageUnit) => {
     setUnitState(u)
@@ -605,10 +613,11 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
     setError(null)
     try {
       const mtdHours = evoAccumulate && hoursWindow !== 'all' ? monthToDateHours(Number(hoursWindow)) : 0
-      const [sumRes, recRes, setRes, mtdRes] = await Promise.all([
+      const [sumRes, recRes, setRes, accRes, mtdRes] = await Promise.all([
         fetch(`${proxyBase}/api/token-usage/summary?hours=${encodeURIComponent(hoursWindow)}&scope=${scopeParam}${money ? '&cells=1' : ''}`),
         fetch(`${proxyBase}/api/token-usage/recent?limit=50`),
         money ? fetchCostSettings(proxyBase) : Promise.resolve(null),
+        fetchAccountSelection(proxyBase),
         // Optional: without it the chart says it is a running total from the
         // window's edge rather than failing the page.
         mtdHours
@@ -623,13 +632,14 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
       setLocalProviders(sumData.local_providers)
       setSummary(sumData)
       setMtd(mtdRes ? { key: mtdKey, summary: mtdRes } : null)
+      setAccountSel(accRes)
       setRecent(recData.data || [])
     } catch (err) {
       setError(`Failed to load token usage. Check that the LLM proxy is running at ${proxyBase || window.location.origin}.`)
     } finally {
       setLoading(false)
     }
-  }, [hoursWindow, scopeParam, proxyBase, money, evoAccumulate, mtdKey])
+  }, [hoursWindow, scopeParam, proxyBase, money, evoAccumulate, mtdKey, accountsRev])
 
   useEffect(() => {
     fetchData()
@@ -956,6 +966,17 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
               ))}
             </SelectContent>
           </Select>
+          {accountSel && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAccountsOpen(true)}
+              title={hiddenAccounts ? `${accountSel.excluded.join(', ')} left out of every figure on this page` : 'Which accounts count — all of them'}
+              className={hiddenAccounts ? 'border-amber-400 text-amber-700' : ''}
+            >
+              Accounts{hiddenAccounts ? ` · ${hiddenAccounts} hidden` : ''}
+            </Button>
+          )}
           {(settings || onSettings) && (
             <Button
               variant="outline"
@@ -979,6 +1000,14 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
           </Button>
         </div>
       </div>
+
+      <AccountsDialog
+        open={accountsOpen}
+        onOpenChange={setAccountsOpen}
+        proxyBase={proxyBase}
+        selection={accountSel}
+        onSaved={(next) => { setAccountSel(next); setAccountsRev(r => r + 1) }}
+      />
 
       {settings && (
         <Suspense fallback={null}>
@@ -1496,7 +1525,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
         {has('cost') && (
           <TabsContent value="cost">
             <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
-              <CostTab proxyBase={proxyBase} currency={unit === 'USD' ? 'USD' : 'EUR'} onCurrency={setUnit} coverage={coverage} />
+              <CostTab proxyBase={proxyBase} currency={unit === 'USD' ? 'USD' : 'EUR'} onCurrency={setUnit} coverage={coverage} accountsRev={accountsRev} hiddenAccounts={hiddenAccounts} onAccounts={accountSel ? () => setAccountsOpen(true) : undefined} />
             </Suspense>
           </TabsContent>
         )}

@@ -11,7 +11,11 @@
 //   <package>/config/cost-defaults.json   shipped with a build
 //   ~/.glass/cost.json                    the user's own (wins)
 // shape: { "discount": { "copilot": 0.8 }, "discountLabel": { "copilot": "…" },
-//          "currency": { "usdPerEur": 1.18 } }
+//          "currency": { "usdPerEur": 1.18 }, "excludeAccounts": ["gh-copilot"] }
+//
+// excludeAccounts is the account selection (all accounts count when absent): the
+// daemon's usage reads leave those accounts' rows out, and an excluded GitHub
+// Copilot hides the status line's cost field. Only the user's file sets it.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -33,8 +37,24 @@ export function loadCostDefaults(home, pkgRoot = PKG_ROOT) {
     for (const key of ['discount', 'discountLabel', 'currency']) {
       if (l[key] && typeof l[key] === 'object') out[key] = { ...(out[key] || {}), ...l[key] };
     }
+    if (Array.isArray(l.excludeAccounts)) out.excludeAccounts = l.excludeAccounts.filter((a) => typeof a === 'string');
   }
   return out;
+}
+
+/**
+ * Saves the account selection into ~/.glass/cost.json, keeping the file's other
+ * keys. Written to a temp file and renamed, so a reader never sees half a file.
+ */
+export function saveExcludedAccounts(home, list) {
+  const file = path.join(home, 'cost.json');
+  const current = readJson(file) || {};
+  const next = { ...current, excludeAccounts: [...new Set(list)] };
+  if (!next.excludeAccounts.length) delete next.excludeAccounts;
+  fs.mkdirSync(home, { recursive: true });
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`);
+  fs.renameSync(tmp, file);
 }
 
 const cache = { key: '', at: 0, value: null };
@@ -51,6 +71,8 @@ const TTL_MS = 30_000;
  */
 export function copilotMonthCost(db, costCfg = {}, now = new Date()) {
   if (!db) return null;
+  // Switched off in the account selection: the field says nothing rather than €0.
+  if ((costCfg.excludeAccounts || []).includes('gh-copilot')) return null;
   const month = now.toISOString().slice(0, 7);
   const discount = Number(costCfg.discount?.copilot) > 0 ? Number(costCfg.discount.copilot) : 1;
   const usdPerEur = Number(costCfg.currency?.usdPerEur) > 0 ? Number(costCfg.currency.usdPerEur) : DEFAULT_USD_PER_EUR;

@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { readTimeline } from '../experiments/timeline-read.mjs';
+import { accountClause } from '../../proxy/dist/token-usage.js';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
@@ -92,21 +93,23 @@ export function sessionModels(db, taskId, { limit = 200 } = {}) {
  * All measured calls of the last `hours` (0 = all time) by agent, model, account,
  * host and call kind, with the number of sessions each group spans. The Models tab.
  */
-export function modelMix(db, { hours = 24 } = {}) {
+export function modelMix(db, { hours = 24, exclude = [] } = {}) {
   if (!db) return { hours, groups: [] };
   const cache = hasCacheColumns(db);
   const f = factColumns(db);
   const cr = cache ? 'COALESCE(cache_read_tokens,0)' : '0';
   const cw = cache ? 'COALESCE(cache_write_tokens,0)' : '0';
   const since = hours > 0 ? new Date(Date.now() - hours * 3_600_000).toISOString() : '';
+  // The account selection, as on the Token Usage page (usage-api.mjs).
+  const ac = accountClause(exclude);
   const groups = db.prepare(`
     SELECT agent, model, provider, ${f.upstream} AS upstream, ${f.callKind} AS call_kind, COUNT(*) AS calls,
            COUNT(DISTINCT NULLIF(task_id, '')) AS sessions,
            SUM(input_tokens) AS input, SUM(output_tokens) AS output,
            SUM(${cr}) AS cache_read, SUM(${cw}) AS cache_write
-    FROM token_usage WHERE timestamp >= ?
+    FROM token_usage WHERE timestamp >= ?${ac.sql}
     GROUP BY agent, model, provider, upstream, call_kind ORDER BY calls DESC, agent, model
-  `).all(since);
+  `).all(since, ...ac.params);
   return { hours, groups };
 }
 
@@ -203,7 +206,7 @@ function serveStatic(uiDir, urlPath, res) {
  * @param {() => object[]} o.liveSessions  open sessions (token stripped)
  * @returns {(req, res) => Promise<boolean>}
  */
-export function createUiApi({ uiDir, dataDir, tokenDb, dbPath, measurement, liveSessions }) {
+export function createUiApi({ uiDir, dataDir, tokenDb, dbPath, measurement, liveSessions, excludedAccounts = () => [] }) {
   const ui = path.resolve(uiDir);
   return async function handleUi(req, res) {
     if (req.method !== 'GET') return false;
@@ -217,7 +220,7 @@ export function createUiApi({ uiDir, dataDir, tokenDb, dbPath, measurement, live
     }
     if (p === '/api/models') {
       const h = Number(u.searchParams.get('hours') ?? 24);
-      json(res, 200, modelMix(tokenDb()?.db, { hours: Number.isFinite(h) && h >= 0 ? Math.min(h, 24 * 366) : 24 }));
+      json(res, 200, modelMix(tokenDb()?.db, { hours: Number.isFinite(h) && h >= 0 ? Math.min(h, 24 * 366) : 24, exclude: excludedAccounts() }));
       return true;
     }
     if (p === '/api/calls/unbound') {

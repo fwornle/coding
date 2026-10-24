@@ -254,3 +254,26 @@ test("loadCostDefaults: the build's cost file, then the user's on top; nothing w
   fs.rmSync(home, { recursive: true, force: true });
   fs.rmSync(pkg, { recursive: true, force: true });
 });
+
+test('account selection: saved into cost.json beside its other keys; an excluded Copilot hides the cost field', async () => {
+  const { DatabaseSync } = await import('node:sqlite');
+  const { loadCostDefaults, saveExcludedAccounts, copilotMonthCost } = await import('../lib/glass/cost.mjs');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-cost-home-'));
+  const pkg = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-cost-pkg-'));
+  fs.writeFileSync(path.join(home, 'cost.json'), JSON.stringify({ discount: { copilot: 0.9 } }));
+  saveExcludedAccounts(home, ['gh-copilot', 'gh-copilot']);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(home, 'cost.json'), 'utf8')),
+    { discount: { copilot: 0.9 }, excludeAccounts: ['gh-copilot'] });
+  const cfg = loadCostDefaults(home, pkg);
+  assert.deepEqual(cfg.excludeAccounts, ['gh-copilot']);
+  const db = new DatabaseSync(':memory:');
+  db.exec(`CREATE TABLE token_usage (timestamp TEXT, provider TEXT, model TEXT, input_tokens INT,
+    output_tokens INT, cache_read_tokens INT, cache_write_tokens INT)`);
+  db.prepare('INSERT INTO token_usage VALUES (?, ?, ?, ?, ?, ?, ?)').run('2026-10-02T10:00:00Z', 'gh-copilot', 'gpt-5-mini', 1, 0, 0, 0);
+  assert.equal(copilotMonthCost(db, cfg, new Date('2026-10-20T00:00:00Z')), null);
+  // Switching every account back on removes the key rather than leaving [].
+  saveExcludedAccounts(home, []);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(home, 'cost.json'), 'utf8')), { discount: { copilot: 0.9 } });
+  fs.rmSync(home, { recursive: true, force: true });
+  fs.rmSync(pkg, { recursive: true, force: true });
+});

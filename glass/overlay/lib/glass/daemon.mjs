@@ -49,7 +49,7 @@ import { glassPaths, PKG_ROOT } from './home.mjs';
 import { createEgressFetch, upstreamProxy, proxyEnvOf, noProxyOf } from './egress.mjs';
 import { createUiApi } from './ui-api.mjs';
 import { statuslineData, renderReport, TAGS } from './statusline.mjs';
-import { loadCostDefaults } from './cost.mjs';
+import { loadCostDefaults, saveExcludedAccounts } from './cost.mjs';
 import { createNetworkMonitor } from './network.mjs';
 import { createOffloadStore } from './offload-store.mjs';
 import { createOffloader, createTargetHealth, OFFLOAD_AGENTS } from '../../proxy/proxy-bridge/offload.mjs';
@@ -216,7 +216,16 @@ export async function startDaemon({
     log,
     logErr,
   });
-  const usageRead = createUsageApi({ tokenDb: () => tokenDb, measurement });
+  // The account selection lives in ~/.glass/cost.json (cost.mjs) and filters
+  // every usage read, as coding's proxy does with its cost settings.
+  const usageRead = createUsageApi({
+    tokenDb: () => tokenDb,
+    measurement,
+    accounts: {
+      excluded: () => loadCostDefaults(home).excludeAccounts ?? [],
+      setExcluded: (list) => saveExcludedAccounts(home, list),
+    },
+  });
 
   // ── opt-in offload ──
   const offloadStore = createOffloadStore(home);
@@ -269,6 +278,7 @@ export async function startDaemon({
   const uiRead = createUiApi({
     uiDir: path.join(PKG_ROOT, 'ui'), dataDir: p.data, tokenDb: () => tokenDb,
     dbPath: resolveTokenDbPath(p.data), measurement, liveSessions: publicSessions,
+    excludedAccounts: () => loadCostDefaults(home).excludeAccounts ?? [],
   });
   // [N:… P:…]: probed only while a session is live (nothing else reads it).
   const netMonitor = network || createNetworkMonitor({ log });
