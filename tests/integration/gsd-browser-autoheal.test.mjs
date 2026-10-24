@@ -9,6 +9,10 @@
  *   C. orphaned Chrome, no daemon      -> same as B, but the lock is VALID and
  *                                         naming a live pid, so clearing it
  *                                         without killing the browser is wrong
+ *   D. daemon alive, browser gone      -> "timeout reading response from daemon"
+ *      (after a lid-close sleep)          — also what a slow page says, so it
+ *                                         heals only when the browser's DevTools
+ *                                         port provably does not answer
  *
  * The shim detects A and B's signatures, resets both halves, and retries once.
  * (C presents as B and is fixed by the same reset — killing the orphan is what
@@ -39,6 +43,8 @@ let stub;
 let hook;
 let countFile;
 let hookFile;
+let probeDead;
+let probeAlive;
 
 /** A stand-in for the real binary whose behaviour the test dictates. */
 const STUB = `#!/usr/bin/env bash
@@ -65,6 +71,12 @@ case "$STUB_MODE" in
     printf '\\x89PNG\\r\\n\\x1a\\n\\x00\\x01\\x02\\x03'; exit 0 ;;
   stop-ok)
     echo "Daemon stopped."; exit 0 ;;
+  timeout)
+    if [[ "$n" == "1" ]]; then
+      echo "Error: request failed while the daemon PID was still alive: timeout reading response from daemon. Refusing to replace a live browser session automatically; stop it with gsd-browser daemon stop and retry" >&2
+      exit 1
+    fi
+    echo "OK-$n"; exit 0 ;;
 esac
 `;
 
@@ -73,7 +85,7 @@ echo reset >> "$HOOK_FILE"
 `;
 
 /** Run the shim; never throws, so exit codes can be asserted. */
-function runShim(mode, args = ['navigate', 'x']) {
+function runShim(mode, args = ['navigate', 'x'], extraEnv = {}) {
   fs.rmSync(countFile, { force: true });
   fs.rmSync(hookFile, { force: true });
   const env = {
@@ -83,6 +95,7 @@ function runShim(mode, args = ['navigate', 'x']) {
     STUB_MODE: mode,
     STUB_COUNT: countFile,
     HOOK_FILE: hookFile,
+    ...extraEnv,
   };
   let stdout = Buffer.alloc(0);
   let status = 0;
@@ -109,6 +122,10 @@ before(() => {
   hookFile = path.join(tmp, 'resets');
   fs.writeFileSync(stub, STUB, { mode: 0o755 });
   fs.writeFileSync(hook, HOOK, { mode: 0o755 });
+  probeDead = path.join(tmp, 'probe-dead');
+  probeAlive = path.join(tmp, 'probe-alive');
+  fs.writeFileSync(probeDead, '#!/usr/bin/env bash\nexit 0\n', { mode: 0o755 });
+  fs.writeFileSync(probeAlive, '#!/usr/bin/env bash\nexit 1\n', { mode: 0o755 });
 });
 
 after(() => {
@@ -185,6 +202,25 @@ describe('gsd-browser shim heals a wedged daemon', () => {
     assert.equal(status, 1, 'the first failure is returned as-is');
     assert.equal(Number(fs.readFileSync(countFile, 'utf8').trim()), 1, 'no retry');
     assert.equal(fs.existsSync(hookFile), false, 'no reset');
+  });
+
+  it('heals a daemon timeout when the browser provably no longer answers (wedge D)', () => {
+    const r = runShim('timeout', ['screenshot', '--output', 'x.png'], { GSD_BROWSER_PROBE_HOOK: probeDead });
+    assert.equal(r.status, 0);
+    assert.equal(r.calls, 2, 'one retry after the reset');
+    assert.equal(r.resets, 1);
+    assert.match(r.stderr + r.stdout.toString(), /OK-2/);
+  });
+
+  it('leaves a daemon timeout alone while the browser still answers (a slow page)', () => {
+    // The same message is what a genuinely slow page produces; retrying would
+    // re-run a command that may still be executing, and the reset would kill a
+    // healthy browser.
+    const r = runShim('timeout', ['click', '@v1:e3'], { GSD_BROWSER_PROBE_HOOK: probeAlive });
+    assert.equal(r.status, 1);
+    assert.equal(r.calls, 1, 'no retry');
+    assert.equal(r.resets, 0, 'no reset');
+    assert.match(r.stderr, /timeout reading response from daemon/);
   });
 });
 

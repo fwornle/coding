@@ -65,6 +65,22 @@ fi
 DEAD_RECEIVER='receiver is gone'
 DEAD_DAEMON='daemon exited during startup'
 
+#   D. Daemon alive, its browser unreachable -> "request failed while the daemon
+#      PID was still alive: timeout reading response from daemon. Refusing to
+#      replace a live browser session automatically"
+#
+# What a lid close does. Both wedges of 2026-10-24 followed a clamshell sleep
+# (17:33-17:35, 21:38) on a daemon that had worked before it; a fresh daemon took
+# six screenshots in a row. After the wake the daemon still holds its CDP socket
+# and waits on it forever, so every command times out instead of failing fast
+# with A's signature, and the binary refuses to replace the "live" session.
+#
+# Unlike A, this signature is also what a genuinely slow page produces, so it
+# only heals when the browser is PROVABLY gone: its DevTools endpoint (the port
+# in the manifest's websocketUrl) does not answer. A dead browser cannot have
+# run the timed-out command, which is what makes the one retry safe.
+DAEMON_TIMEOUT='timeout reading response from daemon'
+
 # Chrome profile the daemon drives. Its own dir, not the user's real profile —
 # clearing a lock here cannot touch a browsing session.
 # The gsd-browser build of 2026-09-04 MOVED this profile out of the temp dir to
@@ -267,6 +283,22 @@ is_daemon_stop() {
     (( ${#seen[@]} == 2 )) && [[ "${seen[0]}" == "daemon" && "${seen[1]}" == "stop" ]]
 }
 
+# Wedge D's test: does the browser the manifest names still answer on its
+# DevTools port? 0 = provably unreachable (no port recorded counts as unknown,
+# i.e. NOT unreachable, so a missing manifest never triggers a reset).
+browser_unreachable() {
+    if [[ -n "${GSD_BROWSER_PROBE_HOOK:-}" && -x "${GSD_BROWSER_PROBE_HOOK}" ]]; then
+        "${GSD_BROWSER_PROBE_HOOK}"
+        return $?
+    fi
+    local port
+    port="$(
+        node -e 'try{const j=require(process.env.HOME+"/.gsd-browser/session.json");const m=/^wss?:\/\/[^/:]+:(\d+)\//.exec(j.websocketUrl||"");if(m)process.stdout.write(m[1])}catch{}' 2>/dev/null
+    )"
+    [[ -z "${port}" ]] && return 1
+    ! curl -s -o /dev/null -m 3 "http://127.0.0.1:${port}/json/version" 2>/dev/null
+}
+
 run "$@"
 rc=$?
 
@@ -274,6 +306,12 @@ if (( rc != 0 )) \
     && { grep -qF "${DEAD_RECEIVER}" "${ERRFILE}" 2>/dev/null \
       || grep -qF "${DEAD_DAEMON}" "${ERRFILE}" 2>/dev/null; }; then
     echo "gsd-browser: browser/daemon out of step — resetting both and retrying once" >&2
+    sweep_daemons_and_browser
+    run "$@"
+    rc=$?
+elif (( rc != 0 )) && grep -qF "${DAEMON_TIMEOUT}" "${ERRFILE}" 2>/dev/null \
+    && browser_is_ours && browser_unreachable; then
+    echo "gsd-browser: daemon alive but its browser is gone (after a sleep?) — resetting both and retrying once" >&2
     sweep_daemons_and_browser
     run "$@"
     rc=$?
