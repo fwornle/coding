@@ -15,12 +15,45 @@ import {
   PieChart, Pie, Cell, Legend, Treemap, AreaChart, Area, Brush
 } from 'recharts'
 import { normalizeModel } from '@/components/performance/models'
+import {
+  CostConfig, Currency, DEFAULT_COST_CONFIG, SummaryCell, CellSplitter,
+  fetchCostSettings, setLocalProviders, withCurrency, formatMoney,
+  cellCostUsd, fromUsd, costSeries, costBy, cellCostParts,
+} from '@/components/cost/cost-model'
 
-// Loaded on first render only: glass's build shows neither (tabs / settings
-// props) and should not carry them in its main chunk; here they cost one fetch.
+// Loaded on first render only: glass's build shows neither the dialog nor the
+// Routing tab (tabs / settings props), and the Cost tab only when opened — none
+// belongs in the main chunk; here they cost one fetch.
 const TokenUsageSettingsDialog = lazy(() => import('./token-usage-settings-dialog').then((m) => ({ default: m.TokenUsageSettingsDialog })))
 const TokenUsageRoutingTab = lazy(() => import('./token-usage-routing-tab').then((m) => ({ default: m.TokenUsageRoutingTab })))
 const CostTab = lazy(() => import('@/components/cost/CostTab').then((m) => ({ default: m.CostTab })))
+
+/**
+ * What every figure on the page is measured in. Tokens are what was consumed;
+ * € and $ are what it cost — the same rows priced per account (see
+ * cost-model.ts): Copilot at GitHub's per-model rates × any contract discount,
+ * € additionally ÷ FX. Remembered per browser: it is a reading preference.
+ */
+export type TokenUsageUnit = 'tokens' | Currency
+const UNIT_STORAGE_KEY = 'token-usage.unit'
+function storedUnit(): TokenUsageUnit {
+  try {
+    const v = localStorage.getItem(UNIT_STORAGE_KEY)
+    return v === 'EUR' || v === 'USD' ? v : 'tokens'
+  } catch { return 'tokens' }
+}
+
+/**
+ * The tab a link asked for: `?tab=cost` in the query (the dashboard's routes) or
+ * in the hash's query (glass's `#/token-usage?tab=cost`, which its status-line
+ * cost field opens). Only a tab this page actually shows counts.
+ */
+function linkedTab(tabs: TokenUsageTab[]): TokenUsageTab | null {
+  const fromSearch = new URLSearchParams(window.location.search).get('tab')
+  const hashQuery = window.location.hash.split('?')[1] || ''
+  const want = fromSearch || new URLSearchParams(hashQuery).get('tab')
+  return want && (tabs as string[]).includes(want) ? want as TokenUsageTab : null
+}
 
 const PROXY_PORT = '12435'
 const PROXY_BASE = `http://localhost:${PROXY_PORT}`
@@ -224,6 +257,9 @@ interface TokenSummary {
   // give the column order (ranked by total tokens descending).
   hours?: number
   bucket_minutes?: number
+  /** Opt-in (`?cells=1`): the priceable breakdown the €/$ view is built from. */
+  cells?: SummaryCell[]
+  local_providers?: string[]
   process_keys?: string[]
   model_keys?: string[]
   provider_keys?: string[]
@@ -244,6 +280,8 @@ interface RecentCall {
   latency_ms: number
   subscription: string
   prompt_preview: string
+  cache_read_tokens?: number
+  cache_write_tokens?: number
 }
 
 // recharts declares a tooltip formatter's value as `TValue | undefined` (a point
@@ -413,9 +451,9 @@ function allTokens(row: { total_tokens: number; cache_read_tokens?: number; cach
 // Custom treemap content for process breakdown
 function TreemapContent(props: {
   x: number; y: number; width: number; height: number;
-  name: string; value: number; fill: string
+  name: string; value: number; fill: string; display?: string
 }) {
-  const { x, y, width, height, name, value, fill } = props
+  const { x, y, width, height, name, value, fill, display } = props
   if (width < 40 || height < 30) return null
   return (
     <g>
@@ -426,7 +464,7 @@ function TreemapContent(props: {
             {processMeta(name).label}
           </text>
           <text x={x + 8} y={y + 34} fill="rgba(255,255,255,0.7)" fontSize={11}>
-            {formatTokens(value)} tokens
+            {display ?? `${formatTokens(value)} tokens`}
           </text>
         </>
       )}
@@ -445,7 +483,7 @@ function TreemapTooltip({ active, payload }: { active?: boolean; payload?: Array
       <div className="text-[11px] text-muted-foreground leading-snug">{processMeta(d.name).desc}</div>
       <div className="text-[10px] text-muted-foreground/70 font-mono">id: {d.name}</div>
       <div className="text-muted-foreground text-xs pt-0.5">
-        {formatTokens(d.value)} tokens total
+        {d.display ? <><span className="font-medium text-foreground">{d.display}</span> · {formatTokens(d.tokens)} tokens</> : <>{formatTokens(d.value)} tokens total</>}
       </div>
       <div className="text-xs">
         <span className="text-blue-500">{formatTokens(d.input ?? 0)} in</span>
@@ -467,8 +505,8 @@ const ALL_TABS: TokenUsageTab[] = ['overview', 'evolution', 'cost', 'recent', 'r
 
 /**
  * proxyBase: where the token-usage reads live — '' for same-origin (glass's daemon
- * serves the page itself). tabs / settings: glass shows a subset (no Cost, no
- * routing tab). onSettings: the Settings button opens the caller's own dialog
+ * serves the page itself). tabs / settings: glass shows a subset (no Routing
+ * tab, no LLM Routing dialog). onSettings: the Settings button opens the caller's own dialog
  * instead of this proxy's LLM Routing one (glass: its offload settings).
  */
 export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settings = true, onSettings }: {
@@ -478,11 +516,28 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
   onSettings?: () => void
 } = {}) {
   const has = (tab: TokenUsageTab) => tabs.includes(tab)
+  const [activeTab, setActiveTab] = useState<string>(() => linkedTab(tabs) ?? tabs[0])
+  // glass re-uses an open UI tab and only changes its hash, so a click on the
+  // status line's cost field must switch the tab of a page already showing.
+  useEffect(() => {
+    const onHash = () => { const t = linkedTab(tabs); if (t) setActiveTab(t) }
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [tabs])
   const [summary, setSummary] = useState<TokenSummary | null>(null)
   const [recent, setRecent] = useState<RecentCall[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [unit, setUnitState] = useState<TokenUsageUnit>(storedUnit)
+  const setUnit = (u: TokenUsageUnit) => {
+    setUnitState(u)
+    try { localStorage.setItem(UNIT_STORAGE_KEY, u) } catch { /* a preference, not state */ }
+  }
+  const money = unit !== 'tokens'
+  // Prices/discount/FX: the proxy's saved `cost` settings where it has them,
+  // the calibrated defaults otherwise (glass has no settings API).
+  const [costCfg, setCostCfg] = useState<CostConfig>(DEFAULT_COST_CONFIG)
   // Time window for the summary endpoint. '24'/'48'/'168'/'720' are hour
   // counts; 'all' is a backend sentinel that picks every retained row.
   const [hoursWindow, setHoursWindow] = useState<string>('24')
@@ -508,6 +563,10 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
   // claude-code-max's 400M is a third of a pixel. A log axis is the only way to
   // read KB and MB traffic on one chart.
   const [evoYScale, setEvoYScale] = useState<'linear' | 'log'>('linear')
+  // Month-to-date: each series as a running total that restarts on the 1st (UTC,
+  // the month the Cost tab and the bill use), so a provider's spend reads as a
+  // rising line against its budget instead of a field of spikes.
+  const [evoAccumulate, setEvoAccumulate] = useState(false)
   const [evoHidden, setEvoHidden] = useState<Set<string>>(new Set())
   const toggleEvoSeries = (key: string) => {
     setEvoHidden(prev => {
@@ -522,13 +581,16 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
     if (!isAuto) setLoading(true)
     setError(null)
     try {
-      const [sumRes, recRes] = await Promise.all([
-        fetch(`${proxyBase}/api/token-usage/summary?hours=${encodeURIComponent(hoursWindow)}&scope=${scopeParam}`),
-        fetch(`${proxyBase}/api/token-usage/recent?limit=50`)
+      const [sumRes, recRes, setRes] = await Promise.all([
+        fetch(`${proxyBase}/api/token-usage/summary?hours=${encodeURIComponent(hoursWindow)}&scope=${scopeParam}${money ? '&cells=1' : ''}`),
+        fetch(`${proxyBase}/api/token-usage/recent?limit=50`),
+        money ? fetchCostSettings(proxyBase) : Promise.resolve(null),
       ])
       if (!sumRes.ok || !recRes.ok) throw new Error(`HTTP ${sumRes.status}/${recRes.status}`)
       const sumData = await sumRes.json()
       const recData = await recRes.json()
+      if (setRes) setCostCfg(setRes.cfg)
+      setLocalProviders(sumData.local_providers)
       setSummary(sumData)
       setRecent(recData.data || [])
     } catch (err) {
@@ -536,7 +598,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
     } finally {
       setLoading(false)
     }
-  }, [hoursWindow, scopeParam, proxyBase])
+  }, [hoursWindow, scopeParam, proxyBase, money])
 
   useEffect(() => {
     fetchData()
@@ -570,15 +632,46 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
   const byProvider = mergeByProvider(summary.by_provider)
   const byModel = mergeByModel(summary.by_provider_model ?? summary.by_model)
 
+  // ---- €/$ view -----------------------------------------------------------
+  // Every money figure comes from the same `cells` the server derived from the
+  // same rows as the token aggregates above, priced per account. `cells` is
+  // absent for a frame after switching unit (the refetch is in flight) and on
+  // a proxy that predates it; `priced` is false then and the page keeps
+  // showing tokens rather than zeros.
+  const cells = summary.cells
+  const priced = money && Array.isArray(cells)
+  const cfg = withCurrency(costCfg, unit === 'USD' ? 'USD' : 'EUR')
+  const fmtMoney = (v: number) => formatMoney(v, unit === 'USD' ? 'USD' : 'EUR')
+  const costByProcess = priced ? costBy(cells!, cfg, c => c.process) : null
+  const costByAccount = priced ? costBy(cells!, cfg, c => normalizeProvider(c.provider)) : null
+  const costByAccountModel = priced ? costBy(cells!, cfg, c => `${normalizeProvider(c.provider)}/${normalizeModel(c.model) || c.model}`) : null
+  const costTotal = priced ? [...costByAccount!.values()].reduce((a, b) => a + b, 0) : 0
+  const costKinds = priced ? cells!.reduce((acc, c) => {
+    const p = cellCostParts(c, cfg)
+    acc.input += fromUsd(p.input, cfg); acc.output += fromUsd(p.output, cfg)
+    acc.cached += fromUsd(p.cacheRead + p.cacheWrite, cfg)
+    return acc
+  }, { input: 0, output: 0, cached: 0 }) : null
+  // The page's one formatter for an axis value: money when priced, else tokens.
+  const fmtValue = (v: number) => (priced ? fmtMoney(v) : formatTokens(v))
+  const accountValue = (p: { provider: string; total_tokens: number; cache_read_tokens?: number; cache_write_tokens?: number }) =>
+    priced ? (costByAccount!.get(p.provider) || 0) : allTokens(p)
+
   // Prepare treemap data for process breakdown
+  const processValue = (p: TokenSummary['by_process'][number]) =>
+    priced ? (costByProcess!.get(p.process) || 0) : allTokens(p)
   const treemapData = summary.by_process
-    .filter(p => allTokens(p) > 0)
-    .sort((a, b) => allTokens(b) - allTokens(a))
+    .filter(p => processValue(p) > 0)
+    .sort((a, b) => processValue(b) - processValue(a))
     .map(p => ({
       name: p.process,
       // Area is total CONSUMPTION, cache included — see allTokens(). Sizing on
-      // total_tokens alone made this chart say the opposite of the truth.
-      value: allTokens(p),
+      // total_tokens alone made this chart say the opposite of the truth. In
+      // the €/$ view it is cost, which is a different ranking: a cheap model's
+      // big process can be a small rectangle.
+      value: processValue(p),
+      display: priced ? fmtMoney(processValue(p)) : undefined,
+      tokens: allTokens(p),
       cacheRead: p.cache_read_tokens || 0,
       cacheWrite: p.cache_write_tokens || 0,
       fill: getProcessColor(p.process),
@@ -594,7 +687,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
   // in the window (incl. test/reap-* / fake-* outliers); restrict to the
   // "main consumers" — series contributing at least 0.5% of the window's
   // total tokens — so the legend and stacked area stay focused.
-  const evoKeysSrc: string[] =
+  let evoKeysSrc: string[] =
     evoGroupBy === 'process' ? (summary.process_keys || [])
     : evoGroupBy === 'model' ? (summary.model_keys || [])
     : evoGroupBy === 'provider' ? (summary.provider_keys || [])
@@ -605,7 +698,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
     // of. Split out rather than folded into `input` because the three are
     // priced differently: cache reads ~10% of the input rate, cache writes ~125%.
     : ['input', 'output', 'cached', 'cacheWrite']
-  const evoSeriesSrc: Array<Record<string, any>> =
+  let evoSeriesSrc: Array<Record<string, any>> =
     evoGroupBy === 'process' ? (summary.by_process_hour || [])
     : evoGroupBy === 'model' ? (summary.by_model_hour || [])
     : evoGroupBy === 'provider' ? (summary.by_provider_hour || [])
@@ -621,6 +714,17 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
   // model punctuation variants (claude-opus-4-8 → claude-opus-4.8) collapse into
   // ONE stacked series, summing each bucket's tokens. process/tokens grouping is
   // untouched (evoCanon is identity there).
+  if (priced) {
+    const splitters: Record<typeof evoGroupBy, CellSplitter> = {
+      process: (c, p) => [[c.process, p.input + p.output + p.cacheRead + p.cacheWrite]],
+      model: (c, p) => [[c.model, p.input + p.output + p.cacheRead + p.cacheWrite]],
+      provider: (c, p) => [[c.provider, p.input + p.output + p.cacheRead + p.cacheWrite]],
+      tokens: (_c, p) => [['input', p.input], ['output', p.output], ['cached', p.cacheRead], ['cacheWrite', p.cacheWrite]],
+    }
+    const series = costSeries(cells!, cfg, (summary.by_hour || []).map(h => String(h.hour)), splitters[evoGroupBy])
+    evoKeysSrc = evoGroupBy === 'tokens' ? ['input', 'output', 'cached', 'cacheWrite'] : series.keys
+    evoSeriesSrc = series.rows
+  }
   const evoCanon = (key: string): string =>
     evoGroupBy === 'provider' ? normalizeProvider(key)
     : evoGroupBy === 'model' ? (normalizeModel(key) || key)
@@ -639,11 +743,11 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
   // against are cache-inclusive (the server folds cache into the hourly
   // pivots), so this must be too — otherwise every share reads far above 100%
   // and the threshold stops excluding anything.
-  const evoGrandTotal = allTokens({
+  const evoGrandTotal = (priced ? costTotal : allTokens({
     total_tokens: summary.total_tokens,
     cache_read_tokens: summary.total_cache_read,
     cache_write_tokens: summary.total_cache_write,
-  }) || 1
+  })) || 1
   const evoKeyTotals = new Map<string, number>()
   for (const k of evoKeysRaw) {
     let t = 0
@@ -680,19 +784,25 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
   // Bucket label format adapts to window width — short windows show HH:MM,
   // multi-day windows show MM/DD HH:MM so the X-axis stays readable.
   const isMultiDay = (summary.hours ?? 24) > 36
+  const running = new Map<string, number>()
+  let runningMonth = ''
   const evoData = evoSeriesRaw.map(row => {
     const d = new Date(String(row.hour))
+    const month = String(row.hour).slice(0, 7)
+    if (evoAccumulate && month !== runningMonth) { running.clear(); runningMonth = month }
     const label = isMultiDay
       ? `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
       : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
     const out: Record<string, number | string | null> = { label }
     for (const k of evoKeys) {
-      const v = Number(row[k] || 0)
+      let v = Number(row[k] || 0)
+      if (evoAccumulate) { v += running.get(k) || 0; running.set(k, v) }
       // log(0) is undefined, so a zero bucket cannot be plotted. null renders as
       // a gap, which is what it is — a bucket with no traffic. Substituting a
       // floor value instead would draw a continuous baseline that reads as
       // "always a little activity" and is a lie about a sparse series.
-      out[k] = (evoYScale === 'log' && v <= 0) ? null : v
+      // Money's log floor is a hundredth of a cent, tokens' is one token.
+      out[k] = (evoYScale === 'log' && v <= (priced ? 0.0001 : 0)) ? null : v
     }
     return out
   })
@@ -753,6 +863,21 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
               <span className="text-muted-foreground" title="Clearing both shows everything rather than nothing — 'show me no data' is not what clearing two checkboxes means.">showing both</span>
             )}
           </div>
+          {/* Tokens / € / $ for every view on the page, the Cost tab included. */}
+          <div className="flex items-center rounded border h-9 p-0.5 text-xs" role="radiogroup" aria-label="Unit">
+            {([['tokens', 'Tokens'], ['EUR', '€'], ['USD', '$']] as Array<[TokenUsageUnit, string]>).map(([u, label]) => (
+              <button
+                key={u}
+                role="radio"
+                aria-checked={unit === u}
+                onClick={() => setUnit(u)}
+                title={u === 'tokens' ? 'Show token consumption'
+                  : u === 'EUR' ? 'Show cost in EUR — GitHub Copilot: token $ × contract discount ÷ FX'
+                  : 'Show cost in USD — GitHub Copilot: token $ × contract discount (no FX)'}
+                className={`px-2.5 h-full rounded-sm ${unit === u ? 'bg-muted font-medium' : 'text-muted-foreground hover:text-foreground'}`}
+              >{label}</button>
+            ))}
+          </div>
           <Select value={hoursWindow} onValueChange={setHoursWindow}>
             <SelectTrigger className="w-[140px] h-9" title="Time window">
               <SelectValue />
@@ -802,9 +927,11 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
       <div className="grid grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Total Tokens</CardDescription>
+            <CardDescription>{priced ? 'Total Cost' : 'Total Tokens'}</CardDescription>
             <CardTitle className="text-3xl">
-              {formatTokens(summary.total_tokens + (summary.total_cache_read || 0) + (summary.total_cache_write || 0))}
+              {priced
+                ? fmtMoney(costTotal)
+                : formatTokens(summary.total_tokens + (summary.total_cache_read || 0) + (summary.total_cache_write || 0))}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -812,6 +939,13 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
                 reads on any day with heavy foreground work, and a reader who
                 cannot see that will mistrust the number — rightly, since the
                 three parts are priced very differently. */}
+            {priced ? (
+            <div className="text-xs text-muted-foreground flex gap-3 flex-wrap">
+              <span className="text-blue-400">{fmtMoney(costKinds!.input)} in</span>
+              <span className="text-emerald-400">{fmtMoney(costKinds!.output)} out</span>
+              <span className="text-violet-400" title="Prompt-cache reads (~0.1x input) and writes (~1.25x input).">{fmtMoney(costKinds!.cached)} cached</span>
+            </div>
+            ) : (
             <div className="text-xs text-muted-foreground flex gap-3 flex-wrap">
               <span className="text-blue-400">{formatTokens(summary.total_input)} in</span>
               <span className="text-emerald-400">{formatTokens(summary.total_output)} out</span>
@@ -821,6 +955,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
                 </span>
               )}
             </div>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -871,7 +1006,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
                   {/* Consumption, cache included. Fresh-only made the account
                       carrying the foreground work — the largest consumer on the
                       machine — read as the smallest line in this card. */}
-                  <Badge variant="secondary" className="text-xs">{formatTokens(allTokens(p))}</Badge>
+                  <Badge variant="secondary" className="text-xs">{fmtValue(accountValue(p))}</Badge>
                 </div>
               ))}
             </CardTitle>
@@ -880,7 +1015,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
       </div>
 
       {/* Main content */}
-      <Tabs defaultValue={tabs[0]}>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           {has('overview') && <TabsTrigger value="overview">Overview</TabsTrigger>}
           {has('evolution') && <TabsTrigger value="evolution">Evolution</TabsTrigger>}
@@ -897,10 +1032,10 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
                   <Zap className="h-4 w-4" />
-                  Token Consumption by Process
+                  {priced ? 'Cost by Process' : 'Token Consumption by Process'}
                 </CardTitle>
                 <CardDescription>
-                  Larger area = more tokens consumed. Hover for details.
+                  {priced ? 'Larger area = more spent.' : 'Larger area = more tokens consumed.'} Hover for details.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -932,7 +1067,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
                         // total_tokens alone the account carrying the foreground
                         // Claude work rendered as a 2% sliver of a window it
                         // actually dominated.
-                        value: allTokens(p),
+                        value: accountValue(p),
                         fill: getProviderColor(p.provider)
                       }))}
                       dataKey="value"
@@ -946,14 +1081,14 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
                         <Cell key={p.provider} fill={getProviderColor(p.provider)} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(val) => formatTokens(toTokenCount(val))} />
+                    <Tooltip formatter={(val) => fmtValue(toTokenCount(val))} />
                     <Legend
                       verticalAlign="bottom"
                       wrapperStyle={{ paddingTop: '12px' }}
                       formatter={(value, entry: any) => {
                         const item = byProvider.find(p => p.provider === value);
-                        const total = byProvider.reduce((s, p) => s + allTokens(p), 0);
-                        const pct = item && total ? ((allTokens(item) / total) * 100).toFixed(0) : '0';
+                        const total = byProvider.reduce((s, p) => s + accountValue(p), 0);
+                        const pct = item && total ? ((accountValue(item) / total) * 100).toFixed(0) : '0';
                         return `${value} ${pct}%`;
                       }}
                     />
@@ -962,7 +1097,9 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
 
                 <div className="mt-4">
                   <h4 className="text-sm font-medium mb-2">By Provider / Model</h4>
-                  {byModel
+                  {(priced
+                    ? [...byModel].sort((a, b) => (costByAccountModel!.get(b.key) || 0) - (costByAccountModel!.get(a.key) || 0))
+                    : byModel)
                     .map(m => (
                       <div key={m.key} className="flex justify-between items-center text-sm py-1">
                         {/* The account is what determines cost, so it leads. The same
@@ -980,7 +1117,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
                           title={m.cache_read_tokens
                             ? `${formatTokens(m.total_tokens)} fresh + ${formatTokens(m.cache_read_tokens + m.cache_write_tokens)} prompt cache`
                             : undefined}
-                        >{formatTokens(allTokens(m))}</span>
+                        >{priced ? fmtMoney(costByAccountModel!.get(m.key) || 0) : formatTokens(allTokens(m))}</span>
                       </div>
                     ))}
                 </div>
@@ -997,10 +1134,11 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
                 <div>
                   <CardTitle className="text-base flex items-center gap-2">
                     <TrendingUp className="h-4 w-4" />
-                    Consumption Evolution
+                    {priced ? 'Cost Evolution' : 'Consumption Evolution'}
                   </CardTitle>
                   <CardDescription>
                     {windowLabel} · {summary.bucket_minutes ?? '?'}-minute buckets ·
+                    {evoAccumulate ? ' month-to-date ·' : ''}
                     {' '}{evoStacked ? 'stacked by' : 'overlapping by'} {
                       evoGroupBy === 'process' ? 'purpose'
                       : evoGroupBy === 'model' ? 'model'
@@ -1022,6 +1160,17 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
                     className="h-9"
                   >
                     {evoStacked ? 'Stacked' : 'Overlap'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setEvoAccumulate(v => !v)}
+                    title={evoAccumulate
+                      ? 'Back to the amount per bucket'
+                      : 'Running total per series, restarting each calendar month — rising cost per provider'}
+                    className="h-9"
+                  >
+                    {evoAccumulate ? 'Month-to-date' : 'Per bucket'}
                   </Button>
                   <Button
                     variant="outline"
@@ -1058,18 +1207,18 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
                     <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                     <XAxis dataKey="label" tick={{ fontSize: 11 }} minTickGap={24} />
                     <YAxis
-                      tickFormatter={formatTokens}
+                      tickFormatter={fmtValue}
                       tick={{ fontSize: 11 }}
                       scale={evoYScale}
                       // A log axis needs a positive floor; 1 token is the
                       // smallest real quantity, so it is the honest one. Linear
                       // keeps its 0 baseline. allowDataOverflow lets the floor
                       // hold rather than being widened back down to 0.
-                      domain={evoYScale === 'log' ? [1, 'auto'] : [0, 'auto']}
+                      domain={evoYScale === 'log' ? [priced ? 0.0001 : 1, 'auto'] : [0, 'auto']}
                       allowDataOverflow={evoYScale === 'log'}
                     />
                     <Tooltip
-                      formatter={(val, name) => [formatTokens(toTokenCount(val)), String(name)]}
+                      formatter={(val, name) => [fmtValue(toTokenCount(val)), String(name)]}
                       labelStyle={{ color: '#999' }}
                       contentStyle={{ backgroundColor: '#1e1e2e', border: '1px solid #333' }}
                     />
@@ -1127,7 +1276,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
                   Top Consumers ({windowLabel})
                 </CardTitle>
                 <CardDescription>
-                  Totals across the selected window, ranked by token volume
+                  Totals across the selected window, ranked by {priced ? 'cost' : 'token volume'}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -1175,7 +1324,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
                     <TableRow>
                       <TableHead>{evoGroupBy === 'process' ? 'Process' : evoGroupBy === 'model' ? 'Model' : 'Token Type'}</TableHead>
                       <TableHead className="text-right">Calls</TableHead>
-                      <TableHead className="text-right">Total Tokens</TableHead>
+                      <TableHead className="text-right">{priced ? 'Cost' : 'Total Tokens'}</TableHead>
                       <TableHead className="text-right">Avg Latency</TableHead>
                       <TableHead className="text-right" title="Total end-to-end median latency (generation-dominated) — forensic context, NOT the worker-pool overhead the threshold grades. See Spawn Overhead.">Median Latency</TableHead>
                       {/* Phase 66-04: the threshold-graded pool-health column. */}
@@ -1186,7 +1335,9 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
                   <TableBody>
                     {evoKeys
                       .map((k, i) => {
-                        const total = evoData.reduce((s, row) => s + Number(row[k] || 0), 0)
+                        // From the raw buckets, not evoData: month-to-date
+                        // values are running totals and would sum to nonsense.
+                        const total = evoSeriesRaw.reduce((s, row) => s + Number(row[k] || 0), 0)
                         return { key: k, total, color: evoColorFor(k, i) }
                       })
                       .sort((a, b) => b.total - a.total)
@@ -1207,7 +1358,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
                             <TableCell className="text-right font-mono">
                               {m?.calls != null ? m.calls : <span className="text-muted-foreground">—</span>}
                             </TableCell>
-                            <TableCell className="text-right font-mono font-semibold">{formatTokens(total)}</TableCell>
+                            <TableCell className="text-right font-mono font-semibold">{fmtValue(total)}</TableCell>
                             <TableCell className="text-right font-mono text-muted-foreground">
                               {m?.avg_latency != null ? formatLatency(m.avg_latency) : <span>—</span>}
                             </TableCell>
@@ -1275,7 +1426,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
         {has('cost') && (
           <TabsContent value="cost">
             <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
-              <CostTab proxyBase={proxyBase} />
+              <CostTab proxyBase={proxyBase} currency={unit === 'USD' ? 'USD' : 'EUR'} />
             </Suspense>
           </TabsContent>
         )}
@@ -1308,6 +1459,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
                     <TableHead>Model</TableHead>
                     <TableHead className="text-right">In</TableHead>
                     <TableHead className="text-right">Out</TableHead>
+                    {priced && <TableHead className="text-right">Cost</TableHead>}
                     <TableHead className="text-right">Latency</TableHead>
                     <TableHead>Preview</TableHead>
                   </TableRow>
@@ -1335,6 +1487,15 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
                       <TableCell className="text-xs text-muted-foreground">{call.model}</TableCell>
                       <TableCell className="text-right font-mono text-xs text-blue-400">{formatTokens(call.input_tokens)}</TableCell>
                       <TableCell className="text-right font-mono text-xs text-emerald-400">{formatTokens(call.output_tokens)}</TableCell>
+                      {priced && (
+                        <TableCell className="text-right font-mono text-xs">
+                          {fmtMoney(fromUsd(cellCostUsd({
+                            provider: call.provider, model: call.model,
+                            input_tokens: call.input_tokens, output_tokens: call.output_tokens,
+                            cache_read_tokens: call.cache_read_tokens || 0, cache_write_tokens: call.cache_write_tokens || 0,
+                          }, cfg), cfg))}
+                        </TableCell>
+                      )}
                       <TableCell className="text-right font-mono text-xs">{formatLatency(call.latency_ms)}</TableCell>
                       <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground">
                         {stripPromptPreview(call.prompt_preview)}

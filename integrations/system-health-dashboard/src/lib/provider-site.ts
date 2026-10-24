@@ -12,3 +12,10 @@ export const SITE_PROVIDER_LABELS: Record<string, string> = {
   'qwen-local': 'On-prem Qwen',
   'qwen-laptop': 'This laptop',
 }
+
+/**
+ * The site providers that run on our own hardware — free per token. The cost
+ * model also learns them from the proxy (`local_providers`: whoever served an
+ * offloaded call); this list covers the ones that served only routed calls.
+ */
+export const SITE_LOCAL_PROVIDERS: string[] = ['qwen-local', 'qwen-laptop']

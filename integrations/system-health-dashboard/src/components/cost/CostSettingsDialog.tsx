@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { CostConfig, DEFAULT_COST_CONFIG, ModelPrice } from './cost-model'
+import { CostConfig, DEFAULT_COST_CONFIG, ModelPrice, mergeCostConfig } from './cost-model'
 
 interface Props {
   open: boolean
@@ -31,13 +31,13 @@ export function CostSettingsDialog({ open, onOpenChange, proxyBase, onSaved }: P
     setLoading(true); setError(null)
     fetch(`${proxyBase}/api/llm/settings`)
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
-      .then(d => setDraft({ ...clone(DEFAULT_COST_CONFIG), ...(d.settings?.cost || {}) }))
+      .then(d => setDraft(clone(mergeCostConfig(d.settings?.cost))))
       .catch(e => setError(`Failed to load: ${e.message}`))
       .finally(() => setLoading(false))
   }, [open, proxyBase])
 
-  const setPrice = (model: string, field: keyof ModelPrice, value: number) => {
-    setDraft(d => ({ ...d, modelPrices: { ...d.modelPrices, [model]: { ...d.modelPrices[model], [field]: value } } }))
+  const setPrice = (table: 'modelPrices' | 'copilotPrices', model: string, field: keyof ModelPrice, value: number) => {
+    setDraft(d => ({ ...d, [table]: { ...d[table], [model]: { ...d[table][model], [field]: value } } }))
   }
   const num = (v: string, fallback = 0) => { const n = parseFloat(v); return isNaN(n) ? fallback : n }
 
@@ -64,8 +64,9 @@ export function CostSettingsDialog({ open, onOpenChange, proxyBase, onSaved }: P
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>Cost & Budget Settings</DialogTitle>
           <DialogDescription>
-            Prices are USD per 1M tokens (public provider rates). Version variants resolve by family
-            (any <code>*opus*</code> → the Opus row). Budgets are per subscription, in EUR.
+            Prices are USD per 1M tokens. GitHub Copilot uses its own calibrated rates; every other
+            account uses the public list rates, where version variants resolve by family (any{' '}
+            <code>*opus*</code> → the Opus row). Budgets are per account, in EUR.
           </DialogDescription>
         </DialogHeader>
 
@@ -74,21 +75,68 @@ export function CostSettingsDialog({ open, onOpenChange, proxyBase, onSaved }: P
           <div className="py-8 text-center text-muted-foreground text-sm">Loading…</div>
         ) : (
           <div className="overflow-y-auto flex-1 space-y-6 pr-1">
-            {/* Currency */}
+            {/* Currency + contract discount: Copilot cost bought through a cloud
+                contract is token $ × the contract's discount factor ÷ FX. */}
             <section>
-              <h3 className="text-sm font-semibold mb-2">Currency</h3>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground">1 USD =</span>
-                <Input type="number" step="0.01" className="w-24 h-8"
-                  value={draft.currency.usdToEur}
-                  onChange={e => setDraft(d => ({ ...d, currency: { ...d.currency, usdToEur: num(e.target.value, 0.92) } }))} />
-                <span className="text-muted-foreground">EUR</span>
+              <h3 className="text-sm font-semibold mb-2">Currency & discount</h3>
+              <div className="flex flex-wrap items-center gap-4 text-sm">
+                <label className="flex items-center gap-2">
+                  <span className="text-muted-foreground">FX</span>
+                  <Input type="number" step="0.01" className="w-24 h-8"
+                    value={draft.currency.usdPerEur}
+                    onChange={e => setDraft(d => ({ ...d, currency: { ...d.currency, usdPerEur: num(e.target.value, 1.18) } }))} />
+                  <span className="text-muted-foreground">USD per EUR</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <span className="text-muted-foreground">GitHub Copilot discount factor</span>
+                  <Input type="number" step="0.01" className="w-24 h-8"
+                    value={draft.discount.copilot ?? 1}
+                    onChange={e => setDraft(d => ({ ...d, discount: { ...d.discount, copilot: num(e.target.value, 1) } }))} />
+                  <span className="text-xs text-muted-foreground">1 = no discount · 0.8 = 20% off</span>
+                </label>
+              </div>
+            </section>
+
+            {/* Calibrated Copilot rates */}
+            <section>
+              <h3 className="text-sm font-semibold mb-2">GitHub Copilot rates — USD / 1M tokens (calibrated)</h3>
+              <div className="text-xs text-muted-foreground mb-2">
+                Fitted per model from GitHub's itemized consumption sheet by{' '}
+                <code>scripts/cost/calibrate-copilot-prices.mjs</code>; re-run it on a new sheet rather
+                than editing by hand. Models not listed here price from GitHub's company-wide rate card. An input rate above list carries the cache-write premium the
+                OpenAI wire does not report separately.
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs text-muted-foreground border-b">
+                      <th className="py-1 pr-2">Model</th>
+                      <th className="py-1 px-2">Input</th>
+                      <th className="py-1 px-2">Output</th>
+                      <th className="py-1 px-2">Cache read</th>
+                      <th className="py-1 px-2">Cache write</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(draft.copilotPrices).map(([model, p]) => (
+                      <tr key={model} className="border-b border-muted/40">
+                        <td className="py-1 pr-2 font-mono text-xs">{model}</td>
+                        {(['in', 'out', 'cacheRead', 'cacheWrite'] as (keyof ModelPrice)[]).map(f => (
+                          <td key={f} className="py-1 px-2">
+                            <Input type="number" step="0.01" className="w-24 h-8"
+                              value={p[f]} onChange={e => setPrice('copilotPrices', model, f, num(e.target.value))} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </section>
 
             {/* Model prices */}
             <section>
-              <h3 className="text-sm font-semibold mb-2">Model prices — USD / 1M tokens</h3>
+              <h3 className="text-sm font-semibold mb-2">List prices — USD / 1M tokens</h3>
               <div className="text-xs text-muted-foreground mb-2">
                 Seeded at published rates — Opus $5 / $25, Sonnet $3 / $15. A <code>-fast</code>{' '}
                 model id has no row of its own: it prices at 2&times; its base model, so{' '}
@@ -112,7 +160,7 @@ export function CostSettingsDialog({ open, onOpenChange, proxyBase, onSaved }: P
                         {(['in', 'out', 'cacheRead', 'cacheWrite'] as (keyof ModelPrice)[]).map(f => (
                           <td key={f} className="py-1 px-2">
                             <Input type="number" step="0.01" className="w-24 h-8"
-                              value={p[f]} onChange={e => setPrice(model, f, num(e.target.value))} />
+                              value={p[f]} onChange={e => setPrice('modelPrices', model, f, num(e.target.value))} />
                           </td>
                         ))}
                       </tr>
@@ -166,7 +214,7 @@ export function CostSettingsDialog({ open, onOpenChange, proxyBase, onSaved }: P
                   </label>
                 </div>
                 {/* Per-month overrides. A cap is not a constant: this one went
-                    300 -> 600 -> 1000 during 2026-08 as extensions were approved,
+                    step by step during 2026-08 as extensions were approved,
                     and without a history a single number would retroactively
                     re-judge every past month against a budget it never had. The
                     standing value above applies to any month with no entry here. */}
