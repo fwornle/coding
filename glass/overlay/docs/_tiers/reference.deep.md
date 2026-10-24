@@ -59,12 +59,14 @@ decrypts:
 | `~/.glass/logs/daemon.log` | Daemon log |
 | `~/.glass/daemon.json` | Running daemon's pid and port |
 | `~/.glass/offload.json`, `offload.key` | [Offload](offload.md) settings and the endpoint key (owner-only) |
+| `~/.glass/cost.json` | Optional: contract discount and FX for the € / $ views ([How cost is calculated](token-usage.md#how-cost-is-calculated)) |
 
 ## Read API
 
 The daemon serves JSON on `http://127.0.0.1:12445`: `/health`,
 `/api/token-usage/summary`, `/api/token-usage/recent?limit=N`,
-`/api/token-usage/cost`, `/api/context-turns?task_id=…`,
+`/api/token-usage/cost`, `/api/cost-defaults` (the merged cost settings),
+`/api/context-turns?task_id=…`,
 `/api/context-breakdown?task_id=…`, `/api/statusline`,
 `/api/models?hours=N` and `/api/experiments/runs/<session id>/models` (the model mix, see
 [Models & Accounts](models.md)), `/api/calls/unbound`, `/api/offload` (see

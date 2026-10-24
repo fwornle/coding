@@ -35,6 +35,47 @@ the tree differs from it (`tests/provenance.test.mjs`), so hand edits cannot sli
 has no release yet, it packs the tarball, runs the install check on it and creates the
 GitHub release `v<version>` with the tarball attached.
 
+## Copilot rates and organisation settings
+
+**Rates.** GitHub's per-model Copilot rates live in coding's `lib/cost/copilot-pricing.mjs`,
+one table shared by the status line, the Cost tab and coding's own dashboard:
+
+- a **calibrated** table, fitted per model from an itemized Copilot consumption sheet
+  against the tokens the proxy recorded over the same days;
+- GitHub's **rate card** as the fallback for every model without enough evidence
+  (included models at 0).
+
+To recalibrate when GitHub changes a rate, run in coding, on a machine whose token
+database covers the sheet's period:
+
+```bash
+node scripts/cost/calibrate-copilot-prices.mjs --sheet=<…_consumption_source.json>
+```
+
+It prints, per model, the fitted price level and cache-write share, the fit quality and
+the sheet's dollars against the fit, then each month's billed against predicted total —
+a stale table shows up as a drifting month. Models with fewer than `--min-days` (default
+5) billed days are left to the rate card. `--json` prints the table to paste into
+`CALIBRATED_COPILOT_PRICES`; commit it in coding and the next extract ships it.
+
+**Organisation settings.** A contract discount, its name, an FX rate — anything only one
+organisation's users should get — never goes into coding, which is public. A target in
+`glass/manifest.yaml` can name a `private_overlay`: a directory outside the repository
+whose files are copied into that target's tree only, after its own overlay:
+
+```yaml
+targets:
+  internal:
+    remote: git.example.com/org/glass
+    private_overlay: ~/.coding/glass-private/internal
+```
+
+with `config/cost-defaults.json` inside it (same shape as `~/.glass/cost.json`, see
+[How cost is calculated](token-usage.md#how-cost-is-calculated)). Declared means required:
+if the directory is missing the extract fails rather than publishing a build without it.
+Keep the directory in a private repository on your organisation's git host and clone it
+to the declared path on every machine that publishes.
+
 ## Documentation
 
 These pages are Markdown under `docs/` with `mkdocs.yml`, built with MkDocs Material.

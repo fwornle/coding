@@ -8,7 +8,7 @@ hide:
 <div class="overview-deck" id="glass-overview" role="region" aria-label="Glass overview presentation" markdown="1">
 
 <div class="overview-toolbar" hidden>
-  <span class="overview-label">glass / in ten slides</span>
+  <span class="overview-label">glass / in eleven slides</span>
   <span class="overview-counter" role="status" aria-live="polite" aria-atomic="true"></span>
   <button type="button" data-fullscreen>Fullscreen</button>
 </div>
@@ -114,9 +114,9 @@ glass ui                # in another terminal
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Claude Code running through glass in tmux after three prompts: the status bar at the bottom, and the context popup a click on its ctx field opens: bytes per part of the latest turn and every turn's prompt size and cache hit.](images/terminal-statusline-tmux.png)](images/terminal-statusline-tmux.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![Claude Code running through glass in tmux after two prompts: the status bar at the bottom — health, context gauge, tokens, this month's GitHub Copilot cost, network — and the context popup a click on its ctx field opens: bytes per part of the latest turn and every turn's prompt size and cache hit.](images/terminal-statusline-tmux.png)](images/terminal-statusline-tmux.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
-<figcaption>The status bar gives live context and token counts. With tmux, click a field for details (here: <strong>ctx</strong>). Without it, use <code>glass watch</code> in a split pane; Claude Code also has its own status line.</figcaption>
+<figcaption>The status bar gives live context, token counts and this month's Copilot cost (<strong>GH €</strong>). With tmux, click a field for details (here: <strong>ctx</strong>). Without it, use <code>glass watch</code> in a split pane; Claude Code also has its own status line.</figcaption>
 </figure>
 <p class="overview-takeaway" markdown="1">
 No Docker or build tools. [Installation and platform details](getting-started.md)
@@ -166,7 +166,8 @@ Find the biggest token consumer before changing your setup. Token totals are not
 Open the **Evolution** tab in **Token Usage**.
 
 The chart splits the time range into short buckets, **stacked by model, agent or
-provider**. Hover a bucket for its numbers.
+provider** — in tokens, € or $. Switch to **month-to-date** and each line becomes a
+running total that restarts on the 1st: rising cost per provider.
 
 Below the chart, **Top Consumers** ranks the models of the time range by tokens,
 with their calls and latency.
@@ -176,9 +177,9 @@ Drag the brush under the chart to zoom into one stretch of work.
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Token Usage Evolution: ninety minutes of sessions in 2-minute buckets stacked by model, a tooltip on one bucket, and the Top Consumers table below.](images/ui-token-usage-evolution.png)](images/ui-token-usage-evolution.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![Token Usage Evolution: thirty days in euros, stacked by provider, month-to-date — the Claude subscription and GitHub Copilot each rising through the month.](images/ui-token-usage-evolution.png)](images/ui-token-usage-evolution.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
-<figcaption>Example runs on one machine, not a benchmark. Each peak is a session; the table shows each model's share of the time range.</figcaption>
+<figcaption>Example runs on one machine, not a benchmark. Month-to-date in €: each step is a session's spend; the slope is the burn rate.</figcaption>
 </figure>
 <p class="overview-takeaway" markdown="1">
 Spot the spike, then open the session behind it in **Sessions**.
@@ -186,7 +187,35 @@ Spot the spike, then open the session behind it in **Sessions**.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-6" aria-labelledby="overview-context" markdown="1">
+<section class="overview-slide" id="slide-6" aria-labelledby="overview-cost" markdown="1">
+<div class="overview-copy" markdown="1">
+
+<p class="overview-kicker">Question 1 / What did it cost?</p>
+
+## Know the bill before it arrives {#overview-cost}
+
+Switch **Tokens · € · $** and open the **Cost** tab.
+
+One tile per account you used this month: **GitHub Copilot** priced at GitHub's
+per-model rates — cache reads and writes each at their own rate — with the month-end
+projection; the Claude subscription as its API-equivalent; your own hardware as free.
+
+The status line carries the Copilot figure as **`GH €`**; one click opens this tab.
+
+</div>
+<figure class="overview-figure" markdown="1">
+
+[![Cost tab: tiles for GitHub Copilot with spend, month-end projection and foreground / background split, the Claude subscription as notional cost, own hardware with what it saved, and cost by month below.](images/ui-token-usage-cost.png)](images/ui-token-usage-cost.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+
+<figcaption>A contract discount or a fixed euro rate goes into <code>~/.glass/cost.json</code>.</figcaption>
+</figure>
+<p class="overview-takeaway" markdown="1">
+See the month's Copilot spend while it is still going on.
+[How cost is calculated](token-usage.md#how-cost-is-calculated)
+</p>
+</section>
+
+<section class="overview-slide" id="slide-7" aria-labelledby="overview-context" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Question 2 / Why is the context so large?</p>
@@ -217,7 +246,7 @@ Don't assume your last prompt filled the window. Look at the whole context.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-7" aria-labelledby="overview-models" markdown="1">
+<section class="overview-slide" id="slide-8" aria-labelledby="overview-models" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Question 3 / Which models did the work?</p>
@@ -248,7 +277,7 @@ Know which model you are paying for before you switch one.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-8" aria-labelledby="overview-offload" markdown="1">
+<section class="overview-slide" id="slide-9" aria-labelledby="overview-offload" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Opt-in, off by default</p>
@@ -285,7 +314,7 @@ Off, glass is exactly what the previous slides show.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-9" aria-labelledby="overview-compare" markdown="1">
+<section class="overview-slide" id="slide-10" aria-labelledby="overview-compare" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Question 4 / Which setup fits my task?</p>
@@ -319,7 +348,7 @@ Try it on your next real task: `glass <agent>`, then `glass ui`.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-10" aria-labelledby="overview-built" markdown="1">
+<section class="overview-slide" id="slide-11" aria-labelledby="overview-built" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Behind the scenes / How glass is made</p>

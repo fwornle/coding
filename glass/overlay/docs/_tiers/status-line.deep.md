@@ -30,6 +30,7 @@ restores it afterwards.
 | health | `glass ●` | The daemon answers. `glass ✗ down` when it does not. |
 | context | `ctx ▋ 9%` | Prompt size of the session's latest main-loop turn (fresh + cache read + cache write) as a share of the model's context window. Side calls (titles, summaries) are skipped so the gauge does not drop to zero. |
 | tokens | `↑258.6K ↓233 ⚡66%` | Tokens sent (prompt) and received (output) in this session; ⚡ is the share of the latest prompt served from cache. |
+| cost | `GH €24.59` | What GitHub Copilot cost this calendar month (UTC), across all sessions — the account's bill, not this run's. Priced at GitHub's per-model rates and your contract settings, the same way as the [Cost tab](token-usage.md#cost). `≥` in front when a model's rate is unknown, so the figure is a floor. Hidden until the month has a Copilot call. |
 | offload | `D:2` `L:5` | Only while [offload](offload.md) is on for the session's agent, each hidden at 0. **L** — calls your endpoint answered (a call that fell back to the agent's provider is not one). **D** — calls the classifier judged easier than their model. |
 | network | `N:CN P:ON` | The same badge as coding's status line, from the same probes. **N** — where the machine is: `CN` (corporate network, on-site), `VPN`, `OPEN` (home / public), `??` (not probed yet). **P** — the local proxy (proxydetox on `:3128`): `ON` (forwarding, `px` toggle on), `AUTO` (forwarding, toggle off), `OFF` (not listening, or cannot open a tunnel to a host the corporate proxy has to carry). **K:NO** — on `CN` / `VPN` only: no Kerberos ticket, so the corporate proxy will refuse tunnels; the popup says how to renew it and shows the last tunnel it refused. Click for the details and the daemon's own egress. `¬tap` when the run uses `--no-intercept`. |
 
@@ -40,6 +41,7 @@ restores it afterwards.
 | health | opens the UI | link to the UI |
 | context | popup with the context report | link to the context explainer |
 | tokens | opens this session in the UI | link to the session |
+| cost | opens Token Usage → Cost | link to the Cost tab |
 | offload | opens Models, where the switch is | link to Models |
 | network | popup with the egress report | link to the same report, as a page |
 

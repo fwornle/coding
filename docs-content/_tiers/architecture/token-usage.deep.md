@@ -211,8 +211,13 @@ These are served by the proxy bridge; the dashboard's `server.js` proxies them t
 ### Summary
 
 ```
-GET /api/token-usage/summary?hours=24[&bucketMinutes=N]
+GET /api/token-usage/summary?hours=24[&bucketMinutes=N][&cells=1]
 ```
+
+`cells=1` adds `cells` — one row per bucket × process × provider × model with fresh
+input, output, cache read and cache write kept apart — and `local_providers`, the
+providers that served an offloaded call. The € / $ view prices these (see
+[Cost and the € / $ view](#cost-and-the-view)); without the flag the payload is unchanged.
 
 Aggregates the trailing `hours` window. `hours` accepts an integer (e.g. `24`, `168`, `720`) or the literal sentinel `all` — the latter falls back to the full retained DB and clamps the timeline start to the earliest persisted row so wide windows don't emit thousands of empty buckets. `bucketMinutes` is optional; when omitted, the bucket size scales with the window (2 / 10 / 30 / 120 / 360 minutes for 24h / 72h / 7d / 30d / All).
 
@@ -290,6 +295,47 @@ PUT /api/llm/settings   (Content-Type: application/json)
 ```
 
 Replaces the entire pin map atomically; the proxy persists the document to `.data/llm-proxy/settings.json`.
+
+---
+
+## Cost and the € / $ view
+
+**Tokens · € · $** in the page header switches every view — cards, Overview, Evolution,
+Cost, Recent Calls — between tokens and money (remembered per browser). Evolution's
+**Month-to-date** turns each series into a running total that restarts on the 1st (UTC),
+so a provider's spend reads as a rising line.
+
+**Cost tab.** One tile per account used in the selected month: GitHub Copilot (spend,
+month-end projection, budget, foreground / background), the Claude subscription as
+*notional* API-equivalent cost, own hardware (this site's local providers and any offload
+target) as free with what it saved, any metered API key at list price.
+
+**Pricing.** Each row is priced by the account that served it:
+
+| Account | Rate |
+|---|---|
+| GitHub Copilot | GitHub's per-model rates from `lib/cost/copilot-pricing.mjs` — a calibrated table, then GitHub's rate card; fresh input, cache read and cache write each at their own rate — × the contract discount |
+| Claude subscription, metered keys | API list prices (`cost.modelPrices`, family fallback) |
+| Own hardware | 0 |
+
+€ = USD ÷ `cost.currency.usdPerEur`; $ skips the FX. A contract discount
+(`cost.discount.copilot`, e.g. `0.8` = 20% off), its on-screen name
+(`cost.discountLabel.copilot`) and budgets (`cost.budgets`) are the operator's own and
+live in the proxy's saved settings (`PUT /api/llm/settings`, or **Prices & Budgets** on the
+Cost tab) — the code ships none.
+
+**Calibrating the Copilot rates.** When GitHub changes a rate, fit the table again from
+an itemized consumption sheet covering days this machine's token database also covers:
+
+```bash
+node scripts/cost/calibrate-copilot-prices.mjs --sheet=<…_consumption_source.json> [--min-days=5] [--json]
+```
+
+It reports each model's fitted level and cache-write share against the sheet, and each
+month billed vs predicted. Paste the `--json` output into `CALIBRATED_COPILOT_PRICES` in
+`lib/cost/copilot-pricing.mjs`; glass picks it up with its next extract (see glass's
+*Development & Releases* page for its per-target `private_overlay`, which carries an
+organisation's cost settings into that target's build only).
 
 ---
 
