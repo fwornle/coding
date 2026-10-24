@@ -28,6 +28,7 @@ const TokenUsageSettingsDialog = lazy(() => import('./token-usage-settings-dialo
 const TokenUsageRoutingTab = lazy(() => import('./token-usage-routing-tab').then((m) => ({ default: m.TokenUsageRoutingTab })))
 const CostTab = lazy(() => import('@/components/cost/CostTab').then((m) => ({ default: m.CostTab })))
 import { AccountsDialog } from '@/components/cost/AccountsDialog'
+import { SeriesTooltip } from '@/components/cost/series-tooltip'
 import { fetchAccountSelection, type AccountSelection, type SourcesControl } from '@/components/cost/account-selection'
 
 /**
@@ -1323,11 +1324,14 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
                       allowDataOverflow={evoYScale === 'log'}
                     />
                     <Tooltip
-                      formatter={(val, name) => [fmtValue(toTokenCount(val)), String(name)]}
-                      labelStyle={{ color: '#999' }}
-                      contentStyle={{ backgroundColor: '#1e1e2e', border: '1px solid #333' }}
+                      content={<SeriesTooltip format={fmtValue} />}
+                      wrapperStyle={{ zIndex: 10 }}
                     />
+                    {/* The legend is laid out inside the chart's 420px: grouped by
+                        process over a long window it is ~135 entries and left
+                        the plot ~50px tall. Cap it and let it scroll. */}
                     <Legend
+                      wrapperStyle={{ maxHeight: 96, overflowY: 'auto', paddingTop: 8 }}
                       onClick={(e: any) => {
                         const key = e?.dataKey || e?.value
                         if (typeof key === 'string') toggleEvoSeries(key)

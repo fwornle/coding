@@ -14,6 +14,7 @@ import {
 } from 'recharts'
 import { getProviderColor } from '@/lib/providers'
 import { CostSettingsDialog } from './CostSettingsDialog'
+import { SeriesTooltip } from './series-tooltip'
 import {
   CostRow, CostConfig, Currency, DEFAULT_COST_CONFIG, PivotDim, AccountKind,
   accountKind, accountName, costAccount, configKey, isSynthetic, cellCostUsd, fromUsd, fromEur,
@@ -41,44 +42,6 @@ interface Props {
   hiddenAccounts?: number
   /** Opens the page's Accounts dialog (absent on a proxy without a selection). */
   onAccounts?: () => void
-}
-
-/** Recharts colours each tooltip line in its series colour — pale pinks and
- *  greens on white were unreadable, and the default box has no z-order over
- *  the Legend, which drew through it. A popover card: swatch, name, value,
- *  largest first, zeros dropped, total at the foot. */
-function CostTooltip({ active, payload, label, money }: {
-  active?: boolean
-  payload?: Array<{ name?: string | number; value?: number | string | null; color?: string }>
-  label?: string | number
-  money: (v: number) => string
-}) {
-  if (!active || !payload?.length) return null
-  const items = payload
-    .map(p => ({ name: String(p.name ?? ''), value: Number(p.value) || 0, color: p.color || '#888' }))
-    .filter(p => p.value > 0)
-    .sort((a, b) => b.value - a.value)
-  if (!items.length) return null
-  const total = items.reduce((a, p) => a + p.value, 0)
-  return (
-    <div className="rounded-md border bg-popover text-popover-foreground shadow-md px-3 py-2 text-xs min-w-[200px]">
-      <div className="font-medium mb-1">{label}</div>
-      {items.map(p => (
-        <div key={p.name} className="flex items-center justify-between gap-4 py-0.5">
-          <span className="flex items-center gap-1.5 min-w-0">
-            <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ backgroundColor: p.color }} />
-            <span className="truncate">{p.name}</span>
-          </span>
-          <span className="tabular-nums">{money(p.value)}</span>
-        </div>
-      ))}
-      {items.length > 1 && (
-        <div className="flex justify-between gap-4 border-t mt-1 pt-1 font-medium">
-          <span>Total</span><span className="tabular-nums">{money(total)}</span>
-        </div>
-      )}
-    </div>
-  )
 }
 
 interface CadenceCfg { enabled: boolean; checkIntervalMinutes: number; undigestedThreshold: number }
@@ -501,7 +464,7 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
                 allowDataOverflow={chartLog}
                 tickFormatter={(v) => `${currency === 'USD' ? '$' : '€'}${v}`}
               />
-              <Tooltip content={<CostTooltip money={money} />} wrapperStyle={{ zIndex: 10 }} cursor={{ fill: 'rgba(148,163,184,0.15)' }} />
+              <Tooltip content={<SeriesTooltip format={money} />} wrapperStyle={{ zIndex: 10 }} cursor={{ fill: 'rgba(148,163,184,0.15)' }} />
               {/* Padded like Evolution's: unpadded, a legend that wraps to two lines sat on
                   the month labels ("2026-" with the month hidden under it). */}
               <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
