@@ -59,6 +59,20 @@ const PROXY_PORT = '12435'
 const PROXY_BASE = `http://localhost:${PROXY_PORT}`
 const REFRESH_INTERVAL = 30_000
 
+/** One Evolution bucket: `hour` plus a number per series key. */
+type EvoRow = Record<string, number | string>
+
+/**
+ * Hours back to the 1st (UTC) of the month a `windowHours` window starts in —
+ * the span month-to-date needs. One hour over: the API takes whole hours, and
+ * the partial hour before the 1st falls outside the month and is dropped.
+ */
+function monthToDateHours(windowHours: number): number {
+  const start = new Date(Date.now() - windowHours * 3600_000)
+  const first = Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1)
+  return Math.ceil((Date.now() - first) / 3600_000) + 1
+}
+
 // Window options for the time-range selector. `value` is what we send as
 // ?hours= (the literal string 'all' is a backend sentinel for "everything").
 const WINDOW_OPTIONS: Array<{ value: string; label: string }> = [
@@ -567,6 +581,13 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
   // the month the Cost tab and the bill use), so a provider's spend reads as a
   // rising line against its budget instead of a field of spikes.
   const [evoAccumulate, setEvoAccumulate] = useState(false)
+  // The month's run-up for month-to-date: hourly buckets from the 1st (UTC) of
+  // the window's first month. Hourly, not the window's 2-minute buckets — a
+  // month of those is ~27MB per 30s refresh, and only the totals are used.
+  // Tagged with the request it answers, so a run-up from another window,
+  // scope or unit is never added to this one's buckets.
+  const [mtd, setMtd] = useState<{ key: string; summary: TokenSummary } | null>(null)
+  const mtdKey = `${hoursWindow}|${scopeParam}|${money ? 'cells' : 'tokens'}`
   const [evoHidden, setEvoHidden] = useState<Set<string>>(new Set())
   const toggleEvoSeries = (key: string) => {
     setEvoHidden(prev => {
@@ -581,10 +602,17 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
     if (!isAuto) setLoading(true)
     setError(null)
     try {
-      const [sumRes, recRes, setRes] = await Promise.all([
+      const mtdHours = evoAccumulate && hoursWindow !== 'all' ? monthToDateHours(Number(hoursWindow)) : 0
+      const [sumRes, recRes, setRes, mtdRes] = await Promise.all([
         fetch(`${proxyBase}/api/token-usage/summary?hours=${encodeURIComponent(hoursWindow)}&scope=${scopeParam}${money ? '&cells=1' : ''}`),
         fetch(`${proxyBase}/api/token-usage/recent?limit=50`),
         money ? fetchCostSettings(proxyBase) : Promise.resolve(null),
+        // Optional: without it the chart says it is a running total from the
+        // window's edge rather than failing the page.
+        mtdHours
+          ? fetch(`${proxyBase}/api/token-usage/summary?hours=${mtdHours}&bucketMinutes=60&scope=${scopeParam}${money ? '&cells=1' : ''}`)
+            .then(r => (r.ok ? r.json() as Promise<TokenSummary> : null)).catch(() => null)
+          : Promise.resolve(null),
       ])
       if (!sumRes.ok || !recRes.ok) throw new Error(`HTTP ${sumRes.status}/${recRes.status}`)
       const sumData = await sumRes.json()
@@ -592,13 +620,14 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
       if (setRes) setCostCfg(setRes.cfg)
       setLocalProviders(sumData.local_providers)
       setSummary(sumData)
+      setMtd(mtdRes ? { key: mtdKey, summary: mtdRes } : null)
       setRecent(recData.data || [])
     } catch (err) {
       setError(`Failed to load token usage. Check that the LLM proxy is running at ${proxyBase || window.location.origin}.`)
     } finally {
       setLoading(false)
     }
-  }, [hoursWindow, scopeParam, proxyBase, money])
+  }, [hoursWindow, scopeParam, proxyBase, money, evoAccumulate, mtdKey])
 
   useEffect(() => {
     fetchData()
@@ -687,58 +716,95 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
   // in the window (incl. test/reap-* / fake-* outliers); restrict to the
   // "main consumers" — series contributing at least 0.5% of the window's
   // total tokens — so the legend and stacked area stay focused.
-  let evoKeysSrc: string[] =
-    evoGroupBy === 'process' ? (summary.process_keys || [])
-    : evoGroupBy === 'model' ? (summary.model_keys || [])
-    : evoGroupBy === 'provider' ? (summary.provider_keys || [])
-    // Three series, not two. Prompt-cache reads are the overwhelming majority
-    // of what a foreground turn sends — 197M of a 205M window — and they are
-    // billed, at a discount. Showing only input/output made the chart describe
-    // a rounding error and said nothing about what the spend actually consists
-    // of. Split out rather than folded into `input` because the three are
-    // priced differently: cache reads ~10% of the input rate, cache writes ~125%.
-    : ['input', 'output', 'cached', 'cacheWrite']
-  let evoSeriesSrc: Array<Record<string, any>> =
-    evoGroupBy === 'process' ? (summary.by_process_hour || [])
-    : evoGroupBy === 'model' ? (summary.by_model_hour || [])
-    : evoGroupBy === 'provider' ? (summary.by_provider_hour || [])
-    : (summary.by_hour || []).map(h => ({
-      hour: h.hour,
-      input: h.input_tokens,
-      output: h.output_tokens,
-      cached: h.cache_read_tokens ?? 0,
-      cacheWrite: h.cache_write_tokens ?? 0,
-    }))
-  // Canonicalize the Evolution series exactly like the Overview By Provider/By
-  // Model breakdowns: provider aliases (copilot/github-copilot → github) and
-  // model punctuation variants (claude-opus-4-8 → claude-opus-4.8) collapse into
-  // ONE stacked series, summing each bucket's tokens. process/tokens grouping is
-  // untouched (evoCanon is identity there).
-  if (priced) {
-    const splitters: Record<typeof evoGroupBy, CellSplitter> = {
-      process: (c, p) => [[c.process, p.input + p.output + p.cacheRead + p.cacheWrite]],
-      model: (c, p) => [[c.model, p.input + p.output + p.cacheRead + p.cacheWrite]],
-      provider: (c, p) => [[c.provider, p.input + p.output + p.cacheRead + p.cacheWrite]],
-      tokens: (_c, p) => [['input', p.input], ['output', p.output], ['cached', p.cacheRead], ['cacheWrite', p.cacheWrite]],
-    }
-    const series = costSeries(cells!, cfg, (summary.by_hour || []).map(h => String(h.hour)), splitters[evoGroupBy])
-    evoKeysSrc = evoGroupBy === 'tokens' ? ['input', 'output', 'cached', 'cacheWrite'] : series.keys
-    evoSeriesSrc = series.rows
-  }
   const evoCanon = (key: string): string =>
     evoGroupBy === 'provider' ? normalizeProvider(key)
     : evoGroupBy === 'model' ? (normalizeModel(key) || key)
     : key
-  const evoKeysRaw: string[] = Array.from(new Set(evoKeysSrc.map(evoCanon)))
-  const evoSeriesRaw: Array<Record<string, any>> = evoSeriesSrc.map(row => {
-    const out: Record<string, any> = {}
-    for (const [k, v] of Object.entries(row)) {
-      if (typeof v !== 'number') { out[k] = v; continue }  // 'hour' + any stray metadata
-      const ck = evoCanon(k)
-      out[ck] = Number(out[ck] || 0) + v
+  // One summary's Evolution series for the current grouping and unit. A
+  // function of the summary because month-to-date builds the run-up from the
+  // 1st (a second, hourly summary) through exactly the same path.
+  const evoSeriesOf = (s: TokenSummary): { keys: string[]; rows: EvoRow[] } => {
+    let evoKeysSrc: string[] =
+      evoGroupBy === 'process' ? (s.process_keys || [])
+      : evoGroupBy === 'model' ? (s.model_keys || [])
+      : evoGroupBy === 'provider' ? (s.provider_keys || [])
+      // Three series, not two. Prompt-cache reads are the overwhelming majority
+      // of what a foreground turn sends — 197M of a 205M window — and they are
+      // billed, at a discount. Showing only input/output made the chart describe
+      // a rounding error and said nothing about what the spend actually consists
+      // of. Split out rather than folded into `input` because the three are
+      // priced differently: cache reads ~10% of the input rate, cache writes ~125%.
+      : ['input', 'output', 'cached', 'cacheWrite']
+    let evoSeriesSrc: Array<Record<string, any>> =
+      evoGroupBy === 'process' ? (s.by_process_hour || [])
+      : evoGroupBy === 'model' ? (s.by_model_hour || [])
+      : evoGroupBy === 'provider' ? (s.by_provider_hour || [])
+      : (s.by_hour || []).map(h => ({
+        hour: h.hour,
+        input: h.input_tokens,
+        output: h.output_tokens,
+        cached: h.cache_read_tokens ?? 0,
+        cacheWrite: h.cache_write_tokens ?? 0,
+      }))
+    // Canonicalize the Evolution series exactly like the Overview By Provider/By
+    // Model breakdowns: provider aliases (copilot/github-copilot → github) and
+    // model punctuation variants (claude-opus-4-8 → claude-opus-4.8) collapse into
+    // ONE stacked series, summing each bucket's tokens. process/tokens grouping is
+    // untouched (evoCanon is identity there).
+    if (priced && Array.isArray(s.cells)) {
+      const splitters: Record<typeof evoGroupBy, CellSplitter> = {
+        process: (c, p) => [[c.process, p.input + p.output + p.cacheRead + p.cacheWrite]],
+        model: (c, p) => [[c.model, p.input + p.output + p.cacheRead + p.cacheWrite]],
+        provider: (c, p) => [[c.provider, p.input + p.output + p.cacheRead + p.cacheWrite]],
+        tokens: (_c, p) => [['input', p.input], ['output', p.output], ['cached', p.cacheRead], ['cacheWrite', p.cacheWrite]],
+      }
+      const series = costSeries(s.cells!, cfg, (s.by_hour || []).map(h => String(h.hour)), splitters[evoGroupBy])
+      evoKeysSrc = evoGroupBy === 'tokens' ? ['input', 'output', 'cached', 'cacheWrite'] : series.keys
+      evoSeriesSrc = series.rows
     }
-    return out
-  })
+    const keys: string[] = Array.from(new Set(evoKeysSrc.map(evoCanon)))
+    const rows: EvoRow[] = evoSeriesSrc.map(row => {
+      const out: EvoRow = {}
+      for (const [k, v] of Object.entries(row)) {
+        if (typeof v !== 'number') { out[k] = v; continue }  // 'hour' + any stray metadata
+        const ck = evoCanon(k)
+        out[ck] = Number(out[ck] || 0) + v
+      }
+      return out
+    })
+    return { keys, rows }
+  }
+  const { keys: evoKeysRaw, rows: evoSeriesRaw } = evoSeriesOf(summary)
+  // Month-to-date starts on the 1st, not at the window's left edge: summed from
+  // the edge, a 24h window called "month-to-date" was just the last day. The
+  // run-up — the 1st up to the edge — is month-from-the-1st minus the window's
+  // own buckets of that month. Hourly buckets align with the 1st (00:00 UTC),
+  // so the partial hour before it drops out exactly; subtracting totals rather
+  // than matching buckets makes the window's partial first bucket a non-issue.
+  // 'all' needs no run-up: nothing precedes the first row.
+  const evoSeed = new Map<string, number>()
+  let evoSeedMonth = ''
+  const evoSeedOk = !evoAccumulate || hoursWindow === 'all'
+    || (mtd?.key === mtdKey && (!priced || Array.isArray(mtd.summary.cells)))
+  if (evoAccumulate && hoursWindow !== 'all' && evoSeedOk && evoSeriesRaw.length) {
+    evoSeedMonth = String(evoSeriesRaw[0].hour).slice(0, 7)
+    const add = (rows: EvoRow[], sign: number) => {
+      for (const row of rows) {
+        if (String(row.hour).slice(0, 7) !== evoSeedMonth) continue
+        for (const [k, v] of Object.entries(row)) {
+          if (typeof v === 'number') evoSeed.set(k, (evoSeed.get(k) || 0) + sign * v)
+        }
+      }
+    }
+    add(evoSeriesOf(mtd!.summary).rows, 1)
+    add(evoSeriesRaw, -1)
+    // Both sides are the same rows read twice a few ms apart; a call landing
+    // in between, or float residue, must not draw a negative start.
+    for (const [k, v] of evoSeed) evoSeed.set(k, Math.max(0, v))
+  }
+  // A series that spent earlier in the month but not inside the window still
+  // has a month-to-date line: flat at what it spent.
+  for (const [k, v] of evoSeed) if (v > 0 && !evoKeysRaw.includes(k)) evoKeysRaw.push(k)
   // Denominator for the "main consumer" threshold. The series it is compared
   // against are cache-inclusive (the server folds cache into the hourly
   // pivots), so this must be too — otherwise every share reads far above 100%
@@ -784,8 +850,8 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
   // Bucket label format adapts to window width — short windows show HH:MM,
   // multi-day windows show MM/DD HH:MM so the X-axis stays readable.
   const isMultiDay = (summary.hours ?? 24) > 36
-  const running = new Map<string, number>()
-  let runningMonth = ''
+  const running = new Map<string, number>(evoSeed)
+  let runningMonth = evoSeedMonth
   const evoData = evoSeriesRaw.map(row => {
     const d = new Date(String(row.hour))
     const month = String(row.hour).slice(0, 7)
@@ -1138,7 +1204,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
                   </CardTitle>
                   <CardDescription>
                     {windowLabel} · {summary.bucket_minutes ?? '?'}-minute buckets ·
-                    {evoAccumulate ? ' month-to-date ·' : ''}
+                    {evoAccumulate ? (evoSeedOk ? ' month-to-date ·' : ' running total from the window start ·') : ''}
                     {' '}{evoStacked ? 'stacked by' : 'overlapping by'} {
                       evoGroupBy === 'process' ? 'purpose'
                       : evoGroupBy === 'model' ? 'model'
