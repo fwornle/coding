@@ -58,8 +58,10 @@ export function conversationTurn(turns) {
  * @param {object} [o.network]      network facts (network.mjs facts())
  * @param {object} [o.offload]      { config, reachable } of the opt-in offload
  * @param {object} [o.costCfg]      cost settings (cost.mjs loadCostDefaults)
+ * @param {object|null} [o.costDb]  what the month's cost reads (the usage views' DB,
+ *                                  coding's rows included); the session's own fields read `db`
  */
-export function statuslineData({ session, db, measurement, egress, network = null, glass, refusal = null, offload = null, costCfg = {} }) {
+export function statuslineData({ session, db, costDb = db, measurement, egress, network = null, glass, refusal = null, offload = null, costCfg = {} }) {
   const taskId = session.taskId;
   const t = totalsByTask(db, [taskId]).get(taskId);
   let turns = [];
@@ -74,7 +76,7 @@ export function statuslineData({ session, db, measurement, egress, network = nul
   const prompt = t ? t.input + t.cache_read + t.cache_write : 0;
   return {
     offload: offloadFacts(db, taskId, session.agent, offload),
-    cost: copilotMonthCost(db, costCfg),
+    cost: copilotMonthCost(costDb, costCfg),
     glass,
     task_id: taskId,
     agent: session.agent,

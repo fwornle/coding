@@ -28,7 +28,7 @@ const TokenUsageSettingsDialog = lazy(() => import('./token-usage-settings-dialo
 const TokenUsageRoutingTab = lazy(() => import('./token-usage-routing-tab').then((m) => ({ default: m.TokenUsageRoutingTab })))
 const CostTab = lazy(() => import('@/components/cost/CostTab').then((m) => ({ default: m.CostTab })))
 import { AccountsDialog } from '@/components/cost/AccountsDialog'
-import { fetchAccountSelection, type AccountSelection } from '@/components/cost/account-selection'
+import { fetchAccountSelection, type AccountSelection, type SourcesControl } from '@/components/cost/account-selection'
 
 /**
  * What every figure on the page is measured in. Tokens are what was consumed;
@@ -525,13 +525,17 @@ const ALL_TABS: TokenUsageTab[] = ['overview', 'evolution', 'cost', 'recent', 'r
  * tab, no LLM Routing dialog). onSettings: the Settings button opens the caller's own dialog
  * instead of this proxy's LLM Routing one (glass: its offload settings).
  */
-export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settings = true, onSettings, coverage }: {
+export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settings = true, onSettings, coverage, sources, writeHeaders }: {
   proxyBase?: string
   tabs?: TokenUsageTab[]
   settings?: boolean
   onSettings?: () => void
   /** Passed to the Cost tab: what the figures cover when it is not the whole account. */
   coverage?: { short: string; long: string }
+  /** Other tools' figures the caller can add (glass: coding's); shown in the Accounts dialog. */
+  sources?: SourcesControl
+  /** Extra headers on settings writes (glass's daemon wants its UI's). */
+  writeHeaders?: Record<string, string>
 } = {}) {
   const has = (tab: TokenUsageTab) => tabs.includes(tab)
   const [activeTab, setActiveTab] = useState<string>(() => linkedTab(tabs) ?? tabs[0])
@@ -1007,6 +1011,8 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
         proxyBase={proxyBase}
         selection={accountSel}
         onSaved={(next) => { setAccountSel(next); setAccountsRev(r => r + 1) }}
+        sources={sources}
+        writeHeaders={writeHeaders}
       />
 
       {settings && (

@@ -14,7 +14,21 @@ The page is organized into five tabs sharing a single header bar:
 
 - **Summary cards** (always visible): Total Tokens (Total Cost in the € / $ view), Total Calls, Avg Latency per LLM call, and an Account card (consumption per billed account). Each card's title names the active **time window** — "Total Cost · Last 7 days" — because the Cost tab below follows the calendar month instead, and an unlabelled 24 h figure over a month's figure reads as a contradiction.
 - **Tabs:** Overview · Evolution · Cost · Recent Calls · Routing.
-- **Header actions:** **foreground / background** checkboxes (your agent conversations vs everything that runs on its own; applied server-side, so every figure on the page describes the same rows) · **Tokens · € · $** unit switch (see [Cost and the € / $ view](#cost-and-the-view)) · **Time window** dropdown (`Last 1h · 24h · 48h · 7 days · 30 days · All time`) · ⚙ Settings (opens the LLM Routing dialog) · ⟳ Refresh.
+- **Header actions:** **foreground / background** checkboxes (your agent conversations vs everything that runs on its own; applied server-side, so every figure on the page describes the same rows) · **Tokens · € · $** unit switch (see [Cost and the € / $ view](#cost-and-the-view)) · **Time window** dropdown (`Last 1h · 24h · 48h · 7 days · 30 days · All time`) · **Accounts** (see [Account selection](#account-selection)) · ⚙ Settings (opens the LLM Routing dialog) · ⟳ Refresh.
+
+### Account selection
+
+**Accounts** opens one checkbox per billed account: GitHub Copilot, Claude Max, the on-prem
+model server and this laptop's local model, plus any other account with rows. All are on
+by default. An unchecked account leaves every view on the machine: the cards, all four
+tabs and the status line's cost field. The proxy applies the selection to every
+token-usage read, so the dashboard and the status line cannot disagree. While anything is
+left out the button reads *Accounts · 1 hidden*, so a filtered page is never mistaken for
+the whole picture. The Cost tab's toolbar has the same button.
+
+The selection is saved with the proxy's cost settings (`cost.excludeAccounts` in
+`settings.json`). Excluding an account also drops the older spellings its rows carry,
+for example `copilot` and `github-copilot` for GitHub Copilot.
 
 ### Time window selector
 
@@ -277,6 +291,29 @@ GET /api/token-usage/recent?limit=50
   }
 ]
 ```
+
+### Accounts
+
+```
+GET /api/token-usage/accounts
+```
+
+```json
+{
+  "accounts": [{ "account": "gh-copilot", "calls": 282089 }, { "account": "claude-code-max", "calls": 167425 }],
+  "excluded": [],
+  "writable": true
+}
+```
+
+```
+PUT /api/token-usage/accounts   (Content-Type: application/json)
+{ "excluded": ["gh-copilot"] }
+```
+
+Saves the selection. `summary`, `recent` and `cost` then leave those accounts out; an
+explicit `?exclude=a,b` on a read overrides the saved selection for that request, and
+`?exclude=` reads everything.
 
 ### LLM routing settings
 

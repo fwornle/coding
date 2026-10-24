@@ -49,7 +49,8 @@ import { glassPaths, PKG_ROOT } from './home.mjs';
 import { createEgressFetch, upstreamProxy, proxyEnvOf, noProxyOf } from './egress.mjs';
 import { createUiApi } from './ui-api.mjs';
 import { statuslineData, renderReport, TAGS } from './statusline.mjs';
-import { loadCostDefaults, saveExcludedAccounts } from './cost.mjs';
+import { createUsageSource } from './combined.mjs';
+import { loadCostDefaults, saveExcludedAccounts, saveIncludeCoding } from './cost.mjs';
 import { createNetworkMonitor } from './network.mjs';
 import { createOffloadStore } from './offload-store.mjs';
 import { createOffloader, createTargetHealth, OFFLOAD_AGENTS } from '../../proxy/proxy-bridge/offload.mjs';
@@ -216,10 +217,19 @@ export async function startDaemon({
     log,
     logErr,
   });
+  // Where coding is installed too, the usage views read its rows as well
+  // (combined.mjs; cost.json includeCoding switches it off). Per-session views
+  // read glass's own DB.
+  const usageSource = createUsageSource({
+    own: () => tokenDb,
+    glassDbPath: resolveTokenDbPath(p.data),
+    wanted: () => loadCostDefaults(home).includeCoding !== false,
+    log,
+  });
   // The account selection lives in ~/.glass/cost.json (cost.mjs) and filters
   // every usage read, as coding's proxy does with its cost settings.
   const usageRead = createUsageApi({
-    tokenDb: () => tokenDb,
+    tokenDb: () => usageSource.handle(),
     measurement,
     accounts: {
       excluded: () => loadCostDefaults(home).excludeAccounts ?? [],
@@ -276,10 +286,11 @@ export async function startDaemon({
     return want ? live.find((x) => x.taskId === want) : live[0];
   };
   const uiRead = createUiApi({
-    uiDir: path.join(PKG_ROOT, 'ui'), dataDir: p.data, tokenDb: () => tokenDb,
+    uiDir: path.join(PKG_ROOT, 'ui'), dataDir: p.data, tokenDb: () => tokenDb, usageDb: () => usageSource.handle(),
     dbPath: resolveTokenDbPath(p.data), measurement, liveSessions: publicSessions,
     excludedAccounts: () => loadCostDefaults(home).excludeAccounts ?? [],
   });
+  const sourcesView = () => ({ coding: usageSource.state() });
   // [N:… P:…]: probed only while a session is live (nothing else reads it).
   const netMonitor = network || createNetworkMonitor({ log });
   netMonitor.start({ active: () => sessions.size > 0 });
@@ -402,7 +413,7 @@ export async function startDaemon({
   const closed = new Promise((r) => { resolveClosed = r; });
 
   const lineData = (session) => statuslineData({
-    session, db: tokenDb?.db, measurement, egress: upstreamProxy(egressEnv, selfPort), network: netMonitor.facts(), glass: VERSION,
+    session, db: tokenDb?.db, costDb: usageSource.handle()?.db, measurement, egress: upstreamProxy(egressEnv, selfPort), network: netMonitor.facts(), glass: VERSION,
     refusal: lastRefusal, offload: { config: offloadStore.getConfig(), reachable: offloadHealth.usable(offloadStore.getConfig()) },
     costCfg: loadCostDefaults(home),
   });
@@ -492,6 +503,21 @@ export async function startDaemon({
         }
         return json(res, 404, { error: `no route for ${req.method} ${url}` });
       }
+      if (url === '/api/glass/sources' && req.method === 'GET') return json(res, 200, sourcesView());
+      if (url === '/api/glass/sources') {
+        if (req.method !== 'PUT') return json(res, 405, { error: 'GET or PUT' });
+        if (!uiWriteAllowed(req, selfPort)) return json(res, 403, { error: 'sources change only from the glass UI' });
+        const body = await readJson(req);
+        if (!body || typeof body.coding !== 'boolean') return json(res, 400, { error: 'expected { coding: boolean }' });
+        saveIncludeCoding(home, body.coding);
+        usageSource.recheck();
+        log(`usage views: coding's figures ${body.coding ? 'included' : 'left out'}`);
+        return json(res, 200, sourcesView());
+      }
+      // The account selection is a setting like offload's: same gate on its write.
+      if (url.startsWith('/api/token-usage/accounts') && req.method !== 'GET' && !uiWriteAllowed(req, selfPort)) {
+        return json(res, 403, { error: 'the account selection changes only from the glass UI' });
+      }
       if (url.startsWith('/relay/')) return onRelay(req, res);
       if (usageRead(req, res)) return undefined;
       if (await uiRead(req, res)) return undefined;
@@ -574,6 +600,7 @@ export async function startDaemon({
       const lock = JSON.parse(fs.readFileSync(p.lock, 'utf8'));
       if (lock.pid === process.pid) fs.rmSync(p.lock, { force: true });
     } catch { /* no lock */ }
+    usageSource.close();
     try { tokenDb.db.close(); } catch { /* already closed */ }
     resolveClosed();
   }

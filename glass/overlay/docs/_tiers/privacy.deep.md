@@ -58,6 +58,13 @@ The daemon listens on 127.0.0.1 only and is not reachable from the network. Its 
 authentication: other processes on the same machine can read the usage data (token
 counts, redacted previews). On a shared multi-user machine, keep that in mind.
 
+Settings writes (the account selection, sources, offload) are accepted only from the
+glass UI: a web page in your browser cannot change them.
+
+Where coding is installed too, the daemon opens coding's token database read-only to add
+its figures to the usage views ([Accounts and sources](token-usage.md#accounts-and-sources)).
+It never writes to it, and the dialog switches the reading off.
+
 ## Removing everything
 
 ```sh

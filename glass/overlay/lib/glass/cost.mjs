@@ -11,11 +11,14 @@
 //   <package>/config/cost-defaults.json   shipped with a build
 //   ~/.glass/cost.json                    the user's own (wins)
 // shape: { "discount": { "copilot": 0.8 }, "discountLabel": { "copilot": "…" },
-//          "currency": { "usdPerEur": 1.18 }, "excludeAccounts": ["gh-copilot"] }
+//          "currency": { "usdPerEur": 1.18 }, "excludeAccounts": ["gh-copilot"],
+//          "includeCoding": false }
 //
 // excludeAccounts is the account selection (all accounts count when absent): the
 // daemon's usage reads leave those accounts' rows out, and an excluded GitHub
-// Copilot hides the status line's cost field. Only the user's file sets it.
+// Copilot hides the status line's cost field. includeCoding (on when absent)
+// adds coding's figures where coding is installed (combined.mjs). Only the
+// user's file sets either.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -38,23 +41,40 @@ export function loadCostDefaults(home, pkgRoot = PKG_ROOT) {
       if (l[key] && typeof l[key] === 'object') out[key] = { ...(out[key] || {}), ...l[key] };
     }
     if (Array.isArray(l.excludeAccounts)) out.excludeAccounts = l.excludeAccounts.filter((a) => typeof a === 'string');
+    if (typeof l.includeCoding === 'boolean') out.includeCoding = l.includeCoding;
   }
   return out;
 }
 
 /**
- * Saves the account selection into ~/.glass/cost.json, keeping the file's other
- * keys. Written to a temp file and renamed, so a reader never sees half a file.
+ * Rewrites ~/.glass/cost.json through `change(current) → next`, keeping the
+ * other keys. Written to a temp file and renamed, so a reader never sees half a file.
  */
-export function saveExcludedAccounts(home, list) {
+function updateUserCost(home, change) {
   const file = path.join(home, 'cost.json');
-  const current = readJson(file) || {};
-  const next = { ...current, excludeAccounts: [...new Set(list)] };
-  if (!next.excludeAccounts.length) delete next.excludeAccounts;
+  const next = change(readJson(file) || {});
   fs.mkdirSync(home, { recursive: true });
   const tmp = `${file}.${process.pid}.tmp`;
   fs.writeFileSync(tmp, `${JSON.stringify(next, null, 2)}\n`);
   fs.renameSync(tmp, file);
+}
+
+/** Saves the account selection; an empty list removes the key (every account counts). */
+export function saveExcludedAccounts(home, list) {
+  updateUserCost(home, (current) => {
+    const next = { ...current, excludeAccounts: [...new Set(list)] };
+    if (!next.excludeAccounts.length) delete next.excludeAccounts;
+    return next;
+  });
+}
+
+/** Saves includeCoding; true (the default) removes the key. */
+export function saveIncludeCoding(home, on) {
+  updateUserCost(home, (current) => {
+    const next = { ...current, includeCoding: Boolean(on) };
+    if (next.includeCoding) delete next.includeCoding;
+    return next;
+  });
 }
 
 const cache = { key: '', at: 0, value: null };
@@ -76,7 +96,7 @@ export function copilotMonthCost(db, costCfg = {}, now = new Date()) {
   const month = now.toISOString().slice(0, 7);
   const discount = Number(costCfg.discount?.copilot) > 0 ? Number(costCfg.discount.copilot) : 1;
   const usdPerEur = Number(costCfg.currency?.usdPerEur) > 0 ? Number(costCfg.currency.usdPerEur) : DEFAULT_USD_PER_EUR;
-  const key = `${month}|${discount}|${usdPerEur}`;
+  const key = `${month}|${discount}|${usdPerEur}|${costCfg.includeCoding !== false}`;
   if (cache.key === key && Date.now() - cache.at < TTL_MS) return cache.value;
   let rows = [];
   try {

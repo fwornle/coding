@@ -99,9 +99,29 @@ e-mail addresses — see [Privacy & Data](privacy.md)).
 
 - **Time range** — last hour, 24 hours, 48 hours, 7 days, 30 days.
 - **foreground / background** — glass measures your interactive agent sessions
-  (foreground). Background is for processes that run without you; with glass it is
-  normally empty.
+  (foreground). Background is for processes that run without you: empty with glass
+  alone, coding's own jobs when its figures are included (see below).
 - **Refresh** — the page also refreshes by itself.
+
+## Accounts and sources
+
+**Accounts** at the top (and in the Cost tab) opens one checkbox per account, all on by
+default. An unchecked account leaves every view: cards, charts, Cost, Recent Calls, the
+Models tab and the status line's `GH €` field, which disappears with GitHub Copilot
+unchecked. The button reads *Accounts · 1 hidden* while anything is left out. The
+choice is saved in `~/.glass/cost.json` as `"excludeAccounts": ["gh-copilot"]`.
+
+**Sources** in the same dialog appears where [coding](https://github.com/fwornle/coding)
+is installed on the machine too. coding's proxy records the machine's other LLM traffic,
+such as its own background work and agents started without glass, so glass's figures
+alone read low next to the account's bill. With *coding's figures* checked (the default)
+the usage views add coding's calls. A call glass forwards through coding's proxy is
+recorded by both tools; it is counted once. The Cost tab then says *glass + coding, this
+machine* instead of *glass sessions only*. Unchecking it saves `"includeCoding": false`.
+The Sessions tab and the status line's session fields always show glass's own sessions.
+
+glass finds coding's token database under `~/.coding/data/` and only reads it; the
+`GLASS_CODING_TOKEN_DB` environment variable of the daemon names another file.
 
 ## The same numbers elsewhere
 

@@ -204,9 +204,11 @@ function serveStatic(uiDir, urlPath, res) {
  * @param {string} o.dbPath                the token DB file (read-only timeline reads)
  * @param {{ readContextTurns: Function }} o.measurement
  * @param {() => object[]} o.liveSessions  open sessions (token stripped)
+ * @param {() => object|null} [o.usageDb]  what the usage views read (coding's rows
+ *                                         included where wanted); defaults to tokenDb
  * @returns {(req, res) => Promise<boolean>}
  */
-export function createUiApi({ uiDir, dataDir, tokenDb, dbPath, measurement, liveSessions, excludedAccounts = () => [] }) {
+export function createUiApi({ uiDir, dataDir, tokenDb, usageDb = tokenDb, dbPath, measurement, liveSessions, excludedAccounts = () => [] }) {
   const ui = path.resolve(uiDir);
   return async function handleUi(req, res) {
     if (req.method !== 'GET') return false;
@@ -220,7 +222,7 @@ export function createUiApi({ uiDir, dataDir, tokenDb, dbPath, measurement, live
     }
     if (p === '/api/models') {
       const h = Number(u.searchParams.get('hours') ?? 24);
-      json(res, 200, modelMix(tokenDb()?.db, { hours: Number.isFinite(h) && h >= 0 ? Math.min(h, 24 * 366) : 24, exclude: excludedAccounts() }));
+      json(res, 200, modelMix(usageDb()?.db, { hours: Number.isFinite(h) && h >= 0 ? Math.min(h, 24 * 366) : 24, exclude: excludedAccounts() }));
       return true;
     }
     if (p === '/api/calls/unbound') {
