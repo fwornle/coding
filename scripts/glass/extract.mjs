@@ -60,6 +60,14 @@ export function loadManifest(file = DEFAULT_MANIFEST) {
 /**
  * One target of the manifest: where its tree is published, an overlay of its own,
  * rewrites applied after both overlays, and the deny scan its tree must pass.
+ *
+ * `private_overlay`: a directory OUTSIDE this repository (`~` expands) applied
+ * after the target's own overlay. coding is public, so data that only one
+ * target's users may see — an organisation's contract discount in
+ * config/cost-defaults.json — cannot live in glass/targets/<t>; the manifest
+ * names only where it is. Declared means required: a target whose private
+ * overlay is missing does not extract, rather than publishing a build that
+ * silently lacks it.
  */
 export function targetOf(manifest, name) {
   const names = Object.keys(manifest.targets);
@@ -69,6 +77,7 @@ export function targetOf(manifest, name) {
   if (!t) throw new ExtractError([`unknown target "${name}": ${names.join(' | ')}`]);
   return {
     name, remote: t.remote, overlay: t.overlay || null, rewrite: t.rewrite || [],
+    privateOverlay: t.private_overlay ? t.private_overlay.replace(/^~(?=\/|$)/, os.homedir()) : null,
     deny: (t.deny || []).map((d) => new RegExp(d, 'i')), allow: t.allow || [],
   };
 }
@@ -188,7 +197,7 @@ function rewrite(rules, out) {
 
 function overlay(from, out, manifestDir) {
   if (!from) return;
-  const dir = path.resolve(manifestDir, '..', from);
+  const dir = path.isAbsolute(from) ? from : path.resolve(manifestDir, '..', from);
   const errors = [];
   for (const rel of listTree(dir)) {
     if (fs.existsSync(path.join(out, rel))) {
@@ -451,6 +460,12 @@ export function extract({ out, manifestFile = DEFAULT_MANIFEST, roots = defaultR
   overlay(manifest.overlay, out, path.dirname(manifestFile));
   if (target) {
     overlay(target.overlay, out, path.dirname(manifestFile));
+    if (target.privateOverlay) {
+      if (!fs.existsSync(target.privateOverlay)) {
+        throw new ExtractError([`target ${target.name}: private overlay ${target.privateOverlay} is missing — it holds the files this target's build must carry that coding cannot (see glass/manifest.yaml)`]);
+      }
+      overlay(target.privateOverlay, out, path.dirname(manifestFile));
+    }
     rewrite(target.rewrite, out);
   }
   build(manifest, roots, out);

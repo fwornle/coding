@@ -262,6 +262,7 @@ async function report(argv) {
 export function clickTarget(tag, links) {
   if (tag === TAGS.health) return { open: links.root };
   if (tag === TAGS.tok) return { open: links.session };
+  if (tag === TAGS.cost) return { open: links.cost };
   if (tag === TAGS.off) return { open: links.models };
   if (tag === TAGS.ctx) return { popup: 'ctx', title: 'glass · context window', fallback: links.explain };
   if (tag === TAGS.net) return { popup: 'net', title: 'glass · network', fallback: links.network };

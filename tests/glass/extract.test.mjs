@@ -183,6 +183,18 @@ test('targets: a target file that the neutral overlay also has is a parallel cop
   }), /overlay: README\.md would shadow a selected file/, 'public');
 });
 
+test('targets: a private overlay from outside the repo is applied to its target only, and required when declared', () => {
+  const priv = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-private-'));
+  fs.mkdirSync(path.join(priv, 'config'));
+  fs.writeFileSync(path.join(priv, 'config', 'cost-defaults.json'), '{"discount":{"copilot":0.5}}\n');
+  const manifest = select('lib/a.mjs') + `targets:\n  internal:\n    remote: git.example/org/glass\n    private_overlay: ${priv}\n  public:\n    remote: github.com/someone/glass\n`;
+  const root = fixture({ files: { 'lib/a.mjs': 'export {};\n' }, manifest });
+  assert.equal(fs.readFileSync(path.join(run(root, 'internal').out, 'config', 'cost-defaults.json'), 'utf8'), '{"discount":{"copilot":0.5}}\n');
+  assert.equal(fs.existsSync(path.join(run(root, 'public').out, 'config')), false, 'another target never gets it');
+  fs.rmSync(priv, { recursive: true, force: true });
+  failsWith(root, /target internal: private overlay .* is missing/, 'internal');
+});
+
 test('targets: the deny scan fails on a corporate string, the allowlist lets one through', () => {
   const files = { 'lib/a.mjs': '// call acme-corp.internal for help\nexport const names = "Acme|Globex";\n' };
   const deny = (allow) => targets(`    deny: ['acme']\n${allow}`);

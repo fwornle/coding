@@ -15,7 +15,6 @@ const SWAPPED: Array<[RegExp, string]> = [
   [/src\/lib\/provider-site\.ts$/, 'provider-site.ts'],
   [/src\/pages\/token-usage-settings-dialog\.tsx$/, 'omitted.tsx'],
   [/src\/pages\/token-usage-routing-tab\.tsx$/, 'omitted.tsx'],
-  [/src\/components\/cost\/CostTab\.tsx$/, 'omitted.tsx'],
 ]
 const swapForGlass = {
   name: 'glass-swap',

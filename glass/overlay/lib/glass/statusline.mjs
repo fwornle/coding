@@ -1,12 +1,14 @@
 // lib/glass/statusline.mjs — the status line: what the daemon knows about one
 // session, and how that renders.
 //
-//   [glass ●] [ctx ██▌░░░  34%] [↑51.3K ↓1.2K ⚡50%] [N:CN P:ON]
+//   [glass ●] [ctx ██▌░░░  34%] [↑51.3K ↓1.2K ⚡50%] [GH €12.34] [N:CN P:ON]
 //
 // Fields (glass decision 5, the "Status line" table in .planning/glass.md):
 //   g:health  daemon up                      click → the UI
 //   g:ctx     last measured turn / window    click → context report (tmux popup)
 //   g:tok     session tokens, cache share    click → the session in the UI
+//   g:cost    GitHub Copilot cost this month click → Token Usage → Cost
+//             (all sessions — it is the account's bill, not this run's)
 //   g:net     network location, local proxy  click → network report (tmux popup)
 //             — coding's [N:… P:…], from the same probes (network.mjs)
 //
@@ -22,8 +24,9 @@ import gauge from '../statusline/context-gauge.cjs';
 
 import { networkBadge } from '../network/location-probe.mjs';
 import { totalsByTask } from './ui-api.mjs';
+import { copilotMonthCost, fmtEur } from './cost.mjs';
 
-export const TAGS = Object.freeze({ health: 'g:health', ctx: 'g:ctx', tok: 'g:tok', off: 'g:off', net: 'g:net' });
+export const TAGS = Object.freeze({ health: 'g:health', ctx: 'g:ctx', tok: 'g:tok', cost: 'g:cost', off: 'g:off', net: 'g:net' });
 
 /** Prompt tokens of one context turn: fresh input + cache read + cache write. */
 export function promptTokens(turn) {
@@ -54,8 +57,9 @@ export function conversationTurn(turns) {
  * @param {string} o.egress         upstream proxy URL, '' when direct
  * @param {object} [o.network]      network facts (network.mjs facts())
  * @param {object} [o.offload]      { config, reachable } of the opt-in offload
+ * @param {object} [o.costCfg]      cost settings (cost.mjs loadCostDefaults)
  */
-export function statuslineData({ session, db, measurement, egress, network = null, glass, refusal = null, offload = null }) {
+export function statuslineData({ session, db, measurement, egress, network = null, glass, refusal = null, offload = null, costCfg = {} }) {
   const taskId = session.taskId;
   const t = totalsByTask(db, [taskId]).get(taskId);
   let turns = [];
@@ -70,6 +74,7 @@ export function statuslineData({ session, db, measurement, egress, network = nul
   const prompt = t ? t.input + t.cache_read + t.cache_write : 0;
   return {
     offload: offloadFacts(db, taskId, session.agent, offload),
+    cost: copilotMonthCost(db, costCfg),
     glass,
     task_id: taskId,
     agent: session.agent,
@@ -128,7 +133,7 @@ export function uiLinks(port, taskId) {
   const root = `http://127.0.0.1:${port}/`;
   const q = taskId ? `?task=${encodeURIComponent(taskId)}` : '';
   return {
-    root, session: `${root}#/sessions${q}`, models: `${root}#/models`, explain: `${root}#/sessions${q}${q ? '&' : '?'}explain=1`, network: `${root}report/net${q}`,
+    root, session: `${root}#/sessions${q}`, models: `${root}#/models`, cost: `${root}#/token-usage?tab=cost`, explain: `${root}#/sessions${q}${q ? '&' : '?'}explain=1`, network: `${root}report/net${q}`,
   };
 }
 
@@ -176,6 +181,10 @@ export function renderStatusline(d, { format = 'plain', port }) {
   const cache = t.cache_pct == null ? '' : ` ⚡${t.cache_pct}%`;
   parts.push(field(TAGS.tok, `↑${fmtTokens(t.prompt)} ↓${fmtTokens(t.output)}${cache}`, links.session));
   // Offload counts, as coding's: hidden at 0, never colouring the line.
+  // This month's Copilot bill; hidden until the account has a call this month
+  // (glass users on other providers never see it). "≥" when a model's GitHub
+  // rate is unknown, so the figure is a floor, not a guess.
+  if (d.cost?.calls) parts.push(field(TAGS.cost, `GH ${d.cost.unpricedCalls ? '≥' : ''}${fmtEur(d.cost.eur)}`, links.cost));
   if (d.offload?.demoted) parts.push(field(TAGS.off, `D:${d.offload.demoted}`, links.models));
   if (d.offload?.local) parts.push(field(TAGS.off, `L:${d.offload.local}`, links.models));
 

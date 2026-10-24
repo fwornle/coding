@@ -17,13 +17,14 @@ const D = {
   ctx: { used: 51_000, window: 1_000_000, pct: 5.1, model: 'claude-opus-5-5', turns: 2 },
   tokens: { calls: 2, prompt: 51_300, input: 300, output: 1_200, cache_read: 25_000, cache_write: 26_000, cache_pct: 49 },
   egress: 'proxy', egress_url: 'http://127.0.0.1:3128',
+  cost: { month: '2026-10', usd: 14.56, eur: 12.34, calls: 3, unpricedCalls: 0 },
   network: { location: 'corporate', proxy_running: true, proxy_functional: true, proxy_enabled_by_user: true },
 };
 const strip = (s) => s.replace(/#\[[^\]]*\]/g, '').replace(/\x1b\][^\x1b]*\x1b\\/g, '').replace(/\x1b\[[0-9;]*m/g, '');
 
 test('plain, tmux and ansi carry the same fields', () => {
   const plain = renderStatusline(D, { format: 'plain', port: 12445 });
-  assert.match(plain, /^\[glass ●\] \[ctx .*5%\] \[↑51\.3K ↓1\.2K ⚡49%\] \[N:CN P:ON\]$/);
+  assert.match(plain, /^\[glass ●\] \[ctx .*5%\] \[↑51\.3K ↓1\.2K ⚡49%\] \[GH €12\.34\] \[N:CN P:ON\]$/);
   const tmux = renderStatusline(D, { format: 'tmux', port: 12445 });
   // g:off appears only with offload on for the agent (tested below).
   for (const tag of Object.values(TAGS).filter((t) => t !== TAGS.off)) assert.ok(tmux.includes(`#[range=user|${tag}]`), tag);
@@ -38,7 +39,7 @@ test('plain, tmux and ansi carry the same fields', () => {
 test('offload: [D:n] [L:n] only while it is on for the agent, hidden at 0; the network report says where calls go', async () => {
   const { offloadFacts } = await import('../lib/glass/statusline.mjs');
   const on = { ...D, agent: 'opencode', offload: { name: 'Team Box', reachable: true, demoted: 2, local: 5 } };
-  assert.match(renderStatusline(on, { port: 1 }), /\[↑51\.3K ↓1\.2K ⚡49%\] \[D:2\] \[L:5\] \[N:CN P:ON\]$/);
+  assert.match(renderStatusline(on, { port: 1 }), /\[↑51\.3K ↓1\.2K ⚡49%\] \[GH €12\.34\] \[D:2\] \[L:5\] \[N:CN P:ON\]$/);
   const tmux = renderStatusline(on, { format: 'tmux', port: 1 });
   assert.ok(tmux.includes(`#[range=user|${TAGS.off}]`));
   assert.deepEqual(clickTarget(TAGS.off, uiLinks(1, on.task_id)), { open: uiLinks(1, on.task_id).models });
@@ -106,6 +107,7 @@ test('tmux clicks: ctx and network → a popup, falling back to the page the fie
   const links = uiLinks(12445, D.task_id);
   assert.deepEqual(clickTarget(TAGS.ctx, links), { popup: 'ctx', title: 'glass · context window', fallback: links.explain });
   assert.deepEqual(clickTarget(TAGS.tok, links), { open: links.session });
+  assert.deepEqual(clickTarget(TAGS.cost, links), { open: 'http://127.0.0.1:12445/#/token-usage?tab=cost' });
   assert.deepEqual(clickTarget(TAGS.health, links), { open: links.root });
   assert.deepEqual(clickTarget(TAGS.net, links), { popup: 'net', title: 'glass · network', fallback: links.network });
   assert.equal(clickTarget('nope', links), null);
@@ -209,4 +211,46 @@ test('report popup on a real pty: held open through a colour-scheme report, clos
     t('kill-server');
     fs.rmSync(path.dirname(sock), { recursive: true, force: true });
   }
+});
+
+test('cost field: hidden without a Copilot call this month, a floor (≥) when a model has no known rate', () => {
+  const none = renderStatusline({ ...D, cost: { ...D.cost, calls: 0 } }, { format: 'plain', port: 1 });
+  assert.doesNotMatch(none, /GH /);
+  assert.doesNotMatch(renderStatusline({ ...D, cost: null }, { format: 'plain', port: 1 }), /GH /);
+  assert.match(renderStatusline({ ...D, cost: { ...D.cost, unpricedCalls: 1 } }, { format: 'plain', port: 1 }), /\[GH ≥€12\.34\]/);
+});
+
+test("copilotMonthCost prices this month's Copilot rows at GitHub's rates × discount ÷ FX", async () => {
+  const { DatabaseSync } = await import('node:sqlite');
+  const { copilotMonthCost } = await import('../lib/glass/cost.mjs');
+  const db = new DatabaseSync(':memory:');
+  db.exec(`CREATE TABLE token_usage (timestamp TEXT, provider TEXT, model TEXT, input_tokens INT,
+    output_tokens INT, cache_read_tokens INT, cache_write_tokens INT)`);
+  const ins = db.prepare('INSERT INTO token_usage VALUES (?, ?, ?, ?, ?, ?, ?)');
+  // 1M fresh input on the rate card's gpt-5-mini ($0.25) under two provider aliases …
+  ins.run('2026-10-02T10:00:00Z', 'gh-copilot', 'gpt-5-mini', 500_000, 0, 0, 0);
+  ins.run('2026-10-03T10:00:00Z', 'github-copilot', 'gpt-5-mini', 500_000, 0, 0, 0);
+  // … last month's row, another account's row, and a model with no known GitHub rate.
+  ins.run('2026-09-30T23:59:59Z', 'gh-copilot', 'gpt-5-mini', 9_000_000, 0, 0, 0);
+  ins.run('2026-10-04T10:00:00Z', 'claude-code-max', 'claude-opus-5', 9_000_000, 0, 0, 0);
+  ins.run('2026-10-05T10:00:00Z', 'gh-copilot', 'some-future-model', 1, 0, 0, 0);
+  const c = copilotMonthCost(db, { discount: { copilot: 0.8 }, currency: { usdPerEur: 1.25 } }, new Date('2026-10-20T00:00:00Z'));
+  assert.equal(c.month, '2026-10');
+  assert.equal(c.calls, 3);
+  assert.equal(c.unpricedCalls, 1);
+  assert.ok(Math.abs(c.usd - 0.25 * 0.8) < 1e-9, `usd ${c.usd}`);
+  assert.ok(Math.abs(c.eur - (0.25 * 0.8) / 1.25) < 1e-9, `eur ${c.eur}`);
+});
+
+test("loadCostDefaults: the build's cost file, then the user's on top; nothing when neither exists", async () => {
+  const { loadCostDefaults } = await import('../lib/glass/cost.mjs');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-cost-home-'));
+  const pkg = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-cost-pkg-'));
+  assert.deepEqual(loadCostDefaults(home, pkg), {});
+  fs.mkdirSync(path.join(pkg, 'config'));
+  fs.writeFileSync(path.join(pkg, 'config', 'cost-defaults.json'), JSON.stringify({ discount: { copilot: 0.7 }, currency: { usdPerEur: 1.2 } }));
+  fs.writeFileSync(path.join(home, 'cost.json'), JSON.stringify({ discount: { copilot: 0.9 } }));
+  assert.deepEqual(loadCostDefaults(home, pkg), { discount: { copilot: 0.9 }, currency: { usdPerEur: 1.2 } });
+  fs.rmSync(home, { recursive: true, force: true });
+  fs.rmSync(pkg, { recursive: true, force: true });
 });

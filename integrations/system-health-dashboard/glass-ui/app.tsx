@@ -46,7 +46,7 @@ const tab = ({ isActive }: { isActive: boolean }) =>
 
 function TokenUsage() {
   const { openSettings } = useOffload()
-  return <TokenUsagePage proxyBase="" tabs={['overview', 'evolution', 'recent']} settings={false} onSettings={openSettings} />
+  return <TokenUsagePage proxyBase="" tabs={['overview', 'evolution', 'cost', 'recent']} settings={false} onSettings={openSettings} />
 }
 
 export function GlassApp() {

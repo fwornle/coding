@@ -49,6 +49,7 @@ import { glassPaths, PKG_ROOT } from './home.mjs';
 import { createEgressFetch, upstreamProxy, proxyEnvOf, noProxyOf } from './egress.mjs';
 import { createUiApi } from './ui-api.mjs';
 import { statuslineData, renderReport, TAGS } from './statusline.mjs';
+import { loadCostDefaults } from './cost.mjs';
 import { createNetworkMonitor } from './network.mjs';
 import { createOffloadStore } from './offload-store.mjs';
 import { createOffloader, createTargetHealth, OFFLOAD_AGENTS } from '../../proxy/proxy-bridge/offload.mjs';
@@ -393,6 +394,7 @@ export async function startDaemon({
   const lineData = (session) => statuslineData({
     session, db: tokenDb?.db, measurement, egress: upstreamProxy(egressEnv, selfPort), network: netMonitor.facts(), glass: VERSION,
     refusal: lastRefusal, offload: { config: offloadStore.getConfig(), reachable: offloadHealth.usable(offloadStore.getConfig()) },
+    costCfg: loadCostDefaults(home),
   });
 
   const server = http.createServer(async (req, res) => {
@@ -416,6 +418,9 @@ export async function startDaemon({
         const span = await closeSession(decodeURIComponent(url.slice('/sessions/'.length)));
         return span ? json(res, 200, span) : json(res, 404, { error: 'no such session' });
       }
+      // The Cost tab's prices without coding's settings API: the contract
+      // discount / FX from the build's and the user's cost files (cost.mjs).
+      if (req.method === 'GET' && url === '/api/cost-defaults') return json(res, 200, loadCostDefaults(home));
       if (req.method === 'GET' && (url === '/api/statusline' || url.startsWith('/api/statusline?'))) {
         const want = new URL(url, 'http://localhost').searchParams.get('task_id');
         const s = liveSession(want);

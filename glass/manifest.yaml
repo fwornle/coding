@@ -43,6 +43,9 @@ select:
       # status-line clicks on macOS: focus an open tab before opening a new one
       - lib/statusline/browser-tab.mjs
       - lib/statusline/visible-cell-width.cjs
+      # GitHub Copilot's per-model rates — the status line's cost field and the
+      # Cost tab (bundled into the UI) price with the same table
+      - lib/cost/copilot-pricing.mjs
       # data home + proxy resolver
       - lib/paths/index.mjs
       - lib/paths/data-home.cjs
@@ -151,6 +154,9 @@ targets:
   bmw:
     remote: bmw.ghe.com/AIMAAD/glass
     overlay: glass/targets/bmw
+    # Outside this (public) repository: config/cost-defaults.json — the contract
+    # discount and FX this target's users price Copilot with (lib/glass/cost.mjs).
+    private_overlay: ~/.coding/glass-private/internal
   public:
     remote: github.com/fwornle/glass
     overlay: glass/targets/public
