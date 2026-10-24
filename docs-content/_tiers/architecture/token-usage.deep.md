@@ -10,15 +10,15 @@ The Token Usage page provides real-time visibility into LLM token consumption ac
 
 ## Page layout
 
-The page is organized into three tabs sharing a single header bar:
+The page is organized into five tabs sharing a single header bar:
 
-- **Summary cards** (always visible): Total Tokens, Total Calls, Avg Latency per LLM call, and a Subscription summary (Claude Max + GitHub Copilot quotas). Every card respects the active **time window** (see header actions below).
-- **Tabs:** Overview · Evolution · Recent Calls. (The earlier dedicated *By Process* and *Timeline* tabs were folded into Overview's Treemap and Evolution's *By Tokens (in/out)* toggle respectively — see below.)
-- **Header actions:** **Time window** dropdown (`Last 1h · 24h · 48h · 7 days · 30 days · All time`) · ⚙ Settings (opens the LLM Routing dialog) · ⟳ Refresh (re-fetches summary + recent; shows a busy spinner while the request is in flight).
+- **Summary cards** (always visible): Total Tokens (Total Cost in the € / $ view), Total Calls, Avg Latency per LLM call, and an Account card (consumption per billed account). Each card's title names the active **time window** — "Total Cost · Last 7 days" — because the Cost tab below follows the calendar month instead, and an unlabelled 24 h figure over a month's figure reads as a contradiction.
+- **Tabs:** Overview · Evolution · Cost · Recent Calls · Routing.
+- **Header actions:** **foreground / background** checkboxes (your agent conversations vs everything that runs on its own; applied server-side, so every figure on the page describes the same rows) · **Tokens · € · $** unit switch (see [Cost and the € / $ view](#cost-and-the-view)) · **Time window** dropdown (`Last 1h · 24h · 48h · 7 days · 30 days · All time`) · ⚙ Settings (opens the LLM Routing dialog) · ⟳ Refresh.
 
 ### Time window selector
 
-The window dropdown drives `?hours=` on the `/api/token-usage/summary` request. Every metric on the page — summary cards, treemap, By-Process table, Timeline, and the Evolution stacked chart — re-aggregates for the chosen window. The default is `Last 24h` so the page matches the historical "trailing 24 h" behavior on first load; switching to `All time` aggregates the full retained DB without changing any other UI.
+The window dropdown drives `?hours=` on the `/api/token-usage/summary` request. Every metric on the page except the Cost tab — summary cards, treemap, breakdowns, the Evolution chart, Recent Calls — re-aggregates for the chosen window; the Cost tab works in calendar months. The default is `Last 24h`. `All time` aggregates the full retained DB, starting at its first row — so while the DB is younger than 30 days, `Last 30 days` and `All time` show the same figures.
 
 Bucket size for the stacked chart **adapts to the window** so the timeline never balloons past ~500 data points: 2-min buckets for `Last 24h`, 10-min for `48h`, 30-min for `7 days`, 2-hour for `30 days`, 6-hour for `All time`. The active bucket size is shown beneath the Evolution chart's title (e.g. *"Last 7 days · 30-minute buckets"*).
 
@@ -28,38 +28,45 @@ The header cards plus two side-by-side panels:
 
 ![Token Consumption by Process](../images/health-mon-tokens-by-process.png)
 
-- **Token Consumption by Process** — a treemap where larger rectangles mean more tokens. Top of the page in the screenshot above shows `observation-writer` (≈ 2.6 M tokens) dominating, with `consolidator-digest` and `consolidator-insight` as distant runners-up. **Hover any box** for a tooltip with process, total tokens, input/output split, call count, and avg latency — including the small boxes that don't fit an inline label. The same payload is also rendered as an SVG `<title>` element so screen readers and native-browser hover work even when the recharts tooltip is unavailable.
-- **By Provider** — a donut chart split by provider (claude-code 67 % / copilot 33 % under normal conditions on this host).
+- **Token Consumption by Process** — a treemap where larger rectangles mean more tokens, cache included (in the € / $ view, more cost — a different ranking, since a cheap model's big process is a small rectangle). **Hover any box** for a tooltip with process, total tokens, input/output split, call count, and avg latency — including the small boxes that don't fit an inline label. The same payload is also rendered as an SVG `<title>` element so screen readers and native-browser hover work even when the recharts tooltip is unavailable.
+- **By Provider** — a donut chart split by billed account (`claude-code-max`, `gh-copilot`, local providers such as `qwen-local`), with a **By Provider / Model** list beneath it.
 - **By Model** — the same totals broken down by canonical model name (`claude-haiku-4.5`, `claude-sonnet-5`, `claude-opus-5`). The proxy canonicalizes whatever spelling each upstream returns — `claude-sonnet-4-6` (Claude CLI dash-version), `claude-sonnet-4.6` (Copilot dot-version), `Claude Sonnet 4.6` (Anthropic title-case), bare `sonnet` (CLI fallback when `modelUsage` is empty), `claude-haiku-4-5-20251001` (Copilot dated snapshot) all collapse to the same row. The raw upstream identifier is preserved per call in the `model_raw` column.
 
 ### Evolution tab
 
 ![Evolution tab — stacked by process](../images/health-mon-tokens-evolution.png)
 
-![Evolution tab — detailed view](../images/health-mon-tokens-evolution-detailed.png)
+![Evolution tab — € by provider, month-to-date](../images/health-mon-tokens-evolution-detailed.png)
 
-The Evolution tab answers "**how does my consumption evolve over time, and who are the main consumers?**" It renders a **stacked area chart** across the selected window with three independently-toggled axes — *By Process*, *By Model*, and *By Tokens (in/out)* — plus a *Stacked / Overlapping* render mode.
+The Evolution tab answers "**how does my consumption evolve over time, and who are the main consumers?**" It renders an area chart across the selected window, with four controls at the top right of the card:
+
+- **Stacked / Overlap** — bands stacked into a total, or each series drawn from the axis floor.
+- **Per bucket / Month-to-date** — the amount per bucket, or each series as a running total that restarts on the 1st (UTC). Month-to-date counts from the 1st even when the window starts later: the run-up from the 1st to the window's left edge comes from a second, hourly summary, so a 24 h window starts at what was already spent this month.
+- **Linear / Log** — a log axis reads a 75 K series next to a 400 M one. Log cannot stack (a stack encodes value as band height, which log does not preserve), so it forces Overlap; empty buckets draw as gaps.
+- **Grouping** — the dropdown described below.
+
+The second screenshot shows the € view by provider in Month-to-date mode.
 
 #### Stack axis toggle
 
-The dropdown at top-right of the chart card switches what each band represents. Same window, same data, three lenses:
+The dropdown at top-right of the chart card switches what each band represents. Same window, same data, four lenses:
 
 | Mode | One band per | Use when |
 |---|---|---|
 | **By Process** *(default)* | Cognitive process (`observation-writer`, `wave-analysis-wave1`, `health-coordinator`, …) | Identifying which subsystem is driving consumption |
 | **By Model** | Canonical model name (`claude-haiku-4.5`, `claude-sonnet-5`, `claude-opus-5`) | Assessing the model mix and per-model spend |
 | **By Provider** | The **account** that gets billed (`claude-code-max`, `gh-copilot`, `anthropic-api`) | Seeing which account is serving the traffic — useful after routing changes, and the only view that separates flat-rate subscription spend from metered API spend |
-| **By Tokens (in/out)** | `input_tokens` vs `output_tokens` only | Tracking prompt-bloat vs generation share — this is what the retired *Timeline* tab used to show |
+| **Input / Output / Cache** | Fresh input, output, cache reads and cache writes | Seeing what the volume consists of — cache reads are usually the overwhelming majority of a foreground turn, and each part is priced differently |
 
 ![Evolution tab — By Model](../images/health-mon-tokens-evolution-by-model.png)
 
 ![Evolution tab — By Provider](../images/health-mon-tokens-by-provider.png)
 
-![Evolution tab — By Tokens (in/out)](../images/health-mon-tokens-evolution-by-in_out.png)
+![Evolution tab — Input / Output / Cache](../images/health-mon-tokens-evolution-by-in_out.png)
 
 #### Design rules
 
-- **Main-consumer threshold.** The chart only renders series contributing **≥ 0.5 %** of the window's total tokens. Test/diagnostic processes (`reap-test`, `reap-final`, `fake-process`, `export-test`, …) routinely satisfy `> 0` but contribute fractions of a percent — they're dropped here to keep the legend readable. The full unfiltered breakdown is still available via the `summary.process_keys` / `summary.model_keys` API fields for callers that want it.
+- **Every series is shown.** There is no minimum share: a small series is often the one worth seeing — a local offload target taking on its first work is a fraction of a percent next to the subscription traffic. Pair it with the Log axis to read it.
 - **Stable colors per process / model.** Canonical processes (`observation-writer`, `consolidator-digest`, etc.) keep the same color across every chart on the page via `PROCESS_COLORS`. Unmapped processes (e.g. `wave-analysis-wave1/wave2/wave3`) fall through to a deterministic **hash → SAFE_EVOLUTION_PALETTE** mapping — every key gets a stable slot across re-renders, never the all-gray fallback that used to make competing stacks indistinguishable. The same hash logic now drives the Overview Treemap and Recent Calls left-border, so the legend you learn here matches across every panel.
 - **Adaptive bucket size.** Driven by the header time window. The bucket-minutes value is echoed in the card subtitle so the reader can sanity-check the granularity.
 
@@ -301,14 +308,25 @@ Replaces the entire pin map atomically; the proxy persists the document to `.dat
 ## Cost and the € / $ view
 
 **Tokens · € · $** in the page header switches every view — cards, Overview, Evolution,
-Cost, Recent Calls — between tokens and money (remembered per browser). Evolution's
-**Month-to-date** turns each series into a running total that restarts on the 1st (UTC),
-so a provider's spend reads as a rising line.
+Cost, Recent Calls — between tokens and money (remembered per browser). The Cost tab
+repeats the € / $ part in its own toolbar, since the header is out of view once the tab is
+scrolled; both drive the same setting, and with *Tokens* selected the Cost tab shows €.
+Evolution's **Month-to-date** turns each series into a running total that restarts on the
+1st (UTC), so a provider's spend reads as a rising line.
+
+![Cost tab — one tile per account, the € / $ switch in the tab's toolbar](../images/health-mon-tokens-cost.png)
 
 **Cost tab.** One tile per account used in the selected month: GitHub Copilot (spend,
 month-end projection, budget, foreground / background), the Claude subscription as
 *notional* API-equivalent cost, own hardware (this site's local providers and any offload
 target) as free with what it saved, any metered API key at list price.
+
+**Cost by month** stacks each calendar month's cost by account or by model. **Linear / Log**
+switches the axis; on Log the bars stand side by side, because a stack's band heights mean
+nothing on a log scale, and a month under a cent draws no bar. Hovering a month opens a card
+listing each series largest first, zeros left out, with the month's total.
+
+![Cost by month — hovering a month](../images/health-mon-tokens-cost-chart.png)
 
 **Pricing.** Each row is priced by the account that served it:
 

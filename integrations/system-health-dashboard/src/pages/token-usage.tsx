@@ -523,11 +523,13 @@ const ALL_TABS: TokenUsageTab[] = ['overview', 'evolution', 'cost', 'recent', 'r
  * tab, no LLM Routing dialog). onSettings: the Settings button opens the caller's own dialog
  * instead of this proxy's LLM Routing one (glass: its offload settings).
  */
-export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settings = true, onSettings }: {
+export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settings = true, onSettings, coverage }: {
   proxyBase?: string
   tabs?: TokenUsageTab[]
   settings?: boolean
   onSettings?: () => void
+  /** Passed to the Cost tab: what the figures cover when it is not the whole account. */
+  coverage?: { short: string; long: string }
 } = {}) {
   const has = (tab: TokenUsageTab) => tabs.includes(tab)
   const [activeTab, setActiveTab] = useState<string>(() => linkedTab(tabs) ?? tabs[0])
@@ -993,7 +995,9 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
       <div className="grid grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>{priced ? 'Total Cost' : 'Total Tokens'}</CardDescription>
+            {/* The window in the title: these cards follow it, the Cost tab follows the
+                calendar month — unlabelled, €2.30 (24h) over a €18.77 month read as a bug. */}
+            <CardDescription>{priced ? 'Total Cost' : 'Total Tokens'} · {windowLabel}</CardDescription>
             <CardTitle className="text-3xl">
               {priced
                 ? fmtMoney(costTotal)
@@ -1026,7 +1030,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Total Calls</CardDescription>
+            <CardDescription>Total Calls · {windowLabel}</CardDescription>
             <CardTitle className="text-3xl">{summary.total_calls}</CardTitle>
           </CardHeader>
           <CardContent>
@@ -1054,7 +1058,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Account</CardDescription>
+            <CardDescription>Account · {windowLabel}</CardDescription>
             {/* Grouped by ACCOUNT, not by the `subscription` column. That column
                 carries four spellings for Claude Max alone (max-oauth-passthrough,
                 max-subscription, anthropic-subscription, and blank) and maps
@@ -1492,7 +1496,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
         {has('cost') && (
           <TabsContent value="cost">
             <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
-              <CostTab proxyBase={proxyBase} currency={unit === 'USD' ? 'USD' : 'EUR'} onCurrency={setUnit} />
+              <CostTab proxyBase={proxyBase} currency={unit === 'USD' ? 'USD' : 'EUR'} onCurrency={setUnit} coverage={coverage} />
             </Suspense>
           </TabsContent>
         )}

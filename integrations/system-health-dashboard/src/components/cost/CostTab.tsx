@@ -29,6 +29,12 @@ interface Props {
   /** Sets the page's unit. The page-wide switch sits above the tabs, out of
    *  view once this tab is scrolled, so the tab offers €/$ in its own toolbar. */
   onCurrency?: (c: Currency) => void
+  /** What these figures cover, when that is less than the whole account — glass
+   *  sees only the calls of the sessions it launched, while GitHub's Copilot
+   *  budget counts every use of the login (IDE plugin, other tools, other
+   *  machines). Without saying so, a small figure against a budget GitHub says is a third used reads as
+   *  a bug. */
+  coverage?: { short: string; long: string }
 }
 
 /** Recharts colours each tooltip line in its series colour — pale pinks and
@@ -98,7 +104,7 @@ interface AccountTile {
   savings?: LocalSavings
 }
 
-export function CostTab({ proxyBase, currency, onCurrency }: Props) {
+export function CostTab({ proxyBase, currency, onCurrency, coverage }: Props) {
   const [rows, setRows] = useState<CostRow[]>([])
   const [savedCfg, setSavedCfg] = useState<CostConfig>(DEFAULT_COST_CONFIG)
   // glass's daemon has no /api/llm/settings: prices stay the calibrated
@@ -328,6 +334,7 @@ export function CostTab({ proxyBase, currency, onCurrency }: Props) {
         {copilotDiscount !== 1 && <> × {cfg.discountLabel?.copilot || 'contract discount'} {Math.round((1 - copilotDiscount) * 100)}%</>}
         {currency === 'EUR' && <> ÷ FX {cfg.currency.usdPerEur} USD/EUR</>}. Claude Max: API list price
         (notional). Own hardware: free per token.
+        {coverage && <div className="mt-1">{coverage.long}</div>}
       </div>
 
       {/* Burn-rate warning banner */}
@@ -371,6 +378,7 @@ export function CostTab({ proxyBase, currency, onCurrency }: Props) {
                   <div className="flex items-baseline gap-2">
                     <span className="text-2xl font-bold">{money(t.spend)}</span>
                     <span className="text-sm text-muted-foreground">spent {activeMonth}</span>
+                    {coverage && <span className="text-xs text-muted-foreground" title={coverage.long}>· {coverage.short}</span>}
                   </div>
                   {isCurrentCalendarMonth && t.kind !== 'local' && (
                     <div className="text-sm text-muted-foreground">
@@ -478,7 +486,9 @@ export function CostTab({ proxyBase, currency, onCurrency }: Props) {
                 tickFormatter={(v) => `${currency === 'USD' ? '$' : '€'}${v}`}
               />
               <Tooltip content={<CostTooltip money={money} />} wrapperStyle={{ zIndex: 10 }} cursor={{ fill: 'rgba(148,163,184,0.15)' }} />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
+              {/* Padded like Evolution's: unpadded, a legend that wraps to two lines sat on
+                  the month labels ("2026-" with the month hidden under it). */}
+              <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
               {chartKeys.map((k, i) => (
                 <Bar key={k} dataKey={k} stackId={chartLog ? undefined : 'cost'}
                   fill={keyColor.get(k) || MODEL_PALETTE[i % MODEL_PALETTE.length]} />

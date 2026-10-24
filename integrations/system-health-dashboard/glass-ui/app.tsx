@@ -8,6 +8,14 @@ import { SessionsPage } from './sessions'
 import { ModelsPage } from './models'
 import { OffloadPill, OffloadProvider, useOffload } from './offload'
 
+// glass records only the sessions it launched. GitHub's Copilot budget counts the
+// whole login — the VS Code plugin, other tools, other machines — so the two
+// figures differ by design, and the page says so rather than look wrong.
+const GLASS_COVERAGE = {
+  short: 'glass sessions only',
+  long: 'These figures cover calls made by agents launched with glass. A GitHub Copilot budget counts every use of the account — IDE plugins, other tools and machines — so GitHub shows more.',
+}
+
 const THEME_ICON = { light: Sun, dark: Moon, system: Monitor }
 
 function ThemeToggle() {
@@ -46,7 +54,7 @@ const tab = ({ isActive }: { isActive: boolean }) =>
 
 function TokenUsage() {
   const { openSettings } = useOffload()
-  return <TokenUsagePage proxyBase="" tabs={['overview', 'evolution', 'cost', 'recent']} settings={false} onSettings={openSettings} />
+  return <TokenUsagePage proxyBase="" tabs={['overview', 'evolution', 'cost', 'recent']} settings={false} onSettings={openSettings} coverage={GLASS_COVERAGE} />
 }
 
 export function GlassApp() {
