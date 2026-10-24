@@ -585,9 +585,20 @@ function publish(target, tree, prov, t) {
       subject, body, onto: current?.headRefName,
     });
     let pr = current?.url ?? null;
+    let branch = c?.branch ?? current?.headRefName ?? null;
     if (c && current) {
       git(dir, ['push', '--quiet', 'origin', `${c.sha}:refs/heads/${c.branch}`]);
       ghRun(['pr', 'edit', String(current.number), '--title', subject, '--body', prBody]);
+      // The branch is named for the shas it was FIRST extracted from; left alone,
+      // the PR reads "coding@8b46555 … from extract/6e1d1cd-…". GitHub's rename
+      // retargets open PRs, so the head moves with it.
+      const fresh = `extract/${short(prov.sources.coding.sha)}-${short(prov.sources.proxy.sha)}`;
+      if (fresh !== c.branch) {
+        execFileSync('gh', ['api', '--method', 'POST', `repos/${gh.repo}/branches/${c.branch}/rename`, '-f', `new_name=${fresh}`], {
+          encoding: 'utf8', env: { ...process.env, GH_HOST: gh.host },
+        });
+        branch = fresh;
+      }
     } else if (c) {
       git(dir, ['push', '--quiet', '-u', 'origin', c.branch]);
       pr = ghRun(['pr', 'create', '--base', 'main', '--head', c.branch, '--title', subject, '--body', prBody]);
@@ -595,7 +606,7 @@ function publish(target, tree, prov, t) {
     for (const o of current ? older : []) {
       ghRun(['pr', 'close', String(o.number), '--delete-branch', '--comment', `Superseded by #${current.number} — one open extract PR per target.`]);
     }
-    return { branch: c?.branch ?? current?.headRefName ?? null, pr, unchanged: !c, updated: Boolean(c && current), closed: current ? older.map((o) => o.number) : [] };
+    return { branch, pr, unchanged: !c, updated: Boolean(c && current), closed: current ? older.map((o) => o.number) : [] };
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }
