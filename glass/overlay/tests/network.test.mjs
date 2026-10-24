@@ -17,6 +17,7 @@ function monitor(seq) {
       enabled: () => s.enabled ?? false,
       kerberos: async () => s.kerberos ?? null,
       renewTicket: s.renewTicket || (async () => []),
+      internet: async () => { s.internetAsked = (s.internetAsked || 0) + 1; return s.internet ?? true; },
       now: s.now,
     },
   });
@@ -58,7 +59,7 @@ test('concurrent ticks share one probe round', async () => {
   let rounds = 0;
   const m = createNetworkMonitor({ watch: false, probes: {
     location: async () => { rounds++; await new Promise((r) => setTimeout(r, 20)); return { observed: 'open' }; },
-    port: async () => false, functional: async () => false, enabled: () => false,
+    port: async () => false, functional: async () => false, enabled: () => false, internet: async () => true,
   } });
   await Promise.all([m.tick(), m.tick(), m.tick()]);
   assert.equal(rounds, 1);
@@ -93,6 +94,26 @@ test('Kerberos: off the corporate network a missing ticket is not chased', async
   assert.equal(asked, 0);
 });
 
+test('no internet off the corporate network → OFFLINE; on CN it is not judged (2026-10-24)', async () => {
+  // A wake from sleep left the laptop with no egress at all; proxydetox answered
+  // 502 and glass's message pointed at Kerberos, on a home network.
+  const seq = { location: ['open'], port: [true], functional: [false], internet: false };
+  const m = monitor(seq);
+  await m.tick();
+  assert.equal(m.facts().internet_reachable, false);
+  const b = networkBadge(m.facts());
+  assert.equal(b.text, 'N:OPEN P:OFF OFFLINE');
+  assert.equal(b.warn, true);
+  const cn = { location: ['corporate'], port: [true], functional: [false], internet: false, kerberos: false };
+  const c = monitor(cn);
+  await c.tick();
+  assert.equal(cn.internetAsked, undefined, 'direct egress is blocked on CN by design: not probed');
+  assert.equal(networkBadge(c.facts()).text, 'N:CN P:OFF K:NO');
+  const up = { location: ['open'], port: [true], functional: [true], internet: false };
+  await monitor(up).tick();
+  assert.equal(up.internetAsked, undefined, 'a forwarding proxy already proves egress');
+});
+
 test('egress: a refused tunnel names the proxy and the host, and is not asked again for 10 s', async () => {
   const http = await import('node:http');
   const { createEgressFetch, TUNNEL_REFUSAL_MEMORY_MS } = await import('../lib/glass/egress.mjs');
@@ -106,7 +127,7 @@ test('egress: a refused tunnel names the proxy and the host, and is not asked ag
   const f = createEgressFetch({ HTTPS_PROXY: proxy }, 12445, { now: () => clock, onRefusal: (r) => seen.push(r) });
   try {
     await assert.rejects(f('https://api.example.com/v1'), (e) => e.code === 'GLASS_TUNNEL_REFUSED'
-      && e.message.includes(proxy) && e.message.includes('api.example.com') && e.message.includes('HTTP 502') && e.message.includes('klist'));
+      && e.message.includes(proxy) && e.message.includes('api.example.com') && e.message.includes('HTTP 502') && e.message.includes('internet') && e.message.includes('klist'));
     assert.deepEqual(seen.map((r) => [r.host, r.status]), [['api.example.com', 502]]);
     await assert.rejects(f('https://api.example.com/v1'), (e) => e.code === 'GLASS_TUNNEL_REFUSED');
     assert.equal(connects, 1, 'the retry inside the window does not wait on the proxy again');

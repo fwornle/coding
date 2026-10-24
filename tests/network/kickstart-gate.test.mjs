@@ -184,3 +184,28 @@ describe('pruneWindow', () => {
     assert.deepEqual(pruneWindow(null, T0), []);
   });
 });
+
+describe('no failure-driven restart while the host is offline (2026-10-24)', () => {
+  // After a wake from sleep the laptop had no egress from 18:45 until a reboot
+  // at 19:16. The coordinator said so every probe and restarted the proxy 15
+  // times anyway: one dispatch per ~100s fits under 3-per-5-minutes forever.
+  it('holds every failure-driven dispatch, however long ago the last one was', () => {
+    const d = decideKickstart({ now: T0, timestamps: [], lastDispatchAt: null, hostOffline: true });
+    assert.equal(d.allowed, false);
+    assert.equal(d.reason, 'offline');
+  });
+
+  it('the networkMode flip still passes — it is not a response to a failure', () => {
+    const d = decideKickstart({ now: T0, hostOffline: true, countsTowardCap: false });
+    assert.equal(d.allowed, true);
+  });
+
+  it('a recent dispatch still reports as debounced, not offline', () => {
+    const d = decideKickstart({ now: T0 + 1_000, lastDispatchAt: T0, hostOffline: true });
+    assert.equal(d.reason, 'debounced');
+  });
+
+  it('online again: dispatch allowed', () => {
+    assert.equal(decideKickstart({ now: T0, hostOffline: false }).allowed, true);
+  });
+});

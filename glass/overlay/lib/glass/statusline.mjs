@@ -214,7 +214,10 @@ export function renderReport(tag, { d, turns = [], port, caPath = '' }) {
     if (corporate && n.kerberos_ticket != null) {
       lines.push(`Kerberos ticket: ${n.kerberos_ticket ? 'present' : 'MISSING — the corporate proxy will refuse tunnels (renew: kinit, or the Kerberos SSO menu)'}`);
     }
-    if (b.warn && !(n.kerberos_ticket === false && n.proxy_functional)) lines.push('  ! on the corporate network without a working local proxy: external hosts are unreachable');
+    if (b.offline) {
+      lines.push('  ! no internet from this machine, with or without the local proxy — restarting the agent, glass or the proxy will not help.');
+      lines.push('    After a wake from sleep: Wi-Fi off and on; if nothing gets out after that, reboot.');
+    } else if (b.warn && !(n.kerberos_ticket === false && n.proxy_functional)) lines.push('  ! on the corporate network without a working local proxy: external hosts are unreachable');
     lines.push(`egress (glass daemon): ${d.egress === 'proxy' ? `via ${d.egress_url}` : 'direct'}`);
     if (d.egress_refused) lines.push(`  last refused tunnel: ${d.egress_refused.host} (HTTP ${d.egress_refused.status}) at ${d.egress_refused.at}`);
     if (caPath) lines.push(`interception CA: ${caPath}`);

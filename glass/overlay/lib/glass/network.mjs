@@ -8,7 +8,7 @@
 // only observes: it never restarts proxydetox and never changes proxy
 // variables.
 import {
-  observeLocation, probePortListening, probeProxyFunctional, probeKerberosTicket, requestKerberosTicket, readProxyEnabledByUser,
+  observeLocation, probePortListening, probeProxyFunctional, probeKerberosTicket, requestKerberosTicket, readProxyEnabledByUser, probeInternetDirect,
   countFunctionalFailures, publishedFunctional, FUNCTIONAL_FAIL_THRESHOLD,
 } from '../network/location-probe.mjs';
 import { settleLocation } from '../network/location-hysteresis.mjs';
@@ -18,7 +18,7 @@ export const NETWORK_PROBE_INTERVAL_MS = 15_000; // the coordinator's cadence
 
 /**
  * @param {object} [o]
- * @param {object} [o.probes]   { location, port, functional, enabled, kerberos, renewTicket } — injectable for tests
+ * @param {object} [o.probes]   { location, port, functional, enabled, kerberos, renewTicket, internet } — injectable for tests
  * @param {boolean} [o.watch]   subscribe to the OS's network changes (macOS, Linux / WSL; Windows polls)
  * @param {(line: string) => void} [o.log]
  */
@@ -29,10 +29,11 @@ export function createNetworkMonitor({ probes = {}, watch = true, log = () => {}
   const enabled = probes.enabled || readProxyEnabledByUser;
   const kerberos = probes.kerberos || probeKerberosTicket;
   const renewTicket = probes.renewTicket || requestKerberosTicket;
+  const internet = probes.internet || probeInternetDirect;
   const now = probes.now || Date.now;
   let lastTicketRequest = 0;
   const state = {
-    location: 'unknown', proxy_running: false, proxy_functional: false, proxy_enabled_by_user: false, kerberos_ticket: null,
+    location: 'unknown', proxy_running: false, proxy_functional: false, proxy_enabled_by_user: false, kerberos_ticket: null, internet_reachable: null,
     location_demotion_pending: 0, consecutive_functional_failures: 0, last_network_change_at: null, last_probe_end: null,
   };
   let running = null;
@@ -59,6 +60,12 @@ export function createNetworkMonitor({ probes = {}, watch = true, log = () => {}
     state.location = settled.location;
     state.location_demotion_pending = settled.pending;
     state.kerberos_ticket = await kerberos();
+    // Off the corporate network, does anything get out at all? On CN direct
+    // egress is blocked by design, and a working proxy proves it either way.
+    // null = not judged; the badge shows OFFLINE only for false.
+    const wasOnline = state.internet_reachable;
+    state.internet_reachable = state.location === 'open' && !state.proxy_functional ? await internet() : null;
+    if (state.internet_reachable === false && wasOnline !== false) log('network: no internet from this machine — not a proxy or Kerberos fault');
     // On CN / VPN without a ticket the corporate proxy refuses every tunnel,
     // and macOS can take minutes to fetch one on its own (2m20s measured after
     // an overnight expiry). Ask for it now; every 2 min at most.

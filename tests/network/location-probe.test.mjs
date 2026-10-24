@@ -49,6 +49,17 @@ describe('networkBadge', () => {
     assert.equal(networkBadge({ location: 'open' }).warn, false);
     assert.equal(networkBadge({ location: 'corporate', proxy_running: true, proxy_functional: true }).warn, false);
   });
+  it('OFFLINE off the corporate network when a completed probe found no internet (2026-10-24)', () => {
+    const probed = { last_probe_end: '2026-10-24T16:46:00.728Z' };
+    const b = networkBadge({ location: 'open', proxy_running: true, proxy_functional: true, internet_reachable: false, ...probed });
+    assert.equal(b.text, 'N:OPEN P:AUTO OFFLINE');
+    assert.equal(b.offline, true);
+    assert.equal(b.warn, true);
+    assert.equal(networkBadge({ location: 'open', internet_reachable: false }).offline, false, 'before the first probe it is only the default');
+    assert.equal(networkBadge({ location: 'open', internet_reachable: null, ...probed }).offline, false, 'null = not judged');
+    const cn = networkBadge({ location: 'corporate', proxy_running: true, proxy_functional: false, internet_reachable: false, kerberos_ticket: false, ...probed });
+    assert.equal(cn.text, 'N:CN P:OFF K:NO', 'on CN no direct egress is normal — the ticket is the finding');
+  });
   it('K:NO on CN / VPN without a Kerberos ticket — the proxy cannot authenticate', () => {
     const up = { proxy_running: true, proxy_functional: true };
     const b = networkBadge({ location: 'corporate', ...up, kerberos_ticket: false });

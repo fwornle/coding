@@ -59,7 +59,8 @@ export function tunnelRefusalStatus(err) {
 
 function refusalError(proxy, host, status) {
   const err = new Error(`the upstream proxy ${proxy} refused the tunnel to ${host} (HTTP ${status}). `
-    + 'On the corporate network: check the Kerberos ticket (klist); right after a network change the local proxy may need a restart.');
+    + 'The proxy could not reach it: check that this machine has internet at all; on the corporate network, '
+    + 'that a Kerberos ticket exists (klist); right after a network change the local proxy may need a restart.');
   err.code = 'GLASS_TUNNEL_REFUSED';
   return err;
 }

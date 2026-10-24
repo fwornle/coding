@@ -321,7 +321,7 @@ const currentState = {
     semantic_ok: null,                   // null until first probe; true|false after — cheap haiku/copilot probe (drives auto-heal FSM)
     last_round_trip_ms: null,            // int, last completion latency
     networkMode: 'unknown',              // 'vpn' | 'corporate' | 'public' | 'unknown'
-    auto_heal_status: 'healthy',         // 'healthy'|'kickstart_pending'|'cooldown'|'disabled' (Plan 34-03 transitions)
+    auto_heal_status: 'healthy',         // 'healthy'|'kickstart_pending'|'cooldown'|'host_offline'|'disabled' (Plan 34-03 transitions)
     kickstart_count: 0,                  // running counter since coordinator boot (D-14 soak gate)
     kickstart_timestamps: [],            // sliding window for D-06 cooldown FSM
     // Epoch ms of the last dispatch by ANY of the five restart paths, including
@@ -1724,6 +1724,7 @@ function isStrongProbeReasonRecoverable(reason) {
  * @param {boolean} [o.countsTowardCap]
  * @returns {boolean} whether a dispatch was made
  */
+let _offlineHoldLogged = false;
 function dispatchProxyKickstart({ reason, logPrefix, detail = '', countsTowardCap = true }) {
   const now = Date.now();
   const decision = decideKickstart({
@@ -1731,11 +1732,25 @@ function dispatchProxyKickstart({ reason, logPrefix, detail = '', countsTowardCa
     timestamps: currentState.proxy.kickstart_timestamps,
     lastDispatchAt: currentState.proxy.last_kickstart_dispatch_at,
     countsTowardCap,
+    // Only once a probe has run (internet_reachable starts out false), and only
+    // off CN / VPN, where no direct egress is normal and a stale proxy reads
+    // the same way — there the restart may be the cure.
+    hostOffline: currentState.network.last_probe_end != null && currentState.network.internet_reachable === false
+      && currentState.network.location !== 'corporate' && currentState.network.location !== 'vpn',
   });
   currentState.proxy.kickstart_timestamps = decision.recent;
 
   if (!decision.allowed) {
-    if (decision.reason === 'debounced') {
+    if (decision.reason === 'offline') {
+      // Logged once per outage; the next allowed dispatch re-arms it.
+      if (!_offlineHoldLogged) {
+        _offlineHoldLogged = true;
+        log(`${logPrefix}: NOT restarting the proxy — this machine has no internet, direct or through `
+          + 'the proxy, and a restarted proxy comes up into the same dead network. If it persists '
+          + 'after a wake from sleep: Wi-Fi off/on; failing that, a reboot.', 'WARN');
+      }
+      currentState.proxy.auto_heal_status = 'host_offline';
+    } else if (decision.reason === 'debounced') {
       // INFO, not WARN: this is the gate working. The proxy was restarted
       // seconds ago and whatever this path saw, it saw through that restart.
       log(`${logPrefix}: suppressed — a kickstart was dispatched ${Math.round((now - currentState.proxy.last_kickstart_dispatch_at) / 1000)}s ago `
@@ -1748,6 +1763,7 @@ function dispatchProxyKickstart({ reason, logPrefix, detail = '', countsTowardCa
     return false;
   }
 
+  _offlineHoldLogged = false;
   currentState.proxy.last_kickstart_dispatch_at = now;
   if (countsTowardCap) {
     currentState.proxy.kickstart_timestamps.push(now);
