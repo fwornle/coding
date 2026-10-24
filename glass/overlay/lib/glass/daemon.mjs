@@ -34,7 +34,7 @@ import http from 'node:http';
 import path from 'node:path';
 import crypto from 'node:crypto';
 
-import { initTokenDb, resolveTokenDbPath } from '../../proxy/dist/token-usage.js';
+import { accountClause, initTokenDb, resolveTokenDbPath } from '../../proxy/dist/token-usage.js';
 import { sanitizeTaskId } from '../../proxy/dist/measurement-span.js';
 import { createMeasurement } from '../../proxy/proxy-bridge/measurement.mjs';
 import { handleAnthropicMessages } from '../../proxy/proxy-bridge/anthropic-forward.mjs';
@@ -288,7 +288,7 @@ export async function startDaemon({
   const uiRead = createUiApi({
     uiDir: path.join(PKG_ROOT, 'ui'), dataDir: p.data, tokenDb: () => tokenDb, usageDb: () => usageSource.handle(),
     dbPath: resolveTokenDbPath(p.data), measurement, liveSessions: publicSessions,
-    excludedAccounts: () => loadCostDefaults(home).excludeAccounts ?? [],
+    accountFilter: () => accountClause(loadCostDefaults(home).excludeAccounts ?? []),
   });
   const sourcesView = () => ({ coding: usageSource.state() });
   // [N:… P:…]: probed only while a session is live (nothing else reads it).

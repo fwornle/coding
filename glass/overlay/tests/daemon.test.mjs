@@ -800,9 +800,11 @@ test('CLI: a reader that goes away (glass status | head) ends glass quietly', as
   assert.doesNotMatch(stderr, /EPIPE/);
 });
 
+// No coding health coordinator, as on CI: on a machine that runs coding one
+// answers on its default port and would hide output the CLI prints without it.
 function runCli(args, env) {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, [BIN, ...args], { env: { PATH: process.env.PATH, HOME: home, ...env } });
+    const child = spawn(process.execPath, [BIN, ...args], { env: { PATH: process.env.PATH, HOME: home, HEALTH_COORDINATOR_URL: 'http://127.0.0.1:9', ...env } });
     let stdout = ''; let stderr = '';
     child.stdout.on('data', (d) => { stdout += d; });
     child.stderr.on('data', (d) => { stderr += d; });
@@ -878,7 +880,7 @@ test('CLI: daemon unreachable → one warning, the agent runs unwired', { skip: 
   await new Promise((r) => squatter.close(r));
   assert.equal(run.code, 0);
   const lines = run.stderr.trim().split('\n').filter(Boolean);
-  assert.equal(lines.length, 1);
+  assert.equal(lines.length, 1, run.stderr);
   assert.match(lines[0], /daemon not reachable .* running claude unmeasured/);
   assert.equal(JSON.parse(run.stdout.trim()).base, null);
   fs.rmSync(cliHome, { recursive: true, force: true });

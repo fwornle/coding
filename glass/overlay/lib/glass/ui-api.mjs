@@ -15,8 +15,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { readTimeline } from '../experiments/timeline-read.mjs';
-import { accountClause } from '../../proxy/dist/token-usage.js';
-
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json', '.woff2': 'font/woff2',
@@ -92,16 +90,18 @@ export function sessionModels(db, taskId, { limit = 200 } = {}) {
 /**
  * All measured calls of the last `hours` (0 = all time) by agent, model, account,
  * host and call kind, with the number of sessions each group spans. The Models tab.
+ * `accounts` is the account selection as an SQL fragment (token-usage accountClause),
+ * as on the Token Usage page. The daemon builds it: the CLI loads this module for the
+ * status line, and the proxy's token-usage module does network work when it loads.
  */
-export function modelMix(db, { hours = 24, exclude = [] } = {}) {
+export function modelMix(db, { hours = 24, accounts = { sql: '', params: [] } } = {}) {
   if (!db) return { hours, groups: [] };
   const cache = hasCacheColumns(db);
   const f = factColumns(db);
   const cr = cache ? 'COALESCE(cache_read_tokens,0)' : '0';
   const cw = cache ? 'COALESCE(cache_write_tokens,0)' : '0';
   const since = hours > 0 ? new Date(Date.now() - hours * 3_600_000).toISOString() : '';
-  // The account selection, as on the Token Usage page (usage-api.mjs).
-  const ac = accountClause(exclude);
+  const ac = accounts;
   const groups = db.prepare(`
     SELECT agent, model, provider, ${f.upstream} AS upstream, ${f.callKind} AS call_kind, COUNT(*) AS calls,
            COUNT(DISTINCT NULLIF(task_id, '')) AS sessions,
@@ -208,7 +208,7 @@ function serveStatic(uiDir, urlPath, res) {
  *                                         included where wanted); defaults to tokenDb
  * @returns {(req, res) => Promise<boolean>}
  */
-export function createUiApi({ uiDir, dataDir, tokenDb, usageDb = tokenDb, dbPath, measurement, liveSessions, excludedAccounts = () => [] }) {
+export function createUiApi({ uiDir, dataDir, tokenDb, usageDb = tokenDb, dbPath, measurement, liveSessions, accountFilter = () => ({ sql: '', params: [] }) }) {
   const ui = path.resolve(uiDir);
   return async function handleUi(req, res) {
     if (req.method !== 'GET') return false;
@@ -222,7 +222,7 @@ export function createUiApi({ uiDir, dataDir, tokenDb, usageDb = tokenDb, dbPath
     }
     if (p === '/api/models') {
       const h = Number(u.searchParams.get('hours') ?? 24);
-      json(res, 200, modelMix(usageDb()?.db, { hours: Number.isFinite(h) && h >= 0 ? Math.min(h, 24 * 366) : 24, exclude: excludedAccounts() }));
+      json(res, 200, modelMix(usageDb()?.db, { hours: Number.isFinite(h) && h >= 0 ? Math.min(h, 24 * 366) : 24, accounts: accountFilter() }));
       return true;
     }
     if (p === '/api/calls/unbound') {
