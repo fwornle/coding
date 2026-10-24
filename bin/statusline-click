@@ -69,6 +69,41 @@ pane_session=""; pane_agent="claude"; pane_project="$CODING_REPO"
 if [ -n "$PANE" ]; then
   pane_session="$(tmux display-message -p -t "$PANE" '#{session_name}' 2>/dev/null || true)"
 fi
+
+# A glass field (`g:*`) belongs to glass, not to this script. glass's own
+# binding claims those clicks and chains everything else here — but key tables
+# are server-wide and _bind_status_clicks in tmux-session-wrapper.sh rebinds
+# MouseDown1Status on every coding launch, so a coding session started after a
+# glass session silently took glass's clicks over ("unmapped field 'g:health'").
+# Whichever binding is current, the click must reach glass, so it is handed on
+# here with the session's own @glass_task / @glass_port.
+#
+# The command is read from the session's status-right, where glass wrote the
+# absolute node and glass.mjs paths it runs under: tmux's run-shell PATH is the
+# server's, which need not contain node or glass at all, and a second glass
+# install must not answer for this one.
+glass_click() {
+  local task port right node bin client
+  task="$(tmux show-options -qv -t "$pane_session" @glass_task 2>/dev/null)"
+  port="$(tmux show-options -qv -t "$pane_session" @glass_port 2>/dev/null)"
+  right="$(tmux show-options -qv -t "$pane_session" status-right 2>/dev/null)"
+  node="$(printf '%s' "$right" | sed -n "s/^#('\([^']*\)' '\([^']*\)' statusline .*/\1/p")"
+  bin="$(printf '%s' "$right" | sed -n "s/^#('\([^']*\)' '\([^']*\)' statusline .*/\2/p")"
+  client="$(tmux display-message -p -t "$PANE" '#{client_name}' 2>/dev/null || true)"
+  if [ -z "$node" ] || [ -z "$bin" ]; then
+    bin="$(command -v glass 2>/dev/null || true)"; node=""
+  fi
+  if [ -z "$bin" ]; then
+    note "statusline: '$TAG' is a glass field, and glass could not be found"
+    return
+  fi
+  click_log "$(date -u +%Y-%m-%dT%H:%M:%SZ)   glass click via=${node:+$node }$bin task=${task:-<none>} port=${port:-<default>}"
+  ${node:+"$node"} "$bin" click "$TAG" ${task:+--task "$task"} ${port:+--port "$port"} \
+    ${client:+--client "$client"} --pane "$PANE" >/dev/null 2>&1 || true
+}
+case "$TAG" in
+  g:*) glass_click; exit 0 ;;
+esac
 if [ -n "$pane_session" ] && [ -r "$CODING_REPO/.data/agent-sessions/$pane_session.json" ]; then
   map="$CODING_REPO/.data/agent-sessions/$pane_session.json"
   pane_agent="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("agent","claude"))' "$map" 2>/dev/null || echo claude)"
