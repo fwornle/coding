@@ -87,6 +87,27 @@ at a fixed rate, put them in `~/.glass/cost.json`:
 (`config/cost-defaults.json`); yours wins. Without either, Copilot is priced at GitHub's
 rates with no discount.
 
+### What the Copilot figure covers
+
+![Agents started with glass and coding's background jobs pass the local meter, which records and prices every call; Copilot in VS Code or another IDE, agents started without glass and other machines reach the GitHub Copilot bill without being measured.](images/glass-copilot-coverage.png)
+
+glass prices what it records, and it records only calls that pass through it. Your GitHub
+Copilot bill can contain more:
+
+| Copilot usage | In the Cost tab and `GH €`? |
+|---|---|
+| Copilot CLI, OpenCode or pi started as `glass <agent>`, in any terminal (VS Code's integrated terminal too) | yes |
+| coding's background jobs, on a machine where coding is installed and its figures are included ([Accounts and sources](#accounts-and-sources)) | yes, as **background** |
+| Copilot inside VS Code or another IDE — chat, agent mode, code completions | no |
+| The same agents started without `glass` in front | no |
+| Other machines, github.com, Copilot on GitHub itself | no |
+
+So read the Copilot figure as a **floor**: exact for every call it shows, but the
+invoice also carries whatever never passed glass. A large gap between the two usually
+means IDE use. An itemized usage sheet (the kind glass's rates are fitted
+from) lists usage per day and model, not per tool, so it cannot split IDE use from the
+rest by itself — the days and models glass shows are the measured part of it.
+
 ## Recent Calls
 
 ![Recent calls](images/ui-token-usage-recent.png)

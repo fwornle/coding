@@ -8,7 +8,7 @@ hide:
 <div class="overview-deck" id="glass-overview" role="region" aria-label="Glass overview presentation" markdown="1">
 
 <div class="overview-toolbar" hidden>
-  <span class="overview-label">glass / in eleven slides</span>
+  <span class="overview-label">glass / in twelve slides</span>
   <span class="overview-counter" role="status" aria-live="polite" aria-atomic="true"></span>
   <button type="button" data-fullscreen>Fullscreen</button>
 </div>
@@ -215,7 +215,37 @@ See the month's Copilot spend while it is still going on.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-7" aria-labelledby="overview-context" markdown="1">
+<section class="overview-slide" id="slide-7" aria-labelledby="overview-coverage" markdown="1">
+<div class="overview-copy" markdown="1">
+
+<p class="overview-kicker">Question 1 / What does the figure cover?</p>
+
+## Every Copilot call that passes through glass {#overview-coverage}
+
+**Measured:** agents started with `glass <agent>` — Copilot CLI, OpenCode, pi — in any
+terminal, VS Code's included. Where coding is installed, its background jobs too.
+
+**Not measured:** Copilot inside VS Code or another IDE (chat, agent mode, completions),
+an agent started without `glass`, other machines and github.com. They reach the same
+bill without passing glass.
+
+So **`GH €` is a floor**: the measured part of your Copilot bill, exact per call — not the
+whole invoice.
+
+</div>
+<figure class="overview-figure" markdown="1">
+
+![Agents started with glass and coding's background jobs pass the local meter, which records and prices every call; Copilot in VS Code or another IDE, agents started without glass and other machines reach the GitHub Copilot bill without being measured.](images/glass-copilot-coverage.png)
+
+<figcaption>Solid: measured and priced. Dotted: billed, but invisible to glass.</figcaption>
+</figure>
+<p class="overview-takeaway" markdown="1">
+Start agents with `glass` to bring them into the figure.
+[What the Copilot figure covers](token-usage.md#what-the-copilot-figure-covers)
+</p>
+</section>
+
+<section class="overview-slide" id="slide-8" aria-labelledby="overview-context" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Question 2 / Why is the context so large?</p>
@@ -246,7 +276,7 @@ Don't assume your last prompt filled the window. Look at the whole context.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-8" aria-labelledby="overview-models" markdown="1">
+<section class="overview-slide" id="slide-9" aria-labelledby="overview-models" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Question 3 / Which models did the work?</p>
@@ -277,7 +307,7 @@ Know which model you are paying for before you switch one.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-9" aria-labelledby="overview-offload" markdown="1">
+<section class="overview-slide" id="slide-10" aria-labelledby="overview-offload" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Opt-in, off by default</p>
@@ -314,7 +344,7 @@ Off, glass is exactly what the previous slides show.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-10" aria-labelledby="overview-compare" markdown="1">
+<section class="overview-slide" id="slide-11" aria-labelledby="overview-compare" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Question 4 / Which setup fits my task?</p>
@@ -348,7 +378,7 @@ Try it on your next real task: `glass <agent>`, then `glass ui`.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-11" aria-labelledby="overview-built" markdown="1">
+<section class="overview-slide" id="slide-12" aria-labelledby="overview-built" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Behind the scenes / How glass is made</p>

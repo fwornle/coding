@@ -1,0 +1,35 @@
+@startuml glass-copilot-coverage
+!include _standard-style.puml
+top to bottom direction
+skinparam defaultFontSize 20
+skinparam componentFontSize 20
+skinparam packageFontSize 20
+skinparam arrowFontSize 16
+skinparam nodesep 40
+skinparam ranksep 50
+skinparam shadowing false
+skinparam componentStyle rectangle
+hide stereotype
+
+rectangle "Measured — in GH € and the Cost tab" {
+  component "Agents started with glass <agent>\nCopilot CLI · OpenCode · pi\nin any terminal, VS Code's included" as agents <<agent>>
+  component "coding's background jobs\nwhere coding is installed" as bg <<core>>
+  component "Local meter\nglass + coding's LLM proxy" as meter <<storage>>
+  agents SYNC_LINE meter : every call
+  bg SYNC_LINE meter : every call
+}
+
+rectangle "Not measured — on the bill only" {
+  component "VS Code / IDE Copilot\nChat · agent mode · completions" as ide <<external>>
+  component "An agent started\nwithout glass" as bare <<external>>
+  component "Other machines\ngithub.com" as other <<external>>
+  ide -[hidden]down- bare
+  bare -[hidden]down- other
+}
+
+component "Your GitHub Copilot bill" as bill <<api>>
+meter DATA_LINE bill : recorded + priced
+bill <-[#757575,thickness=1,dotted]- ide
+bill <-[#757575,thickness=1,dotted]- bare
+bill <-[#757575,thickness=1,dotted]- other
+@enduml
