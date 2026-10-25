@@ -195,6 +195,24 @@ test('targets: a private overlay from outside the repo is applied to its target 
   failsWith(root, /target internal: private overlay .* is missing/, 'internal');
 });
 
+test("targets: deny_values_from — a public tree carrying a value of the organisation's cost file fails, and a missing file fails", () => {
+  const priv = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-cost-values-'));
+  const cost = path.join(priv, 'cost-defaults.json');
+  fs.writeFileSync(cost, JSON.stringify({
+    discount: { copilot: 0.61 }, discountLabel: { copilot: 'Example Contract Rebate' },
+    copilotPrices: { m: { in: 1.234, out: 25, cacheRead: 0.0987, cacheWrite: 0 } },
+    periods: [{ to: '2026-06', families: { claude: 0.42 } }],
+  }));
+  const manifest = (file) => select('lib/a.mjs') + `targets:\n  public:\n    remote: github.com/someone/glass\n    deny_values_from: [${file}]\n`;
+  const clean = fixture({ files: { 'lib/a.mjs': 'export const at = "2026-10-05T14:52:50.611Z"; export const n = 25, f = 10.0987;\n' }, manifest: manifest(cost) });
+  assert.ok(run(clean, 'public').out, 'a timestamp, an everyday number and a longer number pass');
+  for (const leak of ['export const d = 0.61;\n', 'export const r=[.0987];\n', 'export const p = 1.234;\n', 'export const f = 0.42;\n', '// example contract rebate\nexport {};\n']) {
+    failsWith(fixture({ files: { 'lib/a.mjs': leak }, manifest: manifest(cost) }), /deny: lib\/a\.mjs:\d+ matches/, 'public');
+  }
+  failsWith(fixture({ files: { 'lib/a.mjs': 'export {};\n' }, manifest: manifest(path.join(priv, 'nope.json')) }), /deny_values_from .* is not readable/, 'public');
+  fs.rmSync(priv, { recursive: true, force: true });
+});
+
 test('targets: the deny scan fails on a corporate string, the allowlist lets one through', () => {
   const files = { 'lib/a.mjs': '// call acme-corp.internal for help\nexport const names = "Acme|Globex";\n' };
   const deny = (allow) => targets(`    deny: ['acme']\n${allow}`);

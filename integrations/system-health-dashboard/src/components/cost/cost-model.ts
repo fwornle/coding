@@ -15,22 +15,27 @@
 //   - local    ← own hardware (qwen-*, any offload target)  zero per token
 //   - metered  ← anything else (anthropic-api, openai, groq)  API list price
 //
-// Money: token dollars × discount[account] → USD; ÷ usdPerEur → EUR. An
-// organisation buying Copilot through a cloud contract states its rule exactly
-// that way — token $ × its discount ÷ its FX — so both are data, not code: the
-// proxy's settings in coding, glass's per-target cost-defaults.json.
+// Money: token dollars × discount → USD; ÷ usdPerEur → EUR. An organisation
+// buying Copilot through a cloud contract states its rule exactly that way —
+// token $ × its discount ÷ its FX — so both are data, not code: the proxy's
+// settings in coding, glass's per-target cost-defaults.json. Both can change
+// over time, by account, model family or model (`periods`); every row is
+// priced on its own day by lib/cost/billing-rules.mjs.
 import { normalizeProvider, accountLabel } from '@/lib/providers'
 import { SITE_LOCAL_PROVIDERS } from '@/lib/provider-site'
-// The Copilot rate tables live with every other reader of them (glass's status
-// line, the calibration script) — one copy, see the module header.
+// The Copilot rate card and the dated billing rules live with every other
+// reader of them (glass's status line, the calibration script) — one copy.
+import { COPILOT_RATE_CARD } from '../../../../../lib/cost/copilot-pricing.mjs'
 import {
-  CALIBRATED_COPILOT_PRICES, COPILOT_RATE_CARD, copilotRate,
-} from '../../../../../lib/cost/copilot-pricing.mjs'
+  copilotPriceAt, discountAt, usdPerEurAt, DEFAULT_USD_PER_EUR,
+} from '../../../../../lib/cost/billing-rules.mjs'
 
-export { CALIBRATED_COPILOT_PRICES, COPILOT_RATE_CARD }
+export { COPILOT_RATE_CARD }
 
 export interface CostRow {
   month: string            // 'YYYY-MM'
+  /** YYYY-MM-DD, when the proxy groups by day (`?by=day`): a billing rule can change mid-month. */
+  day?: string
   provider: string
   model: string
   process: string
@@ -52,6 +57,19 @@ export interface CostRow {
 
 export interface ModelPrice { in: number; out: number; cacheRead: number; cacheWrite: number }
 
+/** One dated billing rule — see lib/cost/billing-rules.mjs. */
+export interface BillingPeriod {
+  from?: string
+  to?: string
+  account?: string
+  discount?: number
+  families?: Record<string, number>
+  models?: Record<string, number>
+  prices?: Record<string, ModelPrice>
+  usdPerEur?: number
+  note?: string
+}
+
 /** What a money figure is shown in. Tokens are not a currency; see TokenUsageUnit. */
 export type Currency = 'EUR' | 'USD'
 
@@ -65,11 +83,11 @@ export interface CostConfig {
   /** List (vendor API) prices — flat-subscription and metered accounts. */
   modelPrices: Record<string, ModelPrice>
   /**
-   * GitHub Copilot's own per-model rates, USD/MTok, fitted by
-   * scripts/cost/calibrate-copilot-prices.mjs against the itemized consumption
-   * sheet. Exact model ids only — an uncalibrated model falls back to its list
-   * row rather than to a sibling's calibrated rate, because Copilot's rates do
-   * not follow the family (Sonnet 5 bills at n× list, Sonnet 5.5 at ~n×).
+   * GitHub Copilot's per-model rates as measured on an organisation's own bill,
+   * USD/MTok (scripts/cost/calibrate-copilot-prices.mjs fits them). Empty by
+   * default — a bill is the organisation's, so its rates are cost-file data —
+   * and a model without a row here prices at GitHub's rate card. Exact model
+   * ids only: Copilot's rates do not follow the model family.
    */
   copilotPrices: Record<string, ModelPrice>
   /**
@@ -78,6 +96,12 @@ export interface CostConfig {
    * settings / glass's cost-defaults.json, never in code.
    */
   discount: Record<string, number>
+  /**
+   * Dated billing rules: a discount, a model family's or a model's discount,
+   * Copilot rates or an FX in force from one day to another
+   * (lib/cost/billing-rules.mjs has the shape and the precedence).
+   */
+  periods?: BillingPeriod[]
   /** What the discount is called on screen, per budget key ("contract discount" when absent). */
   discountLabel?: Record<string, string>
   providerScale: Record<string, number>
@@ -132,8 +156,9 @@ export const DEFAULT_COST_CONFIG: CostConfig = {
     'gpt-4o-mini':       { in: 0.15, out: 0.6, cacheRead: 0.075, cacheWrite: 0 },
     'gpt-5':             { in: 1.25, out: 10, cacheRead: 0.125, cacheWrite: 0 },
   },
-  copilotPrices: CALIBRATED_COPILOT_PRICES,
+  copilotPrices: {},
   discount: {},
+  periods: [],
   providerScale: { copilot: 1.0, 'claude-max': 1.0 },
   copilot: { plan: 'business', includedCreditsUsd: 19, creditUsd: 0.01, overagePrices: 'sameAsModelPrices' },
   budgets: {
@@ -153,8 +178,8 @@ export const DEFAULT_COST_CONFIG: CostConfig = {
  * { usdToEur: 0.92 }` and no calibrated table. Taking it verbatim would silently
  * undo the calibration on every machine that ever pressed Save.
  *
- * - `copilotPrices`: calibrated defaults, then any saved row (an operator's
- *   edit of one model wins; a model the sheet added later still arrives).
+ * - `copilotPrices`: per model, saved over default.
+ * - `periods`: the saved list as a whole (an order is part of its meaning).
  * - `currency.usdPerEur`: saved if present, else the default. The legacy
  *   `usdToEur` is NOT converted: 0.92 was an untuned placeholder, and inverting
  *   it (1.087) would replace a stated FX with a guess.
@@ -175,6 +200,7 @@ export function mergeCostConfig(saved: Partial<CostConfig> | null | undefined): 
     copilotPrices: { ...base.copilotPrices, ...(s.copilotPrices || {}) },
     discount: { ...base.discount, ...(s.discount || {}) },
     discountLabel: { ...(base.discountLabel || {}), ...(s.discountLabel || {}) },
+    periods: Array.isArray(s.periods) ? s.periods : (base.periods || []),
     providerScale: { ...base.providerScale, ...(s.providerScale || {}) },
     copilot: { ...base.copilot, ...(s.copilot || {}) },
     budgets: { ...base.budgets, ...(s.budgets || {}) },
@@ -409,8 +435,13 @@ export function freshInputTokens(r: { input_tokens: number }): number {
 export interface PriceableRow {
   provider: string
   model: string
-  /** YYYY-MM of a monthly row: a past month is priced at what GitHub charged then. */
+  /**
+   * When the tokens were spent — the most precise of these a row has: the
+   * billing rules in force that day price it (rowAt).
+   */
   month?: string
+  day?: string
+  hour?: string
   input_tokens: number
   output_tokens: number
   cache_read_tokens: number
@@ -420,15 +451,15 @@ export interface PriceableRow {
 /**
  * The price a row is charged at, by account kind.
  *
- * Copilot: GitHub's rate for the model (copilotRate — calibrated table, then
- * the rate card, exact ids). A model GitHub's rate is unknown for falls through
- * to list pricing below.
+ * Copilot: GitHub's rate for the model on the row's day (copilotPriceAt — a
+ * dated rule, the cost file's measured table, then the rate card; exact ids).
+ * A model GitHub's rate is unknown for falls through to list pricing below.
  */
-export function rowPrice(r: { provider: string; model: string; month?: string }, cfg: CostConfig): ResolvedPrice {
+export function rowPrice(r: { provider: string; model: string; month?: string; day?: string; hour?: string }, cfg: CostConfig): ResolvedPrice {
   const kind = accountKind(costAccount(r.provider))
   if (kind === 'local') return { price: { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 }, priced: true, source: 'exact' }
   if (kind === 'copilot') {
-    const rate = copilotRate(r.model, cfg.copilotPrices, r.month)
+    const rate = copilotPriceAt(cfg, r.model, rowAt(r))
     if (rate) return { price: rate, priced: true, source: 'exact' }
   }
   return priceForModel(r.model, cfg.modelPrices)
@@ -450,7 +481,7 @@ export interface CostParts { input: number; output: number; cacheRead: number; c
 export function cellCostParts(r: PriceableRow, cfg: CostConfig): CostParts {
   const { price } = rowPrice(r, cfg)
   const key = configKey(costAccount(r.provider))
-  const f = (cfg.discount?.[key] ?? 1) * (cfg.providerScale?.[key] ?? 1) / 1e6
+  const f = discountAt(cfg, key, r.model, rowAt(r)) * (cfg.providerScale?.[key] ?? 1) / 1e6
   return {
     input: freshInputTokens(r) * price.in * f,
     output: r.output_tokens * price.out * f,
@@ -459,16 +490,30 @@ export function cellCostParts(r: PriceableRow, cfg: CostConfig): CostParts {
   }
 }
 
-/** USD → the configured display currency (EUR: ÷ usdPerEur; USD: as is). */
-export function fromUsd(usd: number, cfg: CostConfig): number {
-  if (cfg.currency?.display === 'USD') return usd
-  return usd / (cfg.currency?.usdPerEur || 1.18)
+/** A row's time for the billing rules: its day, else its time bucket, else its month. */
+export function rowAt(r: { month?: string; day?: string; hour?: string }): string {
+  return r.day || r.hour || r.month || ''
 }
-/** EUR (budgets are kept in EUR) → the display currency. */
+
+/**
+ * USD → the configured display currency (EUR: ÷ the FX in force at `at` —
+ * a row's day, see rowAt — today's when absent; USD: as is).
+ */
+export function fromUsd(usd: number, cfg: CostConfig, at?: string): number {
+  if (cfg.currency?.display === 'USD') return usd
+  return usd / usdPerEurAt(cfg, at)
+}
+/** EUR (budgets are kept in EUR) → the display currency, at today's FX. */
 export function fromEur(eur: number, cfg: CostConfig): number {
-  if (cfg.currency?.display === 'USD') return eur * (cfg.currency?.usdPerEur || 1.18)
+  if (cfg.currency?.display === 'USD') return eur * usdPerEurAt(cfg)
   return eur
 }
+
+/** The Copilot discount for the account as a whole on a day (or month) — what the page states it prices with. */
+export function copilotDiscountAt(cfg: CostConfig, at?: string): number {
+  return discountAt(cfg, 'copilot', '', at)
+}
+export { DEFAULT_USD_PER_EUR, usdPerEurAt }
 
 /** The same config, displaying in another currency. */
 export function withCurrency(cfg: CostConfig, currency: Currency): CostConfig {
@@ -498,7 +543,7 @@ export function monthlySeries(rows: CostRow[], cfg: CostConfig, dim: PivotDim): 
   const byMonth = new Map<string, MonthTotal>()
   for (const r of rows) {
     if (isSynthetic(r)) continue
-    const eur = fromUsd(cellCostUsd(r, cfg), cfg)
+    const eur = fromUsd(cellCostUsd(r, cfg), cfg, rowAt(r))
     if (!byMonth.has(r.month)) byMonth.set(r.month, { month: r.month, costEur: 0, byKey: {} })
     const m = byMonth.get(r.month)!
     m.costEur += eur
@@ -525,7 +570,7 @@ export function pivotForMonth(rows: CostRow[], cfg: CostConfig, dim: PivotDim, m
   for (const r of rows) {
     if (isSynthetic(r)) continue
     if (month && r.month !== month) continue
-    const eur = fromUsd(cellCostUsd(r, cfg), cfg)
+    const eur = fromUsd(cellCostUsd(r, cfg), cfg, rowAt(r))
     total += eur
     const k = dimKey(r, dim)
     if (!agg.has(k)) agg.set(k, { key: k, costEur: 0, calls: 0, inTok: 0, outTok: 0, cacheReadTok: 0, estimated: false, share: 0 })
@@ -545,16 +590,15 @@ export function pivotForMonth(rows: CostRow[], cfg: CostConfig, dim: PivotDim, m
 // ---- Copilot real billing (Business tier) -------------------------------
 export interface CopilotBilling { grossEur: number; includedEur: number; overageEur: number }
 export function copilotBilling(rows: CostRow[], cfg: CostConfig, month: string): CopilotBilling {
-  let grossUsd = 0
+  let grossEur = 0
   for (const r of rows) {
     if (isSynthetic(r)) continue
     if (r.month !== month) continue
     if (accountKind(costAccount(r.provider)) !== 'copilot') continue
-    grossUsd += cellCostUsd(r, cfg)
+    grossEur += fromUsd(cellCostUsd(r, cfg), cfg, rowAt(r))
   }
-  const grossEur = fromUsd(grossUsd, cfg)
   // The allowance is credits, so it is discounted like the usage it offsets.
-  const includedEur = fromUsd((cfg.copilot?.includedCreditsUsd ?? 0) * (cfg.discount?.copilot ?? 1), cfg)
+  const includedEur = fromUsd((cfg.copilot?.includedCreditsUsd ?? 0) * copilotDiscountAt(cfg, month), cfg, month)
   return { grossEur, includedEur, overageEur: Math.max(0, grossEur - includedEur) }
 }
 
@@ -618,8 +662,8 @@ export function buildSuggestions(rows: CostRow[], cfg: CostConfig, month: string
     const fam = modelFamily(r.model)
     if (fam === 'haiku') continue // already cheap
     if (accountKind(costAccount(r.provider)) === 'local') continue // already free
-    const curEur = fromUsd(cellCostUsd(r, cfg), cfg)
-    const haikuEur = fromUsd(cellCostUsd({ ...r, provider: 'gh-copilot', model: 'claude-haiku-5.5' }, cfg), cfg)
+    const curEur = fromUsd(cellCostUsd(r, cfg), cfg, rowAt(r))
+    const haikuEur = fromUsd(cellCostUsd({ ...r, provider: 'gh-copilot', model: 'claude-haiku-5.5' }, cfg), cfg, rowAt(r))
     const key = r.process
     if (!perProcess.has(key)) perProcess.set(key, { costEur: 0, haikuEur: 0, provider: r.provider, model: r.model, tokens: 0 })
     const p = perProcess.get(key)!
@@ -680,7 +724,7 @@ export function splitByScope(rows: CostRow[], cfg: CostConfig): ScopeSplit {
   let fgEur = 0; let bgEur = 0; let unattributedEur = 0
   for (const r of rows) {
     if (isSynthetic(r)) continue
-    const eur = fromUsd(cellCostUsd(r, cfg), cfg)
+    const eur = fromUsd(cellCostUsd(r, cfg), cfg, rowAt(r))
     if (r.scope === 'fg') fgEur += eur
     else if (r.scope === 'bg') bgEur += eur
     else unattributedEur += eur
@@ -727,7 +771,7 @@ export function localSavings(
     if (isSynthetic(r) || !isZeroCostProvider(r.provider)) continue
     // Same row, priced as if gh-copilot had served it.
     const asCopilot: CostRow = { ...r, provider: 'gh-copilot', model: counterfactualModel }
-    const rowEur = fromUsd(cellCostUsd(asCopilot, cfg), cfg)
+    const rowEur = fromUsd(cellCostUsd(asCopilot, cfg), cfg, rowAt(asCopilot))
     eur += rowEur
     calls += r.calls
     tokens += r.input_tokens + r.output_tokens + r.cache_read_tokens + r.cache_write_tokens
@@ -777,9 +821,10 @@ export function costSeries(
   for (const c of cells) {
     if (isSynthetic(c)) continue
     const p = cellCostParts(c, cfg)
+    const at = rowAt(c)
     const parts: CostParts = {
-      input: fromUsd(p.input, cfg), output: fromUsd(p.output, cfg),
-      cacheRead: fromUsd(p.cacheRead, cfg), cacheWrite: fromUsd(p.cacheWrite, cfg),
+      input: fromUsd(p.input, cfg, at), output: fromUsd(p.output, cfg, at),
+      cacheRead: fromUsd(p.cacheRead, cfg, at), cacheWrite: fromUsd(p.cacheWrite, cfg, at),
     }
     let slot = byHour.get(c.hour)
     if (!slot) { slot = {}; byHour.set(c.hour, slot) }
@@ -804,7 +849,7 @@ export function costBy(cells: SummaryCell[], cfg: CostConfig, keyOf: (c: Summary
   for (const c of cells) {
     if (isSynthetic(c)) continue
     const k = keyOf(c)
-    out.set(k, (out.get(k) || 0) + fromUsd(cellCostUsd(c, cfg), cfg))
+    out.set(k, (out.get(k) || 0) + fromUsd(cellCostUsd(c, cfg), cfg, rowAt(c)))
   }
   return out
 }

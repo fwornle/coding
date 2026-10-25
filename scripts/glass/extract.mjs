@@ -68,6 +68,10 @@ export function loadManifest(file = DEFAULT_MANIFEST) {
  * names only where it is. Declared means required: a target whose private
  * overlay is missing does not extract, rather than publishing a build that
  * silently lacks it.
+ *
+ * `deny_values_from`: cost files (`~` expands) whose values this target's tree
+ * must not contain — see billingValuePatterns. Required like a private overlay:
+ * a public build is not published unchecked because the file is not here.
  */
 export function targetOf(manifest, name) {
   const names = Object.keys(manifest.targets);
@@ -79,7 +83,53 @@ export function targetOf(manifest, name) {
     name, remote: t.remote, overlay: t.overlay || null, rewrite: t.rewrite || [],
     privateOverlay: t.private_overlay ? t.private_overlay.replace(/^~(?=\/|$)/, os.homedir()) : null,
     deny: (t.deny || []).map((d) => new RegExp(d, 'i')), allow: t.allow || [],
+    denyValuesFrom: (t.deny_values_from || []).map((f) => f.replace(/^~(?=\/|$)/, os.homedir())),
   };
+}
+
+/**
+ * What a cost file knows that a public tree must not: its discount factors (by
+ * account, family, model, per period), its measured Copilot rates and its
+ * discount labels — as patterns. A rate is matched as a number, with or without
+ * its leading zero (a minified bundle writes .0981), never inside a longer one.
+ * Rates of fewer than three significant digits (25, 0.5) are everyday numbers and
+ * left out; discount factors are not, whatever their length. FX is public.
+ */
+export function billingValuePatterns(cost) {
+  const numbers = new Set();
+  const labels = new Set();
+  const factor = (v) => { if (Number.isFinite(Number(v)) && Number(v) > 0 && Number(v) !== 1) numbers.add(String(Number(v))); };
+  const rate = (v) => {
+    const n = Number(v);
+    if (Number.isFinite(n) && String(n).replace(/^0\.0*|\./g, '').replace(/^0+/, '').length >= 3) numbers.add(String(n));
+  };
+  const rates = (table) => { for (const p of Object.values(table || {})) for (const v of Object.values(p || {})) rate(v); };
+  for (const v of Object.values(cost?.discount || {})) factor(v);
+  for (const v of Object.values(cost?.discountLabel || {})) if (typeof v === 'string' && v.trim().length >= 4) labels.add(v.trim());
+  rates(cost?.copilotPrices);
+  for (const p of Array.isArray(cost?.periods) ? cost.periods : []) {
+    factor(p?.discount);
+    for (const k of ['families', 'models']) for (const v of Object.values(p?.[k] || {})) factor(v);
+    rates(p?.prices);
+  }
+  const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return [
+    ...[...numbers].map((n) => new RegExp(`(?<![\\d.])${n.startsWith('0.') ? `0?${esc(n.slice(1))}` : esc(n)}(?![\\d])`)),
+    ...[...labels].map((l) => new RegExp(esc(l), 'i')),
+  ];
+}
+
+/** The deny patterns of a target's deny_values_from files; a missing or unreadable file fails. */
+function valuePatterns(target) {
+  const out = [];
+  for (const f of target.denyValuesFrom || []) {
+    let cost;
+    try { cost = JSON.parse(fs.readFileSync(f, 'utf8')); } catch (err) {
+      throw new ExtractError([`target ${target.name}: deny_values_from ${f} is not readable (${err.code || err.message}) — the tree cannot be checked for the billing data it must not carry`]);
+    }
+    out.push(...billingValuePatterns(cost));
+  }
+  return out;
 }
 
 /** The checkout each manifest source names: coding = this checkout, proxy = proxy-paths' proxyDir(). */
@@ -243,7 +293,8 @@ const builtPrefixes = (manifest) => manifest.build.map((b) => `${posix(b.to).rep
 const TEXT_EXT = /\.(m?js|cjs|ts|tsx|json|ya?ml|md|html|css|puml|txt|sh|svg)$/i;
 
 export function denyScan(out, target) {
-  if (!target?.deny.length) return [];
+  const deny = [...(target?.deny || []), ...(target ? valuePatterns(target) : [])];
+  if (!deny.length) return [];
   const hits = [];
   for (const rel of listTree(out)) {
     const buf = fs.readFileSync(path.join(out, rel));
@@ -251,7 +302,7 @@ export function denyScan(out, target) {
     // (a literal NUL in a string) would otherwise hide the whole file from the scan.
     if (!TEXT_EXT.test(rel) && buf.subarray(0, 8000).includes(0)) continue;
     buf.toString('utf8').split('\n').forEach((line, i) => {
-      for (const re of target.deny) {
+      for (const re of deny) {
         if (!re.test(line)) continue;
         if (target.allow.some((a) => a.file === rel && new RegExp(a.pattern, 'i').test(line))) continue;
         hits.push(`deny: ${rel}:${i + 1} matches ${re}: ${line.trim().slice(0, 120)}`);

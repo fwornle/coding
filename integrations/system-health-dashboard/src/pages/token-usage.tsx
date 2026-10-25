@@ -18,7 +18,7 @@ import { normalizeModel } from '@/components/performance/models'
 import {
   CostConfig, Currency, DEFAULT_COST_CONFIG, SummaryCell, CellSplitter,
   fetchCostSettings, setLocalProviders, withCurrency, formatMoney,
-  cellCostUsd, fromUsd, costSeries, costBy, cellCostParts,
+  cellCostUsd, fromUsd, costSeries, costBy, cellCostParts, rowAt,
 } from '@/components/cost/cost-model'
 
 // Loaded on first render only: glass's build shows neither the dialog nor the
@@ -694,8 +694,9 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
   const costTotal = priced ? [...costByAccount!.values()].reduce((a, b) => a + b, 0) : 0
   const costKinds = priced ? cells!.reduce((acc, c) => {
     const p = cellCostParts(c, cfg)
-    acc.input += fromUsd(p.input, cfg); acc.output += fromUsd(p.output, cfg)
-    acc.cached += fromUsd(p.cacheRead + p.cacheWrite, cfg)
+    const at = rowAt(c)
+    acc.input += fromUsd(p.input, cfg, at); acc.output += fromUsd(p.output, cfg, at)
+    acc.cached += fromUsd(p.cacheRead + p.cacheWrite, cfg, at)
     return acc
   }, { input: 0, output: 0, cached: 0 }) : null
   // The page's one formatter for an axis value: money when priced, else tokens.
@@ -1599,10 +1600,10 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
                       {priced && (
                         <TableCell className="text-right font-mono text-xs">
                           {fmtMoney(fromUsd(cellCostUsd({
-                            provider: call.provider, model: call.model,
+                            provider: call.provider, model: call.model, hour: call.timestamp,
                             input_tokens: call.input_tokens, output_tokens: call.output_tokens,
                             cache_read_tokens: call.cache_read_tokens || 0, cache_write_tokens: call.cache_write_tokens || 0,
-                          }, cfg), cfg))}
+                          }, cfg), cfg, call.timestamp))}
                         </TableCell>
                       )}
                       <TableCell className="text-right font-mono text-xs">{formatLatency(call.latency_ms)}</TableCell>

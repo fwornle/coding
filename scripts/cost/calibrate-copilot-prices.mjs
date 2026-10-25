@@ -3,21 +3,23 @@
  * Fit per-model GitHub Copilot prices from an itemized consumption sheet.
  *
  * WHY. GitHub Copilot bills in AI credits ($0.01 each) per model per day. The
- * proxy records tokens, not credits, and for several models GitHub's rate is NOT
- * the vendor's list price: measured against a 2026-08..10 itemized sheet, Sonnet 4.6
- * and Opus 5 sit at list, Sonnet 5 at a flat 2/3 of list, Haiku 5.5 at ~1/8. A
- * single list-price table therefore misstates the real Copilot spend by up to
- * 8x per model. This script derives the table from the sheet instead.
+ * proxy records tokens, not credits, and for several models what GitHub charges
+ * is NOT the vendor's list price — some models bill at list, others at a fraction
+ * of it. A single list-price table can misstate the real Copilot spend several
+ * times over for one model. This script derives the rates from the sheet instead.
+ *
+ * The sheet and the rates fitted from it are the organisation's own billing
+ * data: they belong in its cost file (`copilotPrices`, or a dated `periods`
+ * entry when GitHub changed a rate mid-sheet), never in this repository.
  *
  * CACHING. The token row splits a call into fresh input, output, cache reads and
  * cache writes, each priced differently (Anthropic family: 1x / 5x / 0.1x /
  * 1.25x of input). On the OpenAI wire Copilot speaks, a cache WRITE has no
  * counter — `prompt_tokens_details` carries only `cached_tokens` — so tokens that
  * Copilot wrote to the cache (and billed at 1.25x) arrive as plain fresh input.
- * That is visible in the data: Haiku 4.5 tracks list price at 1.00x through
- * mid-September, then 1.23x from 2026-09-19, when consolidator-mentions began
- * sending large, never-reused prefixes. The fit therefore has two parameters per
- * model:
+ * That is visible in the data: a model's apparent input rate rises above list
+ * once a workload starts sending large, never-reused prefixes. The fit therefore
+ * has two parameters per model:
  *
  *   cost_day ≈ k · ( μ·in·P_in + out·P_out + cacheRead·P_cr + cacheWrite·P_cw )
  *
@@ -34,18 +36,24 @@
  *
  * Usage:
  *   node scripts/cost/calibrate-copilot-prices.mjs --sheet=<…_consumption_source.json>
- *        [--db=PATH] [--since=YYYY-MM-DD] [--json]
+ *        [--db=PATH] [--since=YYYY-MM-DD] [--until=YYYY-MM-DD] [--json] [--into=FILE]
  *
  *   --since  fit window start (default: the sheet's own start). Narrow it when
  *            GitHub changes a rate mid-sheet, so the current regime wins.
+ *   --until  fit window end (default: the sheet's own end).
  *   --min-days  days of personal evidence a model needs to be fitted (default
  *            5). Below it the model is left to GitHub's company-wide rate card
- *            (COPILOT_RATE_CARD in cost-model.ts): a 1–4 day fit once priced
- *            Sonnet 5.5 at n× a card it was later billed n× above.
- *   --json   print only the `copilotPrices` block, for pasting into
- *            CALIBRATED_COPILOT_PRICES or PUT /api/llm/settings
+ *            (COPILOT_RATE_CARD in lib/cost/copilot-pricing.mjs): a fit on a
+ *            few days can land far from what the model is later billed at.
+ *   --json   print only the `copilotPrices` block, for the cost file
+ *            (glass: its config/cost-defaults.json; coding: PUT /api/llm/settings)
+ *   --into   merge the fitted rates into that cost file (glass's
+ *            config/cost-defaults.json in the private overlay, ~/.glass/cost.json):
+ *            into its standing `copilotPrices`, or — with --until, for a rate
+ *            GitHub has changed since — as a dated `periods` entry for the
+ *            window, replacing one with the same from/to. Its other keys stay.
  *
- * Read-only: the DB is opened readOnly and nothing is written anywhere.
+ * The DB is opened readOnly; nothing but the --into file is ever written.
  */
 
 import * as fs from 'node:fs';
@@ -80,6 +88,8 @@ function parseArgs(argv) {
     if (a.startsWith('--sheet=')) args.sheet = path.resolve(a.slice(8));
     else if (a.startsWith('--db=')) args.db = path.resolve(a.slice(5));
     else if (a.startsWith('--since=')) args.since = a.slice(8);
+    else if (a.startsWith('--until=')) args.until = a.slice(8);
+    else if (a.startsWith('--into=')) args.into = path.resolve(a.slice(7));
     else if (a.startsWith('--min-days=')) args.minDays = Number(a.slice(11));
     else if (a === '--json') args.json = true;
     else throw new Error(`unknown argument: ${a}`);
@@ -131,10 +141,35 @@ export function fitModel(days, p) {
 
 const round = (n) => Math.round(n * 10000) / 10000;
 
+/**
+ * Merges fitted rates into a cost file, keeping its other keys: the standing
+ * `copilotPrices`, or a dated period for `window` (same from/to → replaced).
+ * Temp file + rename, so a reader never sees half a file. Exported for the test.
+ */
+export function writeInto(file, prices, window) {
+  let cur = {};
+  try { cur = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (err) { if (err.code !== 'ENOENT') throw err; }
+  let where;
+  if (window) {
+    const periods = (Array.isArray(cur.periods) ? cur.periods : []).filter((p) => !(p.from === window.from && p.to === window.to && p.prices));
+    periods.push({ from: window.from, to: window.to, prices, note: 'Copilot rates fitted on this window' });
+    cur = { ...cur, periods };
+    where = `periods ${window.from} .. ${window.to}`;
+  } else {
+    cur = { ...cur, copilotPrices: { ...(cur.copilotPrices || {}), ...prices } };
+    where = 'copilotPrices';
+  }
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, `${JSON.stringify(cur, null, 2)}\n`);
+  fs.renameSync(tmp, file);
+  return where;
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   const sheet = JSON.parse(fs.readFileSync(args.sheet, 'utf8'));
-  const lastDay = sheet.end;
+  const lastDay = args.until || sheet.end;
   const since = args.since || sheet.start;
 
   // Sheet: USD per (day, model). Credits × $0.01 — recomputed rather than read
@@ -183,9 +218,9 @@ function main() {
     const { fam, p } = baseVector(model);
     const tokens = days.reduce((s, d) => s + d.in + d.out + d.cr + d.cw, 0);
     // Below a quarter of evidence the fit is noise; leave the model on its base
-    // row (the family fallback in cost-model.ts) rather than invent a rate. Kept
-    // low on purpose: gpt-5-mini billed $x for nM tokens, and its family
-    // fallback (gpt-5 list) would price the same tokens ~8x higher.
+    // row (the rate card) rather than invent a rate. Kept low on purpose: a cheap
+    // model's whole month can be below a dollar, and its family's list price
+    // would price the same tokens many times higher.
     const billedDays = days.filter((d) => d.usd > 0).length;
     if (sheetUsd < 0.25 || tokens === 0 || billedDays < args.minDays) {
       if (sheetUsd > 0 || tokens > 0) {
@@ -230,6 +265,10 @@ function main() {
     months.set(monthOf(key), m);
   }
 
+  if (args.into) {
+    const where = writeInto(args.into, prices, args.until ? { from: since, to: lastDay } : null);
+    process.stderr.write(`calibrate-copilot-prices: ${Object.keys(prices).length} rate(s) written to ${args.into} (${where})\n`);
+  }
   if (args.json) {
     say(JSON.stringify({ copilotPrices: prices }, null, 2));
     return;

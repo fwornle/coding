@@ -369,28 +369,37 @@ listing each series largest first, zeros left out, with the month's total.
 
 | Account | Rate |
 |---|---|
-| GitHub Copilot | GitHub's per-model rates from `lib/cost/copilot-pricing.mjs` — a calibrated table, then GitHub's rate card; fresh input, cache read and cache write each at their own rate — × the contract discount |
+| GitHub Copilot | GitHub's per-model rates — the operator's measured `cost.copilotPrices`, then GitHub's rate card (`lib/cost/copilot-pricing.mjs`); fresh input, cache read and cache write each at their own rate — × the contract discount |
 | Claude subscription, metered keys | API list prices (`cost.modelPrices`, family fallback) |
 | Own hardware | 0 |
 
 € = USD ÷ `cost.currency.usdPerEur`; $ skips the FX. A contract discount
 (`cost.discount.copilot`, e.g. `0.8` = 20% off), its on-screen name
-(`cost.discountLabel.copilot`) and budgets (`cost.budgets`) are the operator's own and
-live in the proxy's saved settings (`PUT /api/llm/settings`, or **Prices & Budgets** on the
-Cost tab) — the code ships none.
+(`cost.discountLabel.copilot`), measured Copilot rates (`cost.copilotPrices`) and budgets
+(`cost.budgets`) are the operator's own and live in the proxy's saved settings
+(`PUT /api/llm/settings`, or **Prices & Budgets** on the Cost tab) — the code ships none.
 
-**Calibrating the Copilot rates.** When GitHub changes a rate, fit the table again from
-an itemized consumption sheet covering days this machine's token database also covers:
+**Billing that changes.** `cost.periods` holds dated rules — a discount from one day to
+another, per account, model family (`families`, by id prefix) or model (`models`), Copilot
+rates in force then (`prices`), an FX (`usdPerEur`). Each row is priced on its own day (the
+Cost tab reads day rows, `/api/token-usage/cost?by=day`); the most specific discount in
+force wins, and at equal specificity the later entry. `lib/cost/billing-rules.mjs` is the
+one reading of it — shape, precedence and examples in glass's *Token Usage* page,
+"Billing that changes over time".
+
+**Calibrating the Copilot rates.** When GitHub changes a rate, fit the rates again from
+your itemized usage sheet, covering days this machine's token database also covers:
 
 ```bash
-node scripts/cost/calibrate-copilot-prices.mjs --sheet=<…_consumption_source.json> [--min-days=5] [--json]
+node scripts/cost/calibrate-copilot-prices.mjs --sheet=<…_consumption_source.json> [--min-days=5] [--json] [--into=FILE]
 ```
 
 It reports each model's fitted level and cache-write share against the sheet, and each
-month billed vs predicted. Paste the `--json` output into `CALIBRATED_COPILOT_PRICES` in
-`lib/cost/copilot-pricing.mjs`; glass picks it up with its next extract (see glass's
-*Development & Releases* page for its per-target `private_overlay`, which carries an
-organisation's cost settings into that target's build only).
+month billed vs predicted. `--json` prints the `copilotPrices` block for
+`PUT /api/llm/settings`; `--into` merges it into a cost file (with `--until`, as a dated
+period). glass takes its cost file from a per-target `private_overlay` (glass's
+*Development & Releases* page), so an organisation's billing reaches that target's build
+only.
 
 ---
 

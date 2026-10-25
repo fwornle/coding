@@ -64,7 +64,7 @@ export function CostSettingsDialog({ open, onOpenChange, proxyBase, onSaved }: P
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>Cost & Budget Settings</DialogTitle>
           <DialogDescription>
-            Prices are USD per 1M tokens. GitHub Copilot uses its own calibrated rates; every other
+            Prices are USD per 1M tokens. GitHub Copilot uses its measured rates where the cost settings have them, else GitHub's rate card; every other
             account uses the public list rates, where version variants resolve by family (any{' '}
             <code>*opus*</code> → the Opus row). Budgets are per account, in EUR.
           </DialogDescription>
@@ -95,16 +95,37 @@ export function CostSettingsDialog({ open, onOpenChange, proxyBase, onSaved }: P
                   <span className="text-xs text-muted-foreground">1 = no discount · 0.8 = 20% off</span>
                 </label>
               </div>
+              <div className="text-xs text-muted-foreground mt-2">
+                These are the standing values. Discounts that start and end, apply to one model or a
+                model family, dated Copilot rates and FX are <code>periods</code> in the cost settings
+                (see the token usage docs); each row is priced with the rules in force on its day.
+              </div>
+              {(draft.periods || []).length > 0 && (
+                <ul className="text-xs mt-2 space-y-1" aria-label="Dated billing rules">
+                  {(draft.periods || []).map((p, i) => (
+                    <li key={i} className="font-mono">
+                      {p.from || '…'} → {p.to || '…'} · {p.account || 'copilot'}
+                      {p.discount !== undefined && <> · ×{p.discount}</>}
+                      {Object.entries(p.families || {}).map(([k, v]) => <span key={`f${k}`}> · {k}* ×{v}</span>)}
+                      {Object.entries(p.models || {}).map(([k, v]) => <span key={`m${k}`}> · {k} ×{v}</span>)}
+                      {Object.keys(p.prices || {}).length > 0 && <> · rates for {Object.keys(p.prices || {}).join(', ')}</>}
+                      {p.usdPerEur !== undefined && <> · FX {p.usdPerEur}</>}
+                      {p.note && <span className="font-sans text-muted-foreground"> — {p.note}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
 
             {/* Calibrated Copilot rates */}
             <section>
-              <h3 className="text-sm font-semibold mb-2">GitHub Copilot rates — USD / 1M tokens (calibrated)</h3>
+              <h3 className="text-sm font-semibold mb-2">GitHub Copilot rates — USD / 1M tokens (measured)</h3>
               <div className="text-xs text-muted-foreground mb-2">
-                Fitted per model from GitHub's itemized consumption sheet by{' '}
+                Fitted per model from your own Copilot usage sheet by{' '}
                 <code>scripts/cost/calibrate-copilot-prices.mjs</code>; re-run it on a new sheet rather
-                than editing by hand. Models not listed here price from GitHub's company-wide rate card. An input rate above list carries the cache-write premium the
+                than editing by hand. Models not listed here price from GitHub's rate card. An input rate above list carries the cache-write premium the
                 OpenAI wire does not report separately.
+                {Object.keys(draft.copilotPrices).length === 0 && <> None set: every model prices from the rate card.</>}
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">

@@ -87,6 +87,54 @@ at a fixed rate, put them in `~/.glass/cost.json`:
 (`config/cost-defaults.json`); yours wins. Without either, Copilot is priced at GitHub's
 rates with no discount.
 
+#### Billing that changes over time
+
+A contract discount starts and ends, a promotion covers one model or a model family for a
+few months, GitHub changes a model's rate, the FX you book at moves. Each of these is a
+dated entry under `periods` in the same file:
+
+```json
+{
+  "discount": { "copilot": 0.8 },
+  "currency": { "usdPerEur": 1.18 },
+  "copilotPrices": { "claude-sonnet-5": { "in": 2.5, "out": 10, "cacheRead": 0.2, "cacheWrite": 2.5 } },
+  "periods": [
+    { "from": "2026-03", "to": "2026-06", "discount": 0.9, "note": "before the contract" },
+    { "from": "2026-05-01", "to": "2026-05-31", "families": { "claude-opus": 0.5 }, "note": "Opus promotion" },
+    { "from": "2026-07-01", "models": { "gpt-5-mini": 1 } },
+    { "to": "2026-09-30", "prices": { "gpt-5.4": { "in": 6, "out": 30, "cacheRead": 0.6, "cacheWrite": 6 } } },
+    { "from": "2026-01-01", "to": "2026-03-31", "usdPerEur": 1.1 }
+  ]
+}
+```
+
+| Key | Meaning |
+|---|---|
+| `from`, `to` | first and last day, both included, UTC — `YYYY-MM-DD`, or `YYYY-MM` for a whole month; leave one out for open-ended |
+| `account` | whose discount the entry sets: `copilot` (the default), `claude-max`, … |
+| `discount` | the factor for every model of that account |
+| `families` | a factor per model family, by id prefix: `claude-opus` covers `claude-opus-5` and `claude-opus-4.8` |
+| `models` | a factor per model id |
+| `prices` | GitHub Copilot's rates in force then, USD per 1M tokens (per token kind) |
+| `usdPerEur` | the FX in force then, for every account |
+| `note` | free text, shown in coding's Prices & Budgets dialog |
+
+`copilotPrices` (outside `periods`) are standing Copilot rates — the ones fitted from your
+own usage sheet; a model without one prices at GitHub's rate card.
+
+Every row is priced on its own day. For its discount the **most specific** rule in force
+wins: a `models` entry, then the longest `families` prefix, then an entry's `discount`, then
+the standing `discount`. A factor replaces the broader one rather than multiplying it: for a
+20% promotion on top of a 20% contract, write `0.64`. Where two entries of the same kind
+overlap, the one listed later wins; `~/.glass/cost.json`'s entries come after the build's.
+A Copilot rate comes from the latest entry with `prices` for the model, then
+`copilotPrices`, then GitHub's rate card; the FX from the latest entry with `usdPerEur`,
+then `currency`.
+
+A mistyped entry is skipped rather than guessed, so prices fall back to the standing values:
+`glass doctor` lists every entry it cannot read. The Cost tab's header names the discount
+and FX in force for the month shown and how many dated rules there are.
+
 ### What the Copilot figure covers
 
 ![Agents started with glass and coding's background jobs pass glass call by call, VS Code's Copilot Chat is read from its history afterwards; glass prices them and sets them next to GitHub's own month-to-date count for the account, which also covers agents started without glass, other machines and github.com.](images/glass-copilot-coverage.png)

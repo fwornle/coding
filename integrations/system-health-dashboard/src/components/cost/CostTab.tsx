@@ -17,7 +17,7 @@ import { CostSettingsDialog } from './CostSettingsDialog'
 import { SeriesTooltip } from './series-tooltip'
 import {
   CostRow, CostConfig, Currency, DEFAULT_COST_CONFIG, PivotDim, AccountKind,
-  accountKind, accountName, costAccount, configKey, isSynthetic, cellCostUsd, fromUsd, fromEur,
+  accountKind, accountName, costAccount, configKey, isSynthetic, cellCostUsd, fromUsd, fromEur, rowAt, copilotDiscountAt, usdPerEurAt,
   formatMoney, fetchCostSettings, setLocalProviders, withCurrency,
   monthlySeries, pivotForMonth, copilotBilling, projectBurn, budgetStatus,
   buildSuggestions, budgetForMonth, splitByScope, ScopeSplit, localSavings, LocalSavings,
@@ -123,7 +123,9 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
     setError(null)
     try {
       const [costRes, cs, quotaView] = await Promise.all([
-        fetch(`${proxyBase}/api/token-usage/cost?months=${months}`),
+        // by=day: a billing rule can change mid-month; a proxy that predates it
+        // ignores the parameter and its monthly rows price on the month's first day.
+        fetch(`${proxyBase}/api/token-usage/cost?months=${months}&by=day`),
         fetchCostSettings(proxyBase),
         fetch(`${proxyBase}/api/glass/copilot-quota${isAuto ? '' : '?refresh=1'}`)
           .then(r => (r.ok ? r.json() as Promise<CopilotQuotaView> : null))
@@ -208,7 +210,7 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
     for (const account of accounts) {
       const kind = accountKind(account)
       const monthRows = rows.filter(r => !isSynthetic(r) && r.month === activeMonth && costAccount(r.provider) === account)
-      const spend = monthRows.reduce((s, r) => s + fromUsd(cellCostUsd(r, cfg), cfg), 0)
+      const spend = monthRows.reduce((s, r) => s + fromUsd(cellCostUsd(r, cfg), cfg, rowAt(r)), 0)
       const key = configKey(account)
       const budgetCfg = cfg.budgets[key]
       // The cap IN FORCE THAT MONTH, not today's. This one went step by
@@ -269,7 +271,13 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
   if (loading) return <div className="py-16 text-center text-muted-foreground">Loading cost data…</div>
   if (error) return <Alert variant="destructive" className="mt-4"><AlertDescription>{error}</AlertDescription></Alert>
 
-  const copilotDiscount = cfg.discount?.copilot ?? 1
+  // What the header states: the account-wide rule in force on the month shown
+  // (today's for the current one). Dated model and family rules price their rows
+  // all the same; the header says that they exist.
+  const ruleDay = activeMonth && !isCurrentCalendarMonth ? activeMonth : undefined
+  const copilotDiscount = copilotDiscountAt(cfg, ruleDay)
+  const fxShown = usdPerEurAt(cfg, ruleDay)
+  const datedRules = (cfg.periods || []).length
   const tileGrid = tiles.length >= 3 ? 'md:grid-cols-2 xl:grid-cols-3' : 'md:grid-cols-2'
 
   return (
@@ -330,7 +338,8 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
       <div className="text-xs text-muted-foreground">
         GitHub Copilot: GitHub's per-model rates (cache reads and writes priced separately)
         {copilotDiscount !== 1 && <> × {cfg.discountLabel?.copilot || 'contract discount'} {Math.round((1 - copilotDiscount) * 100)}%</>}
-        {currency === 'EUR' && <> ÷ FX {cfg.currency.usdPerEur} USD/EUR</>}. Claude Max: API list price
+        {currency === 'EUR' && <> ÷ FX {fxShown} USD/EUR</>}
+        {datedRules > 0 && <span title="Each row is priced with the discount, Copilot rate and FX in force on its day (the cost file's periods)"> · {datedRules} dated rule{datedRules === 1 ? '' : 's'}</span>}. Claude Max: API list price
         (notional). Own hardware: free per token.
         {coverage && <div className="mt-1">{coverage.long}</div>}
       </div>
@@ -379,7 +388,7 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
                     {coverage && <span className="text-xs text-muted-foreground" title={coverage.long}>· {coverage.short}</span>}
                   </div>
                   {t.kind === 'copilot' && isCurrentCalendarMonth && quota?.enabled && (
-                    <CopilotReported quota={quota} measured={t.spend} toDisplay={usd => fromUsd(usd * copilotDiscount, cfg)} money={money} />
+                    <CopilotReported quota={quota} measured={t.spend} toDisplay={usd => fromUsd(usd * copilotDiscountAt(cfg), cfg)} money={money} />
                   )}
                   {isCurrentCalendarMonth && t.kind !== 'local' && (
                     <div className="text-sm text-muted-foreground">

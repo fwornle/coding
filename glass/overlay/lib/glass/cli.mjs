@@ -20,6 +20,8 @@ import { openUrl } from './open-url.mjs';
 import { renderStatusline, renderReport, uiLinks, TAGS } from './statusline.mjs';
 import { tmuxWanted, launchInTmux, configureStatus, popup, message, selfCommand } from './tmux.mjs';
 import { update } from './update.mjs';
+import { loadCostDefaults } from './cost.mjs';
+import { billingProblems } from '../cost/billing-rules.mjs';
 
 const out = (line = '') => process.stdout.write(`${line}\n`);
 const err = (line) => process.stderr.write(`${line}\n`);
@@ -362,6 +364,12 @@ async function doctor() {
   out(`data home: ${home}`);
   out(`interception CA: ${fs.existsSync(path.join(p.ca, 'ca.pem')) ? path.join(p.ca, 'ca.pem') : '(created on first daemon start)'}`);
   out(`egress proxy: ${upstreamProxy(process.env, port) || '(direct)'}`);
+  // A bad billing rule is skipped when pricing, so a typo would price silently
+  // at the standing rate — this is where it gets said.
+  const rules = loadCostDefaults(home);
+  const ruleProblems = billingProblems(rules);
+  out(`cost settings: ${(rules.periods || []).length} dated rule(s), ${Object.keys(rules.copilotPrices || {}).length} measured Copilot rate(s)`);
+  for (const l of ruleProblems) { out(`  ✗ ${l}`); problems++; }
   for (const agent of AGENTS) {
     const bin = whichBin(agentBin(agent));
     if (!bin) { out(`  - ${agent}: not found on PATH`); continue; }

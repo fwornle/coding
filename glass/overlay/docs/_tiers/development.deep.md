@@ -37,36 +37,37 @@ GitHub release `v<version>` with the tarball attached.
 
 ## Copilot rates and organisation settings
 
-**Rates.** GitHub's per-model Copilot rates live in coding's `lib/cost/copilot-pricing.mjs`,
-one table shared by the status line, the Cost tab and coding's own dashboard:
+**Code and data.** The code holds only public data: GitHub's per-model Copilot **rate
+card** (coding's `lib/cost/copilot-pricing.mjs`, included models at 0) and the reading of
+billing rules (`lib/cost/billing-rules.mjs`), shared by the status line, the Cost tab and
+coding's own dashboard. Everything that comes from an organisation's bill — its contract
+discount, the Copilot rates measured on its usage, dated discounts by model or model
+family, rate changes, its FX — is a **cost file** (shape and precedence:
+[Billing that changes over time](token-usage.md#billing-that-changes-over-time)). A change
+in billing is an edit of that file and a new build; no code changes.
 
-- a **calibrated** table, fitted per model from an itemized Copilot consumption sheet
-  against the tokens the proxy recorded over the same days;
-- GitHub's **rate card** as the fallback for every model without enough evidence
-  (included models at 0).
-
-To recalibrate when GitHub changes a rate, run in coding, on a machine whose token
-database covers the sheet's period:
+**Measuring the rates.** To fit Copilot rates from an itemized usage sheet, run in coding,
+on a machine whose token database covers the sheet's period:
 
 ```bash
-node scripts/cost/calibrate-copilot-prices.mjs --sheet=<…_consumption_source.json>
+node scripts/cost/calibrate-copilot-prices.mjs --sheet=<…_consumption_source.json> \
+  --into=~/.coding/glass-private/internal/config/cost-defaults.json
 ```
 
 It prints, per model, the fitted price level and cache-write share, the fit quality and
 the sheet's dollars against the fit, then each month's billed against predicted total —
 a stale table shows up as a drifting month. Models with fewer than `--min-days` (default
-5) billed days are left to the rate card. `--json` prints the table to paste into
-`CALIBRATED_COPILOT_PRICES`; commit it in coding and the next extract ships it.
+5) billed days are left to the rate card. `--into` merges the rates into the cost file's
+`copilotPrices`, keeping its other keys.
 
 When GitHub changes a model's rate mid-sheet, one fit over the whole sheet averages the
-two rates and every month after the change drifts the same way, whatever its cache share
-(GPT-5.6 Sol, October 2026: n× on every day). Fit the new period alone with
-`--since=<first day>`; if it matches the rate card, drop the model's calibrated row. The old
-rate goes to `COPILOT_PRICE_HISTORY` with the first month of the new one, so the Cost tab
-prices past months at what GitHub charged then.
+two rates, and every day after the change drifts the same way whatever its cache share.
+Fit each regime on its own: the old one with `--since=<first day> --until=<last day of the
+old rate>` (written as a dated `periods` entry), the new one with `--since=<first day of
+the new rate>`. If the new rate matches the rate card, the model needs no row at all.
 
-**Organisation settings.** A contract discount, its name, an FX rate — anything only one
-organisation's users should get — never goes into coding, which is public. A target in
+**Organisation settings.** The cost file, and anything else only one organisation's users
+should get, never goes into coding, which is public. A target in
 `glass/manifest.yaml` can name a `private_overlay`: a directory outside the repository
 whose files are copied into that target's tree only, after its own overlay:
 

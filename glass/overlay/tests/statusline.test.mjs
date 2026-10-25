@@ -242,6 +242,35 @@ test("copilotMonthCost prices this month's Copilot rows at GitHub's rates × dis
   assert.ok(Math.abs(c.eur - (0.25 * 0.8) / 1.25) < 1e-9, `eur ${c.eur}`);
 });
 
+test('copilotMonthCost: each day at the rules in force that day — a discount from mid-month, a family promotion, a dated FX', async () => {
+  const { DatabaseSync } = await import('node:sqlite');
+  const { copilotMonthCost } = await import('../lib/glass/cost.mjs');
+  const db = new DatabaseSync(':memory:');
+  db.exec(`CREATE TABLE token_usage (timestamp TEXT, provider TEXT, model TEXT, input_tokens INT,
+    output_tokens INT, cache_read_tokens INT, cache_write_tokens INT)`);
+  const ins = db.prepare('INSERT INTO token_usage VALUES (?, ?, ?, ?, ?, ?, ?)');
+  // $0.25 of gpt-5-mini each on the 2nd and the 20th, and $1 of measured "claude-x-1" on the 20th.
+  ins.run('2026-10-02T10:00:00Z', 'gh-copilot', 'gpt-5-mini', 1_000_000, 0, 0, 0);
+  ins.run('2026-10-20T10:00:00Z', 'gh-copilot', 'gpt-5-mini', 1_000_000, 0, 0, 0);
+  ins.run('2026-10-20T11:00:00Z', 'gh-copilot', 'claude-x-1', 1_000_000, 0, 0, 0);
+  const cfg = {
+    discount: { copilot: 0.9 },
+    currency: { usdPerEur: 1.25 },
+    copilotPrices: { 'claude-x-1': { in: 1, out: 0, cacheRead: 0, cacheWrite: 0 } },
+    periods: [
+      { from: '2026-10-15', discount: 0.8 },
+      { from: '2026-10-15', families: { claude: 0.5 } },
+      { from: '2026-10-15', usdPerEur: 1 },
+    ],
+  };
+  const c = copilotMonthCost(db, cfg, new Date('2026-10-21T00:00:00Z'));
+  const usd = 0.25 * 0.9 + 0.25 * 0.8 + 1 * 0.5;
+  const eur = (0.25 * 0.9) / 1.25 + 0.25 * 0.8 + 1 * 0.5;
+  assert.ok(Math.abs(c.usd - usd) < 1e-9, `usd ${c.usd}`);
+  assert.ok(Math.abs(c.eur - eur) < 1e-9, `eur ${c.eur}`);
+  assert.equal(c.unpricedCalls, 0, 'the cost file\'s measured rate prices a model the card lacks');
+});
+
 test("loadCostDefaults: the build's cost file, then the user's on top; nothing when neither exists", async () => {
   const { loadCostDefaults } = await import('../lib/glass/cost.mjs');
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-cost-home-'));
@@ -251,6 +280,16 @@ test("loadCostDefaults: the build's cost file, then the user's on top; nothing w
   fs.writeFileSync(path.join(pkg, 'config', 'cost-defaults.json'), JSON.stringify({ discount: { copilot: 0.7 }, currency: { usdPerEur: 1.2 } }));
   fs.writeFileSync(path.join(home, 'cost.json'), JSON.stringify({ discount: { copilot: 0.9 } }));
   assert.deepEqual(loadCostDefaults(home, pkg), { discount: { copilot: 0.9 }, currency: { usdPerEur: 1.2 } });
+  // Measured rates merge per model; dated rules add up, the user's after the build's.
+  const rate = (k) => ({ in: k, out: k, cacheRead: k, cacheWrite: k });
+  fs.writeFileSync(path.join(pkg, 'config', 'cost-defaults.json'), JSON.stringify({
+    copilotPrices: { a: rate(1), b: rate(2) }, periods: [{ to: '2026-06', discount: 0.5 }],
+  }));
+  fs.writeFileSync(path.join(home, 'cost.json'), JSON.stringify({ copilotPrices: { b: rate(3) }, periods: [{ from: '2026-07', discount: 0.6 }] }));
+  assert.deepEqual(loadCostDefaults(home, pkg), {
+    copilotPrices: { a: rate(1), b: rate(3) },
+    periods: [{ to: '2026-06', discount: 0.5 }, { from: '2026-07', discount: 0.6 }],
+  });
   fs.rmSync(home, { recursive: true, force: true });
   fs.rmSync(pkg, { recursive: true, force: true });
 });
