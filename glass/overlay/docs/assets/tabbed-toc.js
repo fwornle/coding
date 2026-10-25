@@ -16,6 +16,8 @@
  */
 (function () {
   "use strict";
+  // The extractor also imports documentation scripts in its Node.js smoke check.
+  if (typeof document === "undefined") return;
 
   function updateToc() {
     var tocs = document.querySelectorAll(".md-nav--secondary");
