@@ -58,6 +58,13 @@ a stale table shows up as a drifting month. Models with fewer than `--min-days` 
 5) billed days are left to the rate card. `--json` prints the table to paste into
 `CALIBRATED_COPILOT_PRICES`; commit it in coding and the next extract ships it.
 
+When GitHub changes a model's rate mid-sheet, one fit over the whole sheet averages the
+two rates and every month after the change drifts the same way, whatever its cache share
+(GPT-5.6 Sol, October 2026: n× on every day). Fit the new period alone with
+`--since=<first day>`; if it matches the rate card, drop the model's calibrated row. The old
+rate goes to `COPILOT_PRICE_HISTORY` with the first month of the new one, so the Cost tab
+prices past months at what GitHub charged then.
+
 **Organisation settings.** A contract discount, its name, an FX rate — anything only one
 organisation's users should get — never goes into coding, which is public. A target in
 `glass/manifest.yaml` can name a `private_overlay`: a directory outside the repository
