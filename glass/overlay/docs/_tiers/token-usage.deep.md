@@ -144,13 +144,22 @@ Models tab and the status line's `GH €` field, which disappears with GitHub Co
 unchecked. The button reads *Accounts · 1 hidden* while anything is left out. The
 choice is saved in `~/.glass/cost.json` as `"excludeAccounts": ["gh-copilot"]`.
 
-**Sources** in the same dialog appears where [coding](https://github.com/fwornle/coding)
-is installed on the machine too. coding's proxy records the machine's other LLM traffic,
-such as its own background work and agents started without glass, so glass's figures
-alone read low next to the account's bill. With *coding's figures* checked (the default)
-the usage views add coding's calls. A call glass forwards through coding's proxy is
-recorded by both tools; it is counted once. The Cost tab then says *glass + coding, this
-machine* instead of *glass sessions only*. Unchecking it saves `"includeCoding": false`.
+**Sources** in the same dialog lists the figures glass can add to its own, each where it
+exists on the machine:
+
+- *coding's figures*, where [coding](https://github.com/fwornle/coding) is installed too.
+  coding's proxy records the machine's other LLM traffic, such as its own background work
+  and agents started without glass, so glass's figures alone read low next to the
+  account's bill. Checked (the default), the usage views add coding's calls. A call glass
+  forwards through coding's proxy is recorded by both tools; it is counted once.
+  Unchecking it saves `"includeCoding": false`.
+- *VS Code's Copilot Chat*, once glass has read a request from VS Code's chat history.
+  Those rows are estimates (see [What the Copilot figure covers](#what-the-copilot-figure-covers)),
+  not calls measured on the wire. Checked (the default), they count; unchecking it saves
+  `"includeVscode": false` and leaves them out of the same views.
+
+The Cost tab names what is counted, e.g. *glass + coding + VS Code chat*, or *glass
+sessions* with both unchecked.
 The Sessions tab and the status line's session fields always show glass's own sessions.
 
 glass finds coding's token database under `~/.coding/data/` and only reads it; the

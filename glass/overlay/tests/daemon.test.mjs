@@ -449,7 +449,8 @@ test('observers: VS Code Copilot Chat lands as an estimated foreground row; GitH
 });
 
 test('sources: coding\'s figures join the usage reads where its DB is, switchable only from the UI', async () => {
-  assert.deepEqual((await api('GET', '/api/glass/sources')).body, { coding: { found: false, included: false, path: null } });
+  const before = (await api('GET', '/api/glass/sources')).body;
+  assert.deepEqual(before.coding, { found: false, included: false, path: null });
   const { initTokenDb, resolveTokenDbPath } = await import('../proxy/dist/token-usage.js');
   const dir = path.join(home, 'no-coding-data');
   const c = initTokenDb(dir);
@@ -475,6 +476,25 @@ test('sources: coding\'s figures join the usage reads where its DB is, switchabl
     process.env.GLASS_CODING_TOKEN_DB = path.join(home, 'no-coding', 'token-usage.db');
     await uiWrite('PUT', '/api/glass/sources', { coding: true }); // forget the test DB
   }
+});
+
+test("sources: VS Code's Copilot Chat is offered once read, and switching it off leaves its rows out of the usage reads", async () => {
+  // The observers test above read one VS Code request into glass's DB.
+  assert.deepEqual((await api('GET', '/api/glass/sources')).body.vscode, { found: true, included: true });
+  const isVscode = (r) => r.agent === 'vscode';
+  assert.ok((await recent()).some(isVscode));
+  assert.equal((await api('PUT', '/api/glass/sources', { vscode: false })).status, 403, 'no x-glass-ui header');
+  const off = await uiWrite('PUT', '/api/glass/sources', { vscode: false });
+  assert.equal(off.status, 200);
+  assert.deepEqual(off.body.vscode, { found: true, included: false });
+  assert.equal(JSON.parse(fs.readFileSync(path.join(home, 'cost.json'), 'utf8')).includeVscode, false);
+  assert.ok(!(await recent()).some(isVscode), 'left out');
+  assert.equal((await uiWrite('PUT', '/api/glass/sources', { vscode: 'no' })).status, 400);
+  assert.equal((await uiWrite('PUT', '/api/glass/sources', {})).status, 400);
+  const on = await uiWrite('PUT', '/api/glass/sources', { vscode: true });
+  assert.equal(on.body.vscode.included, true);
+  assert.equal('includeVscode' in JSON.parse(fs.readFileSync(path.join(home, 'cost.json'), 'utf8')), false, 'on is the default: no key');
+  assert.ok((await recent()).some(isVscode), 'and back');
 });
 
 test('offload: an easy intercepted copilot call is answered by the target; pi (left off) and a switch-off go upstream', async () => {

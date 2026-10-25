@@ -26,6 +26,10 @@
 // same time, outside glass — are kept.
 //
 // cost.json `includeCoding: false` switches it off (it is on when absent).
+//
+// VS Code's Copilot Chat rows (agent `vscode`) are estimates read from its chat
+// history, not calls measured on a wire; `includeVscode: false` leaves them out
+// of the same views, with or without coding's figures.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -55,13 +59,25 @@ export function codingTokenDb(env = process.env, home = os.homedir()) {
 
 const quoteSql = (s) => `'${String(s).replace(/'/g, "''")}'`;
 
+/** The rows VS Code's Copilot Chat estimates came from (lsl/token/vscode-token-rows.mjs). */
+export const VSCODE_AGENT = 'vscode';
+
 /**
  * A read-only handle ({ db }) whose `token_usage` is glass's rows plus coding's,
- * without coding's copies of glass sessions. Throws when either file cannot be opened.
+ * without coding's copies of glass sessions — glass's alone when `codingDbPath`
+ * is null — and without VS Code's estimated rows when `vscode` is false. Throws
+ * when either file cannot be opened.
  */
-export function openCombined(glassDbPath, codingDbPath) {
+export function openCombined(glassDbPath, codingDbPath, { vscode = true } = {}) {
   const db = openDb(glassDbPath, { readonly: true, fileMustExist: true });
   try {
+    if (!codingDbPath) {
+      db.exec(`
+        CREATE TEMP VIEW token_usage AS
+          SELECT * FROM main.token_usage WHERE COALESCE(agent, '') <> ${quoteSql(VSCODE_AGENT)}
+      `);
+      return { db };
+    }
     db.exec(`ATTACH DATABASE ${quoteSql(codingDbPath)} AS coding`);
     const cols = (schema) => db.prepare(`PRAGMA ${schema}.table_info(token_usage)`).all().map((r) => r.name);
     const theirs = new Set(cols('coding'));
@@ -86,14 +102,16 @@ export function openCombined(glassDbPath, codingDbPath) {
       `);
     }
     const cshared = shared.split(', ').map((c) => `c.${c}`).join(', ');
+    const noVscode = (alias) => (!vscode && both('agent') ? `AND COALESCE(${alias}agent, '') <> ${quoteSql(VSCODE_AGENT)}` : '');
     db.exec(`
       CREATE TEMP VIEW token_usage AS
-        SELECT ${shared} FROM main.token_usage
+        SELECT ${shared} FROM main.token_usage WHERE 1 ${noVscode('')}
         UNION ALL
         SELECT ${cshared} FROM coding.token_usage AS c
         WHERE (COALESCE(c.task_id, '') = ''
            OR c.task_id NOT IN (SELECT task_id FROM main.token_usage WHERE COALESCE(task_id, '') <> ''))
           ${rebuiltCopy}
+          ${noVscode('c.')}
     `);
   } catch (err) {
     try { db.close(); } catch { /* closing a failed open */ }
@@ -104,18 +122,20 @@ export function openCombined(glassDbPath, codingDbPath) {
 
 /**
  * The handle the usage views read: the combined one while it is wanted and
- * coding's DB is there, else glass's own. Re-checked at most every `recheckMs`,
+ * coding's DB is there, else glass's own — read through a filtered read-only
+ * handle while VS Code's rows are left out. Re-checked at most every `recheckMs`,
  * so coding installed (or removed) later is picked up without a restart.
  *
  * @param {object} o
  * @param {() => object|null} o.own        glass's live handle
  * @param {string} o.glassDbPath
  * @param {() => boolean} o.wanted         the includeCoding setting
+ * @param {() => boolean} [o.vscodeWanted] the includeVscode setting
  * @param {() => string|null} [o.locate]   coding's DB path (codingTokenDb)
  * @returns {{ handle: () => object|null, state: () => { found: boolean, included: boolean, path: string|null }, close: () => void }}
  */
-export function createUsageSource({ own, glassDbPath, wanted, locate = () => codingTokenDb(), recheckMs = 60_000, log = () => {} }) {
-  let current = null; // { path, handle }
+export function createUsageSource({ own, glassDbPath, wanted, vscodeWanted = () => true, locate = () => codingTokenDb(), recheckMs = 60_000, log = () => {} }) {
+  let current = null; // { key, handle }
   let checkedAt = 0;
   let found = null;
   let lastError = '';
@@ -130,19 +150,21 @@ export function createUsageSource({ own, glassDbPath, wanted, locate = () => cod
     checkedAt = Date.now();
     found = locate();
     if (found && path.resolve(found) === path.resolve(glassDbPath)) found = null; // never glass's own, twice
-    if (current && current.path !== found) drop();
   }
 
   return {
     handle() {
-      if (!wanted()) { drop(); return own(); }
-      refresh();
-      if (!found) return own();
+      const vscode = vscodeWanted();
+      if (wanted()) refresh();
+      const coding = wanted() ? found : null;
+      if (!coding && vscode) { drop(); return own(); }
+      const key = `${coding || ''}|${vscode}`;
+      if (current && current.key !== key) drop();
       if (!current) {
         try {
-          current = { path: found, handle: openCombined(glassDbPath, found) };
+          current = { key, handle: openCombined(glassDbPath, coding, { vscode }) };
           lastError = '';
-          log(`usage views include coding's token DB (${found})`);
+          if (coding) log(`usage views include coding's token DB (${coding})`);
         } catch (err) {
           // Glass's own figures rather than none; said once, not every read.
           if (err.message !== lastError) log(`coding token DB not readable, glass figures only: ${err.message}`);

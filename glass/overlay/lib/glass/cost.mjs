@@ -12,13 +12,14 @@
 //   ~/.glass/cost.json                    the user's own (wins)
 // shape: { "discount": { "copilot": 0.8 }, "discountLabel": { "copilot": "…" },
 //          "currency": { "usdPerEur": 1.18 }, "excludeAccounts": ["gh-copilot"],
-//          "includeCoding": false }
+//          "includeCoding": false, "includeVscode": false }
 //
 // excludeAccounts is the account selection (all accounts count when absent): the
 // daemon's usage reads leave those accounts' rows out, and an excluded GitHub
 // Copilot hides the status line's cost field. includeCoding (on when absent)
-// adds coding's figures where coding is installed (combined.mjs). Only the
-// user's file sets either.
+// adds coding's figures where coding is installed (combined.mjs); includeVscode
+// (on when absent) keeps VS Code's estimated Copilot Chat rows. Only the user's
+// file sets any of them.
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -41,7 +42,9 @@ export function loadCostDefaults(home, pkgRoot = PKG_ROOT) {
       if (l[key] && typeof l[key] === 'object') out[key] = { ...(out[key] || {}), ...l[key] };
     }
     if (Array.isArray(l.excludeAccounts)) out.excludeAccounts = l.excludeAccounts.filter((a) => typeof a === 'string');
-    if (typeof l.includeCoding === 'boolean') out.includeCoding = l.includeCoding;
+    for (const key of ['includeCoding', 'includeVscode']) {
+      if (typeof l[key] === 'boolean') out[key] = l[key];
+    }
   }
   return out;
 }
@@ -68,11 +71,15 @@ export function saveExcludedAccounts(home, list) {
   });
 }
 
-/** Saves includeCoding; true (the default) removes the key. */
-export function saveIncludeCoding(home, on) {
+/** Saves which other figures the usage views add; true (the default) removes the key. */
+export function saveSources(home, { coding, vscode }) {
   updateUserCost(home, (current) => {
-    const next = { ...current, includeCoding: Boolean(on) };
-    if (next.includeCoding) delete next.includeCoding;
+    const next = { ...current };
+    for (const [key, on] of [['includeCoding', coding], ['includeVscode', vscode]]) {
+      if (typeof on !== 'boolean') continue;
+      if (on) delete next[key];
+      else next[key] = false;
+    }
     return next;
   });
 }
@@ -96,7 +103,7 @@ export function copilotMonthCost(db, costCfg = {}, now = new Date()) {
   const month = now.toISOString().slice(0, 7);
   const discount = Number(costCfg.discount?.copilot) > 0 ? Number(costCfg.discount.copilot) : 1;
   const usdPerEur = Number(costCfg.currency?.usdPerEur) > 0 ? Number(costCfg.currency.usdPerEur) : DEFAULT_USD_PER_EUR;
-  const key = `${month}|${discount}|${usdPerEur}|${costCfg.includeCoding !== false}`;
+  const key = `${month}|${discount}|${usdPerEur}|${costCfg.includeCoding !== false}|${costCfg.includeVscode !== false}`;
   if (cache.key === key && Date.now() - cache.at < TTL_MS) return cache.value;
   let rows = [];
   try {

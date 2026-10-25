@@ -50,8 +50,8 @@ import { glassPaths, PKG_ROOT } from './home.mjs';
 import { createEgressFetch, upstreamProxy, proxyEnvOf, noProxyOf } from './egress.mjs';
 import { createUiApi } from './ui-api.mjs';
 import { statuslineData, renderReport, TAGS } from './statusline.mjs';
-import { createUsageSource } from './combined.mjs';
-import { loadCostDefaults, saveExcludedAccounts, saveIncludeCoding } from './cost.mjs';
+import { createUsageSource, VSCODE_AGENT } from './combined.mjs';
+import { loadCostDefaults, saveExcludedAccounts, saveSources } from './cost.mjs';
 import { createNetworkMonitor } from './network.mjs';
 import { createOffloadStore } from './offload-store.mjs';
 import { createCopilotQuota } from './copilot-quota.mjs';
@@ -229,12 +229,14 @@ export async function startDaemon({
     logErr,
   });
   // Where coding is installed too, the usage views read its rows as well
-  // (combined.mjs; cost.json includeCoding switches it off). Per-session views
+  // (combined.mjs; cost.json includeCoding switches it off), and VS Code's
+  // estimated Copilot Chat rows unless includeVscode is false. Per-session views
   // read glass's own DB.
   const usageSource = createUsageSource({
     own: () => tokenDb,
     glassDbPath: resolveTokenDbPath(p.data),
     wanted: () => loadCostDefaults(home).includeCoding !== false,
+    vscodeWanted: () => loadCostDefaults(home).includeVscode !== false,
     log,
   });
   // The account selection lives in ~/.glass/cost.json (cost.mjs) and filters
@@ -301,7 +303,14 @@ export async function startDaemon({
     dbPath: resolveTokenDbPath(p.data), measurement, liveSessions: publicSessions,
     accountFilter: () => accountClause(loadCostDefaults(home).excludeAccounts ?? []),
   });
-  const sourcesView = () => ({ coding: usageSource.state() });
+  // VS Code is offered once glass has read a Copilot Chat request from it.
+  const vscodeFound = () => {
+    try { return Boolean(tokenDb.db.prepare(`SELECT 1 FROM token_usage WHERE agent = ? LIMIT 1`).get(VSCODE_AGENT)); } catch { return false; }
+  };
+  const sourcesView = () => {
+    const found = vscodeFound();
+    return { coding: usageSource.state(), vscode: { found, included: found && loadCostDefaults(home).includeVscode !== false } };
+  };
   // [N:… P:…]: probed only while a session is live (nothing else reads it).
   const netMonitor = network || createNetworkMonitor({ log });
   netMonitor.start({ active: () => sessions.size > 0 });
@@ -523,10 +532,14 @@ export async function startDaemon({
         if (req.method !== 'PUT') return json(res, 405, { error: 'GET or PUT' });
         if (!uiWriteAllowed(req, selfPort)) return json(res, 403, { error: 'sources change only from the glass UI' });
         const body = await readJson(req);
-        if (!body || typeof body.coding !== 'boolean') return json(res, 400, { error: 'expected { coding: boolean }' });
-        saveIncludeCoding(home, body.coding);
+        const given = ['coding', 'vscode'].filter((k) => body && k in body);
+        if (!given.length || given.some((k) => typeof body[k] !== 'boolean')) {
+          return json(res, 400, { error: 'expected { coding?: boolean, vscode?: boolean }' });
+        }
+        saveSources(home, body);
         usageSource.recheck();
-        log(`usage views: coding's figures ${body.coding ? 'included' : 'left out'}`);
+        if ('coding' in body) log(`usage views: coding's figures ${body.coding ? 'included' : 'left out'}`);
+        if ('vscode' in body) log(`usage views: VS Code's Copilot Chat ${body.vscode ? 'included' : 'left out'}`);
         return json(res, 200, sourcesView());
       }
       // The account selection is a setting like offload's: same gate on its write.

@@ -141,3 +141,29 @@ test('the usage source: combined while wanted and present, glass\'s own otherwis
   assert.equal(logs.length, 1, 'said once');
   src.close(); loud.close(); own.db.close();
 });
+
+test("VS Code's estimated rows leave the views when switched off, with or without coding's", () => {
+  const dir = tmp();
+  const h = initTokenDb(dir);
+  const ins = h.db.prepare(`INSERT INTO token_usage (id, timestamp, provider, model, process, input_tokens, output_tokens, total_tokens, user_hash, task_id, agent)
+    VALUES (?, ?, 'github-copilot', 'm', ?, ?, 0, ?, 'cladpt', ?, ?)`);
+  ins.run(1, at(5), 'p', 10, 10, 'glass-copilot-1', 'copilot');
+  ins.run(2, at(4), 'token-adapter-vscode', 900, 900, '', 'vscode');
+  const glass = resolveTokenDbPath(dir);
+  const { coding } = pair();
+  let vscode = true;
+  let codingOn = true;
+  const src = createUsageSource({ own: () => h, glassDbPath: glass, wanted: () => codingOn, vscodeWanted: () => vscode, locate: () => coding, recheckMs: 0 });
+  const total = () => getSummary(src.handle(), { hours: 1 }).total_input;
+  const codingOnly = 1000 + 7 + 50 + 100; // pair()'s coding rows; none of glass's task ids match these
+  assert.equal(total(), 10 + 900 + codingOnly);
+  vscode = false;
+  assert.equal(total(), 10 + codingOnly, 'combined, without VS Code');
+  codingOn = false;
+  assert.notEqual(src.handle(), h, 'glass alone, filtered: a read-only handle of its own');
+  assert.equal(total(), 10);
+  vscode = true;
+  assert.equal(src.handle(), h, 'nothing to filter: glass\'s live handle');
+  assert.equal(openCombined(glass, null, { vscode: false }).db.prepare('SELECT COUNT(*) n FROM token_usage').get().n, 1);
+  src.close(); h.db.close();
+});

@@ -15,43 +15,60 @@ import { OffloadPill, OffloadProvider, useOffload } from './offload'
 // other tools, other machines — so the figures differ by design, and the page
 // says so rather than look wrong.
 const BUDGET_NOTE = 'GitHub counts every use of the account — github.com, other tools and machines too — so its own figure on the Copilot tile is the whole of it.'
-const GLASS_COVERAGE = {
-  short: 'glass sessions + VS Code chat',
-  long: `These figures cover calls made by agents launched with glass, and VS Code's Copilot Chat on this machine (estimated from its chat history). ${BUDGET_NOTE}`,
-}
-const COMBINED_COVERAGE = {
-  short: 'glass + coding + VS Code chat',
-  long: `These figures cover calls made by agents launched with glass, the calls coding records on this machine and VS Code's Copilot Chat here (estimated from its chat history), each counted once. ${BUDGET_NOTE}`,
+
+// What the figures cover, from the sources the Accounts dialog includes.
+function coverage(coding: boolean, vscode: boolean): { short: string; long: string } {
+  const short = ['glass', coding && 'coding', vscode && 'VS Code chat'].filter(Boolean)
+  const long = [
+    'calls made by agents launched with glass',
+    coding && 'the calls coding records on this machine',
+    vscode && "VS Code's Copilot Chat here (estimated from its chat history)",
+  ].filter(Boolean) as string[]
+  const listed = long.length > 1 ? `${long.slice(0, -1).join(', ')} and ${long[long.length - 1]}` : long[0]
+  return {
+    short: short.length === 1 ? 'glass sessions' : short.join(' + '),
+    long: `These figures cover ${listed}${coding ? ', each counted once' : ''}. ${BUDGET_NOTE}`,
+  }
 }
 
-interface SourcesView { coding?: { found: boolean; included: boolean } }
+interface SourcesView {
+  coding?: { found: boolean; included: boolean }
+  vscode?: { found: boolean; included: boolean }
+}
 
 const WRITE_HEADERS = { 'x-glass-ui': '1' }
 
-// coding's figures, offered only where coding's token DB is on this machine.
-function useSources(): { control: SourcesControl; included: boolean } {
+// The other figures the views can add, each offered only where it exists on this
+// machine: coding's token DB, and VS Code's Copilot Chat once glass has read it.
+function useSources(): { control: SourcesControl; coding: boolean; vscode: boolean } {
   const [view, setView] = useState<SourcesView>({})
   useEffect(() => {
     fetch('/api/glass/sources').then((r) => (r.ok ? r.json() : {})).then(setView).catch(() => setView({}))
   }, [])
   const save = useCallback(async (included: Record<string, boolean>) => {
+    const body = Object.fromEntries(['coding', 'vscode'].filter((k) => k in included).map((k) => [k, Boolean(included[k])]))
     const r = await fetch('/api/glass/sources', {
       method: 'PUT',
       headers: { 'content-type': 'application/json', ...WRITE_HEADERS },
-      body: JSON.stringify({ coding: Boolean(included.coding) }),
+      body: JSON.stringify(body),
     })
     const j = await r.json().catch(() => null)
     if (!r.ok) throw new Error(j?.error || `HTTP ${r.status}`)
     setView(j ?? {})
   }, [])
-  const coding = view.coding
+  const { coding, vscode } = view
   const control = useMemo<SourcesControl>(() => ({
-    items: coding?.found
-      ? [{ id: 'coding', label: "coding's figures", detail: "Calls coding's proxy records on this machine — its own work and agents started without glass. Calls both record count once.", included: coding.included }]
-      : [],
+    items: [
+      ...(coding?.found
+        ? [{ id: 'coding', label: "coding's figures", detail: "Calls coding's proxy records on this machine — its own work and agents started without glass. Calls both record count once.", included: coding.included }]
+        : []),
+      ...(vscode?.found
+        ? [{ id: 'vscode', label: "VS Code's Copilot Chat", detail: "Requests read from VS Code's chat history on this machine — estimated, since it keeps no cache split (it read 21% low against Copilot's charge).", included: vscode.included }]
+        : []),
+    ],
     save,
-  }), [coding, save])
-  return { control, included: Boolean(coding?.included) }
+  }), [coding, vscode, save])
+  return { control, coding: Boolean(coding?.included), vscode: Boolean(vscode?.included) }
 }
 
 const THEME_ICON = { light: Sun, dark: Moon, system: Monitor }
@@ -96,7 +113,7 @@ function TokenUsage() {
   return (
     <TokenUsagePage
       proxyBase="" tabs={['overview', 'evolution', 'cost', 'recent']} settings={false} onSettings={openSettings}
-      coverage={sources.included ? COMBINED_COVERAGE : GLASS_COVERAGE}
+      coverage={coverage(sources.coding, sources.vscode)}
       sources={sources.control} writeHeaders={WRITE_HEADERS}
     />
   )
