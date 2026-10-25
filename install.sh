@@ -1494,6 +1494,15 @@ pin_gsd_browser_bundle_split() {
     success "gsd-browser pinned to Chrome for Testing (separate bundle id from your Chrome)"
 }
 
+# gsd-browser comes from open-gsd/gsd-browser: the original gsd-build project stopped at
+# 0.1.25 and its installer host (install.gsd.build) now answers 502. Both the installer and
+# the binary are pinned to one tag, so a new machine gets the version this repo was checked
+# against (0.2.1 relaunches a browser that died in a lid-close sleep itself, and its
+# `daemon stop` really stops) rather than whatever `main` holds that day. The installer
+# keeps the layout the shim expects: ~/.gsd-browser/bin/gsd-browser.
+GSD_BROWSER_VERSION_PIN="0.2.1"
+GSD_BROWSER_INSTALLER_URL="https://raw.githubusercontent.com/open-gsd/gsd-browser/v${GSD_BROWSER_VERSION_PIN}/install.sh"
+
 install_gsd_browser() {
     echo -e "\n${CYAN}🌐 Installing gsd-browser (browser automation)...${NC}"
 
@@ -1515,10 +1524,10 @@ install_gsd_browser() {
     # same consent gate as every other one: --yes approves, --ci and
     # --non-interactive decline and the install continues without it.
     if ! confirm_system_change \
-        "download and run the gsd-browser installer (https://install.gsd.build/browser), writing ~/.gsd-browser/" \
+        "download and run the gsd-browser ${GSD_BROWSER_VERSION_PIN} installer (${GSD_BROWSER_INSTALLER_URL}), writing ~/.gsd-browser/" \
         "Fetches a remote shell script and executes it. It reuses a system Chrome/Chromium when one is present, and otherwise downloads Chrome for Testing (~150MB)."; then
         warning "Skipped gsd-browser install"
-        info "  Install later: curl -fsSL https://install.gsd.build/browser | bash"
+        info "  Install later: curl -fsSL ${GSD_BROWSER_INSTALLER_URL} | GSD_BROWSER_VERSION=${GSD_BROWSER_VERSION_PIN} bash"
         info "  Until then bin/gsd-browser exits 127 and UI verification is unavailable."
         INSTALLATION_WARNINGS+=("gsd-browser: not installed (declined); bin/gsd-browser will exit 127")
         return 0
@@ -1527,7 +1536,12 @@ install_gsd_browser() {
     # curl honours the proxy configure_proxy_for_install() already resolved, so
     # a corporate box needs nothing extra here.
     info "Fetching the gsd-browser installer..."
-    if curl -fsSL https://install.gsd.build/browser 2>/dev/null | bash >/dev/null 2>&1; then
+    # GSD_BROWSER_SKIP_SKILL: its installer otherwise asks on /dev/tty which agents to
+    # install a skill pack for — a prompt nobody sees behind >/dev/null, and one an
+    # unattended --yes run cannot answer. This repo reaches gsd-browser through the
+    # shim and CLAUDE.md, not that pack.
+    if curl -fsSL "${GSD_BROWSER_INSTALLER_URL}" 2>/dev/null \
+        | GSD_BROWSER_VERSION="${GSD_BROWSER_VERSION_PIN}" GSD_BROWSER_SKIP_SKILL=1 bash >/dev/null 2>&1; then
         if [[ -x "$gsd_bin" ]] && "$gsd_bin" --version >/dev/null 2>&1; then
             success "gsd-browser installed ($("$gsd_bin" --version 2>/dev/null | head -1))"
             pin_gsd_browser_bundle_split
@@ -1539,7 +1553,7 @@ install_gsd_browser() {
         fi
     else
         warning "gsd-browser install failed (network, proxy, or unsupported platform)"
-        info "  Retry later: curl -fsSL https://install.gsd.build/browser | bash"
+        info "  Retry later: curl -fsSL ${GSD_BROWSER_INSTALLER_URL} | GSD_BROWSER_VERSION=${GSD_BROWSER_VERSION_PIN} bash"
         INSTALLATION_WARNINGS+=("gsd-browser: install failed; bin/gsd-browser will exit 127 until it is installed")
     fi
 }
