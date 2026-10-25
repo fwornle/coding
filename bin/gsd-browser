@@ -81,6 +81,17 @@ DEAD_DAEMON='daemon exited during startup'
 # run the timed-out command, which is what makes the one retry safe.
 DAEMON_TIMEOUT='timeout reading response from daemon'
 
+#   E. Daemon alive, its socket dead -> "request failed while the daemon PID was
+#      still alive: cannot connect to daemon socket: Connection refused"
+#
+# Two daemons raced for ~/.gsd-browser/daemon.sock: the socket path is per user,
+# not per install, so a second daemon (seen 2026-10-25: the open-gsd installer's
+# verify step, run against a scratch install) unlinks and rebinds it, then exits.
+# The first daemon lives on, listening on a file that no longer exists, and the
+# binary will not replace a "live" session. Nothing reached a daemon, so the one
+# retry after a reset cannot repeat a command — the same footing as A and B.
+DEAD_SOCKET='cannot connect to daemon socket'
+
 # Chrome profile the daemon drives. Its own dir, not the user's real profile —
 # clearing a lock here cannot touch a browsing session.
 # The gsd-browser build of 2026-09-04 MOVED this profile out of the temp dir to
@@ -304,7 +315,8 @@ rc=$?
 
 if (( rc != 0 )) \
     && { grep -qF "${DEAD_RECEIVER}" "${ERRFILE}" 2>/dev/null \
-      || grep -qF "${DEAD_DAEMON}" "${ERRFILE}" 2>/dev/null; }; then
+      || grep -qF "${DEAD_DAEMON}" "${ERRFILE}" 2>/dev/null \
+      || grep -qF "${DEAD_SOCKET}" "${ERRFILE}" 2>/dev/null; }; then
     echo "gsd-browser: browser/daemon out of step — resetting both and retrying once" >&2
     sweep_daemons_and_browser
     run "$@"

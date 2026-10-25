@@ -71,6 +71,12 @@ case "$STUB_MODE" in
     printf '\\x89PNG\\r\\n\\x1a\\n\\x00\\x01\\x02\\x03'; exit 0 ;;
   stop-ok)
     echo "Daemon stopped."; exit 0 ;;
+  refused)
+    if [[ "$n" == "1" ]]; then
+      echo "Error: request failed while the daemon PID was still alive: cannot connect to daemon socket: Connection refused (os error 61). Refusing to replace a live browser session automatically; stop it with gsd-browser daemon stop and retry" >&2
+      exit 1
+    fi
+    echo "OK-$n"; exit 0 ;;
   timeout)
     if [[ "$n" == "1" ]]; then
       echo "Error: request failed while the daemon PID was still alive: timeout reading response from daemon. Refusing to replace a live browser session automatically; stop it with gsd-browser daemon stop and retry" >&2
@@ -146,6 +152,13 @@ describe('gsd-browser shim heals a wedged daemon', () => {
     // "receiver is gone" leaves the state a SIGKILLed Chrome produces, which is
     // the state the standard `pkill -f chromiumoxide-runner` fix CREATES.
     const r = runShim('dead-daemon');
+    assert.equal(r.status, 0);
+    assert.equal(r.calls, 2);
+    assert.equal(r.resets, 1);
+  });
+
+  it('heals a live daemon whose socket file another daemon replaced (wedge E)', () => {
+    const r = runShim('refused');
     assert.equal(r.status, 0);
     assert.equal(r.calls, 2);
     assert.equal(r.resets, 1);
