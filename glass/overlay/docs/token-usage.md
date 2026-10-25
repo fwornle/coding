@@ -24,8 +24,8 @@ How many tokens your agents used — totals, trends and every single call.
 
     ![Cost](images/ui-token-usage-cost.png)
 
-    The Copilot cost covers calls that passed glass — not Copilot inside VS Code or another
-    IDE ([what it covers](#what-the-copilot-figure-covers)).
+    The Copilot tile also shows GitHub's own figure for the account, so you see what glass
+    did not ([what it covers](#what-the-copilot-figure-covers)).
 
     Use the time range (top right) to look further back. **Next:** what filled those
     tokens — [Context Window](context-window.md).

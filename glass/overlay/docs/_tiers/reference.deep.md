@@ -36,18 +36,23 @@
 
 ## Configuration file
 
-`~/.glass/config.json` is optional. Its one setting replaces the list of hosts the daemon
-decrypts:
+`~/.glass/config.json` is optional. Every key is:
 
 ```json
 {
-  "interceptHosts": ["copilot-api.*.ghe.com", "api.githubcopilot.com", "api.openai.com"]
+  "interceptHosts": ["copilot-api.*.ghe.com", "api.githubcopilot.com", "api.openai.com"],
+  "githubHost": "github.example.com",
+  "copilotQuota": true
 }
 ```
 
-`*` matches exactly one DNS label. The default list is `copilot-api.*.ghe.com`,
-`api.githubcopilot.com`, `api.*.githubcopilot.com`, `api.openai.com`,
-`api.anthropic.com`.
+- `interceptHosts` replaces the list of hosts the daemon decrypts. `*` matches exactly one
+  DNS label. The default list is `copilot-api.*.ghe.com`, `api.githubcopilot.com`,
+  `api.*.githubcopilot.com`, `api.openai.com`, `api.anthropic.com`.
+- `githubHost` names the GitHub host whose Copilot quota the Cost tab shows. Without it,
+  glass uses the host of the Copilot traffic it measured, then `GH_HOST`, then `gh`'s default.
+- `copilotQuota: false` stops the read of GitHub's own figure
+  ([What the Copilot figure covers](token-usage.md#what-the-copilot-figure-covers)).
 
 ## Files
 
@@ -58,6 +63,7 @@ decrypts:
 | `~/.glass/ca/` | The interception CA |
 | `~/.glass/logs/daemon.log` | Daemon log |
 | `~/.glass/daemon.json` | Running daemon's pid and port |
+| `~/.glass/run/copilot-quota.json` | GitHub's last month-to-date Copilot figure, and the host it came from |
 | `~/.glass/offload.json`, `offload.key` | [Offload](offload.md) settings and the endpoint key (owner-only) |
 | `~/.glass/cost.json` | Optional: contract discount and FX for the € / $ views ([How cost is calculated](token-usage.md#how-cost-is-calculated)) |
 

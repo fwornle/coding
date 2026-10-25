@@ -15,6 +15,8 @@ select:
       - lib/lsl/token/stop-adapter-registry.mjs
       - lib/lsl/token/claude-token-rows.mjs
       - lib/lsl/token/copilot-token-rows.mjs
+      # VS Code's built-in Copilot Chat, from the chat sessions VS Code keeps
+      - lib/lsl/token/vscode-token-rows.mjs
       - lib/lsl/token/opencode-token-rows.mjs
       - lib/lsl/token/token-db.mjs
       - lib/lsl/token/reconcile.mjs

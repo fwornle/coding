@@ -46,6 +46,18 @@ interface Props {
 
 interface CadenceCfg { enabled: boolean; checkIntervalMinutes: number; undigestedThreshold: number }
 
+/** glass's read of GitHub's month-to-date count for the Copilot account (lib/glass/copilot-quota.mjs). */
+interface CopilotQuotaView {
+  enabled: boolean
+  host: string
+  fetchedAt: string | null
+  error: string
+  quota: null | {
+    plan: string; creditsUsed: number; entitlement: number; usedUsd: number
+    percentUsed: number | null; resetDate: string; asOf: string
+  }
+}
+
 const MODEL_PALETTE = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16', '#a855f7', '#14b8a6']
 const STATUS_CLASS: Record<string, string> = {
   ok: 'text-emerald-600 border-emerald-200',
@@ -94,6 +106,9 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
   const [error, setError] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  // Only glass's daemon serves it; elsewhere the request 404s and the tile shows
+  // what it always did.
+  const [quota, setQuota] = useState<CopilotQuotaView | null>(null)
 
   // Every figure on this tab is in the page's currency; budgets are stored in
   // EUR and converted with the same FX.
@@ -107,10 +122,14 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
     if (!isAuto) setLoading(true)
     setError(null)
     try {
-      const [costRes, cs] = await Promise.all([
+      const [costRes, cs, quotaView] = await Promise.all([
         fetch(`${proxyBase}/api/token-usage/cost?months=${months}`),
         fetchCostSettings(proxyBase),
+        fetch(`${proxyBase}/api/glass/copilot-quota${isAuto ? '' : '?refresh=1'}`)
+          .then(r => (r.ok ? r.json() as Promise<CopilotQuotaView> : null))
+          .catch(() => null),
       ])
+      setQuota(quotaView)
       if (!costRes.ok) throw new Error(`cost HTTP ${costRes.status}`)
       const costJson = await costRes.json()
       setLocalProviders(costJson.local_providers)
@@ -359,6 +378,9 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
                     <span className="text-sm text-muted-foreground">spent {activeMonth}</span>
                     {coverage && <span className="text-xs text-muted-foreground" title={coverage.long}>· {coverage.short}</span>}
                   </div>
+                  {t.kind === 'copilot' && isCurrentCalendarMonth && quota?.enabled && (
+                    <CopilotReported quota={quota} measured={t.spend} toDisplay={usd => fromUsd(usd * copilotDiscount, cfg)} money={money} />
+                  )}
                   {isCurrentCalendarMonth && t.kind !== 'local' && (
                     <div className="text-sm text-muted-foreground">
                       projected month-end: <span className="font-medium text-foreground">{money(t.projected)}</span>
@@ -605,6 +627,52 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
         <CostSettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} proxyBase={proxyBase}
           onSaved={(c) => { setSavedCfg(c); flash('Prices & budgets saved') }} />
       )}
+    </div>
+  )
+}
+
+/**
+ * GitHub's own month-to-date figure for the Copilot account next to what was
+ * measured here. GitHub's covers every client of the login — github.com, other
+ * machines, anything glass never saw — so the difference is the part this
+ * machine's figures miss. Measured above GitHub's means the per-model rates run
+ * high, and says so instead of showing a negative "not seen".
+ */
+function CopilotReported({ quota, measured, toDisplay, money }: {
+  quota: CopilotQuotaView
+  measured: number
+  toDisplay: (usd: number) => number
+  money: (v: number) => string
+}) {
+  const q = quota.quota
+  if (!q) {
+    return (
+      <div className="text-xs text-muted-foreground" title={quota.host ? `GitHub host: ${quota.host}` : undefined}>
+        GitHub's own figure unavailable{quota.error ? `: ${quota.error}` : ''}
+      </div>
+    )
+  }
+  const reported = toDisplay(q.usedUsd)
+  const gap = reported - measured
+  const asOf = q.asOf ? new Date(q.asOf).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
+  return (
+    <div className="space-y-0.5" data-testid="copilot-reported">
+      <div className="text-sm">
+        GitHub reports <span className="font-semibold">{money(reported)}</span>
+        <span className="text-muted-foreground">
+          {' '}· {q.creditsUsed.toLocaleString()} of {q.entitlement.toLocaleString()} credits
+          {q.percentUsed != null && <> ({q.percentUsed}%)</>}
+          {asOf && <> · {asOf}</>}
+        </span>
+      </div>
+      <div
+        className="text-xs text-muted-foreground"
+        title={`GitHub's count for the ${q.plan || 'Copilot'} account on ${quota.host}, every client included; resets ${q.resetDate}.`}
+      >
+        {gap >= 0
+          ? <>not measured here: <span className="font-medium text-foreground">{money(gap)}</span>{reported > 0 && <> ({Math.round(100 * gap / reported)}%)</>} — other machines, github.com, tools glass does not see</>
+          : <>measured is {money(-gap)} above GitHub's figure — the per-model rates run high</>}
+      </div>
     </div>
   )
 }

@@ -220,27 +220,27 @@ See the month's Copilot spend while it is still going on.
 
 <p class="overview-kicker">Question 1 / What does the figure cover?</p>
 
-## Every Copilot call that passes through glass {#overview-coverage}
+## Every Copilot call glass can see — and GitHub's total {#overview-coverage}
 
-**Measured:** agents started with `glass <agent>` — Copilot CLI, OpenCode, pi — in any
-terminal, VS Code's included. Where coding is installed, its background jobs too.
+**Measured per call:** agents started with `glass <agent>` — Copilot CLI, OpenCode, pi — in
+any terminal, and coding's background jobs where coding is installed.
 
-**Not measured:** Copilot inside VS Code or another IDE (chat, agent mode, completions),
-an agent started without `glass`, other machines and github.com. They reach the same
-bill without passing glass.
+**Read after the fact:** VS Code's Copilot Chat, from the chat history VS Code keeps.
+Nothing in VS Code's path changes; its cost is an estimate.
 
-So **`GH €` is a floor**: the measured part of your Copilot bill, exact per call — not the
-whole invoice.
+**GitHub's own count** for the account sits on the same tile — every client included,
+read every 15 minutes with your `gh` login. The difference is what glass did not see:
+agents started without `glass`, other machines, github.com.
 
 </div>
 <figure class="overview-figure" markdown="1">
 
-![Agents started with glass and coding's background jobs pass the local meter, which records and prices every call; Copilot in VS Code or another IDE, agents started without glass and other machines reach the GitHub Copilot bill without being measured.](images/glass-copilot-coverage.png)
+![Agents started with glass and coding's background jobs pass glass call by call, VS Code's Copilot Chat is read from its history afterwards; glass prices them and sets them next to GitHub's own month-to-date count for the account, which also covers agents started without glass, other machines and github.com.](images/glass-copilot-coverage.png)
 
-<figcaption>Solid: measured and priced. Dotted: billed, but invisible to glass.</figcaption>
+<figcaption>Solid: measured per call. Dotted into glass: read afterwards. Dashed: GitHub's own figure.</figcaption>
 </figure>
 <p class="overview-takeaway" markdown="1">
-Start agents with `glass` to bring them into the figure.
+Your measured spend next to GitHub's — no billing export needed.
 [What the Copilot figure covers](token-usage.md#what-the-copilot-figure-covers)
 </p>
 </section>

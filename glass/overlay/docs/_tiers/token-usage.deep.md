@@ -89,24 +89,35 @@ rates with no discount.
 
 ### What the Copilot figure covers
 
-![Agents started with glass and coding's background jobs pass the local meter, which records and prices every call; Copilot in VS Code or another IDE, agents started without glass and other machines reach the GitHub Copilot bill without being measured.](images/glass-copilot-coverage.png)
+![Agents started with glass and coding's background jobs pass glass call by call, VS Code's Copilot Chat is read from its history afterwards; glass prices them and sets them next to GitHub's own month-to-date count for the account, which also covers agents started without glass, other machines and github.com.](images/glass-copilot-coverage.png)
 
-glass prices what it records, and it records only calls that pass through it. Your GitHub
-Copilot bill can contain more:
-
-| Copilot usage | In the Cost tab and `GH €`? |
+| Copilot usage | How glass sees it |
 |---|---|
-| Copilot CLI, OpenCode or pi started as `glass <agent>`, in any terminal (VS Code's integrated terminal too) | yes |
-| coding's background jobs, on a machine where coding is installed and its figures are included ([Accounts and sources](#accounts-and-sources)) | yes, as **background** |
-| Copilot inside VS Code or another IDE — chat, agent mode, code completions | no |
-| The same agents started without `glass` in front | no |
-| Other machines, github.com, Copilot on GitHub itself | no |
+| Copilot CLI, OpenCode or pi started as `glass <agent>`, in any terminal (VS Code's integrated terminal too) | every call, on the wire |
+| coding's background jobs, where coding is installed and its figures are included ([Accounts and sources](#accounts-and-sources)) | every call, as **background** |
+| VS Code's Copilot Chat (chat, agent mode) on this machine | read from VS Code's chat history — **estimated** |
+| The same agents started without `glass` in front, other machines, github.com | only in GitHub's total |
 
-So read the Copilot figure as a **floor**: exact for every call it shows, but the
-invoice also carries whatever never passed glass. A large gap between the two usually
-means IDE use. An itemized usage sheet (the kind glass's rates are fitted
-from) lists usage per day and model, not per tool, so it cannot split IDE use from the
-rest by itself — the days and models glass shows are the measured part of it.
+**VS Code.** glass stays out of VS Code's way: no proxy, no certificate, no extension. While
+the daemon runs it reads the chat sessions VS Code keeps
+(`…/Code/User/workspaceStorage/*/chatSessions`) every 15 minutes. They record each
+request's model and prompt and output size, not the cache split and not every tool-call
+round, so glass estimates: what the prompt grew by since the previous request is fresh
+input, the rest a cache read. Checked against what Copilot charged for eight requests,
+the estimate came out 21% low. These rows count as foreground, agent `vscode`.
+
+**GitHub's own figure.** The Copilot tile also shows what GitHub itself counts for the
+account this month — the number behind "Credits n% used" in VS Code's Copilot menu,
+every client included — and the difference to what glass measured: the part glass did not
+see. glass asks `gh api /copilot_internal/user` (the endpoint VS Code calls) every 15
+minutes while the daemon runs; `gh` sends its own login, glass never reads a token. It
+needs `gh` logged in to your GitHub host. glass learns the host from the Copilot traffic it
+measures; set it with `{ "githubHost": "<host>" }` in `~/.glass/config.json` if you only
+use VS Code, and `{ "copilotQuota": false }` switches the read off. The endpoint is
+internal to GitHub, so it may change; then the tile says the figure is unavailable.
+
+When measured comes out **above** GitHub's figure, the per-model rates run high for your
+mix of models; the tile says so instead of showing a negative remainder.
 
 ## Recent Calls
 

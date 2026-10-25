@@ -45,6 +45,7 @@ import { loadRawBodyRedactionPatterns, makeRedactRawBody } from '../../proxy/pro
 import { canonicalizeModelName } from '../../proxy/proxy-bridge/model-canonical.mjs';
 import { sweepAgedCaptures } from '../measurement/context-turns-retention.mjs';
 import { captureForegroundTokens } from '../lsl/token/stop-adapter-registry.mjs';
+import { sweepVscodeTokenRows } from '../lsl/token/vscode-token-rows.mjs';
 import { glassPaths, PKG_ROOT } from './home.mjs';
 import { createEgressFetch, upstreamProxy, proxyEnvOf, noProxyOf } from './egress.mjs';
 import { createUiApi } from './ui-api.mjs';
@@ -53,6 +54,7 @@ import { createUsageSource } from './combined.mjs';
 import { loadCostDefaults, saveExcludedAccounts, saveIncludeCoding } from './cost.mjs';
 import { createNetworkMonitor } from './network.mjs';
 import { createOffloadStore } from './offload-store.mjs';
+import { createCopilotQuota } from './copilot-quota.mjs';
 import { createOffloader, createTargetHealth, OFFLOAD_AGENTS } from '../../proxy/proxy-bridge/offload.mjs';
 
 const PKG = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8'));
@@ -207,6 +209,12 @@ export async function startDaemon({
   }
   const direct = fetch || createEgressFetch({}, port); // a relay to loopback never takes the corporate proxy
   const config = readConfig(p.config);
+  // GitHub's month-to-date count for the Copilot account (copilot-quota.mjs):
+  // `gh` asks with its own login, through the same egress proxy as the agents.
+  const copilotQuota = createCopilotQuota({
+    statePath: path.join(p.run, 'copilot-quota.json'), config,
+    env: () => ({ ...process.env, ...egressEnv }), log,
+  });
 
   const tokenDb = initTokenDb(p.data);
   const measurement = createMeasurement({
@@ -370,6 +378,7 @@ export async function startDaemon({
     const taskId = s?.taskId || '';
     const upstreamBase = `https://${host}`;
     const provider = providerFor(host);
+    if (provider === 'github-copilot') copilotQuota.noteApiHost(host);
     const pathOnly = (req.url || '').split('?')[0];
     if (req.method === 'POST' && pathOnly.startsWith('/v1/messages')) {
       return handleAnthropicMessages(req, res, {
@@ -504,6 +513,9 @@ export async function startDaemon({
         return json(res, 404, { error: `no route for ${req.method} ${url}` });
       }
       if (url === '/api/glass/sources' && req.method === 'GET') return json(res, 200, sourcesView());
+      if (url.split('?')[0] === '/api/glass/copilot-quota' && req.method === 'GET') {
+        return json(res, 200, await copilotQuota.refresh({ force: /[?&]refresh=1\b/.test(url) }));
+      }
       if (url === '/api/glass/sources') {
         if (req.method !== 'PUT') return json(res, 405, { error: 'GET or PUT' });
         if (!uiWriteAllowed(req, selfPort)) return json(res, 403, { error: 'sources change only from the glass UI' });
@@ -575,6 +587,25 @@ export async function startDaemon({
   };
   sweep();
   const sweepTimer = setInterval(sweep, 3_600_000);
+
+  // What glass observes without being in anyone's path: VS Code's Copilot Chat
+  // requests, read from the chat sessions VS Code keeps (into glass's own DB —
+  // coding's is merged into the views, so one writer means one count), and
+  // GitHub's month-to-date figure for the account. Neither counts as activity:
+  // an idle daemon still shuts down.
+  const vscodeSeen = new Map();
+  const observe = () => {
+    try {
+      const r = sweepVscodeTokenRows({ dbPath: resolveTokenDbPath(p.data), sinceMs: Date.now() - 45 * 86_400_000, seen: vscodeSeen });
+      if (r.inserted) log(`vscode: ${r.inserted} Copilot Chat request(s) from ${r.files} session file(s)`);
+    } catch (err) {
+      logErr(`vscode sweep: ${err.message}`);
+    }
+    copilotQuota.refresh().catch((err) => logErr(`copilot quota: ${err.message}`));
+  };
+  observe();
+  const observeTimer = setInterval(observe, 15 * 60_000);
+  observeTimer.unref();
   const idleTimer = setInterval(() => {
     // A `glass <agent>` that was killed never closes its session: reap it, or
     // the daemon would never go idle.
@@ -590,6 +621,7 @@ export async function startDaemon({
     clearInterval(sweepTimer);
     clearInterval(idleTimer);
     clearInterval(offloadTimer);
+    clearInterval(observeTimer);
     netMonitor.stop();
     // Sessions whose agent still runs stay in sessions.json for the next daemon.
     for (const s of [...sessions.values()]) if (!alive(s.pid)) await closeSession(s.token);

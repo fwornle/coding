@@ -14,14 +14,14 @@ import { OffloadPill, OffloadProvider, useOffload } from './offload'
 // machine. GitHub's Copilot budget counts the whole login — the VS Code plugin,
 // other tools, other machines — so the figures differ by design, and the page
 // says so rather than look wrong.
-const BUDGET_NOTE = 'A GitHub Copilot budget counts every use of the account — IDE plugins, other tools and machines — so GitHub shows more.'
+const BUDGET_NOTE = 'GitHub counts every use of the account — github.com, other tools and machines too — so its own figure on the Copilot tile is the whole of it.'
 const GLASS_COVERAGE = {
-  short: 'glass sessions only',
-  long: `These figures cover calls made by agents launched with glass. ${BUDGET_NOTE}`,
+  short: 'glass sessions + VS Code chat',
+  long: `These figures cover calls made by agents launched with glass, and VS Code's Copilot Chat on this machine (estimated from its chat history). ${BUDGET_NOTE}`,
 }
 const COMBINED_COVERAGE = {
-  short: 'glass + coding, this machine',
-  long: `These figures cover calls made by agents launched with glass and the calls coding records on this machine, each counted once. ${BUDGET_NOTE}`,
+  short: 'glass + coding + VS Code chat',
+  long: `These figures cover calls made by agents launched with glass, the calls coding records on this machine and VS Code's Copilot Chat here (estimated from its chat history), each counted once. ${BUDGET_NOTE}`,
 }
 
 interface SourcesView { coding?: { found: boolean; included: boolean } }
