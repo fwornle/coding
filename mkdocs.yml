@@ -168,7 +168,7 @@ nav:
 extra:
   # Presentations, opened from icon buttons in the header (glass/overlay/overrides/main.html).
   decks:
-    - title: coding overview — the layer in ten slides
+    - title: coding overview — the layer
       link: overview/
       icon: material/presentation
     - title: Connectivity — every path, and how it recovers

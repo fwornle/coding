@@ -8,7 +8,7 @@ hide:
 <div class="overview-deck" id="glass-overview" role="region" aria-label="Glass overview presentation" markdown="1">
 
 <div class="overview-toolbar" hidden>
-  <span class="overview-label">glass / in twelve slides</span>
+  <span class="overview-label">glass / overview</span>
   <span class="overview-counter" role="status" aria-live="polite" aria-atomic="true"></span>
   <button type="button" data-fullscreen>Fullscreen</button>
 </div>
