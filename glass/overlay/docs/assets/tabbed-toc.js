@@ -1,18 +1,17 @@
 /**
  * Synchronises the right-sidebar TOC with the active content tab.
  *
- * Pages in this site are tiered: the whole body sits in one pymdownx.tabbed set with
- * "Quick", "Standard" and "Deep Dive" blocks. Markdown does not know about tabs, so the
- * `toc` extension emits headings from ALL THREE tiers into a single sidebar list — a reader
+ * Pages are tiered: the whole body sits in one pymdownx.tabbed set with a "Quick" and a
+ * "Deep Dive" block (coding's pages may add "Standard"). Markdown does not know about tabs,
+ * so the `toc` extension emits headings from EVERY tier into a single sidebar list — a reader
  * on the 3-minute Quick tab would otherwise be looking at a contents list mostly made of
  * headings that are not on screen and cannot be scrolled to.
  *
  * This hides the TOC entries whose anchors live in an inactive tab, so the sidebar always
  * describes what is actually being read.
  *
- * Ported from /Users/…/Agentic/_work/rapid-automations/docs/javascripts/tabbed-toc.js, which
- * has been serving the same purpose for that site's 2-tier pages. Changed on the way in:
- * the href fragment is now decoded before it is compared to the heading id, because Material
+ * Shared by glass's site and coding's (docs-content/javascripts links here). The href
+ * fragment is decoded before it is compared to the heading id, because Material
  * percent-encodes non-ASCII anchors in the TOC while the id attribute itself is literal.
  */
 (function () {

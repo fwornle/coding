@@ -9,6 +9,8 @@ docs_dir: docs
 extra_css:
   - assets/overview.css
 extra_javascript:
+  # The right-hand contents list follows the open tier tab (Quick / Deep Dive).
+  - assets/tabbed-toc.js
   - assets/overview.js
   - assets/header-decks.js
 
