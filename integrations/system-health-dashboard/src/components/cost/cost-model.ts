@@ -409,6 +409,8 @@ export function freshInputTokens(r: { input_tokens: number }): number {
 export interface PriceableRow {
   provider: string
   model: string
+  /** YYYY-MM of a monthly row: a past month is priced at what GitHub charged then. */
+  month?: string
   input_tokens: number
   output_tokens: number
   cache_read_tokens: number
@@ -422,11 +424,11 @@ export interface PriceableRow {
  * the rate card, exact ids). A model GitHub's rate is unknown for falls through
  * to list pricing below.
  */
-export function rowPrice(r: { provider: string; model: string }, cfg: CostConfig): ResolvedPrice {
+export function rowPrice(r: { provider: string; model: string; month?: string }, cfg: CostConfig): ResolvedPrice {
   const kind = accountKind(costAccount(r.provider))
   if (kind === 'local') return { price: { in: 0, out: 0, cacheRead: 0, cacheWrite: 0 }, priced: true, source: 'exact' }
   if (kind === 'copilot') {
-    const rate = copilotRate(r.model, cfg.copilotPrices)
+    const rate = copilotRate(r.model, cfg.copilotPrices, r.month)
     if (rate) return { price: rate, priced: true, source: 'exact' }
   }
   return priceForModel(r.model, cfg.modelPrices)
