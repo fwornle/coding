@@ -18,6 +18,7 @@
 // glass does not recognise reads as "unavailable", never as zero use.
 
 import fs from 'node:fs';
+import path from 'node:path';
 import { execFile } from 'node:child_process';
 
 export const QUOTA_REFRESH_MS = 15 * 60_000;
@@ -82,6 +83,17 @@ export function createCopilotQuota({ statePath, config = {}, env = () => process
   const save = () => {
     try { fs.writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`); } catch { /* best effort */ }
   };
+  // gh keeps a device id and update-check state under XDG_STATE_HOME / the cache
+  // dir; a call made for glass must not leave files in the user's home that
+  // `glass uninstall` would not remove. Its login (XDG_CONFIG_HOME) is untouched.
+  const ghDir = path.join(path.dirname(statePath), 'gh');
+  const ghEnv = () => ({
+    ...env(),
+    XDG_STATE_HOME: path.join(ghDir, 'state'),
+    XDG_CACHE_HOME: path.join(ghDir, 'cache'),
+    GH_NO_UPDATE_NOTIFIER: '1',
+    GH_PROMPT_DISABLED: '1',
+  });
   const hostToAsk = () => (typeof config.githubHost === 'string' && config.githubHost)
     || env().GH_HOST || state.seenHost || '';
 
@@ -103,7 +115,7 @@ export function createCopilotQuota({ statePath, config = {}, env = () => process
       // No known host: gh's default one — shown with its host and plan, so a
       // personal github.com plan is never mistaken for the work account.
       const args = host ? ['--hostname', host, '/copilot_internal/user'] : ['/copilot_internal/user'];
-      const r = await run(args, env());
+      const r = await run(args, ghEnv());
       state.fetchedAt = now();
       state.host = host || 'gh default host';
       if (!r.ok) {

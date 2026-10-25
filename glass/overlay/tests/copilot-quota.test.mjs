@@ -62,6 +62,19 @@ test('asks gh for the host seen on the wire, then caches the answer', async () =
   assert.equal(calls.length, 2, 'a forced refresh may ask again after a minute');
 });
 
+test("gh's own state goes under glass's run dir, not the user's home", async () => {
+  let seen = null;
+  const file = statePath();
+  const q = createCopilotQuota({ statePath: file, env: () => ({ HOME: '/home/u', GH_HOST: 'acme.ghe.com' }), run: async (_a, e) => { seen = e; return { ok: true, stdout: JSON.stringify(REPLY) }; } });
+  await q.refresh();
+  const dir = path.join(path.dirname(file), 'gh');
+  assert.equal(seen.XDG_STATE_HOME, path.join(dir, 'state'));
+  assert.equal(seen.XDG_CACHE_HOME, path.join(dir, 'cache'));
+  assert.equal(seen.XDG_CONFIG_HOME, undefined, 'the login stays where gh keeps it');
+  assert.equal(seen.GH_NO_UPDATE_NOTIFIER, '1');
+  assert.equal(seen.HOME, '/home/u');
+});
+
 test('githubHost in config wins; a failed call is reported, not read as zero use', async () => {
   const calls = [];
   const run = async (args) => { calls.push(args); return { ok: false, error: 'gh is not installed' }; };
