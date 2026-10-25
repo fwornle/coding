@@ -40,6 +40,8 @@ test('a metered reply becomes credits, dollars and a share of the entitlement', 
 
 test('no metered quota, or a shape glass does not know, is no figure at all', () => {
   assert.equal(parseQuota({ quota_snapshots: { premium_interactions: { unlimited: true } } }), null);
+  // A personal plan without Copilot credits is not "GitHub reports $0".
+  assert.equal(parseQuota({ copilot_plan: 'individual', quota_snapshots: { premium_interactions: { credits_used: 0, entitlement: 0, unlimited: false } } }), null);
   assert.equal(parseQuota({}), null);
   assert.equal(parseQuota(null), null);
 });
@@ -51,7 +53,7 @@ test('asks gh for the host seen on the wire, then caches the answer', async () =
   const q = createCopilotQuota({ statePath: statePath(), env: () => ({}), run, now: () => t });
   q.noteApiHost('copilot-api.acme.ghe.com');
   const v = await q.refresh();
-  assert.deepEqual(calls, [['--hostname', 'acme.ghe.com', '/copilot_internal/user']]);
+  assert.deepEqual(calls, [['api', '--hostname', 'acme.ghe.com', '/copilot_internal/user']]);
   assert.equal(v.host, 'acme.ghe.com');
   assert.equal(v.quota.usedUsd, 250);
   assert.equal(v.error, '');
@@ -81,9 +83,31 @@ test('githubHost in config wins; a failed call is reported, not read as zero use
   const q = createCopilotQuota({ statePath: statePath(), config: { githubHost: 'git.example.com' }, env: () => ({}), run });
   q.noteApiHost('copilot-api.acme.ghe.com');
   const v = await q.refresh();
-  assert.deepEqual(calls[0], ['--hostname', 'git.example.com', '/copilot_internal/user']);
+  assert.deepEqual(calls[0], ['api', '--hostname', 'git.example.com', '/copilot_internal/user']);
   assert.equal(v.quota, null);
   assert.equal(v.error, 'gh is not installed');
+});
+
+test('no host known: every host gh is logged in to, enterprise first, until a metered account answers', async () => {
+  const calls = [];
+  const run = async (args) => {
+    calls.push(args.join(' '));
+    if (args[0] === 'auth') {
+      return { ok: true, stdout: JSON.stringify({ hosts: { 'github.com': [{ state: 'success' }], 'broken.example': [{ state: 'error' }], 'acme.ghe.com': [{ state: 'success' }] } }) };
+    }
+    return { ok: true, stdout: JSON.stringify(args.includes('acme.ghe.com') ? REPLY : { copilot_plan: 'individual' }) };
+  };
+  const file = statePath();
+  const q = createCopilotQuota({ statePath: file, env: () => ({}), run });
+  const v = await q.refresh();
+  assert.deepEqual(calls, ['auth status --json hosts', 'api --hostname acme.ghe.com /copilot_internal/user']);
+  assert.equal(v.host, 'acme.ghe.com');
+  assert.equal(v.quota.creditsUsed, 25000);
+  // The next daemon asks it directly.
+  const again = createCopilotQuota({ statePath: file, env: () => ({}), run, now: () => Date.now() + 3_600_000 });
+  calls.length = 0;
+  await again.refresh();
+  assert.deepEqual(calls, ['api --hostname acme.ghe.com /copilot_internal/user']);
 });
 
 test('copilotQuota: false makes no call', async () => {

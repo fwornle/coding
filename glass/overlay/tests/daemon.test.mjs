@@ -36,6 +36,31 @@ const ANTHROPIC_SSE = sse([
 ], true);
 const CHAT_USAGE = { prompt_tokens: 120, completion_tokens: 5, prompt_tokens_details: { cached_tokens: 100 } };
 
+// The passive observers, without this machine's gh or VS Code: a fake gh that is
+// logged in to one GHE host with a metered Copilot account, and a VS Code User
+// directory holding one chat session with one finished Copilot request.
+const ghCalls = [];
+const stubGh = async (args) => {
+  ghCalls.push(args.join(' '));
+  if (args[0] === 'auth') return { ok: true, stdout: JSON.stringify({ hosts: { 'acme.ghe.com': [{ state: 'success' }], 'github.com': [{ state: 'success' }] } }) };
+  if (args.includes('acme.ghe.com')) {
+    return { ok: true, stdout: JSON.stringify({ copilot_plan: 'business', quota_reset_date: '2026-11-01', quota_snapshots: { premium_interactions: { credits_used: 1234, entitlement: 100000, remaining: 98766 } } }) };
+  }
+  return { ok: true, stdout: JSON.stringify({ copilot_plan: 'individual', quota_snapshots: { premium_interactions: { credits_used: 0, entitlement: 0 } } }) };
+};
+const vscodeUser = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-vscode-'));
+{
+  const chat = path.join(vscodeUser, 'workspaceStorage', 'w1', 'chatSessions');
+  fs.mkdirSync(chat, { recursive: true });
+  const request = { requestId: 'req-1', timestamp: Date.now(), modelId: 'copilot/auto', response: [] };
+  fs.writeFileSync(path.join(chat, 's.jsonl'), [
+    { kind: 0, v: { requests: [] } },
+    { kind: 2, k: ['requests'], v: [request] },
+    { kind: 1, k: ['requests', 0, 'result'], v: { usage: { promptTokens: 9000, completionTokens: 40 }, metadata: { resolvedModel: 'gpt-6-luna', toolCallRounds: [{}, {}] } } },
+  ].map((o) => JSON.stringify(o)).join('\n'));
+}
+const observers = { gh: stubGh, vscodeUserDirs: [vscodeUser] };
+
 // Network facts without probing this machine (network.mjs is tested on its own).
 const stubNetwork = { facts: () => ({ location: 'vpn', proxy_running: true, proxy_functional: true, proxy_enabled_by_user: false }), tick: () => {}, start: () => {}, stop: () => {} };
 
@@ -90,13 +115,14 @@ before(async () => {
   });
   await new Promise((r) => upstream.listen(0, '127.0.0.1', r));
   upPort = upstream.address().port;
-  daemon = await startDaemon({ home, port: 0, fetch: stubFetch, log: () => {}, network: stubNetwork });
+  daemon = await startDaemon({ home, port: 0, fetch: stubFetch, log: () => {}, network: stubNetwork, ...observers });
 });
 
 after(async () => {
   await daemon?.close();
   await new Promise((r) => upstream.close(r));
   fs.rmSync(home, { recursive: true, force: true });
+  fs.rmSync(vscodeUser, { recursive: true, force: true });
 });
 
 const api = async (method, route, body) => {
@@ -407,6 +433,21 @@ test('offload settings: off by default; writes only from the UI; the key is stor
   }
 });
 
+test('observers: VS Code Copilot Chat lands as an estimated foreground row; GitHub\'s quota from the logged-in GHE host', async () => {
+  const q = (await api('GET', '/api/glass/copilot-quota')).body;
+  assert.equal(q.host, 'acme.ghe.com', 'the enterprise host first, its metered account kept');
+  assert.equal(q.quota.usedUsd, 12.34);
+  assert.equal(ghCalls.some((c) => c.includes('github.com')), false, 'github.com not asked once acme answered');
+  const { DatabaseSync } = await import('node:sqlite');
+  const db = new DatabaseSync(path.join(home, 'data', 'llm-proxy', 'token-usage.db'), { readOnly: true });
+  try {
+    const rows = db.prepare(`SELECT agent, model, input_tokens, cache_read_tokens, output_tokens, tokens_estimated FROM token_usage WHERE user_hash = 'vscadt'`).all();
+    assert.deepEqual(rows.map((r) => ({ ...r })), [{ agent: 'vscode', model: 'gpt-6-luna', input_tokens: 9000, cache_read_tokens: 9000, output_tokens: 40, tokens_estimated: 1 }]);
+  } finally {
+    db.close();
+  }
+});
+
 test('sources: coding\'s figures join the usage reads where its DB is, switchable only from the UI', async () => {
   assert.deepEqual((await api('GET', '/api/glass/sources')).body, { coding: { found: false, included: false, path: null } });
   const { initTokenDb, resolveTokenDbPath } = await import('../proxy/dist/token-usage.js');
@@ -468,7 +509,7 @@ test('offload endpoint on a private address goes direct; a public one takes the 
 });
 
 async function ownDaemon(dir) {
-  return startDaemon({ home: dir, port: 0, fetch: stubFetch, log: () => {}, network: stubNetwork });
+  return startDaemon({ home: dir, port: 0, fetch: stubFetch, log: () => {}, network: stubNetwork, gh: stubGh, vscodeUserDirs: [] });
 }
 const deadPid = () => spawnSync(process.execPath, ['-e', '0']).pid;
 // A proxy credential no session of this daemon was issued (an earlier daemon's).
@@ -655,7 +696,7 @@ test('glass ui: one opener chain per platform, no shell', async () => {
 
 test('an idle daemon exits by itself', async () => {
   const idleHome = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-idle-'));
-  const d = await startDaemon({ home: idleHome, port: 0, fetch: stubFetch, idleMs: 100, tickMs: 25, log: () => {}, network: stubNetwork });
+  const d = await startDaemon({ home: idleHome, port: 0, fetch: stubFetch, idleMs: 100, tickMs: 25, log: () => {}, network: stubNetwork, gh: stubGh, vscodeUserDirs: [] });
   assert.ok(fs.existsSync(path.join(idleHome, 'daemon.json')));
   await d.closed;
   assert.equal(fs.existsSync(path.join(idleHome, 'daemon.json')), false, 'lock removed on exit');

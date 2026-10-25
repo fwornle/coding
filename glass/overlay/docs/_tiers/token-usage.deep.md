@@ -111,9 +111,10 @@ account this month — the number behind "Credits n% used" in VS Code's Copilot 
 every client included — and the difference to what glass measured: the part glass did not
 see. glass asks `gh api /copilot_internal/user` (the endpoint VS Code calls) every 15
 minutes while the daemon runs; `gh` sends its own login, glass never reads a token. It
-needs `gh` logged in to your GitHub host. glass learns the host from the Copilot traffic it
-measures; set it with `{ "githubHost": "<host>" }` in `~/.glass/config.json` if you only
-use VS Code, and `{ "copilotQuota": false }` switches the read off. The endpoint is
+needs `gh` logged in to your GitHub host. glass finds the host by itself: from the Copilot
+traffic it measures, else by trying each host `gh` is logged in to (enterprise hosts first)
+until one has a metered Copilot account. `{ "githubHost": "<host>" }` in
+`~/.glass/config.json` names it outright, and `{ "copilotQuota": false }` switches the read off. The endpoint is
 internal to GitHub, so it may change; then the tile says the figure is unavailable.
 
 When measured comes out **above** GitHub's figure, the per-model rates run high for your

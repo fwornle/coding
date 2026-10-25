@@ -50,7 +50,7 @@
   DNS label. The default list is `copilot-api.*.ghe.com`, `api.githubcopilot.com`,
   `api.*.githubcopilot.com`, `api.openai.com`, `api.anthropic.com`.
 - `githubHost` names the GitHub host whose Copilot quota the Cost tab shows. Without it,
-  glass uses the host of the Copilot traffic it measured, then `GH_HOST`, then `gh`'s default.
+  glass uses `GH_HOST`, then the host of the Copilot traffic it measured, then every host `gh` is logged in to (enterprise hosts before github.com), keeping the first with a metered Copilot account.
 - `copilotQuota: false` stops the read of GitHub's own figure
   ([What the Copilot figure covers](token-usage.md#what-the-copilot-figure-covers)).
 

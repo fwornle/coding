@@ -171,11 +171,14 @@ export function relaysOf(raw) {
  * @param {number} [o.retentionDays]
  * @param {(line: string) => void} [o.log]
  * @param {object} [o.network]         network monitor (default: coding's probes, see network.mjs)
+ * @param {Function} [o.gh]            runs `gh <args>` for the Copilot quota read (default: the real gh)
+ * @param {string[]} [o.vscodeUserDirs] VS Code User directories to read Copilot Chat from (default: this machine's)
  * @returns {Promise<{ port: number, url: string, caPath: string, close: () => Promise<void>, closed: Promise<void> }>}
  */
 export async function startDaemon({
   home, port, fetch, idleMs = 30 * 60_000, tickMs = 60_000, retentionDays = 7,
   log = (l) => process.stdout.write(`${new Date().toISOString()} ${l}\n`), network,
+  gh, vscodeUserDirs,
 }) {
   const p = glassPaths(home);
   for (const d of [p.data, p.ca, p.logs]) fs.mkdirSync(d, { recursive: true });
@@ -213,7 +216,7 @@ export async function startDaemon({
   // `gh` asks with its own login, through the same egress proxy as the agents.
   const copilotQuota = createCopilotQuota({
     statePath: path.join(p.run, 'copilot-quota.json'), config,
-    env: () => ({ ...process.env, ...egressEnv }), log,
+    env: () => ({ ...process.env, ...egressEnv }), log, ...(gh ? { run: gh } : {}),
   });
 
   const tokenDb = initTokenDb(p.data);
@@ -596,7 +599,7 @@ export async function startDaemon({
   const vscodeSeen = new Map();
   const observe = () => {
     try {
-      const r = sweepVscodeTokenRows({ dbPath: resolveTokenDbPath(p.data), sinceMs: Date.now() - 45 * 86_400_000, seen: vscodeSeen });
+      const r = sweepVscodeTokenRows({ dbPath: resolveTokenDbPath(p.data), userDirs: vscodeUserDirs, sinceMs: Date.now() - 45 * 86_400_000, seen: vscodeSeen });
       if (r.inserted) log(`vscode: ${r.inserted} Copilot Chat request(s) from ${r.files} session file(s)`);
     } catch (err) {
       logErr(`vscode sweep: ${err.message}`);
@@ -622,6 +625,7 @@ export async function startDaemon({
     clearInterval(idleTimer);
     clearInterval(offloadTimer);
     clearInterval(observeTimer);
+    await copilotQuota.settled(); // a gh still running would write into the home after exit
     netMonitor.stop();
     // Sessions whose agent still runs stay in sessions.json for the next daemon.
     for (const s of [...sessions.values()]) if (!alive(s.pid)) await closeSession(s.token);

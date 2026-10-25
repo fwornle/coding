@@ -11,8 +11,13 @@
 // runs. `gh` holds the login and sends it; glass never reads or stores a token.
 // No gh, no login for the host, or an answer without a quota: the view says so
 // and nothing else changes. ~/.glass/config.json { "copilotQuota": false } stops
-// the read; { "githubHost": "<host>" } names the GitHub host when glass cannot
-// tell it from the Copilot traffic it measured.
+// the read; { "githubHost": "<host>" } names the GitHub host.
+//
+// Which host: githubHost, else GH_HOST, else the host of Copilot traffic glass
+// measured, else every host gh is logged in to — enterprise hosts before
+// github.com — keeping the first whose account has a metered quota. Asking only
+// gh's default host showed a personal github.com plan (entitlement 0) as "GitHub
+// reports €0" on a machine whose work account is on a GHE host.
 //
 // The endpoint is internal to GitHub (undocumented): it may change, and a reply
 // glass does not recognise reads as "unavailable", never as zero use.
@@ -44,7 +49,8 @@ export function parseQuota(body) {
   if (!snap || typeof snap !== 'object' || snap.unlimited === true) return null;
   const used = Number(snap.credits_used ?? (Number(snap.entitlement) - Number(snap.remaining)));
   const entitlement = Number(snap.entitlement);
-  if (!Number.isFinite(used) || !Number.isFinite(entitlement)) return null;
+  // No entitlement is no metered plan (a personal account without Copilot credits).
+  if (!Number.isFinite(used) || !Number.isFinite(entitlement) || entitlement <= 0) return null;
   return {
     plan: typeof body.copilot_plan === 'string' ? body.copilot_plan : '',
     tokenBased: body.token_based_billing === true || snap.token_based_billing === true,
@@ -59,10 +65,10 @@ export function parseQuota(body) {
   };
 }
 
-/** `gh api` as a promise: { ok, stdout, error }. Never rejects. */
-function ghApi(args, env, timeoutMs = 20_000) {
+/** `gh <args>` as a promise: { ok, stdout, error }. Never rejects. */
+export function runGh(args, env, timeoutMs = 20_000) {
   return new Promise((resolve) => {
-    execFile('gh', ['api', ...args], { env, timeout: timeoutMs, maxBuffer: 1 << 20 }, (err, stdout, stderr) => {
+    execFile('gh', args, { env, timeout: timeoutMs, maxBuffer: 1 << 20 }, (err, stdout, stderr) => {
       if (err) {
         const missing = err.code === 'ENOENT';
         resolve({ ok: false, error: missing ? 'gh is not installed' : (String(stderr || err.message).trim().split('\n')[0] || 'gh failed') });
@@ -71,10 +77,20 @@ function ghApi(args, env, timeoutMs = 20_000) {
   });
 }
 
+/** Hosts gh holds a working login for, enterprise ones first, from `gh auth status --json hosts`. */
+export function loggedInHosts(stdout) {
+  let hosts = {};
+  try { hosts = JSON.parse(stdout)?.hosts || {}; } catch { return []; }
+  const ok = Object.entries(hosts)
+    .filter(([, logins]) => Array.isArray(logins) && logins.some((l) => l?.state === 'success'))
+    .map(([host]) => host);
+  return [...ok.filter((h) => h !== 'github.com'), ...ok.filter((h) => h === 'github.com')];
+}
+
 /**
- * @param {{ statePath: string, config?: object, env?: () => object, run?: typeof ghApi, now?: () => number, log?: Function }} deps
+ * @param {{ statePath: string, config?: object, env?: () => object, run?: typeof runGh, now?: () => number, log?: Function }} deps
  */
-export function createCopilotQuota({ statePath, config = {}, env = () => process.env, run = ghApi, now = Date.now, log = () => {} }) {
+export function createCopilotQuota({ statePath, config = {}, env = () => process.env, run = runGh, now = Date.now, log = () => {} }) {
   const enabled = config.copilotQuota !== false;
   let state = { host: '', seenHost: '', fetchedAt: 0, quota: null, error: '' };
   try { state = { ...state, ...JSON.parse(fs.readFileSync(statePath, 'utf8')) }; } catch { /* first run */ }
@@ -111,21 +127,28 @@ export function createCopilotQuota({ statePath, config = {}, env = () => process
     if (inflight) return inflight;
     if (age < (force ? MIN_FORCED_REFRESH_MS : QUOTA_REFRESH_MS)) return view();
     inflight = (async () => {
-      const host = hostToAsk();
-      // No known host: gh's default one — shown with its host and plan, so a
-      // personal github.com plan is never mistaken for the work account.
-      const args = host ? ['--hostname', host, '/copilot_internal/user'] : ['/copilot_internal/user'];
-      const r = await run(args, ghEnv());
+      const known = hostToAsk();
+      let hosts = known ? [known] : [];
+      if (!known) {
+        const r = await run(['auth', 'status', '--json', 'hosts'], ghEnv());
+        hosts = r.ok ? loggedInHosts(r.stdout) : [];
+        if (!r.ok) state.error = r.error;
+        else if (!hosts.length) state.error = 'gh is not logged in to any GitHub host';
+      }
+      if (!hosts.length) state.quota = null;
       state.fetchedAt = now();
-      state.host = host || 'gh default host';
-      if (!r.ok) {
-        state.error = r.error;
-      } else {
+      for (const host of hosts) {
+        const r = await run(['api', '--hostname', host, '/copilot_internal/user'], ghEnv());
+        state.host = host;
+        if (!r.ok) { state.error = r.error; state.quota = null; continue; }
         let body = null;
         try { body = JSON.parse(r.stdout); } catch { /* below */ }
-        const quota = parseQuota(body);
-        state.quota = quota;
-        state.error = quota ? '' : 'no metered Copilot quota in the reply';
+        state.quota = parseQuota(body);
+        state.error = state.quota ? '' : `no metered Copilot quota for the account on ${host}`;
+        if (state.quota) {
+          if (!known) state.seenHost = host; // found: ask it directly from now on
+          break;
+        }
       }
       if (state.error) log(`copilot quota (${state.host}): ${state.error}`);
       save();
@@ -144,5 +167,8 @@ export function createCopilotQuota({ statePath, config = {}, env = () => process
     };
   }
 
-  return { refresh, view, noteApiHost };
+  /** Resolves once no read is in flight — the daemon waits for it before it exits. */
+  const settled = () => (inflight ? inflight.then(() => {}, () => {}) : Promise.resolve());
+
+  return { refresh, view, noteApiHost, settled };
 }
