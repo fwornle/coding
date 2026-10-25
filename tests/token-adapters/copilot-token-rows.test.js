@@ -67,20 +67,26 @@ test('one per-session-aggregate row per model, with coalesced counts', () => {
       expect(r.total_tokens).toBe(r.input_tokens + r.output_tokens);
     }
 
-    // claude-opus-4.6: 232866 in / 1282 out / 115 reasoning.
+    // claude-opus-4.6: 232866 prompt = 203106 cache read + 29750 cache write + 10
+    // fresh / 1282 out / 115 reasoning. Copilot's inputTokens includes the cache;
+    // input_tokens is fresh input only, the cache columns add on top.
     const opus = agg.find((r) => r.model === 'claude-opus-4.6');
     expect(opus).toBeTruthy();
-    expect(opus.input_tokens).toBe(232866);
+    expect(opus.input_tokens).toBe(10);
+    expect(opus.cache_read_tokens).toBe(203106);
+    expect(opus.cache_write_tokens).toBe(29750);
     expect(opus.output_tokens).toBe(1282);
-    expect(opus.total_tokens).toBe(232866 + 1282);
+    expect(opus.total_tokens).toBe(10 + 1282);
     expect(opus.reasoning_tokens).toBe(115);
 
-    // claude-sonnet-4.6: 51002 in / 640 out / NO reasoningTokens key → 0.
+    // claude-sonnet-4.6: 51002 prompt = 40110 cache read + 10892 fresh / 640 out /
+    // NO reasoningTokens key → 0.
     const sonnet = agg.find((r) => r.model === 'claude-sonnet-4.6');
     expect(sonnet).toBeTruthy();
-    expect(sonnet.input_tokens).toBe(51002);
+    expect(sonnet.input_tokens).toBe(10892);
+    expect(sonnet.cache_read_tokens).toBe(40110);
     expect(sonnet.output_tokens).toBe(640);
-    expect(sonnet.total_tokens).toBe(51002 + 640);
+    expect(sonnet.total_tokens).toBe(10892 + 640);
     // Pitfall 5: reasoningTokens absent → coalesced to 0 (not NaN/null/undefined).
     expect(sonnet.reasoning_tokens).toBe(0);
   } finally {
