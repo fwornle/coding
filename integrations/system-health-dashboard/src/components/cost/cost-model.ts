@@ -113,8 +113,8 @@ export interface CostConfig {
  * A subscription's budget.
  *
  * `monthlyEur` is the standing cap. `monthlyEurByMonth` overrides it for named
- * months ('YYYY-MM' -> euros), because a cap is not a constant: this one went
- * step by step during 2026-08 as extensions were approved. Without the
+ * months ('YYYY-MM' -> euros), because a cap is not a constant: it can be
+ * raised several times in one month as extensions are approved. Without the
  * history a single editable number would retroactively re-judge every past
  * month against a budget it never had — reporting July as "over" on a cap that
  * did not exist yet, which is worse than not showing a verdict at all.

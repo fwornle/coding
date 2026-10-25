@@ -234,8 +234,8 @@ export function CostSettingsDialog({ open, onOpenChange, proxyBase, onSaved }: P
                     <span className="text-muted-foreground">warn</span>
                   </label>
                 </div>
-                {/* Per-month overrides. A cap is not a constant: this one went
-                    step by step during 2026-08 as extensions were approved,
+                {/* Per-month overrides. A cap is not a constant: it can be raised
+                    several times in one month as extensions are approved,
                     and without a history a single number would retroactively
                     re-judge every past month against a budget it never had. The
                     standing value above applies to any month with no entry here. */}

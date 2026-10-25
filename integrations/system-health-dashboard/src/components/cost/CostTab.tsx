@@ -33,8 +33,8 @@ interface Props {
   /** What these figures cover, when that is less than the whole account — glass
    *  sees only the calls of the sessions it launched, while GitHub's Copilot
    *  budget counts every use of the login (IDE plugin, other tools, other
-   *  machines). Without saying so, a small figure against a budget GitHub says is a third used reads as
-   *  a bug. */
+   *  machines). Without saying so, a small figure against a budget GitHub says
+   *  is a third used reads as a bug. */
   coverage?: { short: string; long: string }
   /** Changes when the account selection is saved: reload with the new filter. */
   accountsRev?: number
@@ -213,9 +213,9 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
       const spend = monthRows.reduce((s, r) => s + fromUsd(cellCostUsd(r, cfg), cfg, rowAt(r)), 0)
       const key = configKey(account)
       const budgetCfg = cfg.budgets[key]
-      // The cap IN FORCE THAT MONTH, not today's. This one went step by
-      // step during 2026-08; judging an earlier month against today's cap would report a month as
-      // comfortably inside a budget that did not exist yet.
+      // The cap IN FORCE THAT MONTH, not today's: judging an earlier month
+      // against a cap raised since would report it as comfortably inside a
+      // budget that did not exist yet.
       const budgetEur = budgetForMonth(budgetCfg, activeMonth || '')
       const budget = budgetEur == null ? null : fromEur(budgetEur, cfg)
       // Only project forward for the live calendar month; past months are final.

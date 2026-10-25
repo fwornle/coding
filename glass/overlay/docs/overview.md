@@ -177,7 +177,7 @@ Drag the brush under the chart to zoom into one stretch of work.
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Token Usage Evolution: thirty days in euros, stacked by provider, month-to-date — the Claude subscription and GitHub Copilot each rising through the month.](images/ui-token-usage-evolution.png)](images/ui-token-usage-evolution.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![Token Usage Evolution: thirty days in euros, stacked by provider, month-to-date — the Claude subscription and GitHub Copilot each rising through the month — demo data.](images/ui-token-usage-evolution.png)](images/ui-token-usage-evolution.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
 <figcaption>Example runs on one machine, not a benchmark. Month-to-date in €: each step is a session's spend; the slope is the burn rate.</figcaption>
 </figure>
@@ -205,7 +205,7 @@ The status line carries the Copilot figure as **`GH €`**; one click opens this
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Cost tab: tiles for GitHub Copilot with spend, month-end projection and foreground / background split, the Claude subscription as notional cost, own hardware with what it saved, and cost by month below.](images/ui-token-usage-cost.png)](images/ui-token-usage-cost.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![Cost tab: tiles for GitHub Copilot with spend, month-end projection and foreground / background split, the Claude subscription as notional cost, and cost by month below — demo data.](images/ui-token-usage-cost.png)](images/ui-token-usage-cost.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
 <figcaption>A contract discount or a fixed euro rate goes into <code>~/.glass/cost.json</code>.</figcaption>
 </figure>
