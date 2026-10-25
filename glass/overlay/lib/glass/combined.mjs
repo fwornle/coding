@@ -15,6 +15,16 @@
 // work, and glass sessions from before this glass home existed — are kept. An
 // empty task id (an unbound call) is nobody's session, so it never matches.
 //
+// coding also rebuilds sessions from the agents' own files (its opencode and
+// Copilot CLI adapters, process token-adapter-*), and those copies carry coding's
+// ids, not glass's: an opencode session glass measured on the wire came back as
+// a second, unbound set of rows (2026-10-10: 113 calls twice, the Copilot tile
+// €11 above GitHub's own figure). Such a row is dropped when a glass session of
+// the same agent ran in the same project at that time (its first to last call,
+// ±2 min — an adapter stamps the message, the wire the response). Rows coding
+// saw on a wire, and adapter rows of another project — a second session at the
+// same time, outside glass — are kept.
+//
 // cost.json `includeCoding: false` switches it off (it is on when absent).
 import fs from 'node:fs';
 import os from 'node:os';
@@ -58,13 +68,32 @@ export function openCombined(glassDbPath, codingDbPath) {
     // The two schemas migrate on their own; read only the columns both have.
     const shared = cols('main').filter((c) => theirs.has(c)).map((c) => `"${c}"`).join(', ');
     if (!shared) throw new Error('coding token DB has no token_usage table');
+    const both = (c) => theirs.has(c) && cols('main').includes(c);
+    const rebuiltCopy = ['agent', 'project', 'process', 'timestamp'].every(both)
+      ? `AND NOT (c.process LIKE 'token-adapter-%' AND EXISTS (
+           SELECT 1 FROM temp.glass_spans s
+           WHERE s.agent = c.agent AND s.project = c.project AND c.timestamp BETWEEN s.t0 AND s.t1))`
+      : '';
+    if (rebuiltCopy) {
+      db.exec(`
+        CREATE TEMP VIEW glass_spans AS
+          SELECT agent, project,
+                 strftime('%Y-%m-%dT%H:%M:%fZ', MIN(timestamp), '-120 seconds') AS t0,
+                 strftime('%Y-%m-%dT%H:%M:%fZ', MAX(timestamp), '+120 seconds') AS t1
+          FROM main.token_usage
+          WHERE task_id LIKE 'glass-%' AND COALESCE(agent, '') <> '' AND COALESCE(project, '') <> ''
+          GROUP BY task_id, agent, project
+      `);
+    }
+    const cshared = shared.split(', ').map((c) => `c.${c}`).join(', ');
     db.exec(`
       CREATE TEMP VIEW token_usage AS
         SELECT ${shared} FROM main.token_usage
         UNION ALL
-        SELECT ${shared} FROM coding.token_usage
-        WHERE COALESCE(task_id, '') = ''
-           OR task_id NOT IN (SELECT task_id FROM main.token_usage WHERE COALESCE(task_id, '') <> '')
+        SELECT ${cshared} FROM coding.token_usage AS c
+        WHERE (COALESCE(c.task_id, '') = ''
+           OR c.task_id NOT IN (SELECT task_id FROM main.token_usage WHERE COALESCE(task_id, '') <> ''))
+          ${rebuiltCopy}
     `);
   } catch (err) {
     try { db.close(); } catch { /* closing a failed open */ }

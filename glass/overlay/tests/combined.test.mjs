@@ -53,6 +53,40 @@ test('the union: glass rows plus coding\'s, with coding\'s copy of a glass sessi
   h.db.close();
 });
 
+test("coding's rebuild of a glass session from the agent's own files is dropped; a concurrent session elsewhere is kept", () => {
+  const rows = (dir, list) => {
+    const h = initTokenDb(dir);
+    const ins = h.db.prepare(`INSERT INTO token_usage (id, timestamp, provider, model, process, input_tokens, output_tokens, total_tokens, user_hash, task_id, agent, project)
+      VALUES (?, ?, 'github-copilot', 'm', ?, ?, 0, ?, ?, ?, 'opencode', ?)`);
+    list.forEach((r, i) => ins.run(i + 1, r.at, r.process, r.input, r.input, r.hash, r.task ?? '', r.project));
+    h.db.close();
+    return resolveTokenDbPath(dir);
+  };
+  // glass measured an opencode session in repo "rec" on the wire, 20 to 10 min ago.
+  const glass = rows(tmp(), [
+    { at: at(20), process: 'opencode', input: 1, hash: 'opcadt', task: 'glass-opencode-1', project: 'rec' },
+    { at: at(10), process: 'opencode', input: 2, hash: 'opcadt', task: 'glass-opencode-1', project: 'rec' },
+  ]);
+  const coding = rows(tmp(), [
+    // coding's opencode adapter rebuilt the same session: dropped (inside ±2 min).
+    { at: at(21), process: 'token-adapter-opencode', input: 100, hash: 'opnadt', project: 'rec' },
+    { at: at(15), process: 'token-adapter-opencode', input: 200, hash: 'opnadt', project: 'rec' },
+    // A second session at the same time, in another repo: kept.
+    { at: at(15), process: 'token-adapter-opencode', input: 1000, hash: 'opnadt', project: 'other' },
+    // Same repo, but after the glass session ended: kept.
+    { at: at(2), process: 'token-adapter-opencode', input: 10000, hash: 'opnadt', project: 'rec' },
+    // A wire row coding's proxy recorded in the window is not a rebuild: kept.
+    { at: at(15), process: 'opencode', input: 100000, hash: 'opcadt', project: 'rec' },
+  ]);
+  const c = openCombined(glass, coding);
+  try {
+    const { total } = c.db.prepare('SELECT SUM(input_tokens) AS total FROM token_usage').get();
+    assert.equal(total, 1 + 2 + 1000 + 10000 + 100000);
+  } finally {
+    c.db.close();
+  }
+});
+
 test('read-only: nothing can be written to either file through the combined handle', () => {
   const { glass, coding } = pair();
   const h = openCombined(glass, coding);
