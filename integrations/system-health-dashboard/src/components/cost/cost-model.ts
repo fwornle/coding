@@ -107,7 +107,6 @@ export interface CostConfig {
   /** What the discount is called on screen, per budget key ("contract discount" when absent). */
   discountLabel?: Record<string, string>
   providerScale: Record<string, number>
-  copilot: { plan: string; includedCreditsUsd: number; creditUsd: number; overagePrices: string }
   budgets: Record<string, BudgetConfig>
 }
 
@@ -130,7 +129,6 @@ export interface BudgetConfig {
   monthlyEur: number | null
   monthlyEurByMonth?: Record<string, number | null>
   enforce: boolean
-  budgetBasis: string
 }
 
 /**
@@ -162,12 +160,11 @@ export const DEFAULT_COST_CONFIG: CostConfig = {
   discount: {},
   periods: [],
   providerScale: { copilot: 1.0, 'claude-max': 1.0 },
-  copilot: { plan: 'business', includedCreditsUsd: 19, creditUsd: 0.01, overagePrices: 'sameAsModelPrices' },
   budgets: {
     // No cap by default: a budget is someone's own (Prices & Budgets / saved
     // settings). A default number here would judge every user against it.
-    copilot:      { monthlyEur: null, enforce: true,  budgetBasis: 'gross' },
-    'claude-max': { monthlyEur: null, enforce: false, budgetBasis: 'gross' },
+    copilot:      { monthlyEur: null, enforce: true },
+    'claude-max': { monthlyEur: null, enforce: false },
   },
 }
 
@@ -204,7 +201,6 @@ export function mergeCostConfig(saved: Partial<CostConfig> | null | undefined): 
     discountLabel: { ...(base.discountLabel || {}), ...(s.discountLabel || {}) },
     periods: Array.isArray(s.periods) ? s.periods : (base.periods || []),
     providerScale: { ...base.providerScale, ...(s.providerScale || {}) },
-    copilot: { ...base.copilot, ...(s.copilot || {}) },
     budgets: { ...base.budgets, ...(s.budgets || {}) },
   }
 }
@@ -607,21 +603,6 @@ export function pivotForMonth(rows: CostRow[], cfg: CostConfig, dim: PivotDim, m
   const out = [...agg.values()].sort((a, b) => b.costEur - a.costEur)
   for (const c of out) c.share = total > 0 ? c.costEur / total : 0
   return out
-}
-
-// ---- Copilot real billing (Business tier) -------------------------------
-export interface CopilotBilling { grossEur: number; includedEur: number; overageEur: number }
-export function copilotBilling(rows: CostRow[], cfg: CostConfig, month: string): CopilotBilling {
-  let grossEur = 0
-  for (const r of rows) {
-    if (isSynthetic(r)) continue
-    if (r.month !== month) continue
-    if (accountKind(costAccount(r.provider)) !== 'copilot') continue
-    grossEur += fromUsd(cellCostUsd(r, cfg), cfg, rowAt(r))
-  }
-  // The allowance is credits, so it is discounted like the usage it offsets.
-  const includedEur = fromUsd((cfg.copilot?.includedCreditsUsd ?? 0) * copilotDiscountAt(cfg, month), cfg, month)
-  return { grossEur, includedEur, overageEur: Math.max(0, grossEur - includedEur) }
 }
 
 // ---- Burn-rate projection -----------------------------------------------

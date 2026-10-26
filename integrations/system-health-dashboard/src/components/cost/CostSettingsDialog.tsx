@@ -5,9 +5,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
 import { CostConfig, DEFAULT_COST_CONFIG, ModelPrice, mergeCostConfig } from './cost-model'
 
 interface Props {
@@ -191,24 +188,6 @@ export function CostSettingsDialog({ open, onOpenChange, proxyBase, onSaved }: P
               </div>
             </section>
 
-            {/* Copilot billing */}
-            <section>
-              <h3 className="text-sm font-semibold mb-2">GitHub Copilot billing</h3>
-              <div className="flex flex-wrap items-center gap-4 text-sm">
-                <label className="flex items-center gap-2">
-                  <span className="text-muted-foreground">Plan</span>
-                  <span className="font-mono text-xs px-2 py-1 bg-muted rounded">{draft.copilot.plan}</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <span className="text-muted-foreground">Included allowance (USD/mo)</span>
-                  <Input type="number" step="1" className="w-24 h-8"
-                    value={draft.copilot.includedCreditsUsd}
-                    onChange={e => setDraft(d => ({ ...d, copilot: { ...d.copilot, includedCreditsUsd: num(e.target.value, 19) } }))} />
-                </label>
-                <span className="text-xs text-muted-foreground">Business = $19 (1,900 credits · $0.01 each)</span>
-              </div>
-            </section>
-
             {/* Budgets */}
             <section>
               <h3 className="text-sm font-semibold mb-2">Monthly budgets (EUR)</h3>
@@ -220,14 +199,6 @@ export function CostSettingsDialog({ open, onOpenChange, proxyBase, onSaved }: P
                     value={draft.budgets.copilot.monthlyEur ?? ''}
                     placeholder="none"
                     onChange={e => setDraft(d => ({ ...d, budgets: { ...d.budgets, copilot: { ...d.budgets.copilot, monthlyEur: e.target.value === '' ? null : num(e.target.value, 300) } } }))} />
-                  <Select value={draft.budgets.copilot.budgetBasis}
-                    onValueChange={v => setDraft(d => ({ ...d, budgets: { ...d.budgets, copilot: { ...d.budgets.copilot, budgetBasis: v } } }))}>
-                    <SelectTrigger className="w-40 h-8"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="gross">vs gross usage</SelectItem>
-                      <SelectItem value="overage">vs overage only</SelectItem>
-                    </SelectContent>
-                  </Select>
                   <label className="flex items-center gap-1.5">
                     <Checkbox checked={draft.budgets.copilot.enforce}
                       onCheckedChange={c => setDraft(d => ({ ...d, budgets: { ...d.budgets, copilot: { ...d.budgets.copilot, enforce: !!c } } }))} />

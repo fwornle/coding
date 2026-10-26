@@ -19,7 +19,7 @@ import {
   CostRow, CostConfig, Currency, DEFAULT_COST_CONFIG, PivotDim, AccountKind,
   accountKind, accountName, costAccount, configKey, isSynthetic, cellCostUsd, fromUsd, fromEur, rowAt, copilotDiscountAt, usdPerEurAt,
   formatMoney, fetchCostSettings, setLocalProviders, withCurrency,
-  monthlySeries, pivotForMonth, copilotBilling, projectBurn, budgetStatus,
+  monthlySeries, pivotForMonth, projectBurn, budgetStatus,
   buildSuggestions, budgetForMonth, splitByScope, ScopeSplit, localSavings, LocalSavings,
   copilotSeatCredit, recentDailyRate, type RouteAction,
 } from './cost-model'
@@ -241,13 +241,9 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
       // Only project forward for the live calendar month; past months are final.
       const burn = projectBurn(spend, now, recentDailyRate(rows, cfg, now, r => costAccount(r.provider) === account))
       const projected = isCurrentCalendarMonth ? burn.projectedEur : spend
-      const cop = kind === 'copilot' && activeMonth ? copilotBilling(rows, cfg, activeMonth) : undefined
-      const compareVal = kind === 'copilot' && budgetCfg?.budgetBasis === 'overage' && cop
-        ? (isCurrentCalendarMonth ? projectBurn(cop.overageEur, now).projectedEur : cop.overageEur)
-        : projected
       out.push({
         account, kind, label: accountName(account), spend, projected, budget,
-        status: budgetCfg?.enforce ? budgetStatus(compareVal, budget) : 'ok',
+        status: budgetCfg?.enforce ? budgetStatus(projected, budget) : 'ok',
         projectionBasis: burn.basis,
         seatCredit,
         split: splitByScope(monthRows, cfg),
