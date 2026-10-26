@@ -40,6 +40,7 @@ import { createMeasurement } from '../../proxy/proxy-bridge/measurement.mjs';
 import { handleAnthropicMessages } from '../../proxy/proxy-bridge/anthropic-forward.mjs';
 import { handleOpenAIPassthrough, forwardPlain, openAIWireOf } from '../../proxy/proxy-bridge/openai-passthrough.mjs';
 import { createUsageApi } from '../../proxy/proxy-bridge/usage-api.mjs';
+import { listTrials, readTrial, readSamples, effectiveStatus, summarize } from '../../proxy/proxy-bridge/model-trials.mjs';
 import { attachIntercept } from '../../proxy/proxy-bridge/intercept.mjs';
 import { loadRawBodyRedactionPatterns, makeRedactRawBody } from '../../proxy/proxy-bridge/raw-bodies.mjs';
 import { canonicalizeModelName } from '../../proxy/proxy-bridge/model-canonical.mjs';
@@ -50,7 +51,7 @@ import { glassPaths, PKG_ROOT } from './home.mjs';
 import { createEgressFetch, upstreamProxy, proxyEnvOf, noProxyOf } from './egress.mjs';
 import { createUiApi } from './ui-api.mjs';
 import { statuslineData, renderReport, TAGS } from './statusline.mjs';
-import { createUsageSource, VSCODE_AGENT } from './combined.mjs';
+import { createUsageSource, codingTokenDb, VSCODE_AGENT } from './combined.mjs';
 import { loadCostDefaults, saveExcludedAccounts, saveSources } from './cost.mjs';
 import { createNetworkMonitor } from './network.mjs';
 import { createOffloadStore } from './offload-store.mjs';
@@ -545,6 +546,22 @@ export async function startDaemon({
       // The account selection is a setting like offload's: same gate on its write.
       if (url.startsWith('/api/token-usage/accounts') && req.method !== 'GET' && !uiWriteAllowed(req, selfPort)) {
         return json(res, 403, { error: 'the account selection changes only from the glass UI' });
+      }
+      // Model trials, read-only: a coding machine's (rapid-llm-proxy
+      // model-trials.mjs), kept next to coding's token DB. They are started and
+      // accepted in coding's dashboard, where the proxy that runs them lives.
+      if (url.split('?')[0] === '/api/trials' || url.startsWith('/api/trials/')) {
+        if (req.method !== 'GET') return json(res, 405, { error: "trials are started and accepted in coding's dashboard" });
+        const db = codingTokenDb();
+        const dir = db ? path.join(path.dirname(db), 'trials') : null;
+        const view = (t) => {
+          const samples = readSamples(dir, t.id);
+          return { trial: { ...t, status: effectiveStatus(t, samples.length) }, summary: summarize(t, samples), samples };
+        };
+        const id = url.split('?')[0].slice('/api/trials/'.length);
+        if (!id) return json(res, 200, { trials: dir ? listTrials(dir).map((t) => { const v = view(t); return { ...v.trial, summary: v.summary }; }) : [] });
+        const trial = dir ? readTrial(dir, id) : null;
+        return trial ? json(res, 200, view(trial)) : json(res, 404, { error: `no trial ${id}` });
       }
       if (url.startsWith('/relay/')) return onRelay(req, res);
       if (usageRead(req, res)) return undefined;

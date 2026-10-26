@@ -73,6 +73,8 @@ select:
       - proxy-bridge/context-turns.mjs
       - proxy-bridge/turn-identity.mjs
       - proxy-bridge/raw-bodies.mjs
+      # model trials, read-only in glass (started and accepted in coding's dashboard)
+      - proxy-bridge/model-trials.mjs
       - proxy-bridge/shim-tools.mjs
       - proxy-bridge/db-open.cjs
       # opt-in offload (G8): the decision, the downgrade-only classifier, the trail column

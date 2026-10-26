@@ -27,6 +27,7 @@ import {
 const TokenUsageSettingsDialog = lazy(() => import('./token-usage-settings-dialog').then((m) => ({ default: m.TokenUsageSettingsDialog })))
 const TokenUsageRoutingTab = lazy(() => import('./token-usage-routing-tab').then((m) => ({ default: m.TokenUsageRoutingTab })))
 const CostTab = lazy(() => import('@/components/cost/CostTab').then((m) => ({ default: m.CostTab })))
+const TrialsTab = lazy(() => import('@/components/trials/TrialsTab').then((m) => ({ default: m.TrialsTab })))
 import { AccountsDialog } from '@/components/cost/AccountsDialog'
 import { SeriesTooltip } from '@/components/cost/series-tooltip'
 import { fetchAccountSelection, type AccountSelection, type SourcesControl } from '@/components/cost/account-selection'
@@ -517,8 +518,8 @@ function TreemapTooltip({ active, payload }: { active?: boolean; payload?: Array
   )
 }
 
-export type TokenUsageTab = 'overview' | 'evolution' | 'cost' | 'recent' | 'routing'
-const ALL_TABS: TokenUsageTab[] = ['overview', 'evolution', 'cost', 'recent', 'routing']
+export type TokenUsageTab = 'overview' | 'evolution' | 'cost' | 'trials' | 'recent' | 'routing'
+const ALL_TABS: TokenUsageTab[] = ['overview', 'evolution', 'cost', 'trials', 'recent', 'routing']
 
 /**
  * proxyBase: where the token-usage reads live — '' for same-origin (glass's daemon
@@ -540,6 +541,8 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
 } = {}) {
   const has = (tab: TokenUsageTab) => tabs.includes(tab)
   const [activeTab, setActiveTab] = useState<string>(() => linkedTab(tabs) ?? tabs[0])
+  // The trial a Cost-tab suggestion opened, for the Trials tab to show first.
+  const [trialFocus, setTrialFocus] = useState<string | null>(null)
   // glass re-uses an open UI tab and only changes its hash, so a click on the
   // status line's cost field must switch the tab of a page already showing.
   useEffect(() => {
@@ -1127,6 +1130,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
           {has('overview') && <TabsTrigger value="overview">Overview</TabsTrigger>}
           {has('evolution') && <TabsTrigger value="evolution">Evolution</TabsTrigger>}
           {has('cost') && <TabsTrigger value="cost">Cost</TabsTrigger>}
+          {has('trials') && <TabsTrigger value="trials">Trials</TabsTrigger>}
           {has('recent') && <TabsTrigger value="recent">Recent Calls</TabsTrigger>}
           {has('routing') && <TabsTrigger value="routing">Routing</TabsTrigger>}
         </TabsList>
@@ -1536,7 +1540,19 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
         {has('cost') && (
           <TabsContent value="cost">
             <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
-              <CostTab proxyBase={proxyBase} currency={unit === 'USD' ? 'USD' : 'EUR'} onCurrency={setUnit} coverage={coverage} accountsRev={accountsRev} hiddenAccounts={hiddenAccounts} onAccounts={accountSel ? () => setAccountsOpen(true) : undefined} />
+              <CostTab proxyBase={proxyBase} currency={unit === 'USD' ? 'USD' : 'EUR'} onCurrency={setUnit} coverage={coverage} accountsRev={accountsRev} hiddenAccounts={hiddenAccounts} onAccounts={accountSel ? () => setAccountsOpen(true) : undefined}
+                onTrials={has('trials') ? (id?: string) => { setTrialFocus(id ?? null); setActiveTab('trials') } : undefined} />
+            </Suspense>
+          </TabsContent>
+        )}
+
+        {/* Trials Tab — a cheaper model beside a process's current one, judged
+            blind before anything switches. Write actions only where the proxy's
+            settings API is (coding); glass shows the same trials read-only. */}
+        {has('trials') && (
+          <TabsContent value="trials">
+            <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
+              <TrialsTab proxyBase={proxyBase} canWrite={settings} focusId={trialFocus} currency={unit === 'USD' ? 'USD' : 'EUR'} />
             </Suspense>
           </TabsContent>
         )}

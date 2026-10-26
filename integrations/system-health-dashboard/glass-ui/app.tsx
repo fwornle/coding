@@ -112,7 +112,7 @@ function TokenUsage() {
   const sources = useSources()
   return (
     <TokenUsagePage
-      proxyBase="" tabs={['overview', 'evolution', 'cost', 'recent']} settings={false} onSettings={openSettings}
+      proxyBase="" tabs={['overview', 'evolution', 'cost', 'trials', 'recent']} settings={false} onSettings={openSettings}
       coverage={coverage(sources.coding, sources.vscode)}
       sources={sources.control} writeHeaders={WRITE_HEADERS}
     />

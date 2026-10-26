@@ -478,6 +478,36 @@ test('sources: coding\'s figures join the usage reads where its DB is, switchabl
   }
 });
 
+test("trials: a coding machine's model trials, read-only, from beside its token DB", async () => {
+  assert.deepEqual((await api('GET', '/api/trials')).body, { trials: [] }, 'no coding install: none');
+  const { initTokenDb, resolveTokenDbPath } = await import('../proxy/dist/token-usage.js');
+  const { createTrial, appendTrialLine } = await import('../proxy/proxy-bridge/model-trials.mjs');
+  const dir = path.join(home, 'trials-coding-data');
+  initTokenDb(dir).db.close();
+  const db = resolveTokenDbPath(dir);
+  const t = createTrial(path.join(path.dirname(db), 'trials'), {
+    process: 'consolidator-insight',
+    incumbent: { provider: 'gh-copilot', complexity: 'medium', model: 'claude-sonnet-5' },
+    candidate: { provider: 'gh-copilot', complexity: 'small', model: 'claude-haiku-5.5' },
+  });
+  appendTrialLine(path.join(path.dirname(db), 'trials'), t.id, { kind: 'sample', sampleId: 's1', incumbent: { content: 'a' }, candidate: { content: 'b' }, structure: { formatMatch: true } });
+  process.env.GLASS_CODING_TOKEN_DB = db;
+  try {
+    const list = (await api('GET', '/api/trials')).body.trials;
+    assert.equal(list.length, 1);
+    assert.equal(list[0].process, 'consolidator-insight');
+    assert.equal(list[0].summary.samples, 1);
+    assert.equal(list[0].summary.verdict, 'pending');
+    const one = (await api('GET', `/api/trials/${t.id}`)).body;
+    assert.equal(one.samples[0].sampleId, 's1');
+    assert.equal((await api('GET', '/api/trials/no-such-trial')).status, 404);
+    assert.equal((await api('POST', '/api/trials', { process: 'x' })).status, 405, 'started in coding\'s dashboard, not here');
+    assert.equal((await api('POST', `/api/trials/${t.id}/accept`, {})).status, 405);
+  } finally {
+    process.env.GLASS_CODING_TOKEN_DB = path.join(home, 'no-coding', 'token-usage.db');
+  }
+});
+
 test("sources: VS Code's Copilot Chat is offered once read, and switching it off leaves its rows out of the usage reads", async () => {
   // The observers test above read one VS Code request into glass's DB.
   assert.deepEqual((await api('GET', '/api/glass/sources')).body.vscode, { found: true, included: true });

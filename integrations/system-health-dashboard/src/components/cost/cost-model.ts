@@ -684,7 +684,8 @@ export function budgetStatus(projectedEur: number, budgetEur: number | null): Bu
 }
 
 // ---- Optimization suggestions -------------------------------------------
-export interface RouteAction { type: 'route'; process: string; provider: string; model: string }
+/** A suggestion to move a process to a cheaper model — through a trial (TrialsTab), never directly. */
+export interface RouteAction { type: 'route'; process: string; provider: string; model: string; complexity: string }
 export interface CadenceAction { type: 'cadence' }
 export interface Suggestion {
   id: string
@@ -707,7 +708,7 @@ function isRoutableBackground(process: string): boolean {
 }
 
 /** The model a route suggestion moves a background process to. */
-const ROUTE_TARGET = { provider: 'copilot', model: 'claude-haiku-5.5', label: 'Haiku 5.5' }
+const ROUTE_TARGET = { provider: 'copilot', model: 'claude-haiku-5.5', complexity: 'small', label: 'Haiku 5.5' }
 /** Days a suggestion judges by: what runs NOW, not a month that may predate a change. */
 const SUGGESTION_DAYS = 7
 
@@ -756,8 +757,8 @@ export function buildSuggestions(rows: CostRow[], cfg: CostConfig, month: string
       title: `Route "${proc}" to ${ROUTE_TARGET.label}`,
       detail: `${proc} spent ${money(p.costEur)} ${when}, mostly on ${main}. The same tokens on ${ROUTE_TARGET.label} (Copilot) ≈ ${money(p.targetEur)}.`,
       estSavingsEur: savings,
-      action: { type: 'route', process: proc, provider: ROUTE_TARGET.provider, model: ROUTE_TARGET.model },
-      howTo: `In coding's dashboard: Token Usage → Cost → Route, or a processOverrides entry for "${proc}" in its LLM settings.`,
+      action: { type: 'route', process: proc, provider: ROUTE_TARGET.provider, model: ROUTE_TARGET.model, complexity: ROUTE_TARGET.complexity },
+      howTo: `In coding's dashboard: Token Usage → Trials — run ${ROUTE_TARGET.label} beside the current model on "${proc}" first; accepting the trial switches its route.`,
     })
   }
 

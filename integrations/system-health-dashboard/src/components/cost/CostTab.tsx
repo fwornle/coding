@@ -21,8 +21,17 @@ import {
   formatMoney, fetchCostSettings, setLocalProviders, withCurrency,
   monthlySeries, pivotForMonth, copilotBilling, projectBurn, budgetStatus,
   buildSuggestions, budgetForMonth, splitByScope, ScopeSplit, localSavings, LocalSavings,
-  copilotSeatCredit, recentDailyRate,
+  copilotSeatCredit, recentDailyRate, type RouteAction,
 } from './cost-model'
+
+/** The part of a model trial this tab shows (TrialsTab has the whole shape). */
+interface TrialRef {
+  id: string
+  process: string
+  status: string
+  summary?: { verdict: 'pending' | 'pass' | 'fail' | 'insufficient'; judged: number }
+}
+const TRIAL_VERDICT: Record<string, string> = { pass: 'passed', fail: 'failed', pending: 'collecting', insufficient: 'too few pairs' }
 
 interface Props {
   proxyBase: string
@@ -39,6 +48,8 @@ interface Props {
   coverage?: { short: string; long: string }
   /** Changes when the account selection is saved: reload with the new filter. */
   accountsRev?: number
+  /** Opens the Trials tab, on a trial when given. Absent where there is no Trials tab. */
+  onTrials?: (trialId?: string) => void
   /** How many accounts the selection leaves out, for the toolbar button. */
   hiddenAccounts?: number
   /** Opens the page's Accounts dialog (absent on a proxy without a selection). */
@@ -89,14 +100,16 @@ interface AccountTile {
   savings?: LocalSavings
 }
 
-export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev = 0, hiddenAccounts = 0, onAccounts }: Props) {
+export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev = 0, hiddenAccounts = 0, onAccounts, onTrials }: Props) {
   const [rows, setRows] = useState<CostRow[]>([])
   const [savedCfg, setSavedCfg] = useState<CostConfig>(DEFAULT_COST_CONFIG)
   // glass's daemon has no /api/llm/settings: prices stay the calibrated
   // defaults there, and the controls that write coding's routing / cadence
   // settings are not offered at all rather than failing on click.
   const [settingsApi, setSettingsApi] = useState(false)
-  const [overrides, setOverrides] = useState<Record<string, { provider?: string; model?: string }>>({})
+  // Model trials, newest first (rapid-llm-proxy /api/trials): what a suggestion
+  // to move a process to a cheaper model has to pass before anything switches.
+  const [trials, setTrials] = useState<TrialRef[]>([])
   const [cadence, setCadence] = useState<CadenceCfg>({ enabled: true, checkIntervalMinutes: 30, undigestedThreshold: 10 })
   const [months, setMonths] = useState(6)
   const [pivotDim, setPivotDim] = useState<PivotDim>('process')
@@ -126,7 +139,7 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
     if (!isAuto) setLoading(true)
     setError(null)
     try {
-      const [costRes, cs, quotaView] = await Promise.all([
+      const [costRes, cs, quotaView, trialList] = await Promise.all([
         // by=day: a billing rule can change mid-month; a proxy that predates it
         // ignores the parameter and its monthly rows price on the month's first day.
         fetch(`${proxyBase}/api/token-usage/cost?months=${months}&by=day`),
@@ -134,18 +147,19 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
         fetch(`${proxyBase}/api/glass/copilot-quota${isAuto ? '' : '?refresh=1'}`)
           .then(r => (r.ok ? r.json() as Promise<CopilotQuotaView> : null))
           .catch(() => null),
+        fetch(`${proxyBase}/api/trials`)
+          .then(r => (r.ok ? r.json() as Promise<{ trials: TrialRef[] }> : null))
+          .catch(() => null),
       ])
       setQuota(quotaView)
+      setTrials(trialList?.trials || [])
       if (!costRes.ok) throw new Error(`cost HTTP ${costRes.status}`)
       const costJson = await costRes.json()
       setLocalProviders(costJson.local_providers)
       setRows(costJson.rows || [])
       setSettingsApi(cs.settingsApi)
       setSavedCfg(cs.cfg)
-      if (cs.settings) {
-        setOverrides((cs.settings.processOverrides as Record<string, { provider?: string; model?: string }>) || {})
-        if (cs.settings.consolidationCadence) setCadence(cs.settings.consolidationCadence as CadenceCfg)
-      }
+      if (cs.settings?.consolidationCadence) setCadence(cs.settings.consolidationCadence as CadenceCfg)
     } catch (e: any) {
       setError(`Failed to load cost data: ${e.message}. Check that the LLM proxy is running at ${proxyBase || window.location.origin}.`)
     } finally { setLoading(false) }
@@ -250,17 +264,24 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
   // ---- Actions -----------------------------------------------------------
   const flash = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 4000) }
 
-  const applyRoute = async (process: string, provider: string, model: string) => {
+  // A process moves to a cheaper model only through a trial: the candidate runs
+  // beside it on real calls and a judge compares the answers; accepting the
+  // trial is what writes the route. (The old button wrote `processOverrides`,
+  // which the proxy stopped routing on when routing moved to llm-routing.yaml —
+  // it reported "routed" and changed nothing.)
+  const trialFor = (process: string) => trials.find(t => t.process === process) || null
+  const startTrial = async (process: string, complexity: string) => {
     try {
-      const nextOverrides = { ...overrides, [process]: { provider, model } }
-      const res = await fetch(`${proxyBase}/api/llm/settings`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ processOverrides: nextOverrides }),
+      const res = await fetch(`${proxyBase}/api/trials`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ process, candidateComplexity: complexity }),
       })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-      setOverrides(nextOverrides)
-      flash(`Routed "${process}" → ${provider}/${model} (effective next call)`)
-    } catch (e: any) { flash(`Route failed: ${e.message}`) }
+      const j = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`)
+      flash(`Trial started: ${j.trial.candidate.model} runs beside ${j.trial.incumbent.model} on ${process}`)
+      await load(true)
+      onTrials?.(j.trial.id)
+    } catch (e: unknown) { flash(`Trial not started: ${e instanceof Error ? e.message : String(e)}`) }
   }
 
   const saveCadence = async (patch: Partial<CadenceCfg>) => {
@@ -536,7 +557,9 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
             <CardTitle className="text-base flex items-center gap-2"><Lightbulb className="h-4 w-4" />Optimization suggestions — {activeMonth}</CardTitle>
             <CardDescription>
               Ranked by estimated monthly saving, judged by the last 7 days.
-              {settingsApi ? ' Actions take effect on the next call (no restart).' : ' Each says where to make the change.'}
+              {settingsApi
+                ? ' A trial runs the cheaper model beside the current one on real calls before anything switches.'
+                : ' Each says where to make the change.'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
@@ -547,12 +570,22 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
                   <div className="text-xs text-muted-foreground">{s.detail}</div>
                   {!settingsApi && s.howTo && <div className="text-xs mt-0.5">{s.howTo}</div>}
                 </div>
-                {settingsApi && s.action?.type === 'route' && (
-                  <Button size="sm" variant="outline" className="flex-shrink-0"
-                    onClick={() => applyRoute((s.action as any).process, (s.action as any).provider, (s.action as any).model)}>
-                    Route to {s.title.split(' to ').pop()} <ArrowRight className="h-3 w-3 ml-1" />
-                  </Button>
-                )}
+                {s.action?.type === 'route' && (() => {
+                  const route = s.action as RouteAction
+                  const t = trialFor(route.process)
+                  if (t && ['running', 'complete'].includes(t.status)) {
+                    return (
+                      <Button size="sm" variant="outline" className="flex-shrink-0" disabled={!onTrials} onClick={() => onTrials?.(t.id)}>
+                        Trial {t.status === 'running' ? `running · ${t.summary?.judged ?? 0} judged` : TRIAL_VERDICT[t.summary?.verdict || 'pending']} <ArrowRight className="h-3 w-3 ml-1" />
+                      </Button>
+                    )
+                  }
+                  return settingsApi ? (
+                    <Button size="sm" variant="outline" className="flex-shrink-0" onClick={() => void startTrial(route.process, route.complexity)}>
+                      Start trial <ArrowRight className="h-3 w-3 ml-1" />
+                    </Button>
+                  ) : null
+                })()}
                 {settingsApi && s.action?.type === 'cadence' && (
                   <Badge variant="outline" className="flex-shrink-0">see cadence control ↓</Badge>
                 )}
@@ -595,7 +628,9 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
                   <TableCell className="font-mono text-xs">
                     {c.key}
                     {c.estimated && <Badge variant="outline" className="ml-2 text-[10px]">est.</Badge>}
-                    {overrides[c.key] && <Badge variant="outline" className="ml-2 text-[10px] text-emerald-600 border-emerald-200">routed</Badge>}
+                    {trialFor(c.key) && ['running', 'complete'].includes(trialFor(c.key)!.status) && (
+                      <Badge variant="outline" className="ml-2 text-[10px]">trial {trialFor(c.key)!.status === 'running' ? 'running' : TRIAL_VERDICT[trialFor(c.key)!.summary?.verdict || 'pending']}</Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-right font-medium">{money(c.costEur)}</TableCell>
                   <TableCell className="text-right text-muted-foreground">{c.calls.toLocaleString()}</TableCell>
@@ -611,8 +646,10 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
                   {pivotDim === 'process' && settingsApi && (
                     <TableCell className="text-right">
                       {c.key && !c.key.startsWith('token-adapter-') && !['claude', 'opencode', 'copilot', 'unknown'].includes(c.key) && (
-                        <Button size="sm" variant="ghost" className="h-7 text-xs"
-                          onClick={() => applyRoute(c.key, 'copilot', 'claude-haiku-5.5')}>→ Haiku</Button>
+                        !(trialFor(c.key) && ['running', 'complete'].includes(trialFor(c.key)!.status)) && (
+                          <Button size="sm" variant="ghost" className="h-7 text-xs"
+                            onClick={() => void startTrial(c.key, 'small')}>Trial cheaper</Button>
+                        )
                       )}
                     </TableCell>
                   )}

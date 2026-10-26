@@ -403,6 +403,42 @@ only.
 
 ---
 
+## Model trials { #model-trials }
+
+A savings suggestion to move a background process to a cheaper model is a hypothesis, not
+a decision: a cheaper model that drops details does not save anything. **Token Usage →
+Trials** tests it on the process's real calls before anything switches.
+
+- **Start** from a suggestion's *Start trial* button, the breakdown table's *Trial cheaper*,
+  or the Trials tab's form: process, candidate band, share of calls, days and pairs at most.
+- **Run** — the proxy answers every call with the current model as before. For the sampled
+  share it ALSO sends the same request to the candidate afterwards, off the caller's path,
+  and stores both answers (redacted) as a pair. The candidate's tokens are logged as process
+  `model-trial-shadow` (route key `trial:<id>`), so a trial's cost is visible and never mixed
+  into the process it judges.
+- **Judge** — `bg-model-trial-judge` (Opus 5, the high band) reads each pair blind, twice
+  with the order swapped, for details kept, nothing invented and specificity. A pair counts
+  as equivalent only when both readings agree; a judge that follows position rather than
+  content shows up as "disagrees with itself". Structural checks run beside it: the same
+  output format, and the answer's units (insight blocks, JSON items, headed sections)
+  paired by title or body.
+- **Verdict** — passes at ≥ 20 judged pairs, the candidate at least as good in ≥ 90% of
+  them and keeping ≥ 90% of the incumbent's details (all per trial). The tab shows each pair
+  side by side, unit by unit, with both readings and what each answer misses.
+- **Accept** writes the candidate's band into the process's route in `llm-routing.yaml`
+  (`PATCH /api/llm/routing`); a trial that has not passed needs an explicit confirmation.
+  **Reject** leaves the route alone.
+
+API on the proxy: `GET /api/trials`, `GET /api/trials/:id`, `POST /api/trials`
+(`{ process, candidateComplexity, candidateProvider?, samplePct?, days?, maxSamples? }`),
+`POST /api/trials/:id/stop | reject | accept` (`{ force: true }` without a pass). Store:
+`<data>/llm-proxy/trials/<id>.json` and `<id>.samples.jsonl`; engine:
+`rapid-llm-proxy/proxy-bridge/model-trials.mjs`. glass shows the same trials read-only.
+
+The routing is in `llm-routing.yaml` only. The settings dialog's old `processOverrides`
+are not read by the request path, which is why the former *Route to Haiku* button reported
+"routed" and changed nothing; it is gone.
+
 ## Cognitive process reference
 
 | Process ID | System | Description |

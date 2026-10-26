@@ -70,7 +70,14 @@ they would save on a cheaper model, judged by the last 7 days and scaled to a mo
 move already made drops off the list. They compare money per token, not model family: an
 older model of the cheap family can cost several times the newest one. glass cannot change
 coding's routing, so each suggestion says where to make the change; coding's own dashboard
-shows the same list with buttons that apply it.
+shows the same list, and starts a **trial** from it rather than switching outright.
+
+**Trials** (where coding is installed) show whether a cheaper model can take over a
+background job: for a few days it runs beside the current model on a share of the job's
+real calls, and a strong judge compares each pair of answers blind, for details kept and
+nothing invented. The tab lists each trial's verdict, the pairs side by side and what each
+answer missed. glass shows them read-only; they are started and accepted in coding's
+dashboard, where accepting one switches the job's model.
 
 ### How cost is calculated
 
