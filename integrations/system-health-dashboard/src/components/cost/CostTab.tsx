@@ -78,7 +78,6 @@ interface AccountTile {
   projected: number
   budget: number | null
   status: string
-  copilot?: { included: number; overage: number }
   /** What a human waited on vs what ran on its own — the discretionary half. */
   split: ScopeSplit
   /** Own hardware only: the same work priced on GitHub Copilot. */
@@ -227,7 +226,6 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
       out.push({
         account, kind, label: accountName(account), spend, projected, budget,
         status: budgetCfg?.enforce ? budgetStatus(compareVal, budget) : 'ok',
-        copilot: cop ? { included: cop.includedEur, overage: cop.overageEur } : undefined,
         split: splitByScope(monthRows, cfg),
         // Priced at the `small`-band Copilot model — the only band the
         // semantic offload moves, and the call it actually displaces.
@@ -384,9 +382,18 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
                 <CardContent className="space-y-2">
                   <div className="flex items-baseline gap-2">
                     <span className="text-2xl font-bold">{money(t.spend)}</span>
-                    <span className="text-sm text-muted-foreground">spent {activeMonth}</span>
+                    <span className="text-sm text-muted-foreground">{t.kind === 'copilot' ? 'at list price' : 'spent'} {activeMonth}</span>
                     {coverage && <span className="text-xs text-muted-foreground" title={coverage.long}>· {coverage.short}</span>}
                   </div>
+                  {/* GitHub bills a month's use only after its own discount — included
+                      credits pooled with other users, used up on a day that depends on
+                      everyone's use — which shows in the billing report alone. The
+                      figure is the cost once that pool is gone, not the invoice. */}
+                  {t.kind === 'copilot' && (
+                    <div className="text-xs text-muted-foreground" data-testid="copilot-list-price-note">
+                      GitHub's rates × your discount ÷ FX — before GitHub's own discount, which only the billing report shows; not the invoice
+                    </div>
+                  )}
                   {t.kind === 'copilot' && isCurrentCalendarMonth && quota?.enabled && (
                     <CopilotReported quota={quota} measured={t.spend} toDisplay={usd => fromUsd(usd * copilotDiscountAt(cfg), cfg)} money={money} />
                   )}
@@ -399,11 +406,6 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
                   {t.budget != null && (
                     <div className="h-2 w-full bg-muted rounded overflow-hidden">
                       <div className={`h-full ${STATUS_BAR[t.status]}`} style={{ width: `${pct}%` }} />
-                    </div>
-                  )}
-                  {t.copilot && (
-                    <div className="text-xs text-muted-foreground pt-1">
-                      incl. allowance {money(t.copilot.included)} · overage {money(t.copilot.overage)}
                     </div>
                   )}
                   {/* Own hardware: what the same work would have cost on Copilot.

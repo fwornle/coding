@@ -52,8 +52,8 @@ zoom into a time window.
 One tile per account used in the selected month — at work usually GitHub Copilot alone,
 sometimes with your own model server next to it:
 
-- **GitHub Copilot** — spent this month, projected month-end, the budget bar when you set
-  one, and the foreground / background split.
+- **GitHub Copilot** — this month at list price, projected month-end, the budget bar when
+  you set one, and the foreground / background split.
 - **Claude subscription** — *notional*: what the same tokens would cost at API list
   prices. The subscription is flat, so this is not a bill.
 - **Own hardware** (an [offload](offload.md) target) — free per token; the tile says what
@@ -86,6 +86,18 @@ at a fixed rate, put them in `~/.glass/cost.json`:
 `$` does not. A build of glass can ship the same file as its default
 (`config/cost-defaults.json`); yours wins. Without either, Copilot is priced at GitHub's
 rates with no discount.
+
+#### List price, not the invoice
+
+The Copilot figure is what the tokens cost at GitHub's rates, after your discount and FX.
+GitHub's invoice takes off one more discount first: its billing usage report lists every
+row as `gross_amount − discount_amount = net_amount`. In the reports checked so far that
+discount covered each month's use in full up to a different amount every month, then
+nothing — the way a pool of included credits shared with other users would behave, which
+also means the day it stops cannot be known from one machine. The figure is therefore what
+the month costs without that discount — the cost of using more once it has run out — and
+the invoice is lower by whatever the discount covered. GitHub's own count (below) is gross as well: credits at list price, before either
+discount.
 
 #### Billing that changes over time
 
