@@ -72,6 +72,12 @@ export async function listSessions(port) {
   return r.ok ? r.data.sessions : null;
 }
 
+/** The daemon's last read of GitHub's Copilot figure (no new read before it is due), or null. */
+export async function copilotQuotaView(port) {
+  const r = await call(port, 'GET', '/api/glass/copilot-quota');
+  return r.ok ? r.data : null;
+}
+
 export async function recentRows(port, limit = 5) {
   const r = await call(port, 'GET', `/api/token-usage/recent?limit=${limit}&scope=both`);
   return r.ok ? r.data.data : null;

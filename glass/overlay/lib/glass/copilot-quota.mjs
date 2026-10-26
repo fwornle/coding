@@ -88,6 +88,44 @@ export function loggedInHosts(stdout) {
 }
 
 /**
+ * The environment for a `gh` run made for glass: gh keeps a device id and
+ * update-check state under XDG_STATE_HOME / the cache dir, which must land in
+ * `dir` (inside the glass home) so `glass uninstall` removes them. Its login
+ * (XDG_CONFIG_HOME) is untouched.
+ */
+export function ghEnvIn(dir, env = process.env) {
+  return {
+    ...env,
+    XDG_STATE_HOME: path.join(dir, 'state'),
+    XDG_CACHE_HOME: path.join(dir, 'cache'),
+    GH_NO_UPDATE_NOTIFIER: '1',
+    GH_PROMPT_DISABLED: '1',
+  };
+}
+
+/**
+ * glass doctor's lines for gh: whether it is there and logged in, and what became
+ * of the daemon's last read of GitHub's figure. Without gh glass measures and
+ * prices as before — only GitHub's own figure and `glass update` are missing — so
+ * these are warnings, never problems.
+ * @param {{ ghPath: string|null, auth?: { ok: boolean, stdout?: string, error?: string }, config?: object, view?: object|null, host: string }} o
+ *   host: the release host, for the login hint
+ */
+export function ghDoctorLines({ ghPath, auth, config = {}, view = null, host }) {
+  const missing = "GitHub's own Copilot figure (Cost tab) and glass update are unavailable";
+  if (!ghPath) return [`  ! gh: not installed — ${missing}; install the GitHub CLI, then gh auth login --hostname ${host}`];
+  const lines = [];
+  const hosts = auth?.ok ? loggedInHosts(auth.stdout) : [];
+  if (!auth?.ok) lines.push(`  ! gh: ${ghPath} — could not read its logins (${auth?.error || 'gh failed'}); gh auth status shows them`);
+  else if (!hosts.length) lines.push(`  ! gh: ${ghPath} — not logged in to any GitHub host: ${missing}; gh auth login --hostname ${host}`);
+  else lines.push(`  ✓ gh: ${ghPath} (logged in: ${hosts.join(', ')})`);
+  if (config.copilotQuota === false) lines.push("    GitHub's own Copilot figure: switched off (copilotQuota: false)");
+  else if (view?.quota) lines.push(`    GitHub's own Copilot figure: read from ${view.host}${view.fetchedAt ? ` at ${view.fetchedAt}` : ''}`);
+  else if (view?.error) lines.push(`    ! GitHub's own Copilot figure unavailable${view.host ? ` (${view.host})` : ''}: ${view.error}`);
+  return lines;
+}
+
+/**
  * @param {{ statePath: string, config?: object, env?: () => object, run?: typeof runGh, now?: () => number, log?: Function }} deps
  */
 export function createCopilotQuota({ statePath, config = {}, env = () => process.env, run = runGh, now = Date.now, log = () => {} }) {
@@ -99,17 +137,7 @@ export function createCopilotQuota({ statePath, config = {}, env = () => process
   const save = () => {
     try { fs.writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`); } catch { /* best effort */ }
   };
-  // gh keeps a device id and update-check state under XDG_STATE_HOME / the cache
-  // dir; a call made for glass must not leave files in the user's home that
-  // `glass uninstall` would not remove. Its login (XDG_CONFIG_HOME) is untouched.
-  const ghDir = path.join(path.dirname(statePath), 'gh');
-  const ghEnv = () => ({
-    ...env(),
-    XDG_STATE_HOME: path.join(ghDir, 'state'),
-    XDG_CACHE_HOME: path.join(ghDir, 'cache'),
-    GH_NO_UPDATE_NOTIFIER: '1',
-    GH_PROMPT_DISABLED: '1',
-  });
+  const ghEnv = () => ghEnvIn(path.join(path.dirname(statePath), 'gh'), env());
   const hostToAsk = () => (typeof config.githubHost === 'string' && config.githubHost)
     || env().GH_HOST || state.seenHost || '';
 

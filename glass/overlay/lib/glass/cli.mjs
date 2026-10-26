@@ -12,14 +12,16 @@ import { glassHome, glassPort, glassPaths, PKG_ROOT } from './home.mjs';
 import { AGENTS, sessionEnv } from './wiring.mjs';
 import {
   ensureDaemon, health, openSession, closeSession, listSessions, recentRows, stopDaemon, statusline as fetchStatusline, contextTurns,
+  copilotQuotaView,
 } from './client.mjs';
+import { ghDoctorLines, ghEnvIn, runGh } from './copilot-quota.mjs';
 import { runAgent } from './spawn.mjs';
 import { upstreamProxy, proxyEnvOf } from './egress.mjs';
 import { coexistWarnings, opencodeCopilotUpstream, opencodeHttpProviders } from './coexist.mjs';
 import { openUrl } from './open-url.mjs';
 import { renderStatusline, renderReport, uiLinks, TAGS } from './statusline.mjs';
 import { tmuxWanted, launchInTmux, configureStatus, popup, message, selfCommand } from './tmux.mjs';
-import { update } from './update.mjs';
+import { update, RELEASE_REPO } from './update.mjs';
 import { loadCostDefaults } from './cost.mjs';
 import { billingProblems } from '../cost/billing-rules.mjs';
 
@@ -384,6 +386,17 @@ async function doctor() {
   const h = await health(port);
   out(`daemon: ${h ? `running, glass ${h.glass}, pid ${h.pid}, ${h.sessions} session(s)` : 'not running (starts with the first glass <agent>)'}`);
   if (h && h.glass !== VERSION) out(`  ! daemon is glass ${h.glass}, this is ${VERSION} — it is replaced once it has no live session (glass stop)`);
+  // Without gh the only sign was one line in the Cost tab: say it here.
+  const ghPath = whichBin('gh');
+  let config = {};
+  try { config = JSON.parse(fs.readFileSync(p.config, 'utf8')); } catch { /* none */ }
+  for (const l of ghDoctorLines({
+    ghPath,
+    auth: ghPath ? await runGh(['auth', 'status', '--json', 'hosts'], ghEnvIn(path.join(p.run, 'gh'))) : null,
+    config,
+    view: h ? await copilotQuotaView(port) : null,
+    host: RELEASE_REPO.split('/')[0],
+  })) out(l);
   // Warnings, not problems: glass still runs, it just measures less (or twice).
   const warnings = coexistWarnings({ port });
   if (warnings.length) out('warnings (glass runs, but measures less or twice):');

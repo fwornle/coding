@@ -164,6 +164,9 @@ traffic it measures, else by trying each host `gh` is logged in to (enterprise h
 until one has a metered Copilot account. `{ "githubHost": "<host>" }` in
 `~/.glass/config.json` names it outright, and `{ "copilotQuota": false }` switches the read off. The endpoint is
 internal to GitHub, so it may change; then the tile says the figure is unavailable.
+Without `gh`, or without a login, glass measures and prices exactly as before — only this
+line and `glass update` are missing. `glass doctor` says which: whether `gh` is there,
+which hosts it is logged in to, and what became of the last read.
 
 When measured comes out **above** GitHub's figure, the per-model rates run high for your
 mix of models; the tile says so instead of showing a negative remainder.

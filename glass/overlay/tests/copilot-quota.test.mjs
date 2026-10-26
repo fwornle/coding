@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const { createCopilotQuota, githubHostOf, parseQuota } = await import('../lib/glass/copilot-quota.mjs');
+const { createCopilotQuota, githubHostOf, parseQuota, ghDoctorLines, ghEnvIn } = await import('../lib/glass/copilot-quota.mjs');
 
 // The shape of a Business account on token-based billing (2026-10-25), trimmed.
 const REPLY = {
@@ -116,4 +116,39 @@ test('copilotQuota: false makes no call', async () => {
   const v = await q.refresh({ force: true });
   assert.equal(called, false);
   assert.equal(v.enabled, false);
+});
+
+test('glass doctor: no gh is a warning that names what is missing', () => {
+  const lines = ghDoctorLines({ ghPath: null, host: 'acme.ghe.com' });
+  assert.equal(lines.length, 1);
+  assert.match(lines[0], /^ {2}! gh: not installed — GitHub's own Copilot figure \(Cost tab\) and glass update are unavailable/);
+  assert.match(lines[0], /gh auth login --hostname acme\.ghe\.com$/);
+});
+
+test('glass doctor: gh without a login, with a login, and a login it cannot read', () => {
+  const none = ghDoctorLines({ ghPath: '/bin/gh', auth: { ok: true, stdout: JSON.stringify({ hosts: { 'acme.ghe.com': [{ state: 'error' }] } }) }, host: 'acme.ghe.com' });
+  assert.match(none[0], /^ {2}! gh: \/bin\/gh — not logged in to any GitHub host/);
+  const ok = ghDoctorLines({ ghPath: '/bin/gh', auth: { ok: true, stdout: JSON.stringify({ hosts: { 'github.com': [{ state: 'success' }], 'acme.ghe.com': [{ state: 'success' }] } }) }, host: 'acme.ghe.com' });
+  assert.deepEqual(ok, ['  ✓ gh: /bin/gh (logged in: acme.ghe.com, github.com)']);
+  const old = ghDoctorLines({ ghPath: '/bin/gh', auth: { ok: false, error: 'unknown flag: --json' }, host: 'acme.ghe.com' });
+  assert.match(old[0], /could not read its logins \(unknown flag: --json\)/);
+});
+
+test("glass doctor: what became of the daemon's last read", () => {
+  const auth = { ok: true, stdout: JSON.stringify({ hosts: { 'acme.ghe.com': [{ state: 'success' }] } }) };
+  const read = ghDoctorLines({ ghPath: '/bin/gh', auth, host: 'h', view: { host: 'acme.ghe.com', fetchedAt: '2026-10-26T08:00:00.000Z', quota: parseQuota(REPLY), error: '' } });
+  assert.equal(read[1], "    GitHub's own Copilot figure: read from acme.ghe.com at 2026-10-26T08:00:00.000Z");
+  assert.ok(!read.join('\n').includes('25000'), 'no usage figure on the console');
+  const failed = ghDoctorLines({ ghPath: '/bin/gh', auth, host: 'h', view: { host: 'acme.ghe.com', quota: null, error: 'no metered Copilot quota for the account on acme.ghe.com' } });
+  assert.match(failed[1], /^ {4}! GitHub's own Copilot figure unavailable \(acme\.ghe\.com\): no metered/);
+  const off = ghDoctorLines({ ghPath: '/bin/gh', auth, host: 'h', config: { copilotQuota: false }, view: { enabled: false, error: 'switched off' } });
+  assert.equal(off[1], "    GitHub's own Copilot figure: switched off (copilotQuota: false)");
+});
+
+test("gh's state for glass stays in the glass home; its login does not move", () => {
+  const e = ghEnvIn('/g/run/gh', { PATH: '/bin', XDG_CONFIG_HOME: '/u/.config' });
+  assert.equal(e.XDG_STATE_HOME, path.join('/g/run/gh', 'state'));
+  assert.equal(e.XDG_CACHE_HOME, path.join('/g/run/gh', 'cache'));
+  assert.equal(e.XDG_CONFIG_HOME, '/u/.config');
+  assert.equal(e.GH_PROMPT_DISABLED, '1');
 });
