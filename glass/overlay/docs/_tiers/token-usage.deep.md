@@ -53,15 +53,24 @@ One tile per account used in the selected month — at work usually GitHub Copil
 sometimes with your own model server next to it:
 
 - **GitHub Copilot** — this month at list price, projected month-end, the budget bar when
-  you set one, and the foreground / background split.
+  you set one, and the foreground / background split. Month-end runs the rest of the month
+  at the last 7 days' rate, so a change mid-month — a job moved to a cheaper model — shows
+  at once.
 - **Claude subscription** — *notional*: what the same tokens would cost at API list
   prices. The subscription is flat, so this is not a bill.
 - **Own hardware** (an [offload](offload.md) target) — free per token; the tile says what
   the same calls would have cost on GitHub Copilot.
 
-Below: cost by month (by account or by model) and a breakdown of the month by agent,
-model or account. The [status line](status-line.md)'s `GH €` field shows the Copilot tile's
-figure and opens this tab.
+Below: savings suggestions, cost by month (by account or by model) and a breakdown of the
+month by agent, model or account. The [status line](status-line.md)'s `GH €` field shows the
+Copilot tile's figure and opens this tab.
+
+**Savings suggestions** rank background jobs (coding's, where coding is installed) by what
+they would save on a cheaper model, judged by the last 7 days and scaled to a month, so a
+move already made drops off the list. They compare money per token, not model family: an
+older model of the cheap family can cost several times the newest one. glass cannot change
+coding's routing, so each suggestion says where to make the change; coding's own dashboard
+shows the same list with buttons that apply it.
 
 ### How cost is calculated
 
@@ -87,17 +96,23 @@ at a fixed rate, put them in `~/.glass/cost.json`:
 (`config/cost-defaults.json`); yours wins. Without either, Copilot is priced at GitHub's
 rates with no discount.
 
-#### List price, not the invoice
+#### List price and your share
 
 The Copilot figure is what the tokens cost at GitHub's rates, after your discount and FX.
-GitHub's invoice takes off one more discount first: its billing usage report lists every
-row as `gross_amount − discount_amount = net_amount`. In the reports checked so far that
-discount covered each month's use in full up to a different amount every month, then
-nothing — the way a pool of included credits shared with other users would behave, which
-also means the day it stops cannot be known from one machine. The figure is therefore what
-the month costs without that discount — the cost of using more once it has run out — and
-the invoice is lower by whatever the discount covered. GitHub's own count (below) is gross as well: credits at list price, before either
-discount.
+GitHub's billing usage report shows each row as `gross_amount − discount_amount = net_amount`:
+the discount is a pool of included credits that each licence pays into and that a cost
+centre's users share. It covers everyone's use until it runs out, then nothing — so a
+person's "net" only says whether their calls came before or after that day.
+
+When each licence pays in exactly its fee and the pool runs out every month, the licences
+and the pool cancel: the cost centre pays the list price of everyone's use, and each
+person's list-price use is their share of it. That is the figure on the tile. In a month
+the pool does not run out, the licences are the whole bill and extra use costs nothing.
+GitHub's own count (below) is list price too, and so is the budget it is measured against.
+
+A promotion that pays more into the pool than the licence costs makes those months cheaper
+by the difference, per seat: write it as a dated `seatCreditUsd` (below), and the tile and
+the status line take it off that month.
 
 #### Billing that changes over time
 
@@ -115,7 +130,8 @@ dated entry under `periods` in the same file:
     { "from": "2026-05-01", "to": "2026-05-31", "families": { "claude-opus": 0.5 }, "note": "Opus promotion" },
     { "from": "2026-07-01", "models": { "gpt-5-mini": 1 } },
     { "to": "2026-09-30", "prices": { "gpt-5.4": { "in": 6, "out": 30, "cacheRead": 0.6, "cacheWrite": 6 } } },
-    { "from": "2026-01-01", "to": "2026-03-31", "usdPerEur": 1.1 }
+    { "from": "2026-01-01", "to": "2026-03-31", "usdPerEur": 1.1 },
+    { "from": "2026-04", "to": "2026-04", "seatCreditUsd": 20, "note": "spring promotion" }
   ]
 }
 ```
@@ -129,6 +145,7 @@ dated entry under `periods` in the same file:
 | `models` | a factor per model id |
 | `prices` | GitHub Copilot's rates in force then, USD per 1M tokens (per token kind) |
 | `usdPerEur` | the FX in force then, for every account |
+| `seatCreditUsd` | list-price use a promotion adds to each seat's included credits per calendar month; taken off that month's total, discounted and converted like usage |
 | `note` | free text, shown in coding's Prices & Budgets dialog |
 
 `copilotPrices` (outside `periods`) are standing Copilot rates — the ones fitted from your

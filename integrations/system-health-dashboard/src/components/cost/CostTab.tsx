@@ -21,6 +21,7 @@ import {
   formatMoney, fetchCostSettings, setLocalProviders, withCurrency,
   monthlySeries, pivotForMonth, copilotBilling, projectBurn, budgetStatus,
   buildSuggestions, budgetForMonth, splitByScope, ScopeSplit, localSavings, LocalSavings,
+  copilotSeatCredit, recentDailyRate,
 } from './cost-model'
 
 interface Props {
@@ -78,6 +79,10 @@ interface AccountTile {
   projected: number
   budget: number | null
   status: string
+  /** Whether month-end runs at the last 7 days' rate or the month's average. */
+  projectionBasis: 'recent' | 'month'
+  /** Copilot: a promotion's extra included credits taken off this month (display currency). */
+  seatCredit: number
   /** What a human waited on vs what ran on its own — the discretionary half. */
   split: ScopeSplit
   /** Own hardware only: the same work priced on GitHub Copilot. */
@@ -191,16 +196,16 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
   }), [chartData])
 
   const pivot = useMemo(() => pivotForMonth(rows, cfg, pivotDim, activeMonth), [rows, cfg, pivotDim, activeMonth])
+  const now = useMemo(() => new Date(), [])
   const suggestions = useMemo(
-    () => (activeMonth && settingsApi ? buildSuggestions(rows, cfg, activeMonth) : []),
-    [rows, cfg, activeMonth, settingsApi],
+    () => (activeMonth ? buildSuggestions(rows, cfg, activeMonth, now) : []),
+    [rows, cfg, activeMonth, now],
   )
 
   // One tile per account used in the selected month — at work that is usually
   // GitHub Copilot alone, sometimes with own hardware next to it; a machine with
   // Claude Max shows that too. An account idle that month has nothing to say
   // and gets no tile (the monthly chart still shows its history).
-  const now = useMemo(() => new Date(), [])
   const isCurrentCalendarMonth = activeMonth === `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const tiles = useMemo(() => {
     const accounts = new Set<string>()
@@ -209,7 +214,9 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
     for (const account of accounts) {
       const kind = accountKind(account)
       const monthRows = rows.filter(r => !isSynthetic(r) && r.month === activeMonth && costAccount(r.provider) === account)
-      const spend = monthRows.reduce((s, r) => s + fromUsd(cellCostUsd(r, cfg), cfg, rowAt(r)), 0)
+      const gross = monthRows.reduce((s, r) => s + fromUsd(cellCostUsd(r, cfg), cfg, rowAt(r)), 0)
+      const seatCredit = kind === 'copilot' && activeMonth ? Math.min(gross, copilotSeatCredit(cfg, activeMonth)) : 0
+      const spend = gross - seatCredit
       const key = configKey(account)
       const budgetCfg = cfg.budgets[key]
       // The cap IN FORCE THAT MONTH, not today's: judging an earlier month
@@ -218,7 +225,8 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
       const budgetEur = budgetForMonth(budgetCfg, activeMonth || '')
       const budget = budgetEur == null ? null : fromEur(budgetEur, cfg)
       // Only project forward for the live calendar month; past months are final.
-      const projected = isCurrentCalendarMonth ? projectBurn(spend, now).projectedEur : spend
+      const burn = projectBurn(spend, now, recentDailyRate(rows, cfg, now, r => costAccount(r.provider) === account))
+      const projected = isCurrentCalendarMonth ? burn.projectedEur : spend
       const cop = kind === 'copilot' && activeMonth ? copilotBilling(rows, cfg, activeMonth) : undefined
       const compareVal = kind === 'copilot' && budgetCfg?.budgetBasis === 'overage' && cop
         ? (isCurrentCalendarMonth ? projectBurn(cop.overageEur, now).projectedEur : cop.overageEur)
@@ -226,6 +234,8 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
       out.push({
         account, kind, label: accountName(account), spend, projected, budget,
         status: budgetCfg?.enforce ? budgetStatus(compareVal, budget) : 'ok',
+        projectionBasis: burn.basis,
+        seatCredit,
         split: splitByScope(monthRows, cfg),
         // Priced at the `small`-band Copilot model — the only band the
         // semantic offload moves, and the call it actually displaces.
@@ -385,21 +395,28 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
                     <span className="text-sm text-muted-foreground">{t.kind === 'copilot' ? 'at list price' : 'spent'} {activeMonth}</span>
                     {coverage && <span className="text-xs text-muted-foreground" title={coverage.long}>· {coverage.short}</span>}
                   </div>
-                  {/* GitHub bills a month's use only after its own discount — included
-                      credits pooled with other users, used up on a day that depends on
-                      everyone's use — which shows in the billing report alone. The
-                      figure is the cost once that pool is gone, not the invoice. */}
+                  {/* Where included credits are pooled and equal the licence fees, a
+                      pool that runs out every month makes the bill the list price of
+                      everyone's use — so each person's list-price use is their share.
+                      The billing report's per-person "net" only says who used credits
+                      after the pool ran out. See the docs, "List price and your share". */}
                   {t.kind === 'copilot' && (
                     <div className="text-xs text-muted-foreground" data-testid="copilot-list-price-note">
-                      GitHub's rates × your discount ÷ FX — before GitHub's own discount, which only the billing report shows; not the invoice
+                      GitHub's rates × your discount ÷ FX — your share of the bill while the included credits run out each month
+                    </div>
+                  )}
+                  {t.seatCredit > 0 && (
+                    <div className="text-xs text-muted-foreground" data-testid="copilot-seat-credit">
+                      less a promotion's extra included credits: −{money(t.seatCredit)}
                     </div>
                   )}
                   {t.kind === 'copilot' && isCurrentCalendarMonth && quota?.enabled && (
-                    <CopilotReported quota={quota} measured={t.spend} toDisplay={usd => fromUsd(usd * copilotDiscountAt(cfg), cfg)} money={money} />
+                    <CopilotReported quota={quota} measured={t.spend + t.seatCredit} toDisplay={usd => fromUsd(usd * copilotDiscountAt(cfg), cfg)} money={money} />
                   )}
                   {isCurrentCalendarMonth && t.kind !== 'local' && (
                     <div className="text-sm text-muted-foreground">
                       projected month-end: <span className="font-medium text-foreground">{money(t.projected)}</span>
+                      {t.projectionBasis === 'recent' && <span className="text-xs"> at the last 7 days' rate</span>}
                       {t.budget != null && <> / {money(t.budget)} budget</>}
                     </div>
                   )}
@@ -510,13 +527,17 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
         </CardContent>
       </Card>
 
-      {/* Optimization suggestions — their actions write coding's routing, so
-          they appear only where that settings API exists. */}
+      {/* Optimization suggestions — shown everywhere; their actions write coding's
+          routing, so where there is no settings API (glass) each says where to make
+          the change instead of offering a button. */}
       {suggestions.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2"><Lightbulb className="h-4 w-4" />Optimization suggestions — {activeMonth}</CardTitle>
-            <CardDescription>Ranked by estimated monthly saving. Actions take effect on the next call (no restart).</CardDescription>
+            <CardDescription>
+              Ranked by estimated monthly saving, judged by the last 7 days.
+              {settingsApi ? ' Actions take effect on the next call (no restart).' : ' Each says where to make the change.'}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
             {suggestions.map(s => (
@@ -524,14 +545,15 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
                 <div className="min-w-0">
                   <div className="font-medium text-sm">{s.title} <span className="text-emerald-600">· save ~{money(s.estSavingsEur)}/mo</span></div>
                   <div className="text-xs text-muted-foreground">{s.detail}</div>
+                  {!settingsApi && s.howTo && <div className="text-xs mt-0.5">{s.howTo}</div>}
                 </div>
-                {s.action?.type === 'route' && (
+                {settingsApi && s.action?.type === 'route' && (
                   <Button size="sm" variant="outline" className="flex-shrink-0"
                     onClick={() => applyRoute((s.action as any).process, (s.action as any).provider, (s.action as any).model)}>
-                    Route to Haiku <ArrowRight className="h-3 w-3 ml-1" />
+                    Route to {s.title.split(' to ').pop()} <ArrowRight className="h-3 w-3 ml-1" />
                   </Button>
                 )}
-                {s.action?.type === 'cadence' && (
+                {settingsApi && s.action?.type === 'cadence' && (
                   <Badge variant="outline" className="flex-shrink-0">see cadence control ↓</Badge>
                 )}
               </div>

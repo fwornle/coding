@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { COPILOT_RATE_CARD } from '../../lib/cost/copilot-pricing.mjs';
-import { copilotPriceAt, discountAt, usdPerEurAt, billingProblems, dayOf } from '../../lib/cost/billing-rules.mjs';
+import { copilotPriceAt, discountAt, usdPerEurAt, billingProblems, dayOf, seatCreditUsdAt } from '../../lib/cost/billing-rules.mjs';
 
 const price = (k) => ({ in: k, out: k * 4, cacheRead: k / 10, cacheWrite: k });
 
@@ -109,4 +109,22 @@ test('calibration --into: fitted rates join the cost file — standing, or as a 
   assert.deepEqual(copilotPriceAt(out, 'a', '2026-10-01'), price(1));
   assert.deepEqual(billingProblems(out), []);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test("a promotion's seat credit: per calendar month and account, the latest period wins", () => {
+  const promo = {
+    periods: [
+      { from: '2026-05', to: '2026-06', seatCreditUsd: 20, note: 'spring promotion' },
+      { from: '2026-06', to: '2026-06', seatCreditUsd: 25 },
+      { from: '2026-05', seatCreditUsd: 50, account: 'claude-max' },
+    ],
+  };
+  assert.equal(seatCreditUsdAt(promo, 'copilot', '2026-04'), 0);
+  assert.equal(seatCreditUsdAt(promo, 'copilot', '2026-05'), 20);
+  assert.equal(seatCreditUsdAt(promo, 'copilot', '2026-06-17T09:00:00.000Z'), 25);
+  assert.equal(seatCreditUsdAt(promo, 'copilot', '2026-07'), 0);
+  assert.equal(seatCreditUsdAt(promo, 'claude-max', '2026-09'), 50);
+  assert.equal(seatCreditUsdAt({}, 'copilot', '2026-06'), 0);
+  assert.deepEqual(billingProblems(promo), []);
+  assert.deepEqual(billingProblems({ periods: [{ from: '2026-05', seatCreditUsd: -5 }] }), ['periods[0]: seatCreditUsd must be a number above 0']);
 });

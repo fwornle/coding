@@ -27,7 +27,7 @@ import { SITE_LOCAL_PROVIDERS } from '@/lib/provider-site'
 // reader of them (glass's status line, the calibration script) — one copy.
 import { COPILOT_RATE_CARD } from '../../../../../lib/cost/copilot-pricing.mjs'
 import {
-  copilotPriceAt, discountAt, usdPerEurAt, DEFAULT_USD_PER_EUR,
+  copilotPriceAt, discountAt, usdPerEurAt, seatCreditUsdAt, DEFAULT_USD_PER_EUR,
 } from '../../../../../lib/cost/billing-rules.mjs'
 
 export { COPILOT_RATE_CARD }
@@ -67,6 +67,8 @@ export interface BillingPeriod {
   models?: Record<string, number>
   prices?: Record<string, ModelPrice>
   usdPerEur?: number
+  /** A promotion's extra included credits per calendar month, list-price USD. */
+  seatCreditUsd?: number
   note?: string
 }
 
@@ -515,6 +517,15 @@ export function copilotDiscountAt(cfg: CostConfig, at?: string): number {
 }
 export { DEFAULT_USD_PER_EUR, usdPerEurAt }
 
+/**
+ * A promotion's extra included credits for a month of GitHub Copilot, in the
+ * display currency: list-price use the month's total is reduced by, discounted
+ * and converted like that use. 0 without such a promotion.
+ */
+export function copilotSeatCredit(cfg: CostConfig, month: string): number {
+  return fromUsd(seatCreditUsdAt(cfg, 'copilot', month) * copilotDiscountAt(cfg, month), cfg, month)
+}
+
 /** The same config, displaying in another currency. */
 export function withCurrency(cfg: CostConfig, currency: Currency): CostConfig {
   return cfg.currency?.display === currency ? cfg : { ...cfg, currency: { ...cfg.currency, display: currency } }
@@ -549,6 +560,17 @@ export function monthlySeries(rows: CostRow[], cfg: CostConfig, dim: PivotDim): 
     m.costEur += eur
     const k = dimKey(r, dim)
     m.byKey[k] = (m.byKey[k] || 0) + eur
+  }
+  // By account, a promotion's seat credit comes off Copilot's month, as on its
+  // tile. Split by model or process it cannot be placed, so those stay gross.
+  if (dim === 'provider') {
+    const copilotKey = accountLabel(costAccount('gh-copilot'))
+    for (const m of byMonth.values()) {
+      const cut = Math.min(m.byKey[copilotKey] || 0, copilotSeatCredit(cfg, m.month))
+      if (cut <= 0) continue
+      m.byKey[copilotKey] -= cut
+      m.costEur -= cut
+    }
   }
   return [...byMonth.values()].sort((a, b) => a.month.localeCompare(b.month))
 }
@@ -609,13 +631,47 @@ export interface BurnProjection {
   daysElapsed: number
   daysInMonth: number
   dailyRateEur: number
+  /** Whether the rest of the month runs at the last days' rate or the month's average. */
+  basis: 'recent' | 'month'
 }
-export function projectBurn(spendEur: number, now: Date): BurnProjection {
+/**
+ * Month-end from what is spent so far. With `recentDailyEur` (see recentDailyRate)
+ * the rest of the month runs at that rate, so a change mid-month — a process
+ * moved to a cheaper model — shows at once; without it, at the month's average.
+ */
+export function projectBurn(spendEur: number, now: Date, recentDailyEur?: number | null): BurnProjection {
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
   // include the current (partial) day so early-month projections aren't wild
   const daysElapsed = Math.max(1, now.getDate())
+  if (recentDailyEur != null && Number.isFinite(recentDailyEur)) {
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 1).getTime()
+    const daysLeft = Math.max(0, (end - now.getTime()) / 86_400_000)
+    return { spendEur, projectedEur: spendEur + recentDailyEur * daysLeft, daysElapsed, daysInMonth, dailyRateEur: recentDailyEur, basis: 'recent' }
+  }
   const dailyRateEur = spendEur / daysElapsed
-  return { spendEur, projectedEur: dailyRateEur * daysInMonth, daysElapsed, daysInMonth, dailyRateEur }
+  return { spendEur, projectedEur: dailyRateEur * daysInMonth, daysElapsed, daysInMonth, dailyRateEur, basis: 'month' }
+}
+
+/** The UTC days `[from, to)` before `now`'s day: the last `days` complete days. */
+function recentDays(now: Date, days: number): { from: string; to: string } {
+  const today = now.toISOString().slice(0, 10)
+  const from = new Date(Date.parse(`${today}T00:00:00Z`) - days * 86_400_000).toISOString().slice(0, 10)
+  return { from, to: today }
+}
+
+/**
+ * The average daily cost over the last `days` complete days, of the rows
+ * `keep` selects — null when the rows carry no day (a proxy without `?by=day`).
+ */
+export function recentDailyRate(rows: CostRow[], cfg: CostConfig, now: Date, keep: (r: CostRow) => boolean, days = 7): number | null {
+  if (!rows.some(r => r.day)) return null
+  const { from, to } = recentDays(now, days)
+  let eur = 0
+  for (const r of rows) {
+    if (isSynthetic(r) || !r.day || r.day < from || r.day >= to || !keep(r)) continue
+    eur += fromUsd(cellCostUsd(r, cfg), cfg, rowAt(r))
+  }
+  return eur / days
 }
 
 // ---- Budget status ------------------------------------------------------
@@ -636,6 +692,8 @@ export interface Suggestion {
   detail: string
   estSavingsEur: number
   action?: RouteAction | CadenceAction
+  /** Where to make the change by hand — shown where the page cannot apply it (glass). */
+  howTo?: string
 }
 
 // Foreground agent sessions are the user's own interactive work — never a
@@ -648,38 +706,58 @@ function isRoutableBackground(process: string): boolean {
   return true
 }
 
-export function buildSuggestions(rows: CostRow[], cfg: CostConfig, month: string): Suggestion[] {
-  const suggestions: Suggestion[] = []
+/** The model a route suggestion moves a background process to. */
+const ROUTE_TARGET = { provider: 'copilot', model: 'claude-haiku-5.5', label: 'Haiku 5.5' }
+/** Days a suggestion judges by: what runs NOW, not a month that may predate a change. */
+const SUGGESTION_DAYS = 7
 
-  // 1) Background processes running on an expensive (non-haiku) model this month.
-  //    Savings = current cost − cost if the same tokens ran on Haiku 5.5 on
-  //    Copilot, which is where the route action sends them — priced at that
-  //    account's calibrated rate, not the list rate.
-  const perProcess = new Map<string, { costEur: number; haikuEur: number; provider: string; model: string; tokens: number }>()
+/**
+ * Ranked ways to spend less, each with its estimated monthly saving.
+ *
+ * Judged by the last SUGGESTION_DAYS complete days, scaled to a 30-day month, when
+ * the rows carry a day (`?by=day`); else by `month`. A month's total would keep
+ * offering a move that was made in its middle.
+ *
+ * A background process is offered the route target when the same tokens cost
+ * less there, compared in money per token — not by model family: a process on
+ * an older Haiku can cost ten times what the newest one does, and "already a
+ * Haiku" hid that.
+ */
+export function buildSuggestions(rows: CostRow[], cfg: CostConfig, month: string, now: Date = new Date()): Suggestion[] {
+  const suggestions: Suggestion[] = []
+  const money = (v: number) => formatMoney(v, cfg.currency.display)
+  const recent = rows.some(r => r.day)
+  const { from, to } = recentDays(now, SUGGESTION_DAYS)
+  const inWindow = (r: CostRow) => (recent ? !!r.day && r.day >= from && r.day < to : r.month === month)
+  const scale = recent ? 30 / SUGGESTION_DAYS : 1
+  const when = recent ? `in the last ${SUGGESTION_DAYS} days` : 'this month'
+
+  // 1) Background processes whose tokens would cost less on the route target.
+  const perProcess = new Map<string, { costEur: number; targetEur: number; byModel: Map<string, number> }>()
   for (const r of rows) {
-    if (isSynthetic(r) || r.month !== month) continue
+    if (isSynthetic(r) || !inWindow(r)) continue
     if (!isRoutableBackground(r.process)) continue
-    const fam = modelFamily(r.model)
-    if (fam === 'haiku') continue // already cheap
     if (accountKind(costAccount(r.provider)) === 'local') continue // already free
     const curEur = fromUsd(cellCostUsd(r, cfg), cfg, rowAt(r))
-    const haikuEur = fromUsd(cellCostUsd({ ...r, provider: 'gh-copilot', model: 'claude-haiku-5.5' }, cfg), cfg, rowAt(r))
-    const key = r.process
-    if (!perProcess.has(key)) perProcess.set(key, { costEur: 0, haikuEur: 0, provider: r.provider, model: r.model, tokens: 0 })
-    const p = perProcess.get(key)!
+    const onTarget = accountKind(costAccount(r.provider)) === 'copilot' && r.model === ROUTE_TARGET.model
+    const targetEur = onTarget ? curEur : fromUsd(cellCostUsd({ ...r, provider: 'gh-copilot', model: ROUTE_TARGET.model }, cfg), cfg, rowAt(r))
+    const p = perProcess.get(r.process) || { costEur: 0, targetEur: 0, byModel: new Map<string, number>() }
     p.costEur += curEur
-    p.haikuEur += haikuEur
-    p.tokens += r.input_tokens + r.output_tokens
+    p.targetEur += targetEur
+    p.byModel.set(r.model, (p.byModel.get(r.model) || 0) + curEur)
+    perProcess.set(r.process, p)
   }
   for (const [proc, p] of perProcess) {
-    const savings = p.costEur - p.haikuEur
+    const savings = (p.costEur - p.targetEur) * scale
     if (savings < 0.5) continue // ignore sub-€0.50 noise
+    const main = [...p.byModel.entries()].sort((a, b) => b[1] - a[1])[0][0]
     suggestions.push({
       id: `route-haiku-${proc}`,
-      title: `Route "${proc}" to Haiku`,
-      detail: `${proc} spent ${formatMoney(p.costEur, cfg.currency.display)} this month on ${modelFamily(p.model)}. Same tokens on Haiku 5.5 (Copilot) ≈ ${formatMoney(p.haikuEur, cfg.currency.display)}.`,
+      title: `Route "${proc}" to ${ROUTE_TARGET.label}`,
+      detail: `${proc} spent ${money(p.costEur)} ${when}, mostly on ${main}. The same tokens on ${ROUTE_TARGET.label} (Copilot) ≈ ${money(p.targetEur)}.`,
       estSavingsEur: savings,
-      action: { type: 'route', process: proc, provider: 'copilot', model: 'claude-haiku-5.5' },
+      action: { type: 'route', process: proc, provider: ROUTE_TARGET.provider, model: ROUTE_TARGET.model },
+      howTo: `In coding's dashboard: Token Usage → Cost → Route, or a processOverrides entry for "${proc}" in its LLM settings.`,
     })
   }
 
@@ -690,13 +768,14 @@ export function buildSuggestions(rows: CostRow[], cfg: CostConfig, month: string
   const consolTotal = [...perProcess.entries()]
     .filter(([k]) => k.startsWith('consolidator'))
     .reduce((a, [, p]) => a + p.costEur, 0)
-  if (consolTotal > 2) {
+  if (consolTotal * scale > 2) {
     suggestions.push({
       id: 'cadence-consolidation',
       title: 'Throttle consolidation cadence',
-      detail: `Consolidation processes cost ${formatMoney(consolTotal, cfg.currency.display)} this month. Increasing the check interval or the undigested threshold reduces how often they run.`,
-      estSavingsEur: consolidationEur > 0 ? consolidationEur * 0.3 : consolTotal * 0.2,
+      detail: `Consolidation processes cost ${money(consolTotal)} ${when}. Increasing the check interval or the undigested threshold reduces how often they run.`,
+      estSavingsEur: consolidationEur > 0 ? consolidationEur * 0.3 : consolTotal * scale * 0.2,
       action: { type: 'cadence' },
+      howTo: "In coding's dashboard: Token Usage → Cost → consolidation cadence.",
     })
   }
 

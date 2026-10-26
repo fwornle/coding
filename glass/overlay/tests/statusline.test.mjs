@@ -271,6 +271,28 @@ test('copilotMonthCost: each day at the rules in force that day — a discount f
   assert.equal(c.unpricedCalls, 0, 'the cost file\'s measured rate prices a model the card lacks');
 });
 
+test("copilotMonthCost: a promotion's seat credit comes off the month, discounted, never below zero", async () => {
+  const { DatabaseSync } = await import('node:sqlite');
+  const { copilotMonthCost } = await import('../lib/glass/cost.mjs');
+  const db = new DatabaseSync(':memory:');
+  db.exec(`CREATE TABLE token_usage (timestamp TEXT, provider TEXT, model TEXT, input_tokens INT,
+    output_tokens INT, cache_read_tokens INT, cache_write_tokens INT)`);
+  const ins = db.prepare('INSERT INTO token_usage VALUES (?, ?, ?, ?, ?, ?, ?)');
+  // $10 of measured "claude-x-1" in August.
+  ins.run('2026-08-05T10:00:00Z', 'gh-copilot', 'claude-x-1', 10_000_000, 0, 0, 0);
+  const base = { discount: { copilot: 0.5 }, currency: { usdPerEur: 2 }, copilotPrices: { 'claude-x-1': { in: 1, out: 0, cacheRead: 0, cacheWrite: 0 } } };
+  const credit = (usd) => ({ ...base, periods: [{ from: '2026-08', to: '2026-08', seatCreditUsd: usd }] });
+  const c = copilotMonthCost(db, credit(4), new Date('2026-08-20T00:00:00Z'));
+  assert.ok(Math.abs(c.usd - (10 - 4) * 0.5) < 1e-9, `usd ${c.usd}`);
+  assert.ok(Math.abs(c.eur - ((10 - 4) * 0.5) / 2) < 1e-9, `eur ${c.eur}`);
+  assert.ok(Math.abs(c.creditEur - (4 * 0.5) / 2) < 1e-9, `creditEur ${c.creditEur}`);
+  const over = copilotMonthCost(db, credit(25), new Date('2026-08-21T00:00:00Z'));
+  assert.equal(over.usd, 0);
+  assert.equal(over.eur, 0);
+  const none = copilotMonthCost(db, credit(4), new Date('2026-09-02T00:00:00Z'));
+  assert.equal(none.creditEur, 0, 'September has no promotion');
+});
+
 test("loadCostDefaults: the build's cost file, then the user's on top; nothing when neither exists", async () => {
   const { loadCostDefaults } = await import('../lib/glass/cost.mjs');
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-cost-home-'));

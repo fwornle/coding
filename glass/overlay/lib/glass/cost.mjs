@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { COPILOT_PROVIDERS, tokenUsd } from '../cost/copilot-pricing.mjs';
-import { copilotPriceAt, discountAt, usdPerEurAt } from '../cost/billing-rules.mjs';
+import { copilotPriceAt, discountAt, seatCreditUsdAt, usdPerEurAt } from '../cost/billing-rules.mjs';
 import { PKG_ROOT } from './home.mjs';
 
 function readJson(file) {
@@ -129,7 +129,13 @@ export function copilotMonthCost(db, costCfg = {}, now = new Date()) {
     usd += rowUsd;
     eur += rowUsd / usdPerEurAt(costCfg, r.day);
   }
-  const value = { month, usd, eur, calls, unpricedCalls };
+  // A promotion's extra included credits make the month cheaper by that much
+  // list-price use, discounted and converted like the usage it offsets.
+  const creditUsd = seatCreditUsdAt(costCfg, 'copilot', month) * discountAt(costCfg, 'copilot', '', month);
+  const creditEur = Math.min(eur, creditUsd / usdPerEurAt(costCfg, month));
+  usd = Math.max(0, usd - creditUsd);
+  eur -= creditEur;
+  const value = { month, usd, eur, calls, unpricedCalls, creditEur };
   Object.assign(cache, { key, at: Date.now(), value });
   return value;
 }
