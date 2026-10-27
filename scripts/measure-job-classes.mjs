@@ -55,7 +55,10 @@
  *   --cap=<lo>-<hi>      Consolidated class count (default 14-18)
  *   --batch=<n>          Prompts per labelling call (default 30)
  *   --student            Also run the leave-one-out KNN check
- *   --students=<m,...>   Also score these cheap models as closed-set LLM students
+ *   --students=<m,...>   Also score these cheap models as closed-set students: an LLM
+ *                        on the bg-job-class-student route, or ollaya:<model> for a
+ *                        decision model served by Ollaya (OLLAYA_URL)
+ *   --ollaya-concurrency=<n>  Ollaya calls in flight (default 2)
  *   --taxonomy=<file>    Skip the derivations: score a committed taxonomy
  *                        (config/job-classes.yaml) on the checkpointed held-out set
  *   --set=heldout|pool   With --taxonomy: score the held-out set (default; the one
@@ -77,6 +80,7 @@ import { homedir } from 'node:os'
 
 const REPO = process.env.CODING_REPO || resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PROXY = `${(process.env.LLM_CLI_PROXY_URL || 'http://localhost:12435').replace(/\/$/, '')}/api/complete`
+const OLLAYA = (process.env.OLLAYA_URL || 'http://localhost:11435').replace(/\/$/, '')
 
 const argv = process.argv.slice(2)
 const has = (f) => argv.includes(f)
@@ -421,27 +425,65 @@ async function singleLabels(rows, tax, route, tag) {
   const ids = new Set(tax.classes.map((c) => c.id))
   const served = new Set()
   const latency = []
+  const confidences = new Array(rows.length).fill(null)
   let done = 0
-  const labels = await pool(rows, 6, async (r) => {
+  const labels = await pool(rows, route.concurrency || 6, async (r, i) => {
     let c = 'invalid'
     try {
-      const out = await completeJson(classifyMessages(tax, r.text), route)
-      served.add(out.model)
-      if (Number.isFinite(out.latencyMs)) latency.push(out.latencyMs)
-      const got = String(out.json.class || '').trim()
+      let got
+      if (route.ollaya) {
+        const out = await decide(tax, r.text, route.ollaya)
+        served.add(out.model)
+        if (Number.isFinite(out.latencyMs)) latency.push(Math.round(out.latencyMs))
+        if (Number.isFinite(out.confidence)) confidences[i] = out.confidence
+        got = out.label
+      } else {
+        const out = await completeJson(classifyMessages(tax, r.text), route)
+        served.add(out.model)
+        if (Number.isFinite(out.latencyMs)) latency.push(out.latencyMs)
+        got = String(out.json.class || '').trim()
+      }
       c = ids.has(got) ? got : (got === 'none' ? 'none' : 'invalid')
     } catch (err) { console.log(`  ${tag}: ${err.message}`) }
     if (++done % 50 === 0) console.log(`  label ${tag} ${done}/${rows.length}`)
     return c
   })
   latency.sort((x, y) => x - y)
-  const res = { tag, taxonomy: tax.tag, model: route.model || null, served: [...served], n: rows.length, labels,
+  const res = { tag, taxonomy: tax.tag, model: route.model || route.ollaya || null, served: [...served], n: rows.length, labels,
+    ...(route.ollaya ? { confidences } : {}),
     latencyMs: { p50: latency[Math.floor(latency.length / 2)], p90: latency[Math.floor(latency.length * 0.9)] } }
   writeJson(`labels-${tag}.json`, res)
   return res
 }
 
-const studentRoute = (model) => ({ process: 'job-class-student', model, complexity: 'small' })
+const studentRoute = (model) => (model.startsWith('ollaya:')
+  ? { ollaya: model.slice('ollaya:'.length), concurrency: Number(opt('ollaya-concurrency', 2)) }
+  : { process: 'job-class-student', model, complexity: 'small' })
+
+/**
+ * A decision model (Ollaya, the TypeSafe wire) answers a typed `choice` instead
+ * of reading a prompt: the classes are its options, each described by its test
+ * and examples, "none" is one more option described by the taxonomy's none rule,
+ * and the precedence order is the question's instructions. The state is the
+ * same bounded request text an LLM student is given. It returns calibrated
+ * probabilities, kept as `confidence` so the report can show what a threshold
+ * buys.
+ */
+async function decide(tax, text, model) {
+  const criteria = {}
+  for (const c of tax.classes) criteria[c.id] = c.test + (c.examples?.length ? ` Examples: ${c.examples.join(' | ')}` : '')
+  criteria.none = tax.none || 'No job at all: a test message, trivia, or a fragment no class can be read from.'
+  const instructions = 'What kind of job does this request to a coding agent hand over?'
+    + (tax.precedence ? ` If more than one class fits, take the one that comes first in: ${tax.precedence.join(' > ')}.` : '')
+  const res = await fetch(`${OLLAYA}/api/decide`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ model, state: text.slice(0, 500).replace(/\s+/g, ' '), questions: { job_class: { type: 'choice', instructions, criteria } } }),
+  })
+  if (!res.ok) throw new Error(`ollaya HTTP ${res.status} ${(await res.text()).slice(0, 160)}`)
+  const j = await res.json()
+  const a = j.answers?.job_class
+  return { label: String(a?.choice || ''), confidence: a?.confidence, model: `ollaya/${j.model || model}`, latencyMs: j.eval_duration ? j.eval_duration / 1e6 : undefined }
+}
 
 /** Score each student's labels against the teacher's `ref`, with `ref2` (a second teacher pass) for "sure". */
 async function scoreStudents(rows, tax, ref, ref2, tagOf) {
@@ -460,6 +502,14 @@ async function scoreStudents(rows, tax, ref, ref2, tagOf) {
       accuracyCommitted: both.filter((i) => l[i] === ref[i]).length / both.length,
       none: l.filter((x) => x === 'none').length / l.length,
       invalid: l.filter((x) => x === 'invalid').length,
+      // A decision model's confidence as an abstain threshold: at each level, the
+      // share of turns it would label and its agreement with the teacher on those.
+      ...(st.confidences ? {
+        thresholds: [0.5, 0.7, 0.9].map((t) => {
+          const kept = st.confidences.map((c, i) => (c != null && c >= t ? i : -1)).filter((i) => i >= 0)
+          return { t, coverage: kept.length / l.length, accuracy: kept.length ? kept.filter((i) => l[i] === ref[i]).length / kept.length : NaN }
+        }),
+      } : {}),
     })
   }
   return { sureCoverage: sure.length / rows.length, list }
@@ -470,6 +520,10 @@ function studentTable(st, ceiling) {
     `Reference: the teacher's labels. "Sure" = the ${pct(st.sureCoverage)} of items where the teacher gave the same label twice. "Both commit" = items where neither answered none. Ceiling: the teacher's own kappa between its two passes, ${f3(ceiling)}.`, '',
     '| Student | Served by | kappa vs teacher | agree | kappa (sure) | agree (sure) | agree (both commit) | none | invalid | p50 / p90 ms |', '|---|---|---|---|---|---|---|---|---|---|',
     ...st.list.map((x) => `| ${x.model} | ${x.served.join(', ')} | ${f3(x.kappa)} | ${pct(x.accuracy)} | ${f3(x.kappaSure)} | ${pct(x.accuracySure)} | ${pct(x.accuracyCommitted)} | ${pct(x.none)} | ${x.invalid} | ${x.latencyMs.p50 ?? 'n/a'} / ${x.latencyMs.p90 ?? 'n/a'} |`),
+    ...(st.list.some((x) => x.thresholds) ? ['',
+      'Decision models only: labelling a turn only when the model\'s confidence reaches the threshold (coverage = share of turns labelled; agree = with the teacher, on those).', '',
+      '| Student | ≥ 0.5: coverage / agree | ≥ 0.7: coverage / agree | ≥ 0.9: coverage / agree |', '|---|---|---|---|',
+      ...st.list.filter((x) => x.thresholds).map((x) => `| ${x.model} | ${x.thresholds.map((h) => `${pct(h.coverage)} / ${Number.isFinite(h.accuracy) ? pct(h.accuracy) : 'n/a'}`).join(' | ')} |`)] : []),
   ]
 }
 
