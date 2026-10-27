@@ -165,6 +165,13 @@ targets:
     # target's users are billed by: the contract discount and FX, the Copilot rates
     # measured on the bill, and dated rules (lib/cost/billing-rules.mjs).
     private_overlay: ~/.coding/glass-private/internal
+    rewrite:
+      # The worked example with this target's own bill lives in its own repository
+      # (AIMAAD/glass-token-cost); only the internal site links it.
+      - file: docs/_tiers/token-usage.deep.md
+        find: "GitHub's own count (below) is list price too, and so is the budget it is measured against.\n"
+        replace: "GitHub's own count (below) is list price too, and so is the budget it is measured against.\n\n!!! example \"Worked through on a real bill\"\n    [Where the two Copilot euro figures come from](https://aimaad-glass-token-cost.pages.bmw.ghe.com/)\n    follows one month's Copilot use from the call to the cost centre's invoice: what this\n    machine measured, what GitHub counted, how the pool and the licences cancel, and where\n    the euros went.\n"
+        count: 1
   public:
     remote: github.com/fwornle/glass
     overlay: glass/targets/public
