@@ -1,0 +1,93 @@
+# config/job-classes.yaml — the hand-written job-class taxonomy
+# (.planning/shared-job-classes.md, P0 follow-up).
+#
+# P0 showed that a taxonomy a model derives on its own does not hold still: two
+# derivations from the same corpus agreed at kappa 0.54. The classes that DID
+# hold (bug fixing, docs, cleanup, features, session relays) are kept here; the
+# boundaries that moved between derivations are closed by merging:
+#   - every git operation (commit, push, PR, merge, tag, release) is ONE class,
+#     where A and B cut it into two and three;
+#   - fixing and investigating a defect are ONE class: whether the prompt also
+#     asks for the fix was the boundary the students missed most;
+#   - "check the logs" / "run it again" / "is it done?" are cut by what the agent
+#     has to DO (run something vs. report a state), not by topic.
+# A prompt that fits two classes takes the first one in `precedence`: the class
+# of the most demanding part of the job, which is what routing needs to know.
+#
+# Examples are written for this file, never taken from the held-out set.
+#
+# v1 (after v0 on the held-out set: teacher self-kappa 0.95, students ~0.70):
+# the boundaries the students and the teacher disagreed on are spelled out —
+# a "yes" that names an action is that action, pasted output is not a relay,
+# "check / look at / list" is status, and "why did X go wrong" is fix.
+version: 1
+none: >-
+  Answer "none" ONLY for a prompt that is no engineering job at all (a test
+  message, trivia, small talk) or so fragmentary that no class can be read from
+  it. A prompt that is short but clearly asks for something is NOT none: pick
+  the class of what it asks for.
+precedence: [relay, fix, build, cleanup, configure, docs, ship, run, status, explain, reply]
+classes:
+  - id: relay
+    test: The text is a message addressed from another agent session (a handoff, a request from a peer session, a notice to acknowledge), not the user asking for work directly. Agent or tool output the user pasted in (a transcript excerpt, a commit summary, command output) is NOT a relay - classify by what the user wants done with it.
+    examples:
+      - "Message from the coding session: I've pushed the routing change, please rebase your branch before continuing."
+      - "[from session B] Can you confirm the schema migration is done before I start the import?"
+  - id: fix
+    test: Something that should work does not, or a result looks wrong (an error, a crash, wrong or implausible output, a UI glitch, a failing test, a broken login or push, a job that stopped), and the job is to find out why and/or make it work. Includes pasted errors, "why did X happen" about a fault, and "this looks wrong".
+    examples:
+      - "The dashboard shows 0 tokens for yesterday although the proxy logged calls — find out why and fix it."
+      - "git push fails with 403 on the GHE remote since this morning."
+      - "Why does the service stall after about ten minutes?"
+      - "The context meter jumped from 19% to 0% - that can't be right."
+  - id: build
+    test: Add a capability that does not exist yet, or change how something is meant to behave (new feature, new option, UI or layout change, new script or endpoint).
+    examples:
+      - "Add a 'by class' view to the cost tab that groups tokens by job class."
+      - "The start button should be disabled while a trial is running."
+      - "Write a script that exports the trial samples as CSV."
+  - id: cleanup
+    test: Remove or reorganise without adding behaviour - delete stale branches, worktrees, files or entries, refactor, rename, deduplicate, restructure data.
+    examples:
+      - "Delete all merged branches and prune the worktrees."
+      - "Merge the duplicate entities in the knowledge graph and drop the empty clusters."
+  - id: configure
+    test: Change a setting rather than code - a config value, threshold, env var, model list, route, permission or account setup - or set up access, credentials or an install.
+    examples:
+      - "Raise the classifier timeout to 8 seconds."
+      - "Add gpt-5.6-terra to the copilot model list."
+      - "Set up the SSH key for the new GHE org."
+  - id: docs
+    test: Write, rewrite, review, shorten or restructure prose or visuals - docs, READMEs, slides, a plan, diagrams, screenshots for docs.
+    examples:
+      - "Update the routing docs so they describe the new student route."
+      - "Regenerate the architecture diagram, the arrows are wrong."
+  - id: ship
+    test: A version-control or release operation on finished work - commit, push, open or merge a PR, rebase, tag, bump a version, publish a release.
+    examples:
+      - "Commit this and push."
+      - "Merge the PR, tag 0.1.56 and publish the release."
+  - id: run
+    test: Execute something that already exists, to make something happen - run or rerun tests, a script, a benchmark, a build or a workflow; restart a service; deploy; verify end to end. Reading or inspecting state (logs, files, a release, a diff) is status, not run.
+    examples:
+      - "Run the full test suite again."
+      - "Restart the proxy so it picks up the new config."
+      - "Start the benchmark with the open-book arm."
+  - id: status
+    test: Asks for the state of something, or to check / look at / list / diff it and report back - is it finished, what is left, what is running, what changed, what a log, a release or a metric shows - with nothing to execute or change. Pasted output with no request attached is status.
+    examples:
+      - "Is the wave analysis finished?"
+      - "What's still open from yesterday's plan?"
+      - "Merged both - check the 0.2.0 release."
+  - id: explain
+    test: Asks how or why something works, where something is, or how options compare - a question about a system that is working as intended, or about an idea, with no change requested. "Why did it go wrong" is fix.
+    examples:
+      - "How does the classifier decide the band?"
+      - "Where are the trial samples stored?"
+      - "Would a KNN or an LLM be the better student here?"
+  - id: reply
+    test: A bare answer to the agent - yes/no, a choice between offered options, thanks, "go ahead" - that names no action of its own. If the answer names what to do ("yes, commit it", "do the lib/ ones too"), classify that action instead.
+    examples:
+      - "Yes, go with option 2."
+      - "No, keep the old name."
+      - "Option B."

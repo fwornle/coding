@@ -184,6 +184,48 @@ rapid-llm-proxy (`job_class` column, trial keying, class-aware band floor in
 `classifier`/`llm-proxy` must be declared in the four places
 `tests/features/*.test.mjs` checks.
 
+## P0 results (2026-10-27)
+
+Script: `scripts/measure-job-classes.mjs`. Reports in `.data/job-classes/p0/` (not committed).
+
+**Derived taxonomies fail the gate.** Two derivations from the same 876 prompts,
+both capped at 18 classes, agree at kappa 0.54 (ARI 0.44). The teacher applies one
+taxonomy consistently (0.84 when it labels the same prompts twice), so the
+instability is in the derivation itself. A core covering 37% of prompts is stable
+(bug fixing, docs, cleanup, features, session relays). The git, status and
+troubleshooting splits are redrawn on every run. MiniLM KNN reproduces the
+teacher on 25%, so it is no student.
+
+**A committed taxonomy passes** (`config/job-classes.yaml`, 11 classes with
+examples, a precedence order and a "none" rule). v1 was tuned on the 300
+held-out prompts, so it is also scored on a test set of 300 pool prompts nobody
+read while tuning. Teacher and students label one prompt per call with the same
+request.
+
+| | dev (tuned on) | test (unseen) |
+|---|---|---|
+| teacher pass 1 vs 2 | 0.921 | 0.928 |
+| claude-haiku-5.5 | 0.795 | 0.776 |
+| gpt-5.6-luna | 0.799 | 0.773 |
+| gpt-5.6-terra | 0.784 | 0.772 |
+| gpt-4o-mini | 0.666 | 0.711 |
+
+The same students under the derived taxonomy A scored 0.59–0.71, and under the
+first hand-written draft (v0) 0.54–0.70. Students agree with the teacher on about
+80% of unseen prompts. The remaining confusions are build↔docs, fix↔status and
+explain↔status, plus none↔status on fragments.
+
+**What this changes in the design:**
+- Section 3 (automatic derivation and dedup up to a cap) does not survive as
+  designed. A group shares a taxonomy someone wrote and versions. Proposals
+  (P3) become edits to that file and are scored with this script on dev and
+  test before they are merged.
+- Section 2: the student is a closed-set LLM call on the `bg-job-class-student`
+  route (rapid-llm-proxy), not KNN. A cheap cloud model reaches kappa ≈ 0.78.
+  Local Qwen is not yet measured (the cluster was unavailable).
+- A student's agreement with the teacher is scored by exact label match, with
+  no judge, so the per-class trial in P4 is cheaper than a model-trial pair.
+
 ## Open questions (yours to decide)
 
 1. **What is the class primarily for**: routing savings, or reporting plus trial

@@ -56,6 +56,11 @@
  *   --batch=<n>          Prompts per labelling call (default 30)
  *   --student            Also run the leave-one-out KNN check
  *   --students=<m,...>   Also score these cheap models as closed-set LLM students
+ *   --taxonomy=<file>    Skip the derivations: score a committed taxonomy
+ *                        (config/job-classes.yaml) on the checkpointed held-out set
+ *   --set=heldout|pool   With --taxonomy: score the held-out set (default; the one
+ *                        a hand-written taxonomy is tuned on) or a test set of the
+ *                        same size from the derivation pool
  *   --out=<dir>          Output dir (default .data/job-classes/p0)
  *   --fresh              Ignore checkpoints
  *   --help               Show this message
@@ -65,7 +70,7 @@
  */
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import { homedir } from 'node:os'
@@ -375,33 +380,45 @@ Respond ONLY with JSON: {"labels":[{"i":1,"class":"<category id or none>"}]}` }]
 }
 
 /**
- * A cheap model labels the held-out set under `tax`, one prompt per call: the
- * runtime shape, where every prompt is classified as it arrives. An answer that
- * still will not parse after the re-asks counts as 'invalid', not as a crash.
+ * The one-prompt classification request, shared by teacher and students so the
+ * two only ever differ in the model. A committed taxonomy adds its examples, its
+ * "none" rule and its precedence order; a derived one has only the tests.
  */
-async function studentLabels(rows, tax, model) {
-  const tag = `student-${slug(model)}`
+function classifyMessages(tax, text) {
+  const catalogue = tax.classes.map((c) => [`- ${c.id}: ${c.test}`,
+    ...(c.examples || []).map((e) => `    e.g. ${e}`)].join('\n')).join('\n')
+  const none = tax.none || 'If no category\'s test admits it, answer "none" — do not force a fit.'
+  const order = tax.precedence ? `\nIf more than one category fits, take the one that comes first in: ${tax.precedence.join(' > ')}.` : ''
+  return [{ role: 'user', content:
+`Assign the request below to exactly ONE job category, by the category's test.
+${none}${order}
+
+CATEGORIES:
+${catalogue}
+
+REQUEST:
+${text.slice(0, 500).replace(/\s+/g, ' ')}
+
+Respond ONLY with JSON: {"class":"<category id or none>"}` }]
+}
+
+/**
+ * A model labels the held-out set under `tax`, one prompt per call: the runtime
+ * shape, where every prompt is classified as it arrives. `route` is the proxy
+ * process plus, for a student, the model its route's model_profiles name. An
+ * answer that still will not parse after the re-asks counts as 'invalid'.
+ */
+async function singleLabels(rows, tax, route, tag) {
   const ck = readCk(`labels-${tag}.json`)
   if (ck && ck.n === rows.length) { console.log(`labels ${tag}: from checkpoint`); return ck }
   const ids = new Set(tax.classes.map((c) => c.id))
-  const catalogue = tax.classes.map((c) => `- ${c.id}: ${c.test}`).join('\n')
   const served = new Set()
   const latency = []
   let done = 0
   const labels = await pool(rows, 6, async (r) => {
     let c = 'invalid'
     try {
-      const out = await completeJson([{ role: 'user', content:
-`Assign the request below to exactly ONE job category, by the category's test.
-If no category's test admits it, answer "none" — do not force a fit.
-
-CATEGORIES:
-${catalogue}
-
-REQUEST:
-${r.text.slice(0, 500).replace(/\s+/g, ' ')}
-
-Respond ONLY with JSON: {"class":"<category id or none>"}` }], { process: 'job-class-student', model, complexity: 'small' })
+      const out = await completeJson(classifyMessages(tax, r.text), route)
       served.add(out.model)
       if (Number.isFinite(out.latencyMs)) latency.push(out.latencyMs)
       const got = String(out.json.class || '').trim()
@@ -411,10 +428,42 @@ Respond ONLY with JSON: {"class":"<category id or none>"}` }], { process: 'job-c
     return c
   })
   latency.sort((x, y) => x - y)
-  const res = { tag, taxonomy: tax.tag, model, served: [...served], n: rows.length, labels,
+  const res = { tag, taxonomy: tax.tag, model: route.model || null, served: [...served], n: rows.length, labels,
     latencyMs: { p50: latency[Math.floor(latency.length / 2)], p90: latency[Math.floor(latency.length * 0.9)] } }
   writeJson(`labels-${tag}.json`, res)
   return res
+}
+
+const studentRoute = (model) => ({ process: 'job-class-student', model, complexity: 'small' })
+
+/** Score each student's labels against the teacher's `ref`, with `ref2` (a second teacher pass) for "sure". */
+async function scoreStudents(rows, tax, ref, ref2, tagOf) {
+  const sure = ref.map((x, i) => (x === ref2[i] ? i : -1)).filter((i) => i >= 0)
+  const list = []
+  for (const model of opt('students', '').split(',').map((m) => m.trim()).filter(Boolean)) {
+    const st = await singleLabels(rows, tax, studentRoute(model), tagOf(model))
+    const l = st.labels
+    const both = l.map((x, i) => (x !== 'none' && ref[i] !== 'none' ? i : -1)).filter((i) => i >= 0)
+    list.push({
+      model, served: st.served, latencyMs: st.latencyMs,
+      kappa: cohenKappa(ref, l),
+      accuracy: l.filter((x, i) => x === ref[i]).length / l.length,
+      kappaSure: cohenKappa(sure.map((i) => ref[i]), sure.map((i) => l[i])),
+      accuracySure: sure.filter((i) => l[i] === ref[i]).length / sure.length,
+      accuracyCommitted: both.filter((i) => l[i] === ref[i]).length / both.length,
+      none: l.filter((x) => x === 'none').length / l.length,
+      invalid: l.filter((x) => x === 'invalid').length,
+    })
+  }
+  return { sureCoverage: sure.length / rows.length, list }
+}
+
+function studentTable(st, ceiling) {
+  return [
+    `Reference: the teacher's labels. "Sure" = the ${pct(st.sureCoverage)} of items where the teacher gave the same label twice. "Both commit" = items where neither answered none. Ceiling: the teacher's own kappa between its two passes, ${f3(ceiling)}.`, '',
+    '| Student | Served by | kappa vs teacher | agree | kappa (sure) | agree (sure) | agree (both commit) | none | invalid | p50 / p90 ms |', '|---|---|---|---|---|---|---|---|---|---|',
+    ...st.list.map((x) => `| ${x.model} | ${x.served.join(', ')} | ${f3(x.kappa)} | ${pct(x.accuracy)} | ${f3(x.kappaSure)} | ${pct(x.accuracySure)} | ${pct(x.accuracyCommitted)} | ${pct(x.none)} | ${x.invalid} | ${x.latencyMs.p50 ?? 'n/a'} / ${x.latencyMs.p90 ?? 'n/a'} |`),
+  ]
 }
 
 // ---------------------------------------------------------------------------
@@ -546,6 +595,46 @@ async function studentLoo(rows, labels, k = 5) {
 const f3 = (x) => (Number.isFinite(x) ? x.toFixed(3) : 'n/a')
 const pct = (x) => `${(x * 100).toFixed(1)}%`
 
+/**
+ * A committed (hand-written) taxonomy instead of two derivations: nothing to
+ * compare it with, so the question is only whether the teacher applies it
+ * consistently and whether a cheap student reproduces the teacher. The teacher
+ * labels one prompt per call here too, so teacher and students see exactly the
+ * same request and differ only in the model.
+ */
+async function committedRun(heldout, set) {
+  const file = resolve(REPO, opt('taxonomy', ''))
+  const { load } = await import('js-yaml')
+  const raw = load(readFileSync(file, 'utf8'))
+  const name = basename(file).replace(/\.ya?ml$/, '')
+  const tax = { tag: `${name}-v${raw.version ?? 0}${set === 'heldout' ? '' : `-${set}`}`, classes: raw.classes, none: raw.none, precedence: raw.precedence }
+  const ids = tax.classes.map((c) => c.id)
+  if (new Set(ids).size !== ids.length) throw new Error(`${file}: duplicate class ids`)
+  for (const id of tax.precedence || []) if (!ids.includes(id)) throw new Error(`${file}: precedence names unknown class ${id}`)
+  console.log(`taxonomy ${tax.tag}: ${ids.length} classes from ${file}`)
+  const teacher = { process: 'job-class-teacher' }
+  const t1 = await singleLabels(heldout, tax, teacher, `${tax.tag}-teacher1`)
+  const t2 = await singleLabels(heldout, tax, teacher, `${tax.tag}-teacher2`)
+  const self = cohenKappa(t1.labels, t2.labels)
+  const dist = distribution(t1.labels)
+  const maxShare = dist.filter((d) => d.cls !== 'none').at(0)?.share || 0
+  const students = opt('students', '') ? await scoreStudents(heldout, tax, t1.labels, t2.labels, (m) => `${tax.tag}-${slug(m)}`) : null
+  writeJson(`report-${tax.tag}.json`, { generatedAt: new Date().toISOString(), taxonomy: tax.tag, n: heldout.length, teacher: t1.served, selfKappa: self, maxShare, dist, students })
+  const md = [
+    `# Committed taxonomy ${tax.tag} (${new Date().toISOString().slice(0, 10)})`, '',
+    `${set === 'heldout' ? `Held-out ${heldout.length} prompts (the P0 set, which the taxonomy was tuned on)` : `Test set: ${heldout.length} prompts from the P0 derivation pool, never read while tuning`}. Teacher: ${t1.served.join(', ')}, one prompt per call, two passes.`, '',
+    `| Measure | Value |`, '|---|---|',
+    `| teacher pass 1 vs pass 2 (kappa) | ${f3(self)} |`,
+    `| "none" (pass 1) | ${pct(t1.labels.filter((x) => x === 'none').length / heldout.length)} |`,
+    `| largest class | ${pct(maxShare)} (gate ≤ ${pct(GATE.maxShare)}) |`,
+    `| invalid labels | ${t1.labels.concat(t2.labels).filter((x) => x === 'invalid').length} |`,
+    ...(students ? ['', '## LLM students', '', ...studentTable(students, self)] : []),
+    '', '## Distribution (teacher pass 1)', '', ...dist.map((d) => `- **${d.cls}** ${d.n} (${pct(d.share)})`),
+  ].join('\n')
+  writeFileSync(outFile(`report-${tax.tag}.md`), md + '\n')
+  console.log(`\n${md}\n\nfull report: ${outFile(`report-${tax.tag}.md`)}`)
+}
+
 async function main() {
   const { rows, dropped } = extractCorpus()
   const ranked = rows.map((r) => ({ r, h: createHash('sha1').update(`heldout:${r.id}`).digest('hex') }))
@@ -570,6 +659,17 @@ async function main() {
   console.log(`corpus: ${rows.length} prompts over ${DAYS} days (dropped ${JSON.stringify(dropped)}); held-out ${heldout.length}, pool ${derivePool.length}`)
   console.log(`agents: ${JSON.stringify(byAgent)}`)
   if (has('--corpus-only')) return
+  if (opt('taxonomy', '')) {
+    if (opt('set', 'heldout') === 'heldout') return committedRun(heldout, 'heldout')
+    // The test set for a taxonomy tuned on the held-out set: prompts from the same
+    // checkpointed corpus that nobody tuning it has read (the derivations saw
+    // them, but the derived taxonomies are not what is scored here).
+    if (!oldCorpus) throw new Error('--set=pool needs a checkpointed corpus (run P0 first)')
+    const test = [...oldCorpus.values()].filter((r) => !heldIds.has(r.id))
+      .map((r) => ({ r, h: createHash('sha1').update(`pool:${r.id}`).digest('hex') }))
+      .sort((x, y) => (x.h < y.h ? -1 : 1)).slice(0, HELDOUT).map((x) => x.r)
+    return committedRun(test, 'pool')
+  }
   if (heldout.length < HELDOUT || derivePool.length < 8 * 30) throw new Error('corpus too small for a P0 run')
 
   const A = await deriveTaxonomy(derivePool, 1, 'a')
@@ -598,22 +698,7 @@ async function main() {
     maxShare,
   }
   if (has('--student')) metrics.student = await studentLoo(heldout, la)
-  const sure = la.map((x, i) => (x === la2[i] ? i : -1)).filter((i) => i >= 0)
-  const students = []
-  for (const model of opt('students', '').split(',').map((m) => m.trim()).filter(Boolean)) {
-    const st = await studentLabels(heldout, A, model)
-    const l = st.labels
-    students.push({
-      model, served: st.served, latencyMs: st.latencyMs,
-      kappa: cohenKappa(la, l),
-      accuracy: l.filter((x, i) => x === la[i]).length / l.length,
-      kappaSure: cohenKappa(sure.map((i) => la[i]), sure.map((i) => l[i])),
-      accuracySure: sure.filter((i) => l[i] === la[i]).length / sure.length,
-      none: l.filter((x) => x === 'none').length / l.length,
-      invalid: l.filter((x) => x === 'invalid').length,
-    })
-  }
-  if (students.length) metrics.students = { sureCoverage: sure.length / heldout.length, list: students }
+  if (opt('students', '')) metrics.students = await scoreStudents(heldout, A, la, la2, (m) => `student-${slug(m)}`)
   const pass = metrics.kappaAB >= GATE.kappa && metrics.maxShare <= GATE.maxShare
   writeJson('report.json', { generatedAt: new Date().toISOString(), days: DAYS, cap: [CAP_LO, CAP_HI], gate: GATE, pass, corpus: { n: rows.length, dropped, byAgent }, metrics, pairs, distA, distB, teacher: A.model })
 
@@ -629,10 +714,7 @@ async function main() {
     `| "none" under A / B | ${pct(metrics.noneA)} / ${pct(metrics.noneB)} | taxonomy coverage |`,
     `| invalid labels | ${metrics.invalid} | teacher format errors |`,
     ...(metrics.student ? [`| student: LOO ${metrics.student.k}-NN on MiniLM vs A labels | ${pct(metrics.student.accuracy)} of ${metrics.student.n} | can a cheap model reproduce the teacher? |`] : []),
-    ...(metrics.students ? ['', '## LLM students (taxonomy A, one prompt per call)', '',
-      `Reference: the teacher's A labels. "Sure" = the ${pct(metrics.students.sureCoverage)} of items where the teacher gave the same label twice (A = A2). Ceiling: the teacher's own A-vs-A2 kappa, ${f3(metrics.selfKappaA)}.`, '',
-      '| Student | Served by | kappa vs teacher | agree | kappa (sure) | agree (sure) | none | invalid | p50 / p90 ms |', '|---|---|---|---|---|---|---|---|---|',
-      ...metrics.students.list.map((x) => `| ${x.model} | ${x.served.join(', ')} | ${f3(x.kappa)} | ${pct(x.accuracy)} | ${f3(x.kappaSure)} | ${pct(x.accuracySure)} | ${pct(x.none)} | ${x.invalid} | ${x.latencyMs.p50 ?? 'n/a'} / ${x.latencyMs.p90 ?? 'n/a'} |`)] : []),
+    ...(metrics.students ? ['', '## LLM students (taxonomy A, one prompt per call)', '', ...studentTable(metrics.students, metrics.selfKappaA)] : []),
     '', '## A ↔ B class matching', '', '| A | B | both | in A | in B | Jaccard |', '|---|---|---|---|---|---|',
     ...pairs.map((p) => `| ${p.a} | ${p.b} | ${p.both} | ${p.inA} | ${p.inB} | ${p.jaccard.toFixed(2)} |`),
     '', '## Taxonomy A', '', ...A.classes.map((c) => `- **${c.id}** (${distA.find((d) => d.cls === c.id)?.n || 0}) — ${c.test}`),
