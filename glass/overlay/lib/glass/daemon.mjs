@@ -560,7 +560,7 @@ export async function startDaemon({
         const dir = db ? path.join(path.dirname(db), 'trials') : null;
         const view = (t) => {
           const samples = readSamples(dir, t.id);
-          return { trial: { ...t, status: effectiveStatus(t, samples.length) }, summary: summarize(t, samples), samples };
+          return { trial: { ...t, status: effectiveStatus(t, samples) }, summary: summarize(t, samples), samples };
         };
         const id = url.split('?')[0].slice('/api/trials/'.length);
         if (!id) return json(res, 200, { trials: dir ? listTrials(dir).map((t) => { const v = view(t); return { ...v.trial, summary: v.summary }; }) : [] });
