@@ -742,7 +742,6 @@ export interface ProcessCandidates {
 export const AUTO_TRIAL_CANDIDATES = 4
 /** A saving smaller than this a month is noise, not a reason to run a trial. */
 const MIN_MONTHLY_SAVING = 0.5
-const LOCAL_ACCOUNTS = new Set(['on-prem', 'on-device'])
 
 /**
  * Without the proxy's catalogue (glass, an older proxy) the one candidate is
@@ -765,7 +764,7 @@ export function catalogueFromRouting(body: unknown): ModelCatalogue | null {
  * The cheaper models a model trial can try for each background process.
  *
  * Where from: the incumbent's own account (a downgrade stays on the same bill)
- * and own hardware (on-prem / on-device accounts) — each provider only while
+ * and own hardware (accountKind 'local') — each provider only while
  * the proxy can reach it. Other metered accounts and a flat subscription are a
  * different bill, not a downgrade, and are not offered.
  *
@@ -790,7 +789,9 @@ export function trialCandidates(
   const byId = new Map(cat.providers.map(p => [p.id, p]))
   const reachable = (p: CatalogueProvider) => p.enabled
     && (!cat.availableImpls || (!!p.impl && cat.availableImpls.includes(p.impl)))
-  const isLocal = (p: CatalogueProvider) => LOCAL_ACCOUNTS.has(p.account) || accountKind(costAccount(p.id)) === 'local'
+  // Own hardware: this site's local providers, or one the proxy reported serving
+  // offloaded calls (accountKind) — the same test as everywhere on this page.
+  const isLocal = (p: CatalogueProvider) => accountKind(costAccount(p.id)) === 'local'
 
   const byProcess = new Map<string, CostRow[]>()
   for (const r of rows) {
