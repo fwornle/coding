@@ -28,6 +28,7 @@ const TokenUsageSettingsDialog = lazy(() => import('./token-usage-settings-dialo
 const TokenUsageRoutingTab = lazy(() => import('./token-usage-routing-tab').then((m) => ({ default: m.TokenUsageRoutingTab })))
 const CostTab = lazy(() => import('@/components/cost/CostTab').then((m) => ({ default: m.CostTab })))
 const TrialsTab = lazy(() => import('@/components/trials/TrialsTab').then((m) => ({ default: m.TrialsTab })))
+const JobClassesTab = lazy(() => import('@/components/job-classes/JobClassesTab').then((m) => ({ default: m.JobClassesTab })))
 import { AccountsDialog } from '@/components/cost/AccountsDialog'
 import { SeriesTooltip } from '@/components/cost/series-tooltip'
 import { fetchAccountSelection, type AccountSelection, type SourcesControl } from '@/components/cost/account-selection'
@@ -518,8 +519,8 @@ function TreemapTooltip({ active, payload }: { active?: boolean; payload?: Array
   )
 }
 
-export type TokenUsageTab = 'overview' | 'evolution' | 'cost' | 'trials' | 'recent' | 'routing'
-const ALL_TABS: TokenUsageTab[] = ['overview', 'evolution', 'cost', 'trials', 'recent', 'routing']
+export type TokenUsageTab = 'overview' | 'evolution' | 'cost' | 'trials' | 'classes' | 'recent' | 'routing'
+const ALL_TABS: TokenUsageTab[] = ['overview', 'evolution', 'cost', 'trials', 'classes', 'recent', 'routing']
 
 /**
  * proxyBase: where the token-usage reads live — '' for same-origin (glass's daemon
@@ -1131,6 +1132,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
           {has('evolution') && <TabsTrigger value="evolution">Evolution</TabsTrigger>}
           {has('cost') && <TabsTrigger value="cost">Cost</TabsTrigger>}
           {has('trials') && <TabsTrigger value="trials">Trials</TabsTrigger>}
+          {has('classes') && <TabsTrigger value="classes">Classes</TabsTrigger>}
           {has('recent') && <TabsTrigger value="recent">Recent Calls</TabsTrigger>}
           {has('routing') && <TabsTrigger value="routing">Routing</TabsTrigger>}
         </TabsList>
@@ -1553,6 +1555,17 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
           <TabsContent value="trials">
             <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
               <TrialsTab proxyBase={proxyBase} canWrite={settings} focusId={trialFocus} currency={unit === 'USD' ? 'USD' : 'EUR'} />
+            </Suspense>
+          </TabsContent>
+        )}
+
+        {/* Classes Tab — the job class of each foreground turn, labelled in shadow by
+            the proxy (job-class.mjs), and tokens by class. Not in glass: its
+            daemon serves no job-class store. */}
+        {has('classes') && (
+          <TabsContent value="classes" className="mt-4">
+            <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
+              <JobClassesTab proxyBase={proxyBase} hours={hoursWindow} />
             </Suspense>
           </TabsContent>
         )}
