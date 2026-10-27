@@ -208,6 +208,12 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
     const now = new Date()
     return trialCandidates(costRows, cfg, catalogue, now.toISOString().slice(0, 7), now)
   }, [costRows, cfg, catalogue])
+  // The proxy runs one trial per process at a time; a process that has one is
+  // offered again once it ends, so the next trial goes to a different process.
+  const runningProcesses = useMemo(
+    () => new Set((trials || []).filter(t => t.status === 'running').map(t => t.process)),
+    [trials],
+  )
   const formCandidates = processCandidates.find(p => p.process === form.process) || null
   const formAuto = useMemo(
     () => (formCandidates ? autoTrialCandidates(formCandidates, failedTrialModels(trials || [], formCandidates.process)) : []),
@@ -224,13 +230,14 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
     return () => clearInterval(t)
   }, [loadList, loadDetail, selected])
 
-  const act = async (path: string, body: object, ok: string) => {
+  const act = async (path: string, body: object, ok: string, onDone?: () => void) => {
     setBusy(true)
     try {
       const r = await fetch(`${proxyBase}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`)
       setNotice(ok)
+      onDone?.()
       await loadList()
       const id = j.trial?.id || selected
       if (id) { setSelected(id); await loadDetail(id) }
@@ -246,7 +253,10 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
       candidates: chosen.map(c => ({ provider: c.provider, model: c.model })),
       samplePct: Number(form.samplePct) / 100, maxSamples: Number(form.maxSamples),
       ...(form.days.trim() ? { days: Number(form.days) } : {}),
-    }, `Trial started for ${form.process}: ${chosen.map(c => c.model).join(', ')}`)
+    }, `Trial started for ${form.process}: ${chosen.map(c => c.model).join(', ')}`,
+    // Clear the process so the form reads as ready for the next trial, not as
+    // the one just started (the rates stay: they are the user's own defaults).
+    () => setForm(f => ({ ...f, process: '', choice: 'auto' })))
   }
 
   /** The sampled calls' cost on a candidate against the incumbent's on the same calls. */
@@ -318,7 +328,9 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
                     <SelectTrigger id="trial-process" className="h-8 text-xs font-mono"><SelectValue placeholder="a background process" /></SelectTrigger>
                     <SelectContent>
                       {processCandidates.map(p => (
-                        <SelectItem key={p.process} value={p.process} className="font-mono text-xs">{p.process} · {money(p.monthlyEur)}/mo</SelectItem>
+                        <SelectItem key={p.process} value={p.process} disabled={runningProcesses.has(p.process)} className="font-mono text-xs">
+                          {p.process} · {runningProcesses.has(p.process) ? 'trial running' : `${money(p.monthlyEur)}/mo`}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -355,7 +367,7 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
                     <Input id="trial-max" value={form.maxSamples} onChange={e => setForm(f => ({ ...f, maxSamples: e.target.value }))} className="h-8 text-xs" inputMode="numeric" />
                   </label>
                 </div>
-                <Button size="sm" className="w-full" disabled={busy || !formCandidates || (form.choice === 'auto' && !formAuto.length)} onClick={() => void start()}>Start trial</Button>
+                <Button size="sm" className="w-full" disabled={busy || !formCandidates || runningProcesses.has(form.process) || (form.choice === 'auto' && !formAuto.length)} onClick={() => void start()}>Start trial</Button>
               </div>
             )}
           </CardContent>
