@@ -75,8 +75,9 @@ shows the same list, and starts a **trial** from it rather than switching outrig
 **Trials** (where coding is installed) show whether a cheaper model can take over a
 background job: for a few days it runs beside the current model on a share of the job's
 real calls, and a strong judge compares each pair of answers blind, for details kept and
-nothing invented. The tab lists each trial's verdict, the pairs side by side and what each
-answer missed. glass shows them read-only; they are started and accepted in coding's
+nothing invented. An automatic trial tries several cheaper models in turn, cheapest first,
+and names the first that does the job as well. The tab lists each trial's verdict, each
+model's standing, the pairs side by side and what each answer missed. glass shows them read-only; they are started and accepted in coding's
 dashboard, where accepting one switches the job's model.
 
 ### How cost is calculated

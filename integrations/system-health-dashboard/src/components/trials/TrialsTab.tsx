@@ -3,9 +3,13 @@
  * uses, on its real calls, judged blind — the evidence to read before a process
  * is switched (rapid-llm-proxy proxy-bridge/model-trials.mjs, /api/trials).
  *
+ * A trial tries one model, or — Automatic, the default — several, cheapest
+ * first, and reports the cheapest that does the job as well (the winner).
+ *
  * Coding's dashboard can start, stop, reject and accept a trial; accepting
- * writes the candidate's band into the process's route (llm-routing.yaml). glass
- * shows the same trials read-only — its daemon serves a coding machine's store.
+ * writes the chosen candidate into the process's route (llm-routing.yaml: its
+ * band, or a model pin). glass shows the same trials read-only — its daemon
+ * serves a coding machine's store.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { FlaskConical, RefreshCw, Check, X, Square, ChevronRight } from 'lucide-react'
@@ -16,7 +20,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { cellCostUsd, fetchCostSettings, formatMoney, fromUsd, CostConfig, DEFAULT_COST_CONFIG } from '@/components/cost/cost-model'
+import {
+  cellCostUsd, fetchCostSettings, formatMoney, fromUsd, CostConfig, CostRow, DEFAULT_COST_CONFIG,
+  catalogueFromRouting, trialCandidates, autoTrialCandidates, failedTrialModels, setLocalProviders,
+  type ModelCatalogue, type TrialCandidate,
+} from '@/components/cost/cost-model'
 
 interface Side { provider: string; complexity?: string; model: string }
 interface Summary {
@@ -31,13 +39,29 @@ interface Summary {
   tokens: { incumbent: { input: number; output: number }; candidate: { input: number; output: number } }
   verdict: 'pending' | 'pass' | 'fail' | 'insufficient'
   reasons: string[]
+  /** The first candidate (in the trial's order) that passed. Absent on a proxy before candidate lists. */
+  winner?: number | null
+  /** The winner, or the candidate doing best so far — what the top-level figures describe. */
+  lead?: number
+  candidates?: CandidateSummary[]
+}
+type CandidateState = 'active' | 'passed' | 'failed' | 'out' | 'skipped' | 'short'
+interface CandidateSummary extends Omit<Summary, 'status' | 'verdict' | 'winner' | 'lead' | 'candidates'> {
+  index: number
+  candidate: Side
+  state: CandidateState
+  pending: number
 }
 export interface Trial {
   id: string
   process: string
   routeKey: string
+  mode?: 'auto' | 'single'
   incumbent: Side
-  candidate: Side
+  /** Trials from before candidate lists. */
+  candidate?: Side
+  candidates?: Side[]
+  acceptedCandidate?: number
   samplePct: number
   days: number
   maxSamples: number
@@ -58,6 +82,8 @@ interface Judgement { order: 'ic' | 'ci'; ok: boolean; judge?: string; oriented?
 interface Unit { title: string; body: string }
 interface Sample {
   sampleId: string
+  /** Which of the trial's candidates answered; absent = the only one. */
+  candidateIndex?: number
   at: string
   project?: string
   request: string
@@ -72,6 +98,17 @@ interface Sample {
   judgements: Judgement[]
 }
 interface Detail { trial: Trial; summary: Summary; samples: Sample[] }
+
+/** A trial's candidates in its order of preference. */
+const candidatesOf = (t: Trial): Side[] => (t.candidates?.length ? t.candidates : t.candidate ? [t.candidate] : [])
+
+const STATE_LABEL: Record<CandidateState, string> = {
+  active: 'being tried', passed: 'passes', failed: 'fails', out: 'cannot pass', skipped: 'not needed', short: 'too few pairs',
+}
+const STATE_CLASS: Record<CandidateState, string> = {
+  active: 'text-muted-foreground', passed: 'text-emerald-700 dark:text-emerald-400', failed: 'text-red-700 dark:text-red-400',
+  out: 'text-red-700 dark:text-red-400', skipped: 'text-muted-foreground', short: 'text-amber-700 dark:text-amber-400',
+}
 
 const pct = (v: number | null | undefined) => (v == null || !Number.isFinite(v) ? '—' : `${Math.round(v * 100)}%`)
 
@@ -122,7 +159,13 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
   const [busy, setBusy] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [confirmForce, setConfirmForce] = useState(false)
-  const [form, setForm] = useState({ process: '', band: 'small', samplePct: '25', days: '3', maxSamples: '40' })
+  // `choice`: 'auto', or the index of one candidate in the process's list. Days left
+  // blank: the proxy's default (3, or 3 per candidate for an automatic trial).
+  const [form, setForm] = useState({ process: '', choice: 'auto', samplePct: '25', days: '', maxSamples: '40' })
+  // What a trial can try for each process: the Cost tab's candidates, from the
+  // same rows and the proxy's routing catalogue.
+  const [costRows, setCostRows] = useState<CostRow[]>([])
+  const [catalogue, setCatalogue] = useState<ModelCatalogue | null>(null)
 
   const money = useCallback((v: number) => formatMoney(v, currency), [currency])
 
@@ -148,6 +191,26 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
   }, [proxyBase])
 
   useEffect(() => { void loadList(); void fetchCostSettings(proxyBase).then(cs => setCfg({ ...cs.cfg, currency: { ...cs.cfg.currency, display: currency } })) }, [loadList, proxyBase, currency])
+  useEffect(() => {
+    if (!canWrite) return
+    void Promise.all([
+      fetch(`${proxyBase}/api/token-usage/cost?months=1&by=day`).then(r => (r.ok ? r.json() : null)).catch(() => null),
+      fetch(`${proxyBase}/api/llm/routing`).then(r => (r.ok ? r.json() : null)).catch(() => null),
+    ]).then(([cost, routing]) => {
+      setLocalProviders(cost?.local_providers)
+      setCostRows(cost?.rows || [])
+      setCatalogue(catalogueFromRouting(routing))
+    })
+  }, [canWrite, proxyBase])
+  const processCandidates = useMemo(() => {
+    const now = new Date()
+    return trialCandidates(costRows, cfg, catalogue, now.toISOString().slice(0, 7), now)
+  }, [costRows, cfg, catalogue])
+  const formCandidates = processCandidates.find(p => p.process === form.process) || null
+  const formAuto = useMemo(
+    () => (formCandidates ? autoTrialCandidates(formCandidates, failedTrialModels(trials || [], formCandidates.process)) : []),
+    [formCandidates, trials],
+  )
   useEffect(() => { if (focusId) setSelected(focusId) }, [focusId])
   useEffect(() => {
     if (!selected && trials?.length) setSelected(trials[0].id)
@@ -174,18 +237,29 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
     } finally { setBusy(false) }
   }
 
-  const start = () => act('/api/trials', {
-    process: form.process.trim(), candidateComplexity: form.band,
-    samplePct: Number(form.samplePct) / 100, days: Number(form.days), maxSamples: Number(form.maxSamples),
-  }, `Trial started for ${form.process.trim()}`)
+  const start = () => {
+    const chosen: TrialCandidate[] = form.choice === 'auto' ? formAuto : [formCandidates!.candidates[Number(form.choice)]]
+    return act('/api/trials', {
+      process: form.process, mode: form.choice === 'auto' && chosen.length > 1 ? 'auto' : 'single',
+      candidates: chosen.map(c => ({ provider: c.provider, model: c.model })),
+      samplePct: Number(form.samplePct) / 100, maxSamples: Number(form.maxSamples),
+      ...(form.days.trim() ? { days: Number(form.days) } : {}),
+    }, `Trial started for ${form.process}: ${chosen.map(c => c.model).join(', ')}`)
+  }
 
-  const cost = useMemo(() => {
+  /** The sampled calls' cost on a candidate against the incumbent's on the same calls. */
+  const costOf = useCallback((cand: Side, tokens: Summary['tokens']) => {
     if (!detail) return null
     const day = new Date().toISOString().slice(0, 10)
-    const inc = sideCost(cfg, detail.trial.incumbent, detail.summary.tokens.incumbent, day)
-    const cand = sideCost(cfg, detail.trial.candidate, detail.summary.tokens.candidate, day)
-    return { inc, cand, ratio: inc > 0 ? cand / inc : null }
+    const inc = sideCost(cfg, detail.trial.incumbent, tokens.incumbent, day)
+    const c = sideCost(cfg, cand, tokens.candidate, day)
+    return { inc, cand: c, ratio: inc > 0 ? c / inc : null }
   }, [detail, cfg])
+  const detailCandidates = detail ? candidatesOf(detail.trial) : []
+  const lead = detail ? detailCandidates[detail.summary.lead ?? 0] : null
+  const winner = detail && detail.summary.winner != null ? detailCandidates[detail.summary.winner] : null
+  const cost = useMemo(() => (detail && lead ? costOf(lead, detail.summary.tokens) : null), [detail, lead, costOf])
+  const multi = detailCandidates.length > 1
 
   const sample = detail?.samples.find(s => s.sampleId === sampleId) || null
 
@@ -220,36 +294,56 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
                   <span className="font-mono text-xs truncate">{t.process}</span>
                   {t.summary && <Badge variant="outline" className={`text-[10px] shrink-0 ${VERDICT_CLASS[t.summary.verdict]}`}>{VERDICT_LABEL[t.summary.verdict]}</Badge>}
                 </div>
-                <div className="text-xs text-muted-foreground truncate">{t.incumbent.model} → {t.candidate.model}</div>
+                <div className="text-xs text-muted-foreground truncate">{t.incumbent.model} → {candidatesOf(t).length > 1 ? `automatic: ${candidatesOf(t).map(c => c.model).join(', ')}` : candidatesOf(t)[0]?.model}</div>
                 <div className="text-xs text-muted-foreground">{t.status} · {t.summary?.judged ?? 0} judged of {t.summary?.samples ?? 0} · started {t.createdAt.slice(0, 10)}</div>
               </button>
             ))}
             {canWrite && (
               <div className="border-t pt-3 mt-2 space-y-2">
                 <div className="text-sm font-medium">Start a trial</div>
-                <Input id="trial-process" placeholder="process, e.g. consolidator-insight" value={form.process} onChange={e => setForm(f => ({ ...f, process: e.target.value }))} className="h-8 text-xs font-mono" />
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="text-xs text-muted-foreground space-y-1">Candidate band
-                    <Select value={form.band} onValueChange={v => setForm(f => ({ ...f, band: v }))}>
-                      <SelectTrigger id="trial-band" className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <label className="text-xs text-muted-foreground space-y-1 block">Process
+                  <Select value={form.process} onValueChange={v => setForm(f => ({ ...f, process: v, choice: 'auto' }))}>
+                    <SelectTrigger id="trial-process" className="h-8 text-xs font-mono"><SelectValue placeholder="a background process" /></SelectTrigger>
+                    <SelectContent>
+                      {processCandidates.map(p => (
+                        <SelectItem key={p.process} value={p.process} className="font-mono text-xs">{p.process} · {money(p.monthlyEur)}/mo</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </label>
+                {processCandidates.length === 0 && <div className="text-xs text-muted-foreground">No background process has a cheaper model to try (judged by the last 7 days).</div>}
+                {formCandidates && (
+                  <label className="text-xs text-muted-foreground space-y-1 block">Candidates
+                    <Select value={form.choice} onValueChange={v => setForm(f => ({ ...f, choice: v }))}>
+                      <SelectTrigger id="trial-candidates" className="h-8 text-xs"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="small">small</SelectItem>
-                        <SelectItem value="medium">medium</SelectItem>
-                        <SelectItem value="high">high</SelectItem>
+                        {formAuto.length > 1 && <SelectItem value="auto" className="text-xs">Automatic — the cheapest that does the job ({formAuto.length} models)</SelectItem>}
+                        {formCandidates.candidates.map((c, i) => (
+                          <SelectItem key={`${c.provider}/${c.model}`} value={String(i)} className="text-xs">
+                            {c.model} · {c.provider} · {c.local ? 'own hardware' : `≈ ${money(c.monthlyEur)}/mo${c.estimate ? ' (est.)' : ''}`}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </label>
+                )}
+                {formCandidates && form.choice === 'auto' && formAuto.length > 1 && (
+                  <div className="text-xs text-muted-foreground">
+                    Tries {formAuto.map(c => c.model).join(', ')} in turn beside {formCandidates.incumbent.model}, cheapest first; a model that cannot pass drops out, and the first that passes wins.
+                  </div>
+                )}
+                <div className="grid grid-cols-3 gap-2">
                   <label className="text-xs text-muted-foreground space-y-1">Share of calls %
                     <Input id="trial-pct" value={form.samplePct} onChange={e => setForm(f => ({ ...f, samplePct: e.target.value }))} className="h-8 text-xs" inputMode="numeric" />
                   </label>
                   <label className="text-xs text-muted-foreground space-y-1">Days, at most
-                    <Input id="trial-days" value={form.days} onChange={e => setForm(f => ({ ...f, days: e.target.value }))} className="h-8 text-xs" inputMode="decimal" />
+                    <Input id="trial-days" value={form.days} placeholder={form.choice === 'auto' && formAuto.length > 1 ? String(Math.min(14, 3 * formAuto.length)) : '3'} onChange={e => setForm(f => ({ ...f, days: e.target.value }))} className="h-8 text-xs" inputMode="decimal" />
                   </label>
-                  <label className="text-xs text-muted-foreground space-y-1">Pairs, at most
+                  <label className="text-xs text-muted-foreground space-y-1">Pairs per model
                     <Input id="trial-max" value={form.maxSamples} onChange={e => setForm(f => ({ ...f, maxSamples: e.target.value }))} className="h-8 text-xs" inputMode="numeric" />
                   </label>
                 </div>
-                <Button size="sm" className="w-full" disabled={busy || !form.process.trim()} onClick={() => void start()}>Start trial</Button>
+                <Button size="sm" className="w-full" disabled={busy || !formCandidates || (form.choice === 'auto' && !formAuto.length)} onClick={() => void start()}>Start trial</Button>
               </div>
             )}
           </CardContent>
@@ -266,8 +360,8 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
                     <CardTitle className="text-base font-mono break-all">{detail.trial.process}</CardTitle>
                     <CardDescription>
                       {detail.trial.incumbent.provider}/{detail.trial.incumbent.model} <span className="text-muted-foreground">({detail.trial.incumbent.complexity})</span>
-                      {' '}→ {detail.trial.candidate.provider}/{detail.trial.candidate.model} <span className="text-muted-foreground">({detail.trial.candidate.complexity})</span>
-                      {' '}· {Math.round(detail.trial.samplePct * 100)}% of calls · until {detail.trial.endsAt.slice(0, 16).replace('T', ' ')} UTC or {detail.trial.maxSamples} pairs
+                      {' '}→ {multi ? `automatic, cheapest first: ${detailCandidates.map(c => c.model).join(', ')}` : <>{detailCandidates[0]?.provider}/{detailCandidates[0]?.model} <span className="text-muted-foreground">({detailCandidates[0]?.complexity})</span></>}
+                      {' '}· {Math.round(detail.trial.samplePct * 100)}% of calls · until {detail.trial.endsAt.slice(0, 16).replace('T', ' ')} UTC or {detail.trial.maxSamples} pairs{multi ? ' per model' : ''}
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
@@ -278,6 +372,47 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
+                {multi && detail.summary.candidates && (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Candidate</TableHead>
+                          <TableHead>State</TableHead>
+                          <TableHead className="text-right">Judged</TableHead>
+                          <TableHead className="text-right">At least as good</TableHead>
+                          <TableHead className="text-right">Details kept</TableHead>
+                          <TableHead className="text-right">Cost</TableHead>
+                          {canWrite && <TableHead />}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {detail.summary.candidates.map(c => {
+                          const cc = costOf(c.candidate, c.tokens)
+                          return (
+                            <TableRow key={c.index} className={detail.summary.winner === c.index ? 'bg-emerald-50/60 dark:bg-emerald-950/30' : ''}>
+                              <TableCell className="text-xs"><span className="font-mono">{c.candidate.model}</span> <span className="text-muted-foreground">· {c.candidate.provider}</span>{detail.summary.winner === c.index && <Badge variant="outline" className={`ml-2 text-[10px] ${VERDICT_CLASS.pass}`}>winner</Badge>}</TableCell>
+                              <TableCell className={`text-xs ${STATE_CLASS[c.state]}`}>{c.state === 'active' && detail.trial.status !== 'running' ? `${detail.trial.status}, undecided` : STATE_LABEL[c.state]}</TableCell>
+                              <TableCell className="text-right text-xs">{c.judged} / {detail.trial.thresholds.minSamples}{c.pending ? ` (+${c.pending})` : ''}</TableCell>
+                              <TableCell className="text-right text-xs">{pct(c.okRate)}</TableCell>
+                              <TableCell className="text-right text-xs">{pct(c.meanRetention)}</TableCell>
+                              <TableCell className="text-right text-xs" title={cc ? `${money(cc.cand)} vs ${money(cc.inc)} on the sampled calls` : ''}>{cc?.ratio == null ? '—' : pct(cc.ratio)}</TableCell>
+                              {canWrite && (
+                                <TableCell className="text-right">
+                                  {c.state === 'passed' && ['running', 'complete'].includes(detail.trial.status) && (
+                                    <Button size="sm" variant="ghost" className="h-7 text-xs" disabled={busy}
+                                      onClick={() => void act(`/api/trials/${detail.trial.id}/accept`, { candidate: c.index }, `Accepted: ${detail.trial.routeKey} now runs on ${c.candidate.model}`)}>Accept</Button>
+                                  )}
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          )
+                        })}
+                      </TableBody>
+                    </Table>
+                    <div className="text-xs text-muted-foreground mt-1">The figures below are {winner ? `the winner's, ${winner.model}` : `those of the model doing best so far, ${lead?.model}`}. Cost: the candidate's share of what the current model cost on the same calls.</div>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
                   <Metric label="Judged pairs" value={`${detail.summary.judged} / ${detail.summary.samples}`} note={`needs ${detail.trial.thresholds.minSamples}`} />
                   <Metric label="At least as good" value={pct(detail.summary.okRate)} note={`needs ${pct(detail.trial.thresholds.passRate)}`} />
@@ -296,24 +431,29 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
                 )}
                 {canWrite && ['running', 'complete'].includes(detail.trial.status) && (
                   <div className="flex flex-wrap items-center gap-2 border-t pt-3">
-                    {detail.summary.verdict === 'pass' ? (
-                      <Button size="sm" disabled={busy} onClick={() => void act(`/api/trials/${detail.trial.id}/accept`, {}, `Accepted: ${detail.trial.routeKey} now runs on ${detail.trial.candidate.model}`)}>
-                        <Check className="h-3.5 w-3.5 mr-1" />Accept: switch to {detail.trial.candidate.model}
+                    {winner ? (
+                      <Button size="sm" disabled={busy} onClick={() => void act(`/api/trials/${detail.trial.id}/accept`, { candidate: detail.summary.winner }, `Accepted: ${detail.trial.routeKey} now runs on ${winner.model}`)}>
+                        <Check className="h-3.5 w-3.5 mr-1" />Accept: switch to {winner.model}
                       </Button>
-                    ) : confirmForce ? (
+                    ) : detail.summary.verdict === 'pass' && lead ? (
+                      // A proxy before candidate lists: the verdict is the one candidate's.
+                      <Button size="sm" disabled={busy} onClick={() => void act(`/api/trials/${detail.trial.id}/accept`, {}, `Accepted: ${detail.trial.routeKey} now runs on ${lead.model}`)}>
+                        <Check className="h-3.5 w-3.5 mr-1" />Accept: switch to {lead.model}
+                      </Button>
+                    ) : confirmForce && lead ? (
                       <>
-                        <span className="text-sm">The trial has not passed. Switch anyway?</span>
-                        <Button size="sm" variant="destructive" disabled={busy} onClick={() => void act(`/api/trials/${detail.trial.id}/accept`, { force: true }, `Accepted without a pass: ${detail.trial.routeKey} now runs on ${detail.trial.candidate.model}`)}>Switch anyway</Button>
+                        <span className="text-sm">{lead.model} has not passed. Switch anyway?</span>
+                        <Button size="sm" variant="destructive" disabled={busy} onClick={() => void act(`/api/trials/${detail.trial.id}/accept`, { candidate: detail.summary.lead ?? 0, force: true }, `Accepted without a pass: ${detail.trial.routeKey} now runs on ${lead.model}`)}>Switch anyway</Button>
                         <Button size="sm" variant="ghost" onClick={() => setConfirmForce(false)}>Cancel</Button>
                       </>
                     ) : (
-                      <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirmForce(true)}>Accept anyway…</Button>
+                      <Button size="sm" variant="outline" disabled={busy || !lead} onClick={() => setConfirmForce(true)}>Accept {multi && lead ? `${lead.model} ` : ''}anyway…</Button>
                     )}
                     {detail.trial.status === 'running' && (
                       <Button size="sm" variant="outline" disabled={busy} onClick={() => void act(`/api/trials/${detail.trial.id}/stop`, {}, 'Trial stopped')}><Square className="h-3.5 w-3.5 mr-1" />Stop collecting</Button>
                     )}
                     <Button size="sm" variant="ghost" disabled={busy} onClick={() => void act(`/api/trials/${detail.trial.id}/reject`, {}, 'Trial rejected — the process keeps its model')}>Reject</Button>
-                    <span className="text-xs text-muted-foreground">Accept writes band "{detail.trial.candidate.complexity}" to route {detail.trial.routeKey}.</span>
+                    <span className="text-xs text-muted-foreground">Accept writes the model into route {detail.trial.routeKey} — its band, or a model pin when it is no band's model.</span>
                   </div>
                 )}
 
@@ -323,6 +463,7 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
                     <TableHeader>
                       <TableRow>
                         <TableHead>When</TableHead>
+                        {multi && <TableHead>Model</TableHead>}
                         <TableHead>Judge</TableHead>
                         <TableHead className="text-right">Details kept</TableHead>
                         <TableHead className="text-right">Length</TableHead>
@@ -332,7 +473,7 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
                     </TableHeader>
                     <TableBody>
                       {detail.samples.length === 0 && (
-                        <TableRow><TableCell colSpan={6} className="text-sm text-muted-foreground">No pairs yet: they arrive as {detail.trial.process} runs.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={multi ? 7 : 6} className="text-sm text-muted-foreground">No pairs yet: they arrive as {detail.trial.process} runs.</TableCell></TableRow>
                       )}
                       {[...detail.samples].reverse().map(s => {
                         const v = pairVerdict(s.judgements)
@@ -340,6 +481,7 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
                         return (
                           <TableRow key={s.sampleId} className={`cursor-pointer ${sampleId === s.sampleId ? 'bg-muted/60' : ''}`} onClick={() => setSampleId(s.sampleId)}>
                             <TableCell className="text-xs whitespace-nowrap">{s.at.slice(5, 16).replace('T', ' ')}</TableCell>
+                            {multi && <TableCell className="text-xs font-mono">{s.candidate.model}</TableCell>}
                             <TableCell className={`text-xs ${v ? PAIR_CLASS[v] : 'text-muted-foreground'}`}>{v ? PAIR_LABEL[v] : 'waiting for the judge'}</TableCell>
                             <TableCell className="text-right text-xs">{ret.length ? pct(ret.reduce((a, b) => a + b, 0) / ret.length) : '—'}</TableCell>
                             <TableCell className="text-right text-xs">{pct(s.structure.lengthRatio)}</TableCell>
@@ -390,15 +532,15 @@ function SampleView({ sample, trial }: { sample: Sample; trial: Trial }) {
           {sample.judgements.map((j, i) => (
             <div key={i} className="border rounded-md p-3 text-sm space-y-1 min-w-0">
               <div className="text-xs text-muted-foreground">
-                Judge{j.judge ? ` (${j.judge})` : ''}, read {j.order === 'ic' ? `${trial.incumbent.model} first` : `${trial.candidate.model} first`}
+                Judge{j.judge ? ` (${j.judge})` : ''}, read {j.order === 'ic' ? `${trial.incumbent.model} first` : `${sample.candidate.model} first`}
               </div>
               {j.ok && j.oriented ? (
                 <>
-                  <div><span className="font-medium">{j.oriented.winner === 'equal' ? 'Equivalent' : j.oriented.winner === 'candidate' ? `${trial.candidate.model} better` : `${trial.incumbent.model} better`}</span>
+                  <div><span className="font-medium">{j.oriented.winner === 'equal' ? 'Equivalent' : j.oriented.winner === 'candidate' ? `${sample.candidate.model} better` : `${trial.incumbent.model} better`}</span>
                     {j.oriented.retention != null && <span className="text-muted-foreground"> · keeps {pct(j.oriented.retention)} of the details</span>}</div>
                   <div className="text-muted-foreground">{j.oriented.reason}</div>
                   {j.oriented.missingFromCandidate.length > 0 && (
-                    <div><span className="text-xs font-medium">Missing from {trial.candidate.model}:</span>
+                    <div><span className="text-xs font-medium">Missing from {sample.candidate.model}:</span>
                       <ul className="list-disc pl-5 text-xs">{j.oriented.missingFromCandidate.map(m => <li key={m}>{m}</li>)}</ul></div>
                   )}
                   {j.oriented.missingFromIncumbent.length > 0 && (
@@ -414,7 +556,7 @@ function SampleView({ sample, trial }: { sample: Sample; trial: Trial }) {
 
         <div className="grid grid-cols-2 gap-3 text-xs font-medium">
           <div>{trial.incumbent.model} <span className="text-muted-foreground font-normal">(current)</span></div>
-          <div>{trial.candidate.model} <span className="text-muted-foreground font-normal">(candidate)</span></div>
+          <div>{sample.candidate.model} <span className="text-muted-foreground font-normal">(candidate)</span></div>
         </div>
         {aligned ? (
           <div className="space-y-2">

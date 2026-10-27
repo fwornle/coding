@@ -21,15 +21,14 @@ import {
   formatMoney, fetchCostSettings, setLocalProviders, withCurrency,
   monthlySeries, pivotForMonth, projectBurn, budgetStatus,
   buildSuggestions, budgetForMonth, splitByScope, ScopeSplit, localSavings, LocalSavings,
-  copilotSeatCredit, recentDailyRate, type RouteAction,
+  copilotSeatCredit, recentDailyRate, catalogueFromRouting, failedTrialModels,
+  type TrialAction, type TrialOutcome, type ModelCatalogue,
 } from './cost-model'
 
 /** The part of a model trial this tab shows (TrialsTab has the whole shape). */
-interface TrialRef {
+interface TrialRef extends TrialOutcome {
   id: string
-  process: string
-  status: string
-  summary?: { verdict: 'pending' | 'pass' | 'fail' | 'insufficient'; judged: number }
+  summary?: { verdict: 'pending' | 'pass' | 'fail' | 'insufficient'; judged: number; candidates?: { state: string }[] }
 }
 const TRIAL_VERDICT: Record<string, string> = { pass: 'passed', fail: 'failed', pending: 'collecting', insufficient: 'too few pairs' }
 
@@ -110,6 +109,9 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
   // Model trials, newest first (rapid-llm-proxy /api/trials): what a suggestion
   // to move a process to a cheaper model has to pass before anything switches.
   const [trials, setTrials] = useState<TrialRef[]>([])
+  // The proxy's routing catalogue: which models each account serves, which a
+  // trial can try (null: not served here — suggestions fall back to one model).
+  const [catalogue, setCatalogue] = useState<ModelCatalogue | null>(null)
   const [cadence, setCadence] = useState<CadenceCfg>({ enabled: true, checkIntervalMinutes: 30, undigestedThreshold: 10 })
   const [months, setMonths] = useState(6)
   const [pivotDim, setPivotDim] = useState<PivotDim>('process')
@@ -139,7 +141,7 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
     if (!isAuto) setLoading(true)
     setError(null)
     try {
-      const [costRes, cs, quotaView, trialList] = await Promise.all([
+      const [costRes, cs, quotaView, trialList, routing] = await Promise.all([
         // by=day: a billing rule can change mid-month; a proxy that predates it
         // ignores the parameter and its monthly rows price on the month's first day.
         fetch(`${proxyBase}/api/token-usage/cost?months=${months}&by=day`),
@@ -150,9 +152,13 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
         fetch(`${proxyBase}/api/trials`)
           .then(r => (r.ok ? r.json() as Promise<{ trials: TrialRef[] }> : null))
           .catch(() => null),
+        fetch(`${proxyBase}/api/llm/routing`)
+          .then(r => (r.ok ? r.json() : null))
+          .catch(() => null),
       ])
       setQuota(quotaView)
       setTrials(trialList?.trials || [])
+      setCatalogue(catalogueFromRouting(routing))
       if (!costRes.ok) throw new Error(`cost HTTP ${costRes.status}`)
       const costJson = await costRes.json()
       setLocalProviders(costJson.local_providers)
@@ -212,8 +218,8 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
   const pivot = useMemo(() => pivotForMonth(rows, cfg, pivotDim, activeMonth), [rows, cfg, pivotDim, activeMonth])
   const now = useMemo(() => new Date(), [])
   const suggestions = useMemo(
-    () => (activeMonth ? buildSuggestions(rows, cfg, activeMonth, now) : []),
-    [rows, cfg, activeMonth, now],
+    () => (activeMonth ? buildSuggestions(rows, cfg, activeMonth, now, catalogue, p => failedTrialModels(trials, p)) : []),
+    [rows, cfg, activeMonth, now, catalogue, trials],
   )
 
   // One tile per account used in the selected month — at work that is usually
@@ -266,15 +272,20 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
   // which the proxy stopped routing on when routing moved to llm-routing.yaml —
   // it reported "routed" and changed nothing.)
   const trialFor = (process: string) => trials.find(t => t.process === process) || null
-  const startTrial = async (process: string, complexity: string) => {
+  const startTrial = async (action: TrialAction) => {
+    const { process, candidates } = action
     try {
       const res = await fetch(`${proxyBase}/api/trials`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ process, candidateComplexity: complexity }),
+        body: JSON.stringify({
+          process, mode: candidates.length > 1 ? 'auto' : 'single',
+          candidates: candidates.map(c => ({ provider: c.provider, model: c.model })),
+        }),
       })
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`)
-      flash(`Trial started: ${j.trial.candidate.model} runs beside ${j.trial.incumbent.model} on ${process}`)
+      const names = (j.trial.candidates || [j.trial.candidate]).map((c: { model: string }) => c.model).join(', ')
+      flash(`Trial started on ${process}: ${names} beside ${j.trial.incumbent.model}`)
       await load(true)
       onTrials?.(j.trial.id)
     } catch (e: unknown) { flash(`Trial not started: ${e instanceof Error ? e.message : String(e)}`) }
@@ -562,14 +573,17 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
             {suggestions.map(s => (
               <div key={s.id} className="flex items-center justify-between gap-3 border rounded-lg p-3">
                 <div className="min-w-0">
-                  <div className="font-medium text-sm">{s.title} <span className="text-emerald-600">· save ~{money(s.estSavingsEur)}/mo</span></div>
+                  <div className="font-medium text-sm">{s.title} <span className="text-emerald-600">· save ~{s.estSavingsMaxEur != null && s.estSavingsMaxEur - s.estSavingsEur >= 0.5 ? `${money(s.estSavingsEur)}–${money(s.estSavingsMaxEur)}` : money(s.estSavingsEur)}/mo</span></div>
                   <div className="text-xs text-muted-foreground">{s.detail}</div>
                   {!settingsApi && s.howTo && <div className="text-xs mt-0.5">{s.howTo}</div>}
                 </div>
-                {s.action?.type === 'route' && (() => {
-                  const route = s.action as RouteAction
-                  const t = trialFor(route.process)
-                  if (t && ['running', 'complete'].includes(t.status)) {
+                {s.action?.type === 'trial' && (() => {
+                  const action = s.action as TrialAction
+                  const t = trialFor(action.process)
+                  // A trial still collecting, or one with a result to accept, is the
+                  // next step; a failed one is not — its models are already left out
+                  // of these candidates, so a new trial tries the rest.
+                  if (t && (t.status === 'running' || (t.status === 'complete' && t.summary?.verdict === 'pass'))) {
                     return (
                       <Button size="sm" variant="outline" className="flex-shrink-0" disabled={!onTrials} onClick={() => onTrials?.(t.id)}>
                         Trial {t.status === 'running' ? `running · ${t.summary?.judged ?? 0} judged` : TRIAL_VERDICT[t.summary?.verdict || 'pending']} <ArrowRight className="h-3 w-3 ml-1" />
@@ -577,8 +591,8 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
                     )
                   }
                   return settingsApi ? (
-                    <Button size="sm" variant="outline" className="flex-shrink-0" onClick={() => void startTrial(route.process, route.complexity)}>
-                      Start trial <ArrowRight className="h-3 w-3 ml-1" />
+                    <Button size="sm" variant="outline" className="flex-shrink-0" onClick={() => void startTrial(action)}>
+                      {action.candidates.length > 1 ? 'Start automatic trial' : 'Start trial'} <ArrowRight className="h-3 w-3 ml-1" />
                     </Button>
                   ) : null
                 })()}
@@ -641,12 +655,16 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
                   </TableCell>
                   {pivotDim === 'process' && settingsApi && (
                     <TableCell className="text-right">
-                      {c.key && !c.key.startsWith('token-adapter-') && !['claude', 'opencode', 'copilot', 'unknown'].includes(c.key) && (
-                        !(trialFor(c.key) && ['running', 'complete'].includes(trialFor(c.key)!.status)) && (
+                      {(() => {
+                        // The same candidates the process's suggestion offers; none, no button.
+                        const action = suggestions.find(s => s.action?.type === 'trial' && (s.action as TrialAction).process === c.key)?.action as TrialAction | undefined
+                        const t = trialFor(c.key)
+                        if (!action || (t && (t.status === 'running' || (t.status === 'complete' && t.summary?.verdict === 'pass')))) return null
+                        return (
                           <Button size="sm" variant="ghost" className="h-7 text-xs"
-                            onClick={() => void startTrial(c.key, 'small')}>Trial cheaper</Button>
+                            onClick={() => void startTrial(action)}>Trial cheaper</Button>
                         )
-                      )}
+                      })()}
                     </TableCell>
                   )}
                 </TableRow>

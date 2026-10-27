@@ -409,8 +409,22 @@ A savings suggestion to move a background process to a cheaper model is a hypoth
 a decision: a cheaper model that drops details does not save anything. **Token Usage →
 Trials** tests it on the process's real calls before anything switches.
 
-- **Start** from a suggestion's *Start trial* button, the breakdown table's *Trial cheaper*,
-  or the Trials tab's form: process, candidate band, share of calls, days and pairs at most.
+- **Candidates** — the cheaper models the process can move to: every model its own account
+  serves (`available_models` in `llm-routing.yaml`) plus own hardware (on-prem / on-device
+  accounts), each only while the proxy can reach it. Another metered account is a different
+  bill and is not offered. Each is priced on the process's own tokens of the last 7 days
+  (mostly cache reads, so list prices would rank them wrongly) and listed cheapest first; a
+  price that only resolves by model family is marked *est.*
+- **Start** from a suggestion's *Start automatic trial* button, the breakdown table's
+  *Trial cheaper*, or the Trials tab's form: process, candidates, share of calls, days and
+  pairs per model at most. **Automatic** (the default) tries up to four candidates, leaving
+  out any model a finished trial of the process already failed; or pick one model from the
+  list (including one Automatic left out).
+- **Automatic** — each sampled call goes to one candidate, the one with the fewest pairs,
+  so a trial still costs one extra call per sampled call; it runs longer instead (3 days per
+  candidate, at most 14). A candidate that can no longer pass (more pairs worse than the pass
+  rate allows) drops out; one dearer than a candidate that has passed stops. The **winner**
+  is the first candidate, cheapest first, that passes.
 - **Run** — the proxy answers every call with the current model as before. For the sampled
   share it ALSO sends the same request to the candidate afterwards, off the caller's path,
   and stores both answers (redacted) as a pair. The candidate's tokens are logged as process
@@ -422,16 +436,22 @@ Trials** tests it on the process's real calls before anything switches.
   content shows up as "disagrees with itself". Structural checks run beside it: the same
   output format, and the answer's units (insight blocks, JSON items, headed sections)
   paired by title or body.
-- **Verdict** — passes at ≥ 20 judged pairs, the candidate at least as good in ≥ 90% of
-  them and keeping ≥ 90% of the incumbent's details (all per trial). The tab shows each pair
+- **Verdict** — per candidate: passes at ≥ 20 judged pairs, at least as good in ≥ 90% of
+  them and keeping ≥ 90% of the incumbent's details (all per trial); the trial passes when
+  one candidate does. The tab shows each pair
   side by side, unit by unit, with both readings and what each answer misses.
-- **Accept** writes the candidate's band into the process's route in `llm-routing.yaml`
-  (`PATCH /api/llm/routing`); a trial that has not passed needs an explicit confirmation.
+- **Accept** writes the winner (or a chosen candidate) into the process's route in
+  `llm-routing.yaml` (`PATCH /api/llm/routing`): its band when it is the provider's band
+  model, else a **model pin** (`routes.<key>.model`, which must be in the provider's
+  `available_models`, holds only while the call stays on that provider, and is refused on a
+  `from-caller` route). A candidate that has not passed needs an explicit confirmation.
   **Reject** leaves the route alone.
 
 API on the proxy: `GET /api/trials`, `GET /api/trials/:id`, `POST /api/trials`
-(`{ process, candidateComplexity, candidateProvider?, samplePct?, days?, maxSamples? }`),
-`POST /api/trials/:id/stop | reject | accept` (`{ force: true }` without a pass). Store:
+(`{ process, mode?: 'auto' | 'single', candidates: [{ provider, model }], samplePct?, days?,
+maxSamples? }` — candidates cheapest first; the older `{ candidateComplexity,
+candidateProvider? }` still works), `POST /api/trials/:id/stop | reject | accept`
+(`{ candidate?: <index>, force?: true }`; default the winner). Store:
 `<data>/llm-proxy/trials/<id>.json` and `<id>.samples.jsonl`; engine:
 `rapid-llm-proxy/proxy-bridge/model-trials.mjs`. glass shows the same trials read-only.
 

@@ -665,33 +665,224 @@ export function budgetStatus(projectedEur: number, budgetEur: number | null): Bu
 }
 
 // ---- Optimization suggestions -------------------------------------------
-/** A suggestion to move a process to a cheaper model — through a trial (TrialsTab), never directly. */
-export interface RouteAction { type: 'route'; process: string; provider: string; model: string; complexity: string }
+/**
+ * A suggestion to move a process to a cheaper model — through a trial (TrialsTab),
+ * never directly. `candidates` in the order an automatic trial tries them.
+ */
+export interface TrialAction { type: 'trial'; process: string; candidates: TrialCandidate[] }
 export interface CadenceAction { type: 'cadence' }
 export interface Suggestion {
   id: string
   title: string
   detail: string
+  /** The saving if the dearest candidate an automatic trial tries is the one that passes. */
   estSavingsEur: number
-  action?: RouteAction | CadenceAction
+  /** …and if the cheapest one does. */
+  estSavingsMaxEur?: number
+  action?: TrialAction | CadenceAction
   /** Where to make the change by hand — shown where the page cannot apply it (glass). */
   howTo?: string
 }
 
 // Foreground agent sessions are the user's own interactive work — never a
-// routing target. Everything else is a background/pipeline process we can pin
-// to a cheaper model via processOverrides.
-function isRoutableBackground(process: string): boolean {
+// routing target. Everything else is a background/pipeline process whose route
+// a trial can move.
+export function isRoutableBackground(process: string): boolean {
   if (!process) return false
   if (process.startsWith('token-adapter-')) return false
   if (['claude', 'opencode', 'copilot', 'unknown'].includes(process)) return false
+  // The trial's own calls are not a process to optimise.
+  if (process.startsWith('model-trial')) return false
   return true
 }
 
-/** The model a route suggestion moves a background process to. */
-const ROUTE_TARGET = { provider: 'copilot', model: 'claude-haiku-5.5', complexity: 'small', label: 'Haiku 5.5' }
 /** Days a suggestion judges by: what runs NOW, not a month that may predate a change. */
 const SUGGESTION_DAYS = 7
+
+// ---- Trial candidates ---------------------------------------------------
+/** One provider of the proxy's routing catalogue (GET /api/llm/routing → providers). */
+export interface CatalogueProvider {
+  id: string
+  account: string
+  enabled: boolean
+  impl?: string | null
+  availableModels: string[]
+  models: Record<string, string>
+}
+/** What a trial can try: the proxy's providers, routes, and which impls can answer now. */
+export interface ModelCatalogue {
+  providers: CatalogueProvider[]
+  routes: Record<string, { provider: string; complexity: string; model?: string }>
+  /** `runtime.availableImpls`; absent = unknown, every enabled provider is offered. */
+  availableImpls?: string[]
+  /** Offer every provider listed, not only the incumbent's account (the fallback below). */
+  anyAccount?: boolean
+}
+export interface TrialCandidate {
+  provider: string
+  model: string
+  /** The process's recent tokens on this model, scaled to a month. */
+  monthlyEur: number
+  savingEur: number
+  /** Own hardware: no per-token cost. */
+  local: boolean
+  /** Priced by its model family, not by its own rate. */
+  estimate: boolean
+}
+export interface ProcessCandidates {
+  process: string
+  incumbent: { provider: string; model: string }
+  /** What the process cost over the window, scaled to a month. */
+  monthlyEur: number
+  /** Cheapest first. */
+  candidates: TrialCandidate[]
+}
+
+/** An automatic trial tries at most this many (rapid-llm-proxy AUTO_MAX_CANDIDATES). */
+export const AUTO_TRIAL_CANDIDATES = 4
+/** A saving smaller than this a month is noise, not a reason to run a trial. */
+const MIN_MONTHLY_SAVING = 0.5
+const LOCAL_ACCOUNTS = new Set(['on-prem', 'on-device'])
+
+/**
+ * Without the proxy's catalogue (glass, an older proxy) the one candidate is
+ * the model suggestions offered before there was a catalogue to read.
+ */
+const FALLBACK_CATALOGUE: ModelCatalogue = {
+  providers: [{ id: 'gh-copilot', account: 'copilot-subscription', enabled: true, availableModels: ['claude-haiku-5.5'], models: { small: 'claude-haiku-5.5' } }],
+  routes: {},
+  anyAccount: true,
+}
+
+/** The routing catalogue from a GET /api/llm/routing body; null when it has no providers. */
+export function catalogueFromRouting(body: unknown): ModelCatalogue | null {
+  const b = body as { providers?: CatalogueProvider[]; routes?: ModelCatalogue['routes']; runtime?: { availableImpls?: string[] } } | null
+  if (!b || !Array.isArray(b.providers) || !b.providers.length) return null
+  return { providers: b.providers, routes: b.routes || {}, availableImpls: b.runtime?.availableImpls }
+}
+
+/**
+ * The cheaper models a model trial can try for each background process.
+ *
+ * Where from: the incumbent's own account (a downgrade stays on the same bill)
+ * and own hardware (on-prem / on-device accounts) — each provider only while
+ * the proxy can reach it. Other metered accounts and a flat subscription are a
+ * different bill, not a downgrade, and are not offered.
+ *
+ * What they cost: the process's own tokens of the last SUGGESTION_DAYS days
+ * (or `month` when rows carry no day), repriced on each model and scaled to a
+ * month — background calls are mostly cache reads, so list prices would rank
+ * them wrongly. A model with no price at all is left out; one priced by its
+ * family is kept and marked an estimate.
+ *
+ * The incumbent is the route's model (pin, else band model) — what a trial
+ * runs beside — or, without a route, the model the process spent most on.
+ */
+export function trialCandidates(
+  rows: CostRow[], cfg: CostConfig, catalogue: ModelCatalogue | null,
+  month: string, now: Date = new Date(),
+): ProcessCandidates[] {
+  const cat = catalogue ?? FALLBACK_CATALOGUE
+  const recent = rows.some(r => r.day)
+  const { from, to } = recentDays(now, SUGGESTION_DAYS)
+  const inWindow = (r: CostRow) => (recent ? !!r.day && r.day >= from && r.day < to : r.month === month)
+  const scale = recent ? 30 / SUGGESTION_DAYS : 1
+  const byId = new Map(cat.providers.map(p => [p.id, p]))
+  const reachable = (p: CatalogueProvider) => p.enabled
+    && (!cat.availableImpls || (!!p.impl && cat.availableImpls.includes(p.impl)))
+  const isLocal = (p: CatalogueProvider) => LOCAL_ACCOUNTS.has(p.account) || accountKind(costAccount(p.id)) === 'local'
+
+  const byProcess = new Map<string, CostRow[]>()
+  for (const r of rows) {
+    if (isSynthetic(r) || !inWindow(r) || !isRoutableBackground(r.process)) continue
+    const list = byProcess.get(r.process) || []
+    list.push(r)
+    byProcess.set(r.process, list)
+  }
+
+  const out: ProcessCandidates[] = []
+  for (const [proc, prows] of byProcess) {
+    const costOf = (provider: string, model: string) =>
+      prows.reduce((a, r) => a + fromUsd(cellCostUsd({ ...r, provider, model }, cfg), cfg, rowAt(r)), 0) * scale
+    const spent = new Map<string, number>()
+    let actual = 0
+    for (const r of prows) {
+      const eur = fromUsd(cellCostUsd(r, cfg), cfg, rowAt(r))
+      actual += eur
+      const k = `${costAccount(r.provider)}\u0000${r.model}`
+      spent.set(k, (spent.get(k) || 0) + eur)
+    }
+    const route = cat.routes[`bg-${proc}`]
+    const routeModel = route && (route.model || byId.get(route.provider)?.models?.[route.complexity])
+    const [topProvider, topModel] = ([...spent.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '\u0000').split('\u0000')
+    const incumbent = route && routeModel ? { provider: route.provider, model: routeModel } : { provider: topProvider, model: topModel }
+    if (!incumbent.provider || !incumbent.model) continue
+    const monthlyEur = actual * scale
+
+    const candidates: TrialCandidate[] = []
+    for (const p of cat.providers) {
+      if (!reachable(p)) continue
+      const local = isLocal(p)
+      if (!local && !cat.anyAccount && p.id !== incumbent.provider) continue
+      for (const model of p.availableModels || []) {
+        if (p.id === incumbent.provider && model === incumbent.model) continue
+        let monthly = 0
+        let estimate = false
+        if (!local) {
+          const price = rowPrice({ provider: p.id, model, day: to, month: to.slice(0, 7) }, cfg)
+          if (!price.priced) continue
+          estimate = price.source === 'family'
+          monthly = costOf(p.id, model)
+        }
+        const saving = monthlyEur - monthly
+        if (saving < MIN_MONTHLY_SAVING) continue
+        candidates.push({ provider: p.id, model, monthlyEur: monthly, savingEur: saving, local, estimate })
+      }
+    }
+    if (!candidates.length) continue
+    candidates.sort((a, b) => a.monthlyEur - b.monthlyEur || Number(b.local) - Number(a.local) || Number(a.estimate) - Number(b.estimate))
+    out.push({ process: proc, incumbent, monthlyEur, candidates })
+  }
+  return out.sort((a, b) => b.monthlyEur - a.monthlyEur)
+}
+
+/** The part of a model trial (rapid-llm-proxy /api/trials) that says what it found. */
+export interface TrialOutcome {
+  process: string
+  status: string
+  candidate?: { provider: string; model: string }
+  candidates?: { provider: string; model: string }[]
+  summary?: { verdict: string; candidates?: { state: string }[] }
+}
+
+/**
+ * Models ("provider/model") a finished trial of `process` found wanting: a
+ * candidate that failed or could no longer pass, or every candidate of a trial
+ * that failed as a whole or was rejected without per-candidate results.
+ */
+export function failedTrialModels(trials: TrialOutcome[], process: string): Set<string> {
+  const out = new Set<string>()
+  for (const t of trials) {
+    if (t.process !== process || t.status === 'running') continue
+    const list = t.candidates?.length ? t.candidates : t.candidate ? [t.candidate] : []
+    const states = t.summary?.candidates
+    list.forEach((c, i) => {
+      const state = states?.[i]?.state
+      const wanting = state ? ['failed', 'out'].includes(state)
+        : t.summary?.verdict === 'fail' || t.status === 'rejected'
+      if (wanting) out.add(`${c.provider}/${c.model}`)
+    })
+  }
+  return out
+}
+
+/**
+ * What an automatic trial tries: the cheapest candidates, leaving out a model a
+ * finished trial of this process already found wanting (`failed`: "provider/model").
+ */
+export function autoTrialCandidates(pc: ProcessCandidates, failed: Set<string> = new Set()): TrialCandidate[] {
+  return pc.candidates.filter(c => !failed.has(`${c.provider}/${c.model}`)).slice(0, AUTO_TRIAL_CANDIDATES)
+}
 
 /**
  * Ranked ways to spend less, each with its estimated monthly saving.
@@ -700,12 +891,15 @@ const SUGGESTION_DAYS = 7
  * the rows carry a day (`?by=day`); else by `month`. A month's total would keep
  * offering a move that was made in its middle.
  *
- * A background process is offered the route target when the same tokens cost
- * less there, compared in money per token — not by model family: a process on
- * an older Haiku can cost ten times what the newest one does, and "already a
- * Haiku" hid that.
+ * A background process is offered an automatic trial of the cheaper models it
+ * can move to (trialCandidates), compared in money per token on its own tokens —
+ * not by model family: a process on an older Haiku can cost ten times what the
+ * newest one does, and "already a Haiku" hid that.
  */
-export function buildSuggestions(rows: CostRow[], cfg: CostConfig, month: string, now: Date = new Date()): Suggestion[] {
+export function buildSuggestions(
+  rows: CostRow[], cfg: CostConfig, month: string, now: Date = new Date(),
+  catalogue: ModelCatalogue | null = null, failed: (process: string) => Set<string> = () => new Set(),
+): Suggestion[] {
   const suggestions: Suggestion[] = []
   const money = (v: number) => formatMoney(v, cfg.currency.display)
   const recent = rows.some(r => r.day)
@@ -714,32 +908,37 @@ export function buildSuggestions(rows: CostRow[], cfg: CostConfig, month: string
   const scale = recent ? 30 / SUGGESTION_DAYS : 1
   const when = recent ? `in the last ${SUGGESTION_DAYS} days` : 'this month'
 
-  // 1) Background processes whose tokens would cost less on the route target.
-  const perProcess = new Map<string, { costEur: number; targetEur: number; byModel: Map<string, number> }>()
+  // What each background process spent in the window, and on which model mostly.
+  const perProcess = new Map<string, { costEur: number; byModel: Map<string, number> }>()
   for (const r of rows) {
     if (isSynthetic(r) || !inWindow(r)) continue
     if (!isRoutableBackground(r.process)) continue
     if (accountKind(costAccount(r.provider)) === 'local') continue // already free
     const curEur = fromUsd(cellCostUsd(r, cfg), cfg, rowAt(r))
-    const onTarget = accountKind(costAccount(r.provider)) === 'copilot' && r.model === ROUTE_TARGET.model
-    const targetEur = onTarget ? curEur : fromUsd(cellCostUsd({ ...r, provider: 'gh-copilot', model: ROUTE_TARGET.model }, cfg), cfg, rowAt(r))
-    const p = perProcess.get(r.process) || { costEur: 0, targetEur: 0, byModel: new Map<string, number>() }
+    const p = perProcess.get(r.process) || { costEur: 0, byModel: new Map<string, number>() }
     p.costEur += curEur
-    p.targetEur += targetEur
     p.byModel.set(r.model, (p.byModel.get(r.model) || 0) + curEur)
     perProcess.set(r.process, p)
   }
-  for (const [proc, p] of perProcess) {
-    const savings = (p.costEur - p.targetEur) * scale
-    if (savings < 0.5) continue // ignore sub-€0.50 noise
+
+  // 1) Background processes with cheaper models to try.
+  for (const pc of trialCandidates(rows, cfg, catalogue, month, now)) {
+    const p = perProcess.get(pc.process)
+    if (!p) continue
+    const auto = autoTrialCandidates(pc, failed(pc.process))
+    if (!auto.length) continue
     const main = [...p.byModel.entries()].sort((a, b) => b[1] - a[1])[0][0]
+    const listed = auto.map(c => `${c.model} ≈ ${c.local ? `${money(0)} (own hardware)` : `${money(c.monthlyEur)}/mo${c.estimate ? ' (est.)' : ''}`}`).join(', ')
+    const one = auto.length === 1
     suggestions.push({
-      id: `route-haiku-${proc}`,
-      title: `Route "${proc}" to ${ROUTE_TARGET.label}`,
-      detail: `${proc} spent ${money(p.costEur)} ${when}, mostly on ${main}. The same tokens on ${ROUTE_TARGET.label} (Copilot) ≈ ${money(p.targetEur)}.`,
-      estSavingsEur: savings,
-      action: { type: 'route', process: proc, provider: ROUTE_TARGET.provider, model: ROUTE_TARGET.model, complexity: ROUTE_TARGET.complexity },
-      howTo: `In coding's dashboard: Token Usage → Trials — run ${ROUTE_TARGET.label} beside the current model on "${proc}" first; accepting the trial switches its route.`,
+      id: `trial-${pc.process}`,
+      title: one ? `Try ${auto[0].model} for "${pc.process}"` : `Try cheaper models for "${pc.process}"`,
+      detail: `${pc.process} spent ${money(p.costEur)} ${when}, mostly on ${main}. ${one ? 'The same tokens on' : 'Cheaper:'} ${listed}.`
+        + (one ? '' : ' An automatic trial tries them cheapest first and keeps the first that does the job as well.'),
+      estSavingsEur: auto[auto.length - 1].savingEur,
+      estSavingsMaxEur: auto[0].savingEur,
+      action: { type: 'trial', process: pc.process, candidates: auto },
+      howTo: `In coding's dashboard: Token Usage → Trials — start ${one ? 'a trial' : 'an automatic trial'} on "${pc.process}"; the candidates run beside the current model on real calls, and accepting the result switches its route.`,
     })
   }
 

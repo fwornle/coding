@@ -59,6 +59,9 @@ export const COST_SRC = path.join(
 export const WORKFLOW_SRC = path.join(
   ROOT, 'integrations/system-health-dashboard/src/components/workflow');
 
+/** The dashboard's `src/` — what its `@/` import alias names. */
+const DASHBOARD_SRC = path.join(ROOT, 'integrations/system-health-dashboard/src');
+
 /** Dashboard hooks, incl. the WebSocket reconnect policy. */
 export const HOOKS_SRC = path.join(
   ROOT, 'integrations/system-health-dashboard/src/hooks');
@@ -120,6 +123,30 @@ export async function loadRoutingModules({ names, entry, prefix, srcDir = ROUTIN
   }
   const esbuild = resolveEsbuild();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+
+  // A module that imports through the dashboard's `@/` alias (tsconfig paths →
+  // src/) cannot be transpiled file by file: the alias means nothing to node.
+  // Such an entry is bundled instead, with `@/` resolved and npm packages left
+  // as imports. cost-model.ts gained `@/lib/providers` on 2026-10-24 and its
+  // suite failed to load from then on.
+  const entryTs = path.join(srcDir, `${entry}.ts`);
+  if (/from\s+(['"])@\//.test(fs.readFileSync(entryTs, 'utf8'))) {
+    const outfile = path.join(dir, `${entry}.mjs`);
+    await esbuild.build({
+      entryPoints: [entryTs], outfile, bundle: true, format: 'esm', platform: 'node',
+      packages: 'external', logLevel: 'silent',
+      plugins: [{
+        name: 'dashboard-alias',
+        setup(build) {
+          build.onResolve({ filter: /^@\// }, async (args) => {
+            const r = await build.resolve(`./${args.path.slice(2)}`, { kind: args.kind, resolveDir: DASHBOARD_SRC });
+            return r.errors.length ? { errors: r.errors } : { path: r.path };
+          });
+        },
+      }],
+    });
+    return import(outfile);
+  }
 
   for (const name of names) {
     const ts = fs.readFileSync(path.join(srcDir, `${name}.ts`), 'utf8');
