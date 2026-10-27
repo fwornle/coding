@@ -71,15 +71,16 @@ then each candidate with its estimated monthly cost. POST
 - `createTrial` takes `candidates[]` (order = preference: cheapest first, set by the
   caller, which owns prices) and `mode`. Each model must be in its provider's
   `available_models`. Old trials (`candidate`) read as a one-entry list.
-- **Sampling:** a sampled call goes to ONE candidate — the active one with the fewest
-  pairs (ties → list order). The incumbent's answer is reused, so a trial costs one
-  candidate call per sampled call, as today.
+- **Sampling:** a sampled call goes to EVERY active candidate (changed 2026-10-27 at the
+  user's request, from one candidate per call): their answers to the same request sit side
+  by side, sharing a `requestId`, the request stored once. One candidate call per candidate
+  per sampled call; every candidate collects as fast as a one-model trial.
 - **Per candidate:** `maxSamples` is per candidate. A candidate is **done** when it has
   `minSamples` judged pairs; **out** when its failures (worse + inconsistent) exceed
   `(1 − passRate) · minSamples` — it can no longer pass. A candidate dearer than one
   that has already passed is stopped (automatic wants the cheapest that passes).
-- **Length:** automatic defaults to `days = 3 × candidates` (capped at 14). The trial
-  completes when no candidate is active, or at `endsAt`.
+- **Length:** 3 days by default, automatic or not. The trial completes when no candidate
+  is active, or at `endsAt`.
 - **Summary:** `summarize()` per candidate (unchanged rules) plus `winner` = the first
   candidate in list order whose verdict is pass. Trial verdict: pass with a winner,
   pending while any candidate is active, else fail / insufficient.
@@ -130,4 +131,10 @@ deletes). `/resolve` and the Routing tab show the pin.
   6 days), refused an unserved model and an accept without a pass, rejected. Under the new
   rules the Haiku 5.5 trial resolved to complete / fail (Haiku "out": 7 of 16 pairs failed).
   Not done: no automatic trial started on a real process — the user's call.
+- **2026-10-27 (fan-out)** — PR #69 opened; automatic trial consolidator-insight-20261027-0642-4e2d
+  started (gpt-4o-mini, gpt-5.6-luna, claude-haiku-4.5; 9 days under the old default). Then,
+  at the user's request, each sampled call goes to every active candidate
+  (`candidatesToSample`, `requestId`, `requestRef`), default 3 days; dashboard pairs table
+  one row per call with a column per candidate, column 2 of an opened pair steps through
+  the candidates.
 

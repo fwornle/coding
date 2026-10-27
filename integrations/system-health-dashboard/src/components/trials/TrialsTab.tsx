@@ -12,7 +12,7 @@
  * serves a coding machine's store.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { FlaskConical, RefreshCw, Check, X, Square, ChevronRight } from 'lucide-react'
+import { FlaskConical, RefreshCw, Check, X, Square, ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -84,6 +84,8 @@ interface Sample {
   sampleId: string
   /** Which of the trial's candidates answered; absent = the only one. */
   candidateIndex?: number
+  /** The sampled call: every candidate's answer to the same request shares it. */
+  requestId?: string
   at: string
   project?: string
   request: string
@@ -160,7 +162,7 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
   const [notice, setNotice] = useState<string | null>(null)
   const [confirmForce, setConfirmForce] = useState(false)
   // `choice`: 'auto', or the index of one candidate in the process's list. Days left
-  // blank: the proxy's default (3, or 3 per candidate for an automatic trial).
+  // blank: the proxy's default (3).
   const [form, setForm] = useState({ process: '', choice: 'auto', samplePct: '25', days: '', maxSamples: '40' })
   // What a trial can try for each process: the Cost tab's candidates, from the
   // same rows and the proxy's routing catalogue.
@@ -262,6 +264,16 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
   const multi = detailCandidates.length > 1
 
   const sample = detail?.samples.find(s => s.sampleId === sampleId) || null
+  // Pairs by sampled call, newest first: each call's candidates in the trial's order.
+  const calls = useMemo(() => {
+    const by = new Map<string, Sample[]>()
+    for (const s of detail?.samples || []) {
+      const k = s.requestId || s.sampleId
+      by.set(k, [...(by.get(k) || []), s])
+    }
+    return [...by.values()].map(g => g.sort((a, b) => (a.candidateIndex ?? 0) - (b.candidateIndex ?? 0))).reverse()
+  }, [detail])
+  const call = sample ? calls.find(g => g.some(s => s.sampleId === sample.sampleId)) || [sample] : null
 
   if (trials === null) return <div className="p-6 text-sm text-muted-foreground">Loading trials…</div>
 
@@ -329,7 +341,7 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
                 )}
                 {formCandidates && form.choice === 'auto' && formAuto.length > 1 && (
                   <div className="text-xs text-muted-foreground">
-                    Tries {formAuto.map(c => c.model).join(', ')} in turn beside {formCandidates.incumbent.model}, cheapest first; a model that cannot pass drops out, and the first that passes wins.
+                    Every sampled call goes to {formAuto.map(c => c.model).join(', ')} beside {formCandidates.incumbent.model} ({formAuto.length} extra calls each); a model that cannot pass drops out, and the cheapest that passes wins.
                   </div>
                 )}
                 <div className="grid grid-cols-3 gap-2">
@@ -337,7 +349,7 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
                     <Input id="trial-pct" value={form.samplePct} onChange={e => setForm(f => ({ ...f, samplePct: e.target.value }))} className="h-8 text-xs" inputMode="numeric" />
                   </label>
                   <label className="text-xs text-muted-foreground space-y-1">Days, at most
-                    <Input id="trial-days" value={form.days} placeholder={form.choice === 'auto' && formAuto.length > 1 ? String(Math.min(14, 3 * formAuto.length)) : '3'} onChange={e => setForm(f => ({ ...f, days: e.target.value }))} className="h-8 text-xs" inputMode="decimal" />
+                    <Input id="trial-days" value={form.days} placeholder="3" onChange={e => setForm(f => ({ ...f, days: e.target.value }))} className="h-8 text-xs" inputMode="decimal" />
                   </label>
                   <label className="text-xs text-muted-foreground space-y-1">Pairs per model
                     <Input id="trial-max" value={form.maxSamples} onChange={e => setForm(f => ({ ...f, maxSamples: e.target.value }))} className="h-8 text-xs" inputMode="numeric" />
@@ -457,47 +469,67 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
                   </div>
                 )}
 
-                {/* Pairs */}
+                {/* Pairs: one row per sampled call; with several candidates, one column each. */}
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>When</TableHead>
-                        {multi && <TableHead>Model</TableHead>}
-                        <TableHead>Judge</TableHead>
-                        <TableHead className="text-right">Details kept</TableHead>
-                        <TableHead className="text-right">Length</TableHead>
-                        <TableHead className="text-right">Units</TableHead>
+                        {multi ? detailCandidates.map((c, i) => <TableHead key={i} className="font-mono text-xs">{c.model}</TableHead>) : (
+                          <>
+                            <TableHead>Judge</TableHead>
+                            <TableHead className="text-right">Details kept</TableHead>
+                            <TableHead className="text-right">Length</TableHead>
+                            <TableHead className="text-right">Units</TableHead>
+                          </>
+                        )}
                         <TableHead />
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {detail.samples.length === 0 && (
-                        <TableRow><TableCell colSpan={multi ? 7 : 6} className="text-sm text-muted-foreground">No pairs yet: they arrive as {detail.trial.process} runs.</TableCell></TableRow>
+                      {calls.length === 0 && (
+                        <TableRow><TableCell colSpan={multi ? detailCandidates.length + 2 : 6} className="text-sm text-muted-foreground">No pairs yet: they arrive as {detail.trial.process} runs.</TableCell></TableRow>
                       )}
-                      {[...detail.samples].reverse().map(s => {
-                        const v = pairVerdict(s.judgements)
-                        const ret = s.judgements.filter(j => j.ok && j.oriented?.retention != null).map(j => j.oriented!.retention as number)
+                      {calls.map(g => {
+                        const open = g.some(s => s.sampleId === sampleId)
+                        const verdictCell = (s: Sample | undefined, key: number) => {
+                          if (!s) return <TableCell key={key} className="text-xs text-muted-foreground">—</TableCell>
+                          const v = pairVerdict(s.judgements)
+                          const ret = s.judgements.filter(j => j.ok && j.oriented?.retention != null).map(j => j.oriented!.retention as number)
+                          return (
+                            <TableCell key={key} className={`text-xs ${v ? PAIR_CLASS[v] : 'text-muted-foreground'} ${sampleId === s.sampleId ? 'underline underline-offset-4' : ''}`}
+                              onClick={e => { e.stopPropagation(); setSampleId(s.sampleId) }}>
+                              {v ? PAIR_LABEL[v] : 'waiting'}{ret.length ? ` · ${pct(ret.reduce((a, b) => a + b, 0) / ret.length)}` : ''}
+                            </TableCell>
+                          )
+                        }
+                        const s0 = g[0]
+                        const v0 = pairVerdict(s0.judgements)
+                        const ret0 = s0.judgements.filter(j => j.ok && j.oriented?.retention != null).map(j => j.oriented!.retention as number)
                         return (
-                          <TableRow key={s.sampleId} className={`cursor-pointer ${sampleId === s.sampleId ? 'bg-muted/60' : ''}`} onClick={() => setSampleId(s.sampleId)}>
-                            <TableCell className="text-xs whitespace-nowrap">{s.at.slice(5, 16).replace('T', ' ')}</TableCell>
-                            {multi && <TableCell className="text-xs font-mono">{s.candidate.model}</TableCell>}
-                            <TableCell className={`text-xs ${v ? PAIR_CLASS[v] : 'text-muted-foreground'}`}>{v ? PAIR_LABEL[v] : 'waiting for the judge'}</TableCell>
-                            <TableCell className="text-right text-xs">{ret.length ? pct(ret.reduce((a, b) => a + b, 0) / ret.length) : '—'}</TableCell>
-                            <TableCell className="text-right text-xs">{pct(s.structure.lengthRatio)}</TableCell>
-                            <TableCell className="text-right text-xs">{s.structure.unitsCandidate} / {s.structure.unitsIncumbent}{s.structure.formatMatch ? '' : ' · other format'}</TableCell>
+                          <TableRow key={s0.requestId || s0.sampleId} className={`cursor-pointer ${open ? 'bg-muted/60' : ''}`} onClick={() => setSampleId(s0.sampleId)}>
+                            <TableCell className="text-xs whitespace-nowrap">{s0.at.slice(5, 16).replace('T', ' ')}</TableCell>
+                            {multi ? detailCandidates.map((_, i) => verdictCell(g.find(s => (s.candidateIndex ?? 0) === i), i)) : (
+                              <>
+                                <TableCell className={`text-xs ${v0 ? PAIR_CLASS[v0] : 'text-muted-foreground'}`}>{v0 ? PAIR_LABEL[v0] : 'waiting for the judge'}</TableCell>
+                                <TableCell className="text-right text-xs">{ret0.length ? pct(ret0.reduce((a, b) => a + b, 0) / ret0.length) : '—'}</TableCell>
+                                <TableCell className="text-right text-xs">{pct(s0.structure.lengthRatio)}</TableCell>
+                                <TableCell className="text-right text-xs">{s0.structure.unitsCandidate} / {s0.structure.unitsIncumbent}{s0.structure.formatMatch ? '' : ' · other format'}</TableCell>
+                              </>
+                            )}
                             <TableCell className="text-right"><ChevronRight className="h-3.5 w-3.5 inline text-muted-foreground" /></TableCell>
                           </TableRow>
                         )
                       })}
                     </TableBody>
                   </Table>
+                  {multi && <div className="text-xs text-muted-foreground mt-1">Each row is one sampled call, answered by every model still being tried (judge's verdict · details kept). Click a cell to open that model's answer.</div>}
                 </div>
               </CardContent>
             </Card>
           )}
 
-          {sample && detail && <SampleView sample={sample} trial={detail.trial} />}
+          {sample && detail && call && <SampleView sample={sample} call={call} onPick={setSampleId} trial={detail.trial} />}
         </div>
       </div>
     </div>
@@ -514,9 +546,15 @@ function Metric({ label, value, note }: { label: string; value: string; note?: s
   )
 }
 
-/** One pair side by side: units aligned by title where both answers have them, the judge's reading below. */
-function SampleView({ sample, trial }: { sample: Sample; trial: Trial }) {
+/**
+ * One pair side by side: units aligned by title where both answers have them, the
+ * judge's reading below. Column 2 switches between the candidates that answered
+ * the same sampled call (`call`).
+ */
+function SampleView({ sample, call, onPick, trial }: { sample: Sample; call: Sample[]; onPick: (sampleId: string) => void; trial: Trial }) {
   const st = sample.structure
+  const at = call.findIndex(s => s.sampleId === sample.sampleId)
+  const step = (d: number) => { const n = call[(at + d + call.length) % call.length]; if (n) onPick(n.sampleId) }
   const aligned = st.formatIncumbent !== 'text' && st.pairs?.length > 0
   return (
     <Card>
@@ -556,7 +594,23 @@ function SampleView({ sample, trial }: { sample: Sample; trial: Trial }) {
 
         <div className="grid grid-cols-2 gap-3 text-xs font-medium">
           <div>{trial.incumbent.model} <span className="text-muted-foreground font-normal">(current)</span></div>
-          <div>{sample.candidate.model} <span className="text-muted-foreground font-normal">(candidate)</span></div>
+          {call.length > 1 ? (
+            <div className="flex items-center gap-1 flex-wrap min-w-0" role="group" aria-label="Candidate answering this call">
+              <button className="p-0.5 rounded hover:bg-muted" onClick={() => step(-1)} aria-label="Previous candidate"><ChevronLeft className="h-3.5 w-3.5" /></button>
+              {call.map(s => {
+                const v = pairVerdict(s.judgements)
+                return (
+                  <button key={s.sampleId} onClick={() => onPick(s.sampleId)}
+                    className={`px-1.5 py-0.5 rounded border font-mono ${s.sampleId === sample.sampleId ? 'bg-primary text-primary-foreground border-primary' : `hover:bg-muted ${v ? PAIR_CLASS[v] : ''}`}`}
+                    title={v ? PAIR_LABEL[v] : 'waiting for the judge'}>{s.candidate.model}</button>
+                )
+              })}
+              <button className="p-0.5 rounded hover:bg-muted" onClick={() => step(1)} aria-label="Next candidate"><ChevronRight className="h-3.5 w-3.5" /></button>
+              <span className="text-muted-foreground font-normal">({at + 1} of {call.length})</span>
+            </div>
+          ) : (
+            <div>{sample.candidate.model} <span className="text-muted-foreground font-normal">(candidate)</span></div>
+          )}
         </div>
         {aligned ? (
           <div className="space-y-2">
@@ -578,7 +632,7 @@ function SampleView({ sample, trial }: { sample: Sample; trial: Trial }) {
           </div>
         )}
         <details className="text-xs">
-          <summary className="cursor-pointer text-muted-foreground">The request both models answered</summary>
+          <summary className="cursor-pointer text-muted-foreground">The request {call.length > 1 ? `all ${call.length + 1} models` : 'both models'} answered</summary>
           <pre className="mt-2 whitespace-pre-wrap break-words border rounded-md p-3 max-h-[420px] overflow-auto">{sample.request}</pre>
         </details>
       </CardContent>

@@ -420,11 +420,17 @@ Trials** tests it on the process's real calls before anything switches.
   pairs per model at most. **Automatic** (the default) tries up to four candidates, leaving
   out any model a finished trial of the process already failed; or pick one model from the
   list (including one Automatic left out).
-- **Automatic** — each sampled call goes to one candidate, the one with the fewest pairs,
-  so a trial still costs one extra call per sampled call; it runs longer instead (3 days per
-  candidate, at most 14). A candidate that can no longer pass (more pairs worse than the pass
-  rate allows) drops out; one dearer than a candidate that has passed stops. The **winner**
-  is the first candidate, cheapest first, that passes.
+- **Automatic** — each sampled call goes to EVERY candidate still being tried, so their
+  answers to the same request can be compared side by side (one pair per candidate, sharing a
+  `requestId`; the request is stored once). That is one extra call per candidate per sampled
+  call, and every candidate gets its pairs as fast as a one-model trial (default 3 days). A
+  candidate that can no longer pass (more pairs worse than the pass rate allows) drops out;
+  one dearer than a candidate that has passed stops. The **winner** is the first candidate,
+  cheapest first, that passes. A provider that cannot answer at the moment sits the call out.
+- **Side by side** — the pairs table has one row per sampled call and one column per
+  candidate (verdict · details kept). An opened pair shows the current model on the left;
+  column 2 steps through the candidates that answered the same call (‹ model chips ›), each
+  with the judge's two readings.
 - **Run** — the proxy answers every call with the current model as before. For the sampled
   share it ALSO sends the same request to the candidate afterwards, off the caller's path,
   and stores both answers (redacted) as a pair. The candidate's tokens are logged as process
