@@ -387,6 +387,13 @@ Respond ONLY with JSON: {"labels":[{"i":1,"class":"<category id or none>"}]}` }]
 function classifyMessages(tax, text) {
   const catalogue = tax.classes.map((c) => [`- ${c.id}: ${c.test}`,
     ...(c.examples || []).map((e) => `    e.g. ${e}`)].join('\n')).join('\n')
+  const request = text.slice(0, 500).replace(/\s+/g, ' ')
+  // A committed taxonomy carries its own prompt, which the proxy's shadow tagger
+  // renders the same way (proxy-bridge/job-class.mjs in rapid-llm-proxy).
+  if (tax.prompt) {
+    const fill = { none: tax.none, precedence: (tax.precedence || []).join(' > '), catalogue, request }
+    return [{ role: 'user', content: tax.prompt.replace(/\{(none|precedence|catalogue|request)\}/g, (_, k) => fill[k]) }]
+  }
   const none = tax.none || 'If no category\'s test admits it, answer "none" — do not force a fit.'
   const order = tax.precedence ? `\nIf more than one category fits, take the one that comes first in: ${tax.precedence.join(' > ')}.` : ''
   return [{ role: 'user', content:
@@ -607,7 +614,7 @@ async function committedRun(heldout, set) {
   const { load } = await import('js-yaml')
   const raw = load(readFileSync(file, 'utf8'))
   const name = basename(file).replace(/\.ya?ml$/, '')
-  const tax = { tag: `${name}-v${raw.version ?? 0}${set === 'heldout' ? '' : `-${set}`}`, classes: raw.classes, none: raw.none, precedence: raw.precedence }
+  const tax = { tag: `${name}-v${raw.version ?? 0}${set === 'heldout' ? '' : `-${set}`}`, classes: raw.classes, none: raw.none, precedence: raw.precedence , prompt: raw.prompt }
   const ids = tax.classes.map((c) => c.id)
   if (new Set(ids).size !== ids.length) throw new Error(`${file}: duplicate class ids`)
   for (const id of tax.precedence || []) if (!ids.includes(id)) throw new Error(`${file}: precedence names unknown class ${id}`)

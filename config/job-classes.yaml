@@ -27,6 +27,25 @@ none: >-
   it. A prompt that is short but clearly asks for something is NOT none: pick
   the class of what it asks for.
 precedence: [relay, fix, build, cleanup, configure, docs, ship, run, status, explain, reply]
+# The request a classifier sends, teacher and student alike: the measurement
+# (scripts/measure-job-classes.mjs) and the proxy's shadow tagger
+# (rapid-llm-proxy proxy-bridge/job-class.mjs) both render THIS text, so a model
+# scored offline is asked exactly what it is asked live. Placeholders: {none},
+# {precedence} (ids joined by " > "), {catalogue} (one "- id: test" line per
+# class, its examples indented under it as "e.g. ..."), {request} (the prompt,
+# whitespace-collapsed, first 500 characters).
+prompt: |-
+  Assign the request below to exactly ONE job category, by the category's test.
+  {none}
+  If more than one category fits, take the one that comes first in: {precedence}.
+
+  CATEGORIES:
+  {catalogue}
+
+  REQUEST:
+  {request}
+
+  Respond ONLY with JSON: {"class":"<category id or none>"}
 classes:
   - id: relay
     test: The text is a message addressed from another agent session (a handoff, a request from a peer session, a notice to acknowledge), not the user asking for work directly. Agent or tool output the user pasted in (a transcript excerpt, a commit summary, command output) is NOT a relay - classify by what the user wants done with it.
