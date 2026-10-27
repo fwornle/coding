@@ -478,6 +478,12 @@ test('sources: coding\'s figures join the usage reads where its DB is, switchabl
   }
 });
 
+test('the page\'s probes for what only coding serves are answered, not 404s', async () => {
+  assert.deepEqual((await api('GET', '/api/llm/settings')).body, { settings: null });
+  assert.deepEqual((await api('GET', '/api/observations?from=2026-10-01&to=2026-10-02&limit=200')).body, { data: [] });
+  assert.deepEqual((await api('GET', '/api/digests?from=2026-10-01&to=2026-10-02')).body, { data: [] });
+});
+
 test("trials: a coding machine's model trials, read-only, from beside its token DB", async () => {
   assert.deepEqual((await api('GET', '/api/trials')).body, { trials: [] }, 'no coding install: none');
   const { initTokenDb, resolveTokenDbPath } = await import('../proxy/dist/token-usage.js');

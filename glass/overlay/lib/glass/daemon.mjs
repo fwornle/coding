@@ -468,6 +468,11 @@ export async function startDaemon({
       // on every load, and a 404 is a red console error each time. `settings:
       // null` sends it to /api/cost-defaults, as the 404 did.
       if (req.method === 'GET' && url === '/api/llm/settings') return json(res, 200, { settings: null });
+      // The Sessions page reads a run's observations and digests where coding
+      // records them; glass records neither. An empty list, not a 404 per run.
+      if (req.method === 'GET' && (url.split('?')[0] === '/api/observations' || url.split('?')[0] === '/api/digests')) {
+        return json(res, 200, { data: [] });
+      }
       if (req.method === 'GET' && (url === '/api/statusline' || url.startsWith('/api/statusline?'))) {
         const want = new URL(url, 'http://localhost').searchParams.get('task_id');
         const s = liveSession(want);
