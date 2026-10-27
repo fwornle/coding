@@ -30,6 +30,13 @@
  *   6. Optional student check (--student): leave-one-out KNN over local MiniLM
  *      embeddings of the held-out set, against the A labels. Small and weak, but
  *      it says early whether a cheap classifier can reproduce the teacher at all.
+ *   7. Optional LLM students (--students=<model,...>): each named cheap model
+ *      labels the held-out set under A, ONE prompt per call as it would at
+ *      runtime, through the `bg-job-class-student` route (sent as process
+ *      `job-class-student`: the proxy adds the `bg-`), whose model_profiles name
+ *      the models it may be asked for. Scored against the teacher's A labels,
+ *      and on the items where A and A2 agree (the teacher was sure), with the
+ *      teacher's own A-vs-A2 kappa as the ceiling.
  *
  * GATE (from the plan): kappa(A,B) >= 0.70 and no class holding more than 35% of
  * the held-out set. The report states pass/fail; it never rounds a fail up.
@@ -48,6 +55,7 @@
  *   --cap=<lo>-<hi>      Consolidated class count (default 14-18)
  *   --batch=<n>          Prompts per labelling call (default 30)
  *   --student            Also run the leave-one-out KNN check
+ *   --students=<m,...>   Also score these cheap models as closed-set LLM students
  *   --out=<dir>          Output dir (default .data/job-classes/p0)
  *   --fresh              Ignore checkpoints
  *   --help               Show this message
@@ -96,18 +104,19 @@ const writeJson = (name, v) => writeFileSync(outFile(name), JSON.stringify(v, nu
 // transport (same contract as derive-intent-spine.mjs)
 // ---------------------------------------------------------------------------
 
-async function complete(messages, complexity = 'high', tries = 3) {
+async function complete(messages, { process: proc = 'job-class-teacher', model, complexity = 'high' } = {}, tries = 3) {
   for (let i = 0; i < tries; i++) {
     try {
       const res = await fetch(PROXY, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        // `complexity` is the ONLY field that routes; the teacher should be strong.
-        body: JSON.stringify({ process: 'bg-job-class-teacher', messages, complexity }),
+        // The route picks the model; `model` is read only where the route's
+        // model_profiles list it (bg-job-class-student).
+        body: JSON.stringify({ process: proc, messages, complexity, ...(model ? { model } : {}) }),
       })
       if (!res.ok) throw new Error(`HTTP ${res.status} ${(await res.text()).slice(0, 160)}`)
       const j = await res.json()
-      return { content: j.content, model: `${j.provider}/${j.model}` }
+      return { content: j.content, model: `${j.provider}/${j.model}`, latencyMs: j.latencyMs, tokens: j.tokens }
     } catch (err) {
       if (i === tries - 1) throw err
       await new Promise((r) => setTimeout(r, 3000 * (i + 1)))
@@ -128,10 +137,10 @@ function parseJson(text) {
  * that writes an unescaped quote inside a category test is a formatting slip, not
  * an answer worth aborting a whole run over (it ended the first capped P0 run).
  */
-async function completeJson(messages, tries = 3) {
+async function completeJson(messages, route, tries = 3) {
   for (let i = 0; ; i++) {
-    const r = await complete(messages)
-    try { return { json: parseJson(r.content), model: r.model } } catch (err) {
+    const r = await complete(messages, route)
+    try { return { ...r, json: parseJson(r.content) } } catch (err) {
       if (i === tries - 1) throw err
       console.log(`  unparseable reply (${err.message}), asking again`)
     }
@@ -365,6 +374,49 @@ Respond ONLY with JSON: {"labels":[{"i":1,"class":"<category id or none>"}]}` }]
   return labels
 }
 
+/**
+ * A cheap model labels the held-out set under `tax`, one prompt per call: the
+ * runtime shape, where every prompt is classified as it arrives. An answer that
+ * still will not parse after the re-asks counts as 'invalid', not as a crash.
+ */
+async function studentLabels(rows, tax, model) {
+  const tag = `student-${slug(model)}`
+  const ck = readCk(`labels-${tag}.json`)
+  if (ck && ck.n === rows.length) { console.log(`labels ${tag}: from checkpoint`); return ck }
+  const ids = new Set(tax.classes.map((c) => c.id))
+  const catalogue = tax.classes.map((c) => `- ${c.id}: ${c.test}`).join('\n')
+  const served = new Set()
+  const latency = []
+  let done = 0
+  const labels = await pool(rows, 6, async (r) => {
+    let c = 'invalid'
+    try {
+      const out = await completeJson([{ role: 'user', content:
+`Assign the request below to exactly ONE job category, by the category's test.
+If no category's test admits it, answer "none" — do not force a fit.
+
+CATEGORIES:
+${catalogue}
+
+REQUEST:
+${r.text.slice(0, 500).replace(/\s+/g, ' ')}
+
+Respond ONLY with JSON: {"class":"<category id or none>"}` }], { process: 'job-class-student', model, complexity: 'small' })
+      served.add(out.model)
+      if (Number.isFinite(out.latencyMs)) latency.push(out.latencyMs)
+      const got = String(out.json.class || '').trim()
+      c = ids.has(got) ? got : (got === 'none' ? 'none' : 'invalid')
+    } catch (err) { console.log(`  ${tag}: ${err.message}`) }
+    if (++done % 50 === 0) console.log(`  label ${tag} ${done}/${rows.length}`)
+    return c
+  })
+  latency.sort((x, y) => x - y)
+  const res = { tag, taxonomy: tax.tag, model, served: [...served], n: rows.length, labels,
+    latencyMs: { p50: latency[Math.floor(latency.length / 2)], p90: latency[Math.floor(latency.length * 0.9)] } }
+  writeJson(`labels-${tag}.json`, res)
+  return res
+}
+
 // ---------------------------------------------------------------------------
 // agreement
 // ---------------------------------------------------------------------------
@@ -498,9 +550,20 @@ async function main() {
   const { rows, dropped } = extractCorpus()
   const ranked = rows.map((r) => ({ r, h: createHash('sha1').update(`heldout:${r.id}`).digest('hex') }))
     .sort((x, y) => (x.h < y.h ? -1 : 1))
-  const heldout = ranked.slice(0, HELDOUT).map((x) => x.r)
-  const derivePool = ranked.slice(HELDOUT).map((x) => x.r)
-  writeFileSync(outFile('corpus.jsonl'), rows.map((r) => JSON.stringify(r)).join('\n') + '\n')
+  // A rerun keeps the checkpointed held-out set, read from the checkpointed
+  // corpus: the labels in the checkpoints were made for exactly that text, and
+  // the window has moved since (the LSL is also rewritten in place, e.g. by a
+  // redaction change, so the same prompt can come back with a different id).
+  const pinned = readCk('split.json')?.heldout
+  const oldCorpus = pinned && existsSync(outFile('corpus.jsonl'))
+    ? new Map(readFileSync(outFile('corpus.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).map((r) => [r.id, r]))
+    : null
+  if (pinned && (!oldCorpus || pinned.some((id) => !oldCorpus.has(id)))) throw new Error('split.json names prompts missing from corpus.jsonl (use --fresh)')
+  const heldout = pinned ? pinned.map((id) => oldCorpus.get(id)) : ranked.slice(0, HELDOUT).map((x) => x.r)
+  const heldIds = new Set(heldout.map((r) => r.id))
+  const derivePool = ranked.filter((x) => !heldIds.has(x.r.id)).map((x) => x.r)
+  if (pinned) console.log(`held-out: ${heldout.length} prompts from the checkpointed corpus`)
+  else writeFileSync(outFile('corpus.jsonl'), rows.map((r) => JSON.stringify(r)).join('\n') + '\n')
   writeJson('split.json', { heldout: heldout.map((r) => r.id), pool: derivePool.length })
   const byAgent = {}
   for (const r of rows) byAgent[r.agent] = (byAgent[r.agent] || 0) + 1
@@ -535,6 +598,22 @@ async function main() {
     maxShare,
   }
   if (has('--student')) metrics.student = await studentLoo(heldout, la)
+  const sure = la.map((x, i) => (x === la2[i] ? i : -1)).filter((i) => i >= 0)
+  const students = []
+  for (const model of opt('students', '').split(',').map((m) => m.trim()).filter(Boolean)) {
+    const st = await studentLabels(heldout, A, model)
+    const l = st.labels
+    students.push({
+      model, served: st.served, latencyMs: st.latencyMs,
+      kappa: cohenKappa(la, l),
+      accuracy: l.filter((x, i) => x === la[i]).length / l.length,
+      kappaSure: cohenKappa(sure.map((i) => la[i]), sure.map((i) => l[i])),
+      accuracySure: sure.filter((i) => l[i] === la[i]).length / sure.length,
+      none: l.filter((x) => x === 'none').length / l.length,
+      invalid: l.filter((x) => x === 'invalid').length,
+    })
+  }
+  if (students.length) metrics.students = { sureCoverage: sure.length / heldout.length, list: students }
   const pass = metrics.kappaAB >= GATE.kappa && metrics.maxShare <= GATE.maxShare
   writeJson('report.json', { generatedAt: new Date().toISOString(), days: DAYS, cap: [CAP_LO, CAP_HI], gate: GATE, pass, corpus: { n: rows.length, dropped, byAgent }, metrics, pairs, distA, distB, teacher: A.model })
 
@@ -550,6 +629,10 @@ async function main() {
     `| "none" under A / B | ${pct(metrics.noneA)} / ${pct(metrics.noneB)} | taxonomy coverage |`,
     `| invalid labels | ${metrics.invalid} | teacher format errors |`,
     ...(metrics.student ? [`| student: LOO ${metrics.student.k}-NN on MiniLM vs A labels | ${pct(metrics.student.accuracy)} of ${metrics.student.n} | can a cheap model reproduce the teacher? |`] : []),
+    ...(metrics.students ? ['', '## LLM students (taxonomy A, one prompt per call)', '',
+      `Reference: the teacher's A labels. "Sure" = the ${pct(metrics.students.sureCoverage)} of items where the teacher gave the same label twice (A = A2). Ceiling: the teacher's own A-vs-A2 kappa, ${f3(metrics.selfKappaA)}.`, '',
+      '| Student | Served by | kappa vs teacher | agree | kappa (sure) | agree (sure) | none | invalid | p50 / p90 ms |', '|---|---|---|---|---|---|---|---|---|',
+      ...metrics.students.list.map((x) => `| ${x.model} | ${x.served.join(', ')} | ${f3(x.kappa)} | ${pct(x.accuracy)} | ${f3(x.kappaSure)} | ${pct(x.accuracySure)} | ${pct(x.none)} | ${x.invalid} | ${x.latencyMs.p50 ?? 'n/a'} / ${x.latencyMs.p90 ?? 'n/a'} |`)] : []),
     '', '## A ↔ B class matching', '', '| A | B | both | in A | in B | Jaccard |', '|---|---|---|---|---|---|',
     ...pairs.map((p) => `| ${p.a} | ${p.b} | ${p.both} | ${p.inA} | ${p.inB} | ${p.jaccard.toFixed(2)} |`),
     '', '## Taxonomy A', '', ...A.classes.map((c) => `- **${c.id}** (${distA.find((d) => d.cls === c.id)?.n || 0}) — ${c.test}`),
