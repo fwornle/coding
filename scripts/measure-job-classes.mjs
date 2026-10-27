@@ -1,0 +1,562 @@
+#!/usr/bin/env node
+/**
+ * P0 of shared job classes (.planning/shared-job-classes.md): is there a STABLE
+ * taxonomy of the jobs people hand their coding agents? If two independent
+ * derivations from the same corpus disagree, there is nothing worth sharing
+ * with a group, and P1+ should not be built.
+ *
+ * WHAT IS MEASURED
+ *
+ *   1. Corpus: the human prompts of the last N days, from every discovered repo's
+ *      LSL (`<repo>/.coding/history/YYYY/MM/*.jsonl`, already redacted). Harness
+ *      noise is dropped: task notifications, slash-command expansions,
+ *      continuation summaries, local-command caveats, sub-agent prompts. Pasted
+ *      blocks and image references are reduced to a marker. Prompts shorter than
+ *      --min-chars after that ("yes", "merged") are dropped: they are turns of a
+ *      job, not jobs, and in routing they inherit the band their turn started with.
+ *   2. Split: a fixed held-out set (hash of the text, so reruns pick the same one)
+ *      and a derivation pool. No held-out prompt is ever shown to a derivation.
+ *   3. Two derivations, A and B, with derive-intent-spine.mjs's recipe: 8 disjoint
+ *      samples propose categories, one call consolidates to the cap. A and B use
+ *      different seeds, so they see different samples of the pool.
+ *   4. The teacher labels the held-out set under A, under B, and under A a second
+ *      time (A2). A vs A2 is the labelling noise floor; A vs B is what P0 is about.
+ *   5. Agreement. A and B have different label sets, so:
+ *        - ARI (adjusted Rand index): mapping-free, chance-corrected.
+ *        - kappa after a 1:1 Hungarian matching of B's classes onto A's.
+ *        - kappa on shared categories: only items whose A and B labels are both
+ *          in a matched pair with Jaccard >= 0.5 (the number intent-spine quoted
+ *          as "0.83 on shared categories").
+ *   6. Optional student check (--student): leave-one-out KNN over local MiniLM
+ *      embeddings of the held-out set, against the A labels. Small and weak, but
+ *      it says early whether a cheap classifier can reproduce the teacher at all.
+ *
+ * GATE (from the plan): kappa(A,B) >= 0.70 and no class holding more than 35% of
+ * the held-out set. The report states pass/fail; it never rounds a fail up.
+ *
+ * Every LLM answer is checkpointed under --out, so a rerun resumes rather than
+ * re-asking, and a scoring change is re-applied offline (--fresh starts over).
+ *
+ * Usage:
+ *   node scripts/measure-job-classes.mjs                 # full P0 run
+ *   node scripts/measure-job-classes.mjs --corpus-only   # extract + split, no LLM
+ *
+ * Options:
+ *   --days=<n>           Corpus window (default 28)
+ *   --min-chars=<n>      Shortest prompt kept after cleaning (default 25)
+ *   --heldout=<n>        Held-out set size (default 300)
+ *   --cap=<lo>-<hi>      Consolidated class count (default 14-18)
+ *   --batch=<n>          Prompts per labelling call (default 30)
+ *   --student            Also run the leave-one-out KNN check
+ *   --out=<dir>          Output dir (default .data/job-classes/p0)
+ *   --fresh              Ignore checkpoints
+ *   --help               Show this message
+ *
+ * Environment:
+ *   LLM_CLI_PROXY_URL    default http://localhost:12435   (POST /api/complete)
+ */
+
+import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync, statSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { createHash } from 'node:crypto'
+import { homedir } from 'node:os'
+
+const REPO = process.env.CODING_REPO || resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const PROXY = `${(process.env.LLM_CLI_PROXY_URL || 'http://localhost:12435').replace(/\/$/, '')}/api/complete`
+
+const argv = process.argv.slice(2)
+const has = (f) => argv.includes(f)
+const opt = (name, dflt) => {
+  const hit = argv.find((a) => a.startsWith(`--${name}=`))
+  return hit ? hit.slice(name.length + 3) : dflt
+}
+
+if (has('--help') || has('-h')) {
+  const header = readFileSync(fileURLToPath(import.meta.url), 'utf8').split('*/')[0]
+  console.log(header.slice(header.indexOf(' * Usage:')).replace(/^ \* ?/gm, '').trimEnd())
+  process.exit(0)
+}
+
+const DAYS = Number(opt('days', 28))
+const MIN_CHARS = Number(opt('min-chars', 25))
+const HELDOUT = Number(opt('heldout', 300))
+const [CAP_LO, CAP_HI] = opt('cap', '14-18').split('-').map(Number)
+const BATCH = Number(opt('batch', 30))
+const OUT = resolve(REPO, opt('out', '.data/job-classes/p0'))
+const FRESH = has('--fresh')
+const GATE = { kappa: 0.7, maxShare: 0.35 }
+
+mkdirSync(OUT, { recursive: true })
+const outFile = (name) => join(OUT, name)
+const readCk = (name) => (!FRESH && existsSync(outFile(name)) ? JSON.parse(readFileSync(outFile(name), 'utf8')) : null)
+const writeJson = (name, v) => writeFileSync(outFile(name), JSON.stringify(v, null, 2))
+
+// ---------------------------------------------------------------------------
+// transport (same contract as derive-intent-spine.mjs)
+// ---------------------------------------------------------------------------
+
+async function complete(messages, complexity = 'high', tries = 3) {
+  for (let i = 0; i < tries; i++) {
+    try {
+      const res = await fetch(PROXY, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        // `complexity` is the ONLY field that routes; the teacher should be strong.
+        body: JSON.stringify({ process: 'bg-job-class-teacher', messages, complexity }),
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${(await res.text()).slice(0, 160)}`)
+      const j = await res.json()
+      return { content: j.content, model: `${j.provider}/${j.model}` }
+    } catch (err) {
+      if (i === tries - 1) throw err
+      await new Promise((r) => setTimeout(r, 3000 * (i + 1)))
+    }
+  }
+}
+
+function parseJson(text) {
+  const s = String(text).trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim()
+  const ob = s.indexOf('{'), obEnd = s.lastIndexOf('}')
+  const ar = s.indexOf('['), arEnd = s.lastIndexOf(']')
+  const useArray = ar !== -1 && (ob === -1 || ar < ob)
+  return JSON.parse(useArray ? s.slice(ar, arEnd + 1) : s.slice(ob, obEnd + 1))
+}
+
+/**
+ * complete() + parseJson(), re-asking when the reply is not valid JSON. A model
+ * that writes an unescaped quote inside a category test is a formatting slip, not
+ * an answer worth aborting a whole run over (it ended the first capped P0 run).
+ */
+async function completeJson(messages, tries = 3) {
+  for (let i = 0; ; i++) {
+    const r = await complete(messages)
+    try { return { json: parseJson(r.content), model: r.model } } catch (err) {
+      if (i === tries - 1) throw err
+      console.log(`  unparseable reply (${err.message}), asking again`)
+    }
+  }
+}
+
+/** Run `fn` over `items` with at most `n` in flight, keeping order. */
+async function pool(items, n, fn) {
+  const out = new Array(items.length)
+  let next = 0
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
+    while (next < items.length) { const i = next++; out[i] = await fn(items[i], i) }
+  }))
+  return out
+}
+
+// ---------------------------------------------------------------------------
+// corpus
+// ---------------------------------------------------------------------------
+
+/** Harness text that reaches the LSL as a "user" message but is nobody's job. */
+const NOISE = [
+  /^<task-notification>/, /^<local-command-/, /^<command-(name|message)>/, /^Caveat:/,
+  /^This session is being continued from a previous conversation/,
+  /^# /,                       // a slash command's expanded skill file
+  /^\[Request interrupted/,
+]
+
+export function cleanPrompt(raw) {
+  let t = String(raw || '')
+  t = t.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, ' ')
+  t = t.replace(/<pasted_content[^>]*>([\s\S]*?)<\/pasted_content>/g, (_, body) => ` [pasted ${body.length} chars] `)
+  t = t.replace(/\[Image[^\]]*\]/g, ' [image] ')
+  return t.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
+}
+
+function discoveredRepos() {
+  const candidates = [
+    join(homedir(), '.coding', 'data', 'coding', 'var', 'projects.json'),
+    join(homedir(), '.coding', 'var', 'projects.json'),
+  ]
+  for (const f of candidates) {
+    if (existsSync(f)) return JSON.parse(readFileSync(f, 'utf8')).repos || []
+  }
+  return [{ path: REPO, name: 'coding' }]
+}
+
+function extractCorpus() {
+  const since = Date.now() - DAYS * 864e5
+  const rows = []
+  const seen = new Set()
+  const dropped = { noise: 0, short: 0, subagent: 0, duplicate: 0 }
+  for (const repo of discoveredRepos()) {
+    const base = join(repo.path, '.coding', 'history')
+    if (!existsSync(base)) continue
+    for (const year of readdirSync(base).filter((d) => /^\d{4}$/.test(d))) {
+      for (const month of readdirSync(join(base, year)).filter((d) => /^\d{2}$/.test(d))) {
+        const dir = join(base, year, month)
+        for (const f of readdirSync(dir).filter((x) => x.endsWith('.jsonl'))) {
+          const fp = join(dir, f)
+          if (statSync(fp).mtimeMs < since) continue
+          let agent = '?'
+          for (const line of readFileSync(fp, 'utf8').split('\n')) {
+            if (!line) continue
+            let o
+            try { o = JSON.parse(line) } catch { continue }
+            if (o.customType === 'lsl.promptSet') { agent = o.data?.agent || '?'; continue }
+            if (o.type !== 'message' || o.message?.role !== 'user') continue
+            if (Date.parse(o.timestamp) < since) continue
+            const c = o.message.content
+            const raw = (Array.isArray(c) ? c.map((b) => b?.text || '').join('\n') : String(c || '')).trim()
+            if (!raw) continue
+            if (agent === 'sub-agent') { dropped.subagent++; continue }
+            if (NOISE.some((re) => re.test(raw))) { dropped.noise++; continue }
+            const text = cleanPrompt(raw)
+            if (text.replace(/\[(image|pasted \d+ chars)\]/g, '').trim().length < MIN_CHARS) { dropped.short++; continue }
+            const key = text.toLowerCase()
+            if (seen.has(key)) { dropped.duplicate++; continue }
+            seen.add(key)
+            rows.push({
+              id: createHash('sha1').update(text).digest('hex').slice(0, 12),
+              ts: o.timestamp, agent, repo: repo.name, session: f.replace(/\.jsonl$/, ''),
+              text: text.slice(0, 800),
+            })
+          }
+        }
+      }
+    }
+  }
+  return { rows, dropped }
+}
+
+// ---------------------------------------------------------------------------
+// derivation (derive-intent-spine.mjs's recipe, reworded for jobs)
+// ---------------------------------------------------------------------------
+
+const RULES = `
+A category names a KIND OF JOB: what the person asked the coding agent to DO,
+judged from the request alone. Two prompts belong together when doing them takes
+the same kind of work, whatever part of the system they are about.
+
+FORBIDDEN as category names:
+ - repository, module, service or technology names (glass, Docker, dashboard, proxy)
+ - structural labels (Architecture, Configuration, Integration, Utilities)
+ - unfalsifiable catch-alls (Misc, Other, General requests, Follow-ups)
+
+EXCLUDABILITY RULE — the most important one. Every category must be able to
+REJECT prompts. Write its test so a reader can say "no, that one does not belong
+here". Do NOT broaden a category with a trailing clause such as "... and related
+tasks". Prefer TWO precise categories over one broad one.`
+
+function mulberry32(seed) {
+  return () => {
+    seed |= 0; seed = (seed + 0x6d2b79f5) | 0
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+function shuffled(arr, seed) {
+  const rnd = mulberry32(seed)
+  const a = arr.slice()
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); [a[i], a[j]] = [a[j], a[i]] }
+  return a
+}
+
+const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48)
+
+async function deriveTaxonomy(poolRows, seed, tag) {
+  const ck = readCk(`taxonomy-${tag}.json`)
+  if (ck) { console.log(`taxonomy ${tag}: from checkpoint (${ck.classes.length} classes)`); return ck }
+  const SAMPLES = 8
+  const order = shuffled(poolRows, seed)
+  const proposals = []
+  for (let s = 0; s < SAMPLES; s++) {
+    const batch = order.filter((_, i) => i % SAMPLES === s).slice(0, 60)
+    const list = batch.map((r, i) => `${i + 1}. ${r.text.slice(0, 300).replace(/\s+/g, ' ')}`).join('\n')
+    const { json } = await completeJson([{ role: 'user', content:
+`Below are ${batch.length} requests real people typed to an AI coding agent.
+${RULES}
+
+Propose 10-18 job categories that would cover these requests.
+
+REQUESTS:
+${list}
+
+Respond ONLY with JSON: {"categories":[{"name":"...","test":"one sentence: what belongs AND what is excluded"}]}` }])
+    const got = json.categories || []
+    proposals.push(...got)
+    console.log(`  derive ${tag} ${s + 1}/${SAMPLES}  (+${got.length})`)
+  }
+  const { json, model } = await completeJson([{ role: 'user', content:
+`These are overlapping job-category proposals from eight independent samples of the same corpus.
+${RULES}
+
+Consolidate into a FINAL set of ${CAP_LO}-${CAP_HI} mutually exclusive job categories.
+Merge only true duplicates. Do NOT merge two categories just to reach a smaller
+number — a larger, sharper set is better than a small blurry one. No catch-all.
+
+PROPOSALS:
+${proposals.map((c) => `- ${c.name}: ${c.test || ''}`).join('\n')}
+
+Respond ONLY with JSON: {"categories":[{"name":"...","test":"..."}]}` }])
+  let cats = json.categories || []
+  // The consolidation prompt names the cap, and the model does not obey it: the
+  // first P0 run asked for 14-18 and got 22 and 30, which is the over-granular
+  // range intent-spine measured as unstable. So the cap is enforced here, by
+  // asking for merges until the set fits, and the rounds are recorded.
+  const merges = []
+  for (let round = 0; cats.length > CAP_HI && round < 3; round++) {
+    const before = cats.length
+    const { json: merged } = await completeJson([{ role: 'user', content:
+`This job taxonomy has ${before} categories; it must have at most ${CAP_HI}.
+${RULES}
+
+Merge the closest pairs until at most ${CAP_HI} remain. A merged category gets a
+test that admits both and still rejects everything else. Keep every other
+category exactly as it is.
+
+CATEGORIES:
+${cats.map((c) => `- ${c.name}: ${c.test || ''}`).join('\n')}
+
+Respond ONLY with JSON: {"categories":[{"name":"...","test":"..."}]}` }])
+    cats = merged.categories || cats
+    merges.push({ round, before, after: cats.length })
+    console.log(`  cap ${tag}: ${before} -> ${cats.length}`)
+  }
+  if (cats.length > CAP_HI || cats.length < CAP_LO) console.log(`  cap ${tag}: ${cats.length} classes is OUTSIDE ${CAP_LO}-${CAP_HI}`)
+  const classes = cats.map((c) => ({ id: slug(c.name), name: c.name, test: c.test }))
+  const tax = { tag, seed, model, derivedAt: new Date().toISOString(), proposals: proposals.length, merges, classes }
+  writeJson(`taxonomy-${tag}.json`, tax)
+  console.log(`taxonomy ${tag}: ${classes.length} classes (${model})`)
+  return tax
+}
+
+// ---------------------------------------------------------------------------
+// labelling
+// ---------------------------------------------------------------------------
+
+async function labelSet(rows, tax, tag) {
+  const ck = readCk(`labels-${tag}.json`)
+  if (ck && ck.n === rows.length) { console.log(`labels ${tag}: from checkpoint`); return ck.labels }
+  const ids = new Set(tax.classes.map((c) => c.id))
+  const catalogue = tax.classes.map((c) => `- ${c.id}: ${c.test}`).join('\n')
+  const batches = []
+  for (let i = 0; i < rows.length; i += BATCH) batches.push(rows.slice(i, i + BATCH))
+  const results = await pool(batches, 3, async (batch, b) => {
+    const list = batch.map((r, i) => `${i + 1}. ${r.text.slice(0, 500).replace(/\s+/g, ' ')}`).join('\n')
+    const { json } = await completeJson([{ role: 'user', content:
+`Assign each request below to exactly ONE job category, by the category's test.
+If no category's test admits it, answer "none" — do not force a fit.
+
+CATEGORIES:
+${catalogue}
+
+REQUESTS:
+${list}
+
+Respond ONLY with JSON: {"labels":[{"i":1,"class":"<category id or none>"}]}` }])
+    const got = json.labels || []
+    const byI = new Map(got.map((g) => [Number(g.i), String(g.class || '').trim()]))
+    console.log(`  label ${tag} ${b + 1}/${batches.length}`)
+    return batch.map((_, i) => {
+      const c = byI.get(i + 1)
+      return ids.has(c) ? c : (c === 'none' ? 'none' : 'invalid')
+    })
+  })
+  const labels = results.flat()
+  writeJson(`labels-${tag}.json`, { tag, taxonomy: tax.tag, n: rows.length, labels })
+  return labels
+}
+
+// ---------------------------------------------------------------------------
+// agreement
+// ---------------------------------------------------------------------------
+
+function cohenKappa(a, b) {
+  const n = a.length
+  if (!n) return NaN
+  let agree = 0
+  const pa = new Map(), pb = new Map()
+  for (let i = 0; i < n; i++) {
+    if (a[i] === b[i]) agree++
+    pa.set(a[i], (pa.get(a[i]) || 0) + 1)
+    pb.set(b[i], (pb.get(b[i]) || 0) + 1)
+  }
+  const po = agree / n
+  let pe = 0
+  for (const [k, v] of pa) pe += (v / n) * ((pb.get(k) || 0) / n)
+  return pe === 1 ? 1 : (po - pe) / (1 - pe)
+}
+
+function adjustedRand(a, b) {
+  const n = a.length
+  const c2 = (x) => (x * (x - 1)) / 2
+  const cell = new Map(), ra = new Map(), rb = new Map()
+  for (let i = 0; i < n; i++) {
+    const k = `${a[i]}\u0000${b[i]}`
+    cell.set(k, (cell.get(k) || 0) + 1)
+    ra.set(a[i], (ra.get(a[i]) || 0) + 1)
+    rb.set(b[i], (rb.get(b[i]) || 0) + 1)
+  }
+  const sumCell = [...cell.values()].reduce((s, v) => s + c2(v), 0)
+  const sumA = [...ra.values()].reduce((s, v) => s + c2(v), 0)
+  const sumB = [...rb.values()].reduce((s, v) => s + c2(v), 0)
+  const expected = (sumA * sumB) / c2(n)
+  const max = (sumA + sumB) / 2
+  return max === expected ? 1 : (sumCell - expected) / (max - expected)
+}
+
+/** Hungarian algorithm on a square cost matrix; returns assignment row -> col. */
+function hungarian(cost) {
+  const n = cost.length
+  const u = new Array(n + 1).fill(0), v = new Array(n + 1).fill(0)
+  const p = new Array(n + 1).fill(0), way = new Array(n + 1).fill(0)
+  for (let i = 1; i <= n; i++) {
+    p[0] = i
+    let j0 = 0
+    const minv = new Array(n + 1).fill(Infinity)
+    const used = new Array(n + 1).fill(false)
+    do {
+      used[j0] = true
+      const i0 = p[j0]
+      let delta = Infinity, j1 = 0
+      for (let j = 1; j <= n; j++) {
+        if (used[j]) continue
+        const cur = cost[i0 - 1][j - 1] - u[i0] - v[j]
+        if (cur < minv[j]) { minv[j] = cur; way[j] = j0 }
+        if (minv[j] < delta) { delta = minv[j]; j1 = j }
+      }
+      for (let j = 0; j <= n; j++) {
+        if (used[j]) { u[p[j]] += delta; v[j] -= delta } else minv[j] -= delta
+      }
+      j0 = j1
+    } while (p[j0] !== 0)
+    do { const j1 = way[j0]; p[j0] = p[j1]; j0 = j1 } while (j0)
+  }
+  const assign = new Array(n).fill(-1)
+  for (let j = 1; j <= n; j++) if (p[j]) assign[p[j] - 1] = j - 1
+  return assign
+}
+
+/** Match B's classes 1:1 onto A's by co-occurrence; report the pairs and their Jaccard. */
+function matchClasses(a, b) {
+  const la = [...new Set(a)], lb = [...new Set(b)]
+  const n = Math.max(la.length, lb.length)
+  const count = Array.from({ length: n }, () => new Array(n).fill(0))
+  for (let i = 0; i < a.length; i++) count[la.indexOf(a[i])][lb.indexOf(b[i])]++
+  const max = Math.max(...count.flat())
+  const assign = hungarian(count.map((row) => row.map((c) => max - c)))
+  const pairs = []
+  const mapB = new Map()
+  for (let r = 0; r < la.length; r++) {
+    const c = assign[r]
+    if (c < 0 || c >= lb.length || count[r][c] === 0) continue
+    const inA = a.filter((x) => x === la[r]).length
+    const inB = b.filter((x) => x === lb[c]).length
+    const both = count[r][c]
+    pairs.push({ a: la[r], b: lb[c], both, inA, inB, jaccard: both / (inA + inB - both) })
+    mapB.set(lb[c], la[r])
+  }
+  return { pairs: pairs.sort((x, y) => y.both - x.both), mapB }
+}
+
+function distribution(labels) {
+  const m = new Map()
+  for (const l of labels) m.set(l, (m.get(l) || 0) + 1)
+  return [...m.entries()].sort((x, y) => y[1] - x[1]).map(([cls, n]) => ({ cls, n, share: n / labels.length }))
+}
+
+// ---------------------------------------------------------------------------
+// student (optional)
+// ---------------------------------------------------------------------------
+
+async function studentLoo(rows, labels, k = 5) {
+  const { EmbeddingModel, FlagEmbedding } = await import('fastembed')
+  const { normalizeVector, cosineSimilarityNormalized } = await import('./lib/prompt-classifier-knn.mjs')
+  const embedder = await FlagEmbedding.init({ model: EmbeddingModel.AllMiniLML6V2, cacheDir: resolve(REPO, '.data/fastembed-cache') })
+  const vecs = []
+  for await (const batch of embedder.embed(rows.map((r) => r.text), 64)) for (const v of batch) vecs.push(normalizeVector(v))
+  const keep = labels.map((l, i) => (l !== 'none' && l !== 'invalid' ? i : -1)).filter((i) => i >= 0)
+  let correct = 0
+  for (const i of keep) {
+    const nn = keep.filter((j) => j !== i)
+      .map((j) => ({ j, s: cosineSimilarityNormalized(vecs[i], vecs[j]) }))
+      .sort((x, y) => y.s - x.s).slice(0, k)
+    const vote = new Map()
+    for (const { j, s } of nn) vote.set(labels[j], (vote.get(labels[j]) || 0) + s)
+    const best = [...vote.entries()].sort((x, y) => y[1] - x[1])[0]?.[0]
+    if (best === labels[i]) correct++
+  }
+  return { k, n: keep.length, accuracy: correct / keep.length }
+}
+
+// ---------------------------------------------------------------------------
+// main
+// ---------------------------------------------------------------------------
+
+const f3 = (x) => (Number.isFinite(x) ? x.toFixed(3) : 'n/a')
+const pct = (x) => `${(x * 100).toFixed(1)}%`
+
+async function main() {
+  const { rows, dropped } = extractCorpus()
+  const ranked = rows.map((r) => ({ r, h: createHash('sha1').update(`heldout:${r.id}`).digest('hex') }))
+    .sort((x, y) => (x.h < y.h ? -1 : 1))
+  const heldout = ranked.slice(0, HELDOUT).map((x) => x.r)
+  const derivePool = ranked.slice(HELDOUT).map((x) => x.r)
+  writeFileSync(outFile('corpus.jsonl'), rows.map((r) => JSON.stringify(r)).join('\n') + '\n')
+  writeJson('split.json', { heldout: heldout.map((r) => r.id), pool: derivePool.length })
+  const byAgent = {}
+  for (const r of rows) byAgent[r.agent] = (byAgent[r.agent] || 0) + 1
+  console.log(`corpus: ${rows.length} prompts over ${DAYS} days (dropped ${JSON.stringify(dropped)}); held-out ${heldout.length}, pool ${derivePool.length}`)
+  console.log(`agents: ${JSON.stringify(byAgent)}`)
+  if (has('--corpus-only')) return
+  if (heldout.length < HELDOUT || derivePool.length < 8 * 30) throw new Error('corpus too small for a P0 run')
+
+  const A = await deriveTaxonomy(derivePool, 1, 'a')
+  const B = await deriveTaxonomy(derivePool, 2, 'b')
+  const la = await labelSet(heldout, A, 'a')
+  const la2 = await labelSet(heldout, A, 'a2')
+  const lb = await labelSet(heldout, B, 'b')
+
+  const { pairs, mapB } = matchClasses(la, lb)
+  const lbMapped = lb.map((x) => mapB.get(x) ?? `b:${x}`)
+  const shared = new Set(pairs.filter((p) => p.jaccard >= 0.5).map((p) => p.a))
+  const sharedIdx = la.map((x, i) => (shared.has(x) && shared.has(lbMapped[i]) ? i : -1)).filter((i) => i >= 0)
+  const distA = distribution(la), distB = distribution(lb)
+  const maxShare = Math.max(distA.filter((d) => d.cls !== 'none').at(0)?.share || 0, distB.filter((d) => d.cls !== 'none').at(0)?.share || 0)
+
+  const metrics = {
+    n: heldout.length,
+    selfKappaA: cohenKappa(la, la2),
+    ariAB: adjustedRand(la, lb),
+    kappaAB: cohenKappa(la, lbMapped),
+    kappaShared: cohenKappa(sharedIdx.map((i) => la[i]), sharedIdx.map((i) => lbMapped[i])),
+    sharedCoverage: sharedIdx.length / heldout.length,
+    noneA: la.filter((x) => x === 'none').length / la.length,
+    noneB: lb.filter((x) => x === 'none').length / lb.length,
+    invalid: [...la, ...la2, ...lb].filter((x) => x === 'invalid').length,
+    maxShare,
+  }
+  if (has('--student')) metrics.student = await studentLoo(heldout, la)
+  const pass = metrics.kappaAB >= GATE.kappa && metrics.maxShare <= GATE.maxShare
+  writeJson('report.json', { generatedAt: new Date().toISOString(), days: DAYS, cap: [CAP_LO, CAP_HI], gate: GATE, pass, corpus: { n: rows.length, dropped, byAgent }, metrics, pairs, distA, distB, teacher: A.model })
+
+  const md = [
+    `# P0 — job-class stability (${new Date().toISOString().slice(0, 10)})`, '',
+    `Corpus: ${rows.length} prompts, last ${DAYS} days, agents ${JSON.stringify(byAgent)}. Held-out ${heldout.length}. Teacher: ${A.model}. Cap ${CAP_LO}-${CAP_HI}: A=${A.classes.length}, B=${B.classes.length} classes.`, '',
+    `**Gate: ${pass ? 'PASS' : 'FAIL'}** — kappa(A,B) ${f3(metrics.kappaAB)} (needs ≥ ${GATE.kappa}), largest class ${pct(maxShare)} (needs ≤ ${pct(GATE.maxShare)}).`, '',
+    '| Measure | Value | Reads as |', '|---|---|---|',
+    `| kappa A vs A2 (same taxonomy, labelled twice) | ${f3(metrics.selfKappaA)} | labelling noise floor |`,
+    `| kappa A vs B (Hungarian-matched) | ${f3(metrics.kappaAB)} | derivation stability, the gate |`,
+    `| ARI A vs B | ${f3(metrics.ariAB)} | same, mapping-free |`,
+    `| kappa on shared categories (Jaccard ≥ 0.5) | ${f3(metrics.kappaShared)} over ${pct(metrics.sharedCoverage)} of items | the stable core |`,
+    `| "none" under A / B | ${pct(metrics.noneA)} / ${pct(metrics.noneB)} | taxonomy coverage |`,
+    `| invalid labels | ${metrics.invalid} | teacher format errors |`,
+    ...(metrics.student ? [`| student: LOO ${metrics.student.k}-NN on MiniLM vs A labels | ${pct(metrics.student.accuracy)} of ${metrics.student.n} | can a cheap model reproduce the teacher? |`] : []),
+    '', '## A ↔ B class matching', '', '| A | B | both | in A | in B | Jaccard |', '|---|---|---|---|---|---|',
+    ...pairs.map((p) => `| ${p.a} | ${p.b} | ${p.both} | ${p.inA} | ${p.inB} | ${p.jaccard.toFixed(2)} |`),
+    '', '## Taxonomy A', '', ...A.classes.map((c) => `- **${c.id}** (${distA.find((d) => d.cls === c.id)?.n || 0}) — ${c.test}`),
+    '', '## Taxonomy B', '', ...B.classes.map((c) => `- **${c.id}** (${distB.find((d) => d.cls === c.id)?.n || 0}) — ${c.test}`),
+  ].join('\n')
+  writeFileSync(outFile('report.md'), md + '\n')
+  console.log(`\n${md.split('\n').slice(0, 14).join('\n')}\n\nfull report: ${outFile('report.md')}`)
+}
+
+main().catch((err) => { console.error(err?.stack || err); process.exit(1) })
