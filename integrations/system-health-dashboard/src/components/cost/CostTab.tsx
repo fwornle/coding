@@ -141,7 +141,7 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
     if (!isAuto) setLoading(true)
     setError(null)
     try {
-      const [costRes, cs, quotaView, trialList, routing] = await Promise.all([
+      const [costRes, cs, quotaView, trialList] = await Promise.all([
         // by=day: a billing rule can change mid-month; a proxy that predates it
         // ignores the parameter and its monthly rows price on the month's first day.
         fetch(`${proxyBase}/api/token-usage/cost?months=${months}&by=day`),
@@ -152,12 +152,13 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
         fetch(`${proxyBase}/api/trials`)
           .then(r => (r.ok ? r.json() as Promise<{ trials: TrialRef[] }> : null))
           .catch(() => null),
-        fetch(`${proxyBase}/api/llm/routing`)
-          .then(r => (r.ok ? r.json() : null))
-          .catch(() => null),
       ])
       setQuota(quotaView)
       setTrials(trialList?.trials || [])
+      // Only coding's proxy has the routing catalogue; glass's daemon would 404.
+      const routing = cs.settingsApi
+        ? await fetch(`${proxyBase}/api/llm/routing`).then(r => (r.ok ? r.json() : null)).catch(() => null)
+        : null
       setCatalogue(catalogueFromRouting(routing))
       if (!costRes.ok) throw new Error(`cost HTTP ${costRes.status}`)
       const costJson = await costRes.json()

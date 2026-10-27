@@ -464,6 +464,10 @@ export async function startDaemon({
       // The Cost tab's prices without coding's settings API: the contract
       // discount / FX from the build's and the user's cost files (cost.mjs).
       if (req.method === 'GET' && url === '/api/cost-defaults') return json(res, 200, loadCostDefaults(home));
+      // No settings API here, said as an answer rather than a 404: the page asks
+      // on every load, and a 404 is a red console error each time. `settings:
+      // null` sends it to /api/cost-defaults, as the 404 did.
+      if (req.method === 'GET' && url === '/api/llm/settings') return json(res, 200, { settings: null });
       if (req.method === 'GET' && (url === '/api/statusline' || url.startsWith('/api/statusline?'))) {
         const want = new URL(url, 'http://localhost').searchParams.get('task_id');
         const s = liveSession(want);
