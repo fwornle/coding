@@ -10,9 +10,9 @@ title From prompts to a cheaper model per kind of job
 
 component "**1  Define**\nconfig/job-classes.yaml\n11 classes · 3 groups\ntest + examples + prompt" as define <<core>>
 component "**2  Measure**\nteacher labels your history twice\nstudents scored against it\n-> reference set" as measure <<core>>
-component "**3  Label live**\nproxy labels each turn\nwith the student (haiku)\n10 % re-checked by the teacher" as live <<core>>
+component "**3  Label live**\nproxy labels each turn\nwith the student (haiku)\na sample re-checked by the teacher" as live <<core>>
 component "**4  Read coverage**\nToken Usage -> Classes\ntree · map · gaps" as read <<core>>
-component "**5  Share with a team**\nnext: P2 / P3\nteam repo: taxonomy,\nexamples, proposals" as share <<external>>
+component "**5  Share with a team**\nbuilt (P2): init · join · pull\nnext (P3): proposals,\nclass cap, maintainer" as share <<core>>
 component "**6  Trial per class**\nnext: P4\ncheaper model beside the current\none, judged blind" as trial <<external>>
 component "**7  Route by class**\nnext: P4\naccepted trial = evidence\n-> cheaper model for that class" as route <<external>>
 
@@ -26,7 +26,7 @@ define -[hidden]down- route
 read -[#757575,thickness=1,dotted,norank]-> define : gaps -> new taxonomy version
 
 legend right
-  green: built and running
+  green: built and running (step 5: read side only)
   gray: next
 endlegend
 @enduml

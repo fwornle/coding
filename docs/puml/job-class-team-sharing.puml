@@ -1,33 +1,34 @@
 @startuml job-class-team-sharing
 !include _standard-style.puml
-top to bottom direction
 skinparam defaultFontSize 15
 skinparam componentFontSize 15
 skinparam arrowFontSize 13
 skinparam shadowing false
 skinparam componentStyle rectangle
 hide stereotype
-title A team shares one taxonomy (next: P2 / P3)
+title A team shares one taxonomy
 
-package "team repo  (bmw.ghe.com or github.com)" {
-  file "job-classes/taxonomy.yaml\nclasses, groups, prompt, version, maxClasses" as tax <<storage>>
-  file "job-classes/exemplars/<class>.jsonl\nsynthetic examples (real ones only on bmw.ghe, opt-in)" as ex <<storage>>
-  file "job-classes/evidence/<class>.json\ntrial verdicts per model" as ev <<storage>>
-  file "job-classes/proposals/<member>/\nnew classes, examples, verdicts" as prop <<storage>>
+package "a team member's learning repo  (e.g. coding-history)" {
+  component "**job-classes/taxonomy.yaml**\nname, version, classes,\ngroups, prompt" as tax <<storage>>
+  component "**job-classes/CHANGELOG.md**\none line per version" as log <<storage>>
+  component "next (P3, P4): proposals/<member>/,\nevidence/<class>.json" as later <<external>>
 }
 
-component "**first member**\ncoding job-classes init --team <id>\nseeds the taxonomy from their history" as first <<cli>>
-component "**maintainer run**\nabsorb / add / merge under the cap,\nre-score the reference set, bump the version" as maint <<core>>
-component "**each member's machine**\n$HOME/.coding/teams.yaml binds the team to the repo;\ncoding sync pulls it at launch" as member <<agent>>
-component "**that member's LLM proxy**\nlabels with the team's taxonomy" as proxy <<core>>
+component "**first member**\ncoding job-classes init --team <id>\nwrites the package, commits locally;\ncoding sync --push shares it" as first <<cli>>
+component "**each other member**\ncoding job-classes join ~--team <id> ~--repo <url>\nbinds the team in $HOME/.coding/teams.yaml,\nclones the repo; coding sync pulls it" as member <<cli>>
+component "**bindings index**\nvar/job-classes/bindings.json\nproject -> team -> taxonomy file" as index <<storage>>
+component "**LLM proxy**\nlabels a project's turns with its\nteam's taxonomy, the rest with the\ndefault; a project two teams claim\nis not labelled" as proxy <<core>>
 
-first CONTROL_LINE tax : creates
-member DATA_LINE prop : coding sync --push\n(own folder only, no conflicts)
-prop DATA_LINE maint
-maint CONTROL_LINE tax : new version + CHANGELOG
-maint CONTROL_LINE ex
-tax DATA_LINE member : pull
-ex DATA_LINE member : pull
-ev DATA_LINE member : pull
-member DATA_LINE proxy
+first -[#9C27B0,thickness=2]right-> tax : creates
+first -[#9C27B0,thickness=2]right-> log
+tax -[#FF9800,thickness=2]down-> member : pull
+member -[#9C27B0,thickness=2]right-> index : rewritten on join\nand on every pull
+index -[#FF9800,thickness=2]right-> proxy : read by mtime
+tax -[#FF9800,thickness=2]down-> proxy : the file it names
+tax -[hidden]right- log
+log -[hidden]right- later
+
+legend right
+  all built (P2, the read side) except gray: next
+endlegend
 @enduml

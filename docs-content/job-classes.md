@@ -30,10 +30,10 @@ from a trial, not by reputation.
 <div class="overview-benefits" markdown="1">
 
 **Built and running**  
-define the classes · measure them · label live turns · read the coverage
+define the classes · measure them · label live turns · read the coverage · share with a team
 
 **Next**  
-share with a team · trial per class · route by class
+team proposals · trial per class · route by class
 
 </div>
 
@@ -214,29 +214,30 @@ Then edit the YAML, bump the `version` and measure again.
 <section class="overview-slide" id="slide-7" aria-labelledby="jc-team" markdown="1">
 <div class="overview-copy" markdown="1">
 
-<p class="overview-kicker">Step 5 · next (P2 / P3)</p>
+<p class="overview-kicker">Step 5 · built (P2) · proposals next (P3)</p>
 
 ## Set up a team {#jc-team}
 
-**Today:** declare the team's repos in `~/.coding/teams.yaml`, or in the
-dashboard's **Teams** tab, then measure with `--team=<id>`. Only that team's
-prompts are read.
+1. Declare the team's repos in `~/.coding/teams.yaml`, or in the dashboard's **Teams** tab.
+2. The first member runs `coding job-classes init --team <id>`. It writes `job-classes/taxonomy.yaml` into their learning repo and commits it locally. `coding sync --push` shares it.
+3. Every other member runs `coding job-classes join --team <id> --repo <url>`. After that, `coding sync` pulls new versions at launch.
+4. Measure the team's taxonomy on the team's prompts: `measure-job-classes.mjs --team=<id> --taxonomy=<its file>`.
 
-**Next:**
+From then on, the proxy labels that team's projects with the team's taxonomy and
+every other project with the default. Labels carry the taxonomy's name and
+version, and **Classes** has a picker for which one to read.
 
-1. The first member runs `coding job-classes init --team <id>`. This seeds the team repo from their history.
-2. Every member's `teams.yaml` points the team at that repo, and `coding sync` pulls it at launch.
-3. Members **propose** new classes, examples and verdicts in their own folder, pushed with `coding sync --push`.
-4. One **maintainer** run folds the proposals in. It keeps the class count under a cap, re-scores the reference set and refuses churn.
+**Next (P3):** members propose new classes in their own folder, and one
+maintainer run folds them in under a class cap.
 
 </div>
 <figure class="overview-figure" markdown="1">
 
 [![The team repo holds taxonomy.yaml, synthetic exemplars, evidence per class and per-member proposal folders. The first member creates it, members pull it and push proposals, a maintainer run folds proposals into a new version, and each member's LLM proxy labels with the team's taxonomy.](images/job-class-team-sharing.png)](images/job-class-team-sharing.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
 
-<figcaption>The team repo holds no raw prompts, only the taxonomy, synthetic examples and verdicts.</figcaption>
+<figcaption>The shared package holds no prompts: only the taxonomy and its changelog.</figcaption>
 </figure>
-<p class="overview-takeaway">One maintainer edits the taxonomy, so it never has merge conflicts.</p>
+<p class="overview-takeaway">A project in two teams with two taxonomies is not labelled, not guessed.</p>
 </section>
 
 <section class="overview-slide" id="slide-8" aria-labelledby="jc-trial" markdown="1">
@@ -309,7 +310,7 @@ Downgrade-only and fail-open still apply: no evidence, no change.
 | P0 measure | ✅ | a hand-written taxonomy: teacher vs itself 0.93, student 80 % |
 | P1 shadow labels | ✅ running | every turn labelled; tokens, coverage and agreement per class |
 | P1 gate | ⏳ collecting | enough teacher-checked live turns to trust the live accuracy |
-| P2 team repo, read side | next | `job-classes init`, binding, pull on sync |
+| P2 team repo, read side | ✅ | `coding job-classes init` / `join`, labels per team, pull on sync |
 | P3 contributions | next | proposals, maintainer fold, class cap, stability check |
 | P4 class trials + routing | next | `jobClass` on trials, evidence, per-class band floor |
 
