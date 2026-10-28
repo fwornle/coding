@@ -10,13 +10,17 @@ Where the tokens went: per process, per model, per account, over any window you 
     through the proxy is logged with its provider, model, calling process, token counts, latency
     and a prompt preview.
 
-    ## Three tabs
+    ## The tabs
 
     | Tab | Answers |
     |-----|---------|
     | **Overview** | Who is consuming — a treemap by process, plus donuts by provider and model |
     | **Evolution** | How consumption changes over time, stacked by process, model, provider or in/out |
+    | **Cost** | What the month costs per account, in € or $ |
+    | **Trials** | Whether a cheaper model would do for a background process, judged on its real calls |
+    | **Classes** | What kind of job each of your turns was (fix, build, explain, …) and what each kind costs |
     | **Recent Calls** | The last 50 calls, individually |
+    | **Routing** | Which band and provider each process is routed to |
 
     A time-window dropdown (1h through All time) drives every number on the page at once.
 

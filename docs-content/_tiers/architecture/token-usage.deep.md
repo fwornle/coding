@@ -13,7 +13,7 @@ The Token Usage page provides real-time visibility into LLM token consumption ac
 The page is organized into five tabs sharing a single header bar:
 
 - **Summary cards** (always visible): Total Tokens (Total Cost in the € / $ view), Total Calls, Avg Latency per LLM call, and an Account card (consumption per billed account). Each card's title names the active **time window** — "Total Cost · Last 7 days" — because the Cost tab below follows the calendar month instead, and an unlabelled 24 h figure over a month's figure reads as a contradiction.
-- **Tabs:** Overview · Evolution · Cost · Recent Calls · Routing.
+- **Tabs:** Overview · Evolution · Cost · Trials · Classes · Recent Calls · Routing.
 - **Header actions:** **foreground / background** checkboxes (your agent conversations vs everything that runs on its own; applied server-side, so every figure on the page describes the same rows) · **Tokens · € · $** unit switch (see [Cost and the € / $ view](#cost-and-the-view)) · **Time window** dropdown (`Last 1h · 24h · 48h · 7 days · 30 days · All time`) · **Accounts** (see [Account selection](#account-selection)) · ⚙ Settings (opens the LLM Routing dialog) · ⟳ Refresh.
 
 ### Account selection
@@ -464,6 +464,37 @@ candidateProvider? }` still works), `POST /api/trials/:id/stop | reject | accept
 The routing is in `llm-routing.yaml` only. The settings dialog's old `processOverrides`
 are not read by the request path, which is why the former *Route to Haiku* button reported
 "routed" and changed nothing; it is gone.
+
+## Job classes { #job-classes }
+
+**Token Usage → Classes** answers "what kind of job was each of my turns, and what does
+each kind cost?" — the step before routing a kind of job to a cheaper model. The whole
+mechanism, step by step, is the [job classes deck](../job-classes.md).
+
+- **Labels** — the proxy's shadow tagger (`rapid-llm-proxy/proxy-bridge/job-class.mjs`)
+  labels every foreground human turn once, in the background, with a cheap student model
+  (Haiku 5.5) against a taxonomy: each class has a test, examples and a group (build ·
+  repair · understand). A share of turns (`teacher_sample_pct`, 30 %) is labelled by the
+  teacher (Sonnet 5) as well. Sub-agent and utility calls carry no job of their own and are
+  skipped. Shadow only: nothing routes on the labels yet.
+- **The tab** — a taxonomy picker (the default `config/job-classes.yaml`, or a team's
+  shared one), then:
+  - **Taxonomy and coverage**, as a **Tree** (group → class, each with its share of the
+    turns) or a **Map** (classes by project, with the gaps the taxonomy cannot place);
+  - **By class** — turns, tokens and the student's agreement with the teacher per class
+    (the gate before anything routes on a class);
+  - **Recently labelled turns**, with the prompt preview (redacted).
+- **Teams** — a team may share its own taxonomy from a member's learning repo
+  (`coding job-classes init` / `join`); its projects are labelled under it, and members
+  grow it with `coding job-classes propose` and the maintainer's `fold`. A class merged
+  away keeps its history: its labels count for the class it was merged into. Labels made
+  under two different taxonomies are never counted together.
+
+API on the proxy: `GET /api/job-classes` (the tagger's counters, `labelled` / `skipped`),
+`GET /api/job-classes/summary?days=7&taxonomy=<name>-v<n>` (tokens and agreement by class,
+joined to `token_usage` on the turn identity), `GET /api/job-classes/coverage`. Store: the
+`turn_job_class` table in the token DB. Plan: `.planning/shared-job-classes.md`. glass does
+not show this tab.
 
 ## Cognitive process reference
 
