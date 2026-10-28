@@ -59,6 +59,7 @@
  *                        on the bg-job-class-student route, or ollaya:<model> for a
  *                        decision model served by Ollaya (OLLAYA_URL)
  *   --ollaya-concurrency=<n>  Ollaya calls in flight (default 2)
+ *   --ollaya-timeout-s=<n>    Seconds before an Ollaya call counts as hung (default 300)
  *   --taxonomy=<file>    Skip the derivations: score a committed taxonomy
  *                        (config/job-classes.yaml) on the checkpointed held-out set
  *   --set=heldout|pool   With --taxonomy: score the held-out set (default; the one
@@ -426,13 +427,24 @@ async function singleLabels(rows, tax, route, tag) {
   const served = new Set()
   const latency = []
   const confidences = new Array(rows.length).fill(null)
-  let done = 0
+  // A slow student (a decision model on a laptop CPU) saves its progress as it
+  // goes, so a run that is stopped resumes where it was instead of starting over.
+  const partialName = `labels-${tag}.partial.json`
+  const partial = route.ollaya ? (readCk(partialName) || { labels: {}, confidences: {}, latency: [] }) : null
+  if (partial && Object.keys(partial.labels).length) console.log(`labels ${tag}: resuming, ${Object.keys(partial.labels).length} already labelled`)
+  if (partial) for (const v of partial.latency) latency.push(v)
+  let done = partial ? Object.keys(partial.labels).length : 0
   const labels = await pool(rows, route.concurrency || 6, async (r, i) => {
+    if (partial && partial.labels[i] != null) { confidences[i] = partial.confidences[i] ?? null; served.add(`ollaya/${route.ollaya}`); return partial.labels[i] }
     let c = 'invalid'
     try {
       let got
       if (route.ollaya) {
-        const out = await decide(tax, r.text, route.ollaya)
+        let out
+        try { out = await decide(tax, r.text, route.ollaya) } catch (err) {
+          console.log(`  ${tag}: item ${i}: ${err.message}, asking once more`)
+          out = await decide(tax, r.text, route.ollaya)
+        }
         served.add(out.model)
         if (Number.isFinite(out.latencyMs)) latency.push(Math.round(out.latencyMs))
         if (Number.isFinite(out.confidence)) confidences[i] = out.confidence
@@ -445,6 +457,12 @@ async function singleLabels(rows, tax, route, tag) {
       }
       c = ids.has(got) ? got : (got === 'none' ? 'none' : 'invalid')
     } catch (err) { console.log(`  ${tag}: ${err.message}`) }
+    if (partial) {
+      partial.labels[i] = c
+      partial.confidences[i] = confidences[i]
+      if (Number.isFinite(latency.at(-1))) partial.latency = latency.slice()
+      if (Object.keys(partial.labels).length % 10 === 0) writeJson(partialName, partial)
+    }
     if (++done % 50 === 0) console.log(`  label ${tag} ${done}/${rows.length}`)
     return c
   })
@@ -477,6 +495,9 @@ async function decide(tax, text, model) {
     + (tax.precedence ? ` If more than one class fits, take the one that comes first in: ${tax.precedence.join(' > ')}.` : '')
   const res = await fetch(`${OLLAYA}/api/decide`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
+    // A 4B model on a laptop CPU takes 20-60 s; a request that has not answered
+    // in five minutes is hung (an unbounded one stalled a run for ten hours).
+    signal: AbortSignal.timeout(Number(opt('ollaya-timeout-s', 300)) * 1000),
     body: JSON.stringify({ model, state: text.slice(0, 500).replace(/\s+/g, ' '), questions: { job_class: { type: 'choice', instructions, criteria } } }),
   })
   if (!res.ok) throw new Error(`ollaya HTTP ${res.status} ${(await res.text()).slice(0, 160)}`)
