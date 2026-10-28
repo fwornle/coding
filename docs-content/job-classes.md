@@ -30,10 +30,10 @@ from a trial, not by reputation.
 <div class="overview-benefits" markdown="1">
 
 **Built and running**  
-define the classes · measure them · label live turns · read the coverage · share with a team
+define the classes · measure them · label live turns · read the coverage · share and grow them as a team
 
 **Next**  
-team proposals · trial per class · route by class
+trial per class · route by class
 
 </div>
 
@@ -214,7 +214,7 @@ Then edit the YAML, bump the `version` and measure again.
 <section class="overview-slide" id="slide-7" aria-labelledby="jc-team" markdown="1">
 <div class="overview-copy" markdown="1">
 
-<p class="overview-kicker">Step 5 · built (P2) · proposals next (P3)</p>
+<p class="overview-kicker">Step 5 · built (P2)</p>
 
 ## Set up a team {#jc-team}
 
@@ -227,20 +227,39 @@ From then on, the proxy labels that team's projects with the team's taxonomy and
 every other project with the default. Labels carry the taxonomy's name and
 version, and **Classes** has a picker for which one to read.
 
-**Next (P3):** members propose new classes in their own folder, and one
-maintainer run folds them in under a class cap.
-
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![The team repo holds taxonomy.yaml, synthetic exemplars, evidence per class and per-member proposal folders. The first member creates it, members pull it and push proposals, a maintainer run folds proposals into a new version, and each member's LLM proxy labels with the team's taxonomy.](images/job-class-team-sharing.png)](images/job-class-team-sharing.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
+[![The first member writes job-classes/taxonomy.yaml and CHANGELOG.md into their learning repo; each other member joins, which binds the team and clones the repo; a bindings index maps each project to its team's taxonomy file, and the LLM proxy labels each project with it.](images/job-class-team-sharing.png)](images/job-class-team-sharing.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
 
 <figcaption>The shared package holds no prompts: only the taxonomy and its changelog.</figcaption>
 </figure>
 <p class="overview-takeaway">A project in two teams with two taxonomies is not labelled, not guessed.</p>
 </section>
 
-<section class="overview-slide" id="slide-8" aria-labelledby="jc-trial" markdown="1">
+<section class="overview-slide" id="slide-8" aria-labelledby="jc-grow" markdown="1">
+<div class="overview-copy" markdown="1">
+
+<p class="overview-kicker">Step 5, continued · built (P3)</p>
+
+## Grow the taxonomy {#jc-grow}
+
+1. Any member runs `coding job-classes propose --team <id>`. The teacher reads the prompts no class could place and drafts new classes, with examples it writes itself. The proposal goes into the member's own repo, and `coding sync --push` shares it.
+2. The maintainer runs `coding job-classes fold --team <id>` (`--dry-run` first).
+3. A proposal an existing class already holds is **absorbed**. A new kind of job is **added**. At the class cap, the two classes the teacher confuses most **merge** to make room.
+4. Before anything is written, the **stability check** labels reference prompts under the old and the new version. A version that moves the untouched classes is refused.
+
+</div>
+<figure class="overview-figure" markdown="1">
+
+[![A member's proposal lands in their own repo; the maintainer's fold absorbs it, adds it, or merges two classes to make room; a stability check guards the new version, which is committed with a changelog line and pulled by every member.](images/job-class-team-growth.png)](images/job-class-team-growth.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
+
+<figcaption>A merged class leaves a tombstone, so its old labels still count for the class it merged into.</figcaption>
+</figure>
+<p class="overview-takeaway">One maintainer writes the taxonomy; every member can propose.</p>
+</section>
+
+<section class="overview-slide" id="slide-9" aria-labelledby="jc-trial" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Step 6 · built per process, per class next (P4)</p>
@@ -269,7 +288,7 @@ Here haiku-5.5 **failed** on `consolidator-insight`: it was at least as good on 
 <p class="overview-takeaway">No model gets cheaper without evidence from your own traffic.</p>
 </section>
 
-<section class="overview-slide" id="slide-9" aria-labelledby="jc-route" markdown="1">
+<section class="overview-slide" id="slide-10" aria-labelledby="jc-route" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Step 7 · next (P4)</p>
@@ -298,7 +317,7 @@ Downgrade-only and fail-open still apply: no evidence, no change.
 <p class="overview-takeaway">The class picks which jobs to try; the evidence decides the model.</p>
 </section>
 
-<section class="overview-slide" id="slide-10" aria-labelledby="jc-status" markdown="1">
+<section class="overview-slide" id="slide-11" aria-labelledby="jc-status" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Where it stands</p>
@@ -311,7 +330,7 @@ Downgrade-only and fail-open still apply: no evidence, no change.
 | P1 shadow labels | ✅ running | every turn labelled; tokens, coverage and agreement per class |
 | P1 gate | ⏳ collecting | enough teacher-checked live turns to trust the live accuracy |
 | P2 team repo, read side | ✅ | `coding job-classes init` / `join`, labels per team, pull on sync |
-| P3 contributions | next | proposals, maintainer fold, class cap, stability check |
+| P3 contributions | ✅ | `propose` / `fold`: absorb, add, merge at the cap, stability check |
 | P4 class trials + routing | next | `jobClass` on trials, evidence, per-class band floor |
 
 </div>

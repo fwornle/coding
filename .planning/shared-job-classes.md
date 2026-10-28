@@ -174,7 +174,7 @@ nothing changes silently.
 | **P0 — measure** | Offline script: teacher labels ~2 weeks of captured first-call prompts from `context_turns`, at cap 16, twice | kappa ≥ 0.7 between the two derivations, and a class distribution not dominated by one bucket. **If this fails, stop: there is no stable taxonomy to share** |
 | **P1 — local class, shadow** | Service returns `class` (KNN + closed-set LLM fallback); `job_class`/`job_class_source` columns; "by class" view; no routing effect | Student vs teacher per-class precision on held-out data |
 | **P2 — shared repo, read side** ✅ | Package format + validator, `teams.yaml` binding, `job-classes init`, pull via `coding sync`, local KNN rebuild | Two machines resolve the same class for the same prompt |
-| **P3 — contributions + dedup** | `proposals/`, maintainer fold with absorb/add/merge/stability check, versioned CHANGELOG, tombstones | A forced cap overflow merges correctly and keeps old rows resolvable |
+| **P3 — contributions + dedup** ✅ | `proposals/`, maintainer fold with absorb/add/merge/stability check, versioned CHANGELOG, tombstones | A forced cap overflow merges correctly and keeps old rows resolvable |
 | **P4 — per-class trials + evidence routing** | `jobClass` on trials; fg first-call sampling; `evidence/` publishing; evidence-derived band floor per member | One accepted class trial changes a routing decision on a second member's machine and is visible in `/resolve` |
 | **P5 — glass** | glass reads the binding and shows classes, evidence and "by class" read-only. Whether glass gets `init` depends on question 3 below | — |
 
@@ -262,6 +262,48 @@ Team `coding` is bound on this machine (`coding-history`, committed locally,
 not pushed). Its reference set does not exist yet: the measurement has to be
 run under the team taxonomy's tag
 (`measure-job-classes.mjs --team=coding --taxonomy=<package file>`).
+
+## P3 results (2026-10-28)
+
+Built: `coding job-classes propose|fold` (`lib/job-classes/evolve.mjs`).
+
+- **Proposals live in the proposer's OWN learning repo**, under
+  `job-classes/proposals/<team>/<member>-<time>.json`, not in the package
+  repo: a teammate's package clone is pull-only. The maintainer already pulls
+  every member's repo, which is where `fold` finds them. A member is a
+  10-character pseudonym, never a user or host name.
+- **No prompt is shared.** The teacher reads the member's gaps (reference
+  prompts labelled none or labelled two ways, live `none` turns) and writes
+  synthetic examples. An example that shares a run of 6 words with any real
+  prompt is dropped, and a class must hold at least 3 of the gaps it was shown.
+- **The decisions without embeddings.** The plan's centroid distance needed the
+  KNN that P0 dropped. Instead: absorb = the teacher labels the proposal's
+  examples under the current taxonomy and most land in one class; merge-to-make-room
+  = the pair the two teacher passes disagree on most in the maintainer's
+  reference set (at least 3 disagreements), the larger class surviving.
+- **Tombstones**: `retired: [{id, mergedInto, version, test}]`. The validator
+  requires every chain to end at a current class. rapid-llm-proxy counts the
+  labels of every version of a taxonomy, each resolved to today's class
+  (`resolveClass`, `versionTags`), in `summary` and live `coverage`.
+- **Stability**: 40 reference prompts under the old and the new taxonomy,
+  kappa ≥ 0.7 on the classes the fold did not touch, at least 10 compared;
+  otherwise refused and nothing is written.
+- `job-classes/folded.json` records every decision, absorbs and rejects
+  included, so a proposal is folded once.
+
+Gate: the forced cap overflow is a test (`tests/teams/job-classes-evolve.test.mjs`):
+at maxClasses 3 a distinct proposal merges the most-confused pair, the
+survivor's test is rewritten, the old label resolves to the survivor, and
+the proxy counts the old version's labels under it.
+
+Real run on team coding: the teacher proposed `investigate-discrepancy` from 34
+gaps (one call earlier proposed nothing: the teacher is not deterministic);
+the fold **absorbed** it into `fix` (its examples all landed there, matching v1's
+"why did X go wrong is fix"). No new version.
+
+Found on the way: the reference set's gaps include harness text (a skill's
+loader text, "Base directory for this skill"), which the measurement's noise
+filter misses. They are noise to the teacher, not prompts.
 
 ## Open questions (yours to decide)
 

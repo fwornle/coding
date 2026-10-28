@@ -11,7 +11,6 @@ title A team shares one taxonomy
 package "a team member's learning repo  (e.g. coding-history)" {
   component "**job-classes/taxonomy.yaml**\nname, version, classes,\ngroups, prompt" as tax <<storage>>
   component "**job-classes/CHANGELOG.md**\none line per version" as log <<storage>>
-  component "next (P3, P4): proposals/<member>/,\nevidence/<class>.json" as later <<external>>
 }
 
 component "**first member**\ncoding job-classes init --team <id>\nwrites the package, commits locally;\ncoding sync --push shares it" as first <<cli>>
@@ -26,9 +25,8 @@ member -[#9C27B0,thickness=2]right-> index : rewritten on join\nand on every pul
 index -[#FF9800,thickness=2]right-> proxy : read by mtime
 tax -[#FF9800,thickness=2]down-> proxy : the file it names
 tax -[hidden]right- log
-log -[hidden]right- later
 
 legend right
-  all built (P2, the read side) except gray: next
+  built (P2)
 endlegend
 @enduml

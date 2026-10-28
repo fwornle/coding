@@ -1,0 +1,34 @@
+@startuml job-class-team-growth
+!include _standard-style.puml
+skinparam defaultFontSize 15
+skinparam componentFontSize 15
+skinparam arrowFontSize 13
+skinparam shadowing false
+skinparam componentStyle rectangle
+hide stereotype
+title A team grows its taxonomy
+
+component "**any member**\ncoding job-classes propose\nthe teacher reads the prompts\nno class could place" as proposer <<cli>>
+component "**proposals/<team>/<member>-<time>.json**\nin the member's OWN repo\ntest + synthetic examples, no prompts" as prop <<storage>>
+component "**maintainer**\ncoding job-classes fold\nthe teacher labels each proposal's\nexamples under today's classes" as maint <<core>>
+component "**absorb**\nmost land in one class:\nit already holds the job" as absorb <<core>>
+component "**add**\nunder the cap:\na new class" as add <<core>>
+component "**merge to make room**\nat the cap: the two classes the\nteacher confuses most become one;\nthe other is retired (tombstone)" as merge <<core>>
+component "**stability check**\nreference prompts under old and new;\nkappa < 0.7 on untouched classes = refused" as stab <<core>>
+component "**new version**\ntaxonomy.yaml + CHANGELOG.md\n+ folded.json, committed;\nmembers pull it" as ver <<storage>>
+
+proposer -[#9C27B0,thickness=2]right-> prop : writes
+prop -[#FF9800,thickness=2]right-> maint : pulled with\ntheir repo
+maint -[#9C27B0,thickness=2]down-> absorb
+maint -[#9C27B0,thickness=2]down-> add
+maint -[#9C27B0,thickness=2]down-> merge
+add -[#9C27B0,thickness=2]down-> stab
+merge -[#9C27B0,thickness=2]down-> stab
+stab -[#9C27B0,thickness=2]left-> ver : passes
+absorb -[#757575,thickness=1,dotted]down-> ver : recorded only
+
+legend right
+  an old label of a retired class
+  counts for the class it merged into
+endlegend
+@enduml
