@@ -176,7 +176,7 @@ nothing changes silently.
 | **P2 — shared repo, read side** ✅ | Package format + validator, `teams.yaml` binding, `job-classes init`, pull via `coding sync`, local KNN rebuild | Two machines resolve the same class for the same prompt |
 | **P3 — contributions + dedup** ✅ | `proposals/`, maintainer fold with absorb/add/merge/stability check, versioned CHANGELOG, tombstones | A forced cap overflow merges correctly and keeps old rows resolvable |
 | **P4 — per-class trials + evidence routing** | `jobClass` on trials; fg first-call sampling; `evidence/` publishing; evidence-derived band floor per member | One accepted class trial changes a routing decision on a second member's machine and is visible in `/resolve` |
-| **P5 — glass** | glass reads the binding and shows classes, evidence and "by class" read-only. Whether glass gets `init` depends on question 3 below | — |
+| **P5 — glass** | Opt-in live labelling in glass (the user's own model), the read endpoints, the Classes tab; later a team taxonomy pulled read-only from a git URL. Design below | Starts after the P1 gate. Done when a glass user with labelling switched on sees the same class as coding for the same prompt and the same taxonomy, and with it off glass sends nothing new |
 
 Touch points: coding (service, trainer, teacher, sync, teams, dashboard),
 rapid-llm-proxy (`job_class` column, trial keying, class-aware band floor in
@@ -303,7 +303,57 @@ the fold **absorbed** it into `fix` (its examples all landed there, matching v1'
 
 Found on the way: the reference set's gaps include harness text (a skill's
 loader text, "Base directory for this skill"), which the measurement's noise
-filter misses. They are noise to the teacher, not prompts.
+filter misses. They are noise to the teacher, not prompts. Fixed in fb36222f
+(`lib/job-classes/noise.mjs`, used by the measurement and by `propose`).
+
+## P5 — glass (design, 2026-10-28)
+
+**Why it is off today.** glass 0.1.56 carries the pieces but none runs: the
+dashboard's Classes tab is in the bundle and not among glass's tabs, and
+`anthropic-forward.mjs` has the `onTurn` hook that glass never passes. That is
+deliberate. glass is a passive meter: it forwards and counts the agents'
+traffic and makes no model call of its own (offload is opt-in and goes to the
+user's own endpoint; trials are read-only in glass for the same reason). The
+tagger calls a student on every turn and a teacher on a share of them, through
+rapid-llm-proxy's routing and accounts, which glass does not have.
+
+**What glass users would get, in order:**
+
+1. **Opt-in live labelling** — off by default, switched on in Token Usage →
+   Settings like offload, with the same "what leaves your machine" wording.
+   - Manifest: `proxy-bridge/job-class.mjs` (and what it imports) selected; the
+     daemon creates the tagger and passes `onTurn` to the forwarder.
+   - The labelling model is the user's choice: their offload endpoint (a local
+     model, no cost) or a model on an account they already use, called with
+     their own credentials. No teacher by default; a teacher share is a
+     second, explicit setting, since it costs more per turn.
+   - The prompt is redacted before any model sees it (the daemon's redactor, as
+     in coding), and only the bounded preview is stored.
+   - Taxonomy: the shipped default (`config/job-classes.yaml`, copied by the
+     manifest).
+2. **Read side** — `GET /api/job-classes`, `/summary` and `/coverage` in the
+   glass daemon (shared code with server.mjs rather than a copy, the way the
+   trials reads are shared), the `turn_job_class` table in glass's token DB,
+   and `classes` added to glass's tab list. Coverage has no reference set in
+   glass (no session-log history), so the tab shows live labels only; the map's
+   reference toggle is hidden.
+3. **Team taxonomy, read-only (later)** — glass reads a team's
+   `job-classes/taxonomy.yaml` from a git URL it pulls itself, like `join`
+   without `teams.yaml` or `coding sync`. `propose` and `fold` stay in coding:
+   they need the session-log history and the maintainer's checkout.
+
+**Not in glass:** the measurement (P0), the reference set, propose and fold,
+and routing by class (P4), until glass routes at all.
+
+**Checks:** `forbidden` stays as it is (the KNN model was dropped in P0, so
+there is no embedding dependency to ship); the extract is closed and
+deny-clean on both targets; a daemon test with labelling off sees no outbound
+call beyond the agent's own; one with a stub model sees the label row; the
+public tree carries no internal taxonomy or examples.
+
+**Open:** whether the default taxonomy, written from coding's own history,
+fits other teams well enough to ship as glass's default, or whether glass
+should start with labelling off until a team taxonomy is bound.
 
 ## Open questions (yours to decide)
 
@@ -312,9 +362,9 @@ filter misses. They are noise to the teacher, not prompts.
    much P4 is worth.
 2. **Group = coding team?** This would reuse `teams.yaml` membership. The alternative
    is a separate group concept, for people who use glass and no coding.
-3. **glass's role.** Today glass is read-only and ships no classifier service.
-   Bootstrapping from glass means shipping the service (and MiniLM) in glass, which
-   breaks its "no heavy deps" stance in `manifest.yaml`'s `forbidden` list.
+3. **glass's role.** Proposed in P5 (2026-10-28): opt-in live labelling and a read-only
+   team taxonomy (P5); no `init`, `propose` or `fold` in glass. The MiniLM
+   concern is gone, since P0 dropped the KNN model.
 4. **Maintainer model.** Single maintainer (simple, one writer), or every member's
    machine folding proposals deterministically? The second is possible but needs the
    dedup to be reproducible, and teacher LLM calls are not.
