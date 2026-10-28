@@ -175,7 +175,7 @@ nothing changes silently.
 | **P1 — local class, shadow** | Service returns `class` (KNN + closed-set LLM fallback); `job_class`/`job_class_source` columns; "by class" view; no routing effect | Student vs teacher per-class precision on held-out data |
 | **P2 — shared repo, read side** ✅ | Package format + validator, `teams.yaml` binding, `job-classes init`, pull via `coding sync`, local KNN rebuild | Two machines resolve the same class for the same prompt |
 | **P3 — contributions + dedup** ✅ | `proposals/`, maintainer fold with absorb/add/merge/stability check, versioned CHANGELOG, tombstones | A forced cap overflow merges correctly and keeps old rows resolvable |
-| **P4 — per-class trials + evidence routing** | `jobClass` on trials; fg first-call sampling; `evidence/` publishing; evidence-derived band floor per member | One accepted class trial changes a routing decision on a second member's machine and is visible in `/resolve` |
+| **P4 — per-class replay trials + evidence** | Whole-turn replays of sampled real turns in a sandbox, incumbent vs candidate, judged blind; `evidence/` in the team package; the class-aware floor for agents the proxy routes. Design below | Replays of one answer-only class reach a verdict, and the A/A noise floor is measured |
 | **P5 — glass** | Opt-in live labelling in glass (the user's own model), the read endpoints, the Classes tab; later a team taxonomy pulled read-only from a git URL. Design below | Starts after the P1 gate. Done when a glass user with labelling switched on sees the same class as coding for the same prompt and the same taxonomy, and with it off glass sends nothing new |
 
 Touch points: coding (service, trainer, teacher, sync, teams, dashboard),
@@ -354,6 +354,71 @@ public tree carries no internal taxonomy or examples.
 **Open:** whether the default taxonomy, written from coding's own history,
 fits other teams well enough to ship as glass's default, or whether glass
 should start with labelling off until a team taxonomy is bound.
+
+## P4 — per-class replay trials (design, 2026-10-28)
+
+**Why not the live trials.** A live trial judges one call against one call. A
+background process's call is its whole job; a human turn's first call is
+usually a plan or a first tool call, and the job happens in the tool loop
+after it. A cheaper first call that looks as good says little about the turn.
+Decided (2026-10-28): **replay whole turns** in a sandbox (option b), for a few
+high-volume classes. Reporting by class (the Classes tab) is the fallback for
+the rest.
+
+**Meanwhile, the P1 gate is fed faster:** `teacher_sample_pct` is 1.0 from
+2026-10-28 for about two weeks (it was 0.3; about 13–30 labelled turns a day,
+spread over 11 classes, would have taken months), then back to 0.3.
+
+**The loop:**
+
+1. **Capture at turn start.** A `UserPromptSubmit` hook records a light
+   snapshot of the turn's repo: HEAD, a capped dirty patch and the list of
+   untracked files (the `lib/repro/git-state.mjs` primitives, no KB, no env),
+   keyed by the turn identity the proxy labels with. When the label arrives,
+   retention keeps the snapshot only for a sampled turn of a target class; the
+   rest are deleted within the day.
+2. **Replay.** `lib/repro/restore-snapshot.mjs` builds an isolated worktree at
+   the captured state. The session transcript is copied and cut just before the
+   turn, and the agent resumes from the copy with the turn's prompt, headless,
+   once with the **incumbent** model and once with the **candidate**. The
+   sandbox denies outward actions (push, PR, merge, release, writes outside the
+   worktree) and points the agent at a sandbox proxy data dir, as the
+   experiment harness does.
+3. **Judge.** The trials judge, blind and twice with the order swapped: the
+   final answer (and, later, the diff) of incumbent vs candidate. The A/A floor
+   is the incumbent's replay against what really happened in the turn, so
+   replay noise is not mistaken for a worse model.
+4. **Verdict.** The trials' rule (≥ 20 judged pairs, at least as good in
+   ≥ 90 %), per class and candidate. An accepted verdict is written to the
+   team package's `evidence/<class>.json` (model, agent, pairs, judge, date;
+   no prompt text), proposed and folded like a class.
+5. **Use.** For agents whose model the proxy routes (opencode, pi, copilot via
+   offload), the evidence sets the class's lowest allowed band on that member's
+   route. For Claude Code, whose main model the proxy does not choose, it is a
+   recommendation in the Classes tab ("status turns: Haiku 5.5 was as good in
+   23 of 24 replays").
+
+**First slice: answer-only classes.** `status` and `explain` end in an answer,
+not a change, so the outcome is the final text and the sandbox only needs the
+repo at the turn's state. Classes that change things (`fix`, `build`,
+`cleanup`) need the diff judged and a test signal, and `ship` / `run` act on
+the outside world: later, if at all. `reply` is excluded, since its job is
+whatever the previous turn proposed.
+
+**Cost.** A replay is a whole agent turn, about 0.5–1 M cache-read tokens for a
+status turn today; two replays per sample (incumbent and candidate), 20
+samples per class and candidate. The replays are logged under their own
+process (as `model-trial-shadow` is) so their cost is visible.
+
+**Risks to settle in the spike:**
+- Does a resumed, truncated transcript reproduce the turn's context closely
+  enough? The A/A floor answers this; if the incumbent replay often disagrees
+  with the real turn, the method fails and P4 stops at reporting.
+- Live reads during a replay (a `curl` to a local service) see today's state,
+  not the turn's. Answer-only classes are the most exposed to this, so the
+  judge must be told that live figures may differ.
+- Headless termination differs per agent (see the experiment harness notes);
+  the spike uses Claude Code only.
 
 ## Open questions (yours to decide)
 
