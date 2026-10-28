@@ -122,6 +122,7 @@ const require = createRequire(import.meta.url)
 const teamsConfig = require('../lib/teams/config.cjs')
 const { varDir } = require('../lib/paths/data-home.cjs')
 const { defaultTeamsFor, parseTeams } = await import('../lib/teams/scope.mjs')
+const { isHarnessNoise } = await import('../lib/job-classes/noise.mjs')
 
 // The corpus scope: whose prompts a taxonomy is built and scored on.
 const TEAMS = opt('team', '') === 'all' ? null : parseTeams(opt('team', '') || defaultTeamsFor(process.cwd()))
@@ -197,14 +198,6 @@ async function pool(items, n, fn) {
 // corpus
 // ---------------------------------------------------------------------------
 
-/** Harness text that reaches the LSL as a "user" message but is nobody's job. */
-const NOISE = [
-  /^<task-notification>/, /^<local-command-/, /^<command-(name|message)>/, /^Caveat:/,
-  /^This session is being continued from a previous conversation/,
-  /^# /,                       // a slash command's expanded skill file
-  /^\[Request interrupted/,
-]
-
 export function cleanPrompt(raw) {
   let t = String(raw || '')
   t = t.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, ' ')
@@ -256,7 +249,7 @@ function extractCorpus() {
             const raw = (Array.isArray(c) ? c.map((b) => b?.text || '').join('\n') : String(c || '')).trim()
             if (!raw) continue
             if (agent === 'sub-agent') { dropped.subagent++; continue }
-            if (NOISE.some((re) => re.test(raw))) { dropped.noise++; continue }
+            if (isHarnessNoise(raw)) { dropped.noise++; continue }
             const text = cleanPrompt(raw)
             if (text.replace(/\[(image|pasted \d+ chars)\]/g, '').trim().length < MIN_CHARS) { dropped.short++; continue }
             const key = text.toLowerCase()

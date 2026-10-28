@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { validateTaxonomy } from '../../lib/job-classes/package.mjs';
+import { isHarnessNoise } from '../../lib/job-classes/noise.mjs';
 import { fold, propose, pendingProposals, readTaxonomy, resolveClass, confusedPairs, kappa } from '../../lib/job-classes/evolve.mjs';
 
 const TAXONOMY = `# the team's taxonomy — this comment must survive a fold
@@ -210,5 +211,20 @@ describe('helpers', () => {
     assert.deepEqual(confusedPairs(tax, [{ teacher: ['a', 'c'] }, { teacher: ['b', 'a'] }, { teacher: ['b', 'c'] }]), [{ pair: ['a', 'b'], n: 2 }]);
     assert.equal(kappa(['a', 'b', 'a'], ['a', 'b', 'a']), 1);
     assert.equal(kappa([], []), null);
+  });
+});
+
+describe('harness noise', () => {
+  test('skill loads, bash mode and its output are nobody\'s job; a real prompt is kept', () => {
+    for (const t of [
+      'Base directory for this skill: /x/skills/sl\n\n# Session logs',
+      '(Re-invocation of /sl — the skill instructions were previously loaded',
+      'Skill /documentation-style is already loaded above; instructions unchanged.',
+      '! git -C ~/repo push origin --delete HEAD',
+      '<bash-stdout>/x</bash-stdout><bash-stderr></bash-stderr>',
+      'The following tool was executed by the user',
+      '<task-notification>done</task-notification>',
+    ]) assert.equal(isHarnessNoise(t), true, t);
+    for (const t of ['restart the proxy and do the cleanup', 'why did ! fail here?', 'fix install.sh']) assert.equal(isHarnessNoise(t), false, t);
   });
 });
