@@ -738,7 +738,8 @@ async function committedRun(heldout, set) {
   const file = resolve(REPO, opt('taxonomy', ''))
   const { load } = await import('js-yaml')
   const raw = load(readFileSync(file, 'utf8'))
-  const name = basename(file).replace(/\.ya?ml$/, '')
+  // A team package (lib/job-classes/package.mjs) names itself; config/job-classes.yaml is named by its file.
+  const name = raw.name || basename(file).replace(/\.ya?ml$/, '')
   const tax = { tag: `${name}-v${raw.version ?? 0}${set === 'heldout' ? '' : `-${set}`}`, classes: raw.classes, none: raw.none, precedence: raw.precedence , prompt: raw.prompt }
   const ids = tax.classes.map((c) => c.id)
   if (new Set(ids).size !== ids.length) throw new Error(`${file}: duplicate class ids`)

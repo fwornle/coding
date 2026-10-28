@@ -171,6 +171,11 @@ if [[ "${1:-}" == "sync" ]]; then
   shift
   exec node "$SCRIPT_DIR/../lib/history/sync.mjs" "$@"
 fi
+# `coding job-classes …` — a team's shared job-class taxonomy (lib/job-classes/cli.mjs).
+if [[ "${1:-}" == "job-classes" ]]; then
+  shift
+  exec node "$SCRIPT_DIR/../lib/job-classes/cli.mjs" "$@"
+fi
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do

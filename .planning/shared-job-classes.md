@@ -173,7 +173,7 @@ nothing changes silently.
 |---|---|---|
 | **P0 — measure** | Offline script: teacher labels ~2 weeks of captured first-call prompts from `context_turns`, at cap 16, twice | kappa ≥ 0.7 between the two derivations, and a class distribution not dominated by one bucket. **If this fails, stop: there is no stable taxonomy to share** |
 | **P1 — local class, shadow** | Service returns `class` (KNN + closed-set LLM fallback); `job_class`/`job_class_source` columns; "by class" view; no routing effect | Student vs teacher per-class precision on held-out data |
-| **P2 — shared repo, read side** | Package format + validator, `teams.yaml` binding, `job-classes init`, pull via `coding sync`, local KNN rebuild | Two machines resolve the same class for the same prompt |
+| **P2 — shared repo, read side** ✅ | Package format + validator, `teams.yaml` binding, `job-classes init`, pull via `coding sync`, local KNN rebuild | Two machines resolve the same class for the same prompt |
 | **P3 — contributions + dedup** | `proposals/`, maintainer fold with absorb/add/merge/stability check, versioned CHANGELOG, tombstones | A forced cap overflow merges correctly and keeps old rows resolvable |
 | **P4 — per-class trials + evidence routing** | `jobClass` on trials; fg first-call sampling; `evidence/` publishing; evidence-derived band floor per member | One accepted class trial changes a routing decision on a second member's machine and is visible in `/resolve` |
 | **P5 — glass** | glass reads the binding and shows classes, evidence and "by class" read-only. Whether glass gets `init` depends on question 3 below | — |
@@ -225,6 +225,43 @@ explain↔status, plus none↔status on fragments.
   Local Qwen is not yet measured (the cluster was unavailable).
 - A student's agreement with the teacher is scored by exact label match, with
   no judge, so the per-class trial in P4 is cheaper than a model-trial pair.
+
+## P2 results (2026-10-28)
+
+Built, the read side. Decisions: the package lives in a team member's
+existing learning repo (no new repo), a group is a coding team, and no prompt
+leaves the machine (the reference set stays in `<data home>/var/job-classes/`).
+
+What changed against the design above, and why:
+- **No exemplars and no KNN.** P0/P1 made the student an LLM reading the
+  taxonomy's own prompt, so the package is only `job-classes/taxonomy.yaml`
+  (with a `name`, so labels are tagged `<name>-v<version>`) and `CHANGELOG.md`.
+- **The folder is fixed at `job-classes/`**, not configurable: any other
+  top-level entry of a learning checkout is moved into `history/` by
+  `restructure` (`lib/history/repo-link.mjs`, where `job-classes` is now a
+  layout entry).
+- **The proxy does not learn about teams.** coding resolves project → team →
+  taxonomy into `<data home>/var/job-classes/bindings.json`
+  (`lib/job-classes/package.mjs`), rewritten by `init`/`join`/`status` and after
+  every `coding sync pull`; the tagger reads it by mtime. No index or no entry =
+  the default taxonomy. A project two teams bind to different taxonomies is
+  **not labelled** (skip reason `taxonomy-conflict`).
+- `coding job-classes init|join|validate|status` (`lib/job-classes/cli.mjs`).
+  `init` writes into the member's OWN learning checkout and commits locally;
+  `join` clones a teammate's repo under `var/shared/` (pull-only). Pushing stays
+  `coding sync --push`.
+- `/api/job-classes` lists every taxonomy in use; `summary` and `coverage` take
+  `?taxonomy=<tag>`. The dashboard's Classes tab has a taxonomy picker.
+
+Gate: simulated with a second home that joined from a clone of the committed
+package. Both machines resolved project `coding` to `job-classes-coding-v1`
+(same file hash) and the real student gave the same class on 5/5 prompts. A
+real second machine is still to do, after `coding sync --push`.
+
+Team `coding` is bound on this machine (`coding-history`, committed locally,
+not pushed). Its reference set does not exist yet: the measurement has to be
+run under the team taxonomy's tag
+(`measure-job-classes.mjs --team=coding --taxonomy=<package file>`).
 
 ## Open questions (yours to decide)
 

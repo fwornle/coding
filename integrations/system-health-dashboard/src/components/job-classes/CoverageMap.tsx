@@ -65,7 +65,8 @@ function shade(share: number) {
   return { backgroundColor: `hsl(var(--primary) / ${a.toFixed(2)})`, color: a > 0.55 ? 'hsl(var(--primary-foreground))' : undefined }
 }
 
-export function CoverageMap({ proxyBase, hours }: { proxyBase: string; hours: string }) {
+/** `taxonomy` is a tag from GET /api/job-classes ('' = the default), `taxonomyFile` where it lives (for the measurement hint). */
+export function CoverageMap({ proxyBase, hours, taxonomy = '', taxonomyFile = 'config/job-classes.yaml', taxonomyTeam = null }: { proxyBase: string; hours: string; taxonomy?: string; taxonomyFile?: string; taxonomyTeam?: string | null }) {
   const [data, setData] = useState<Coverage | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
@@ -78,7 +79,7 @@ export function CoverageMap({ proxyBase, hours }: { proxyBase: string; hours: st
 
   useEffect(() => {
     let cancelled = false
-    const q = hours === 'all' ? 'days=90' : `hours=${encodeURIComponent(hours)}`
+    const q = `${hours === 'all' ? 'days=90' : `hours=${encodeURIComponent(hours)}`}${taxonomy ? `&taxonomy=${encodeURIComponent(taxonomy)}` : ''}`
     fetch(`${proxyBase}/api/job-classes/coverage?${q}`)
       .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       .then((d: Coverage) => { if (!cancelled) { setData(d); setError(d.error ? `The proxy could not build the coverage map: ${d.error}` : null) } })
@@ -86,7 +87,7 @@ export function CoverageMap({ proxyBase, hours }: { proxyBase: string; hours: st
     // Teams are optional: without them the map shows every project.
     fetch('/api/teams-config').then(r => (r.ok ? r.json() : null)).then(d => { if (!cancelled && d?.teams) setTeams(d.teams) }).catch(() => {})
     return () => { cancelled = true }
-  }, [proxyBase, hours])
+  }, [proxyBase, hours, taxonomy])
 
   const src = data?.[source]
   const teamProjects = useMemo(() => {
@@ -204,7 +205,7 @@ export function CoverageMap({ proxyBase, hours }: { proxyBase: string; hours: st
         {view && view.all === 0 && (
           <div className="py-6 text-center text-muted-foreground">
             {source === 'reference'
-              ? 'No reference set yet. Run scripts/measure-job-classes.mjs --taxonomy=config/job-classes.yaml to make one.'
+              ? `No reference set yet. Run scripts/measure-job-classes.mjs${taxonomyTeam ? ` --team=${taxonomyTeam}` : ''} --taxonomy=${taxonomyFile} to make one.`
               : 'No labelled turns in this window.'}
           </div>
         )}

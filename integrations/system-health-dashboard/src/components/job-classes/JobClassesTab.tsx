@@ -13,6 +13,10 @@
  *
  * The teacher-agreement column is the P1 gate: the student's live precision per
  * class, set against what the offline measurement found on unseen prompts.
+ *
+ * A team may share its own taxonomy (coding job-classes init/join, P2); its
+ * projects are then labelled under it. The taxonomy picker chooses which one the
+ * tab reads: labels made under two taxonomies are never counted together.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { RefreshCw, Tags } from 'lucide-react'
@@ -20,6 +24,7 @@ import { RefreshCw, Tags } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { CoverageMap } from './CoverageMap'
 
@@ -67,6 +72,15 @@ interface TaggerState {
   invalid: number
   taxonomy: string | null
   taxonomyError: string | null
+  taxonomies?: TaxonomyEntry[]
+  conflicts?: { project: string; teams: string[] }[]
+}
+interface TaxonomyEntry {
+  file: string
+  team: string | null
+  projects: string[]
+  tag: string | null
+  error: string | null
 }
 
 const fmt = (n: number) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : String(n))
@@ -90,20 +104,26 @@ export function JobClassesTab({ proxyBase, hours }: { proxyBase: string; hours: 
   const [summary, setSummary] = useState<Summary | null>(null)
   const [tagger, setTagger] = useState<TaggerState | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // null until the tagger answers: then its one team taxonomy if exactly one team
+  // shares one (that is where this machine's team turns are labelled), else the default.
+  const [taxonomy, setTaxonomy] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try {
-      const [s, t] = await Promise.all([
-        fetch(`${proxyBase}/api/job-classes/summary?${hours === 'all' ? 'days=90' : `hours=${encodeURIComponent(hours)}`}&recent=30`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() }),
-        fetch(`${proxyBase}/api/job-classes`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() }),
-      ])
+      const t: TaggerState = await fetch(`${proxyBase}/api/job-classes`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
+      const usable = (t.taxonomies ?? []).filter(x => x.tag)
+      const teamTags = usable.filter(x => x.team).map(x => x.tag as string)
+      const tag = taxonomy !== null && usable.some(x => x.tag === taxonomy) ? taxonomy : (teamTags.length === 1 ? teamTags[0] : (t.taxonomy ?? ''))
+      if (tag !== taxonomy) setTaxonomy(tag)
+      const s = await fetch(`${proxyBase}/api/job-classes/summary?${hours === 'all' ? 'days=90' : `hours=${encodeURIComponent(hours)}`}&recent=30${tag ? `&taxonomy=${encodeURIComponent(tag)}` : ''}`)
+        .then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       setSummary(s)
       setTagger(t)
       setError(s.error ? `The proxy could not read the labels: ${s.error}` : null)
     } catch (e: unknown) {
       setError(`Job classes are not available from this proxy: ${e instanceof Error ? e.message : String(e)}`)
     }
-  }, [proxyBase, hours])
+  }, [proxyBase, hours, taxonomy])
 
   useEffect(() => { void load() }, [load])
 
@@ -133,8 +153,25 @@ export function JobClassesTab({ proxyBase, hours }: { proxyBase: string; hours: 
           {tagger && (
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={tagger.enabled ? 'default' : 'secondary'}>{tagger.enabled ? 'labelling' : 'off'}</Badge>
-              {tagger.taxonomy && <Badge variant="outline">{tagger.taxonomy}</Badge>}
+              {(tagger.taxonomies ?? []).filter(x => x.tag).length > 1 ? (
+                <Select value={taxonomy ?? ''} onValueChange={v => setTaxonomy(v)}>
+                  <SelectTrigger className="h-7 w-auto text-xs font-mono"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {(tagger.taxonomies ?? []).filter(x => x.tag).map(x => (
+                      <SelectItem key={x.tag} value={x.tag as string} className="text-xs">
+                        <span className="font-mono">{x.tag}</span> · {x.team ? `team ${x.team} (${x.projects.join(', ') || 'no projects found'})` : 'default: every other project'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : tagger.taxonomy && <Badge variant="outline">{tagger.taxonomy}</Badge>}
               {tagger.taxonomyError && <span className="text-destructive">taxonomy: {tagger.taxonomyError}</span>}
+              {(tagger.taxonomies ?? []).filter(x => x.error).map(x => (
+                <span key={x.file} className="text-destructive">{x.team ? `team ${x.team}` : 'default'} taxonomy unusable: {x.error}</span>
+              ))}
+              {(tagger.conflicts ?? []).map(c => (
+                <span key={c.project} className="text-destructive">{c.project} is not labelled: teams {c.teams.join(' and ')} bind it to different taxonomies</span>
+              ))}
               <span className="text-muted-foreground">
                 Since the proxy started: {tagger.labelled} labelled, {tagger.teacherSampled} checked by the teacher
                 {tagger.failed > 0 && `, ${tagger.failed} failed`}{tagger.dropped > 0 && `, ${tagger.dropped} dropped (busy)`}
@@ -154,7 +191,10 @@ export function JobClassesTab({ proxyBase, hours }: { proxyBase: string; hours: 
         </CardContent>
       </Card>
 
-      <CoverageMap proxyBase={proxyBase} hours={hours} />
+      {taxonomy !== null && (() => {
+        const entry = (tagger?.taxonomies ?? []).find(x => x.tag === taxonomy)
+        return <CoverageMap proxyBase={proxyBase} hours={hours} taxonomy={taxonomy} taxonomyFile={entry?.team ? entry.file : undefined} taxonomyTeam={entry?.team ?? null} />
+      })()}
 
       <Card>
         <CardHeader className="pb-2">
