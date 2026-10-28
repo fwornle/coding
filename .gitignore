@@ -173,6 +173,10 @@ integrations/mcp-server-browserbase/
 # Trained semantic prompt-classifier artifacts. Generated from labelled data;
 # source labels/config stay tracked while machine-specific vectors do not.
 .data/prompt-classifier/
+# Job-class measurement runs (scripts/measure-job-classes.mjs): a corpus of real
+# prompts and its labels. They live in <data home>/var/job-classes/ now; this
+# catches a run pointed here with --out.
+.data/job-classes/
 # Intent-spine placement cache — a local answer cache keyed to this machine's
 # corpus state, rebuilt from the graph's own aggregates edges when absent.
 .data/intent-spine/

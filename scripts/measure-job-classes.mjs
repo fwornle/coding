@@ -7,8 +7,10 @@
  *
  * WHAT IS MEASURED
  *
- *   1. Corpus: the human prompts of the last N days, from every discovered repo's
- *      LSL (`<repo>/.coding/history/YYYY/MM/*.jsonl`, already redacted). Harness
+ *   1. Corpus: the human prompts of the last N days from the LSL of one team's
+ *      repos (`<repo>/.coding/history/YYYY/MM/*.jsonl`, already redacted): a
+ *      team's taxonomy is built from that team's work, never from every repo on
+ *      the machine (--team; default the teams the current repo belongs to). Harness
  *      noise is dropped: task notifications, slash-command expansions,
  *      continuation summaries, local-command caveats, sub-agent prompts. Pasted
  *      blocks and image references are reduced to a marker. Prompts shorter than
@@ -44,6 +46,18 @@
  * Every LLM answer is checkpointed under --out, so a rerun resumes rather than
  * re-asking, and a scoring change is re-applied offline (--fresh starts over).
  *
+ * WHERE THE OUTPUT LIVES, AND WHAT IS WORTH KEEPING
+ *
+ *   `<data home>/var/job-classes/<scope>/` (scope = the team ids, or `all`):
+ *   machine-local, never committed, because the corpus is your real prompts.
+ *   The one durable product is `reference-<taxonomy>.jsonl`, written by every
+ *   --taxonomy run: each scored prompt with both teacher passes, and `class` set
+ *   where the two agree. It is the fixed set a taxonomy change is re-scored on
+ *   (P3's stability check) and what the dashboard's coverage map reads. Labels,
+ *   logs and reports are checkpoints of the run that wrote them. What a group
+ *   shares (the taxonomy, synthetic examples, scores) goes to the group's repo,
+ *   never these files.
+ *
  * Usage:
  *   node scripts/measure-job-classes.mjs                 # full P0 run
  *   node scripts/measure-job-classes.mjs --corpus-only   # extract + split, no LLM
@@ -65,7 +79,9 @@
  *   --set=heldout|pool   With --taxonomy: score the held-out set (default; the one
  *                        a hand-written taxonomy is tuned on) or a test set of the
  *                        same size from the derivation pool
- *   --out=<dir>          Output dir (default .data/job-classes/p0)
+ *   --team=<id,...>|all  Whose prompts: the repos of these teams (~/.coding/teams.yaml),
+ *                        or every discovered repo. Default: the current repo's teams
+ *   --out=<dir>          Output dir (default <data home>/var/job-classes/<scope>)
  *   --fresh              Ignore checkpoints
  *   --help               Show this message
  *
@@ -78,6 +94,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createHash } from 'node:crypto'
 import { homedir } from 'node:os'
+import { createRequire } from 'node:module'
 
 const REPO = process.env.CODING_REPO || resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PROXY = `${(process.env.LLM_CLI_PROXY_URL || 'http://localhost:12435').replace(/\/$/, '')}/api/complete`
@@ -101,7 +118,16 @@ const MIN_CHARS = Number(opt('min-chars', 25))
 const HELDOUT = Number(opt('heldout', 300))
 const [CAP_LO, CAP_HI] = opt('cap', '14-18').split('-').map(Number)
 const BATCH = Number(opt('batch', 30))
-const OUT = resolve(REPO, opt('out', '.data/job-classes/p0'))
+const require = createRequire(import.meta.url)
+const teamsConfig = require('../lib/teams/config.cjs')
+const { varDir } = require('../lib/paths/data-home.cjs')
+const { defaultTeamsFor, parseTeams } = await import('../lib/teams/scope.mjs')
+
+// The corpus scope: whose prompts a taxonomy is built and scored on.
+const TEAMS = opt('team', '') === 'all' ? null : parseTeams(opt('team', '') || defaultTeamsFor(process.cwd()))
+if (TEAMS && !TEAMS.length) throw new Error('not in a repo, so no team to scope the corpus to: pass --team=<id> or --team=all')
+const SCOPE = TEAMS ? TEAMS.join('+') : 'all'
+const OUT = opt('out', '') ? resolve(REPO, opt('out', '')) : join(varDir(), 'job-classes', SCOPE)
 const FRESH = has('--fresh')
 const GATE = { kappa: 0.7, maxShare: 0.35 }
 
@@ -187,15 +213,21 @@ export function cleanPrompt(raw) {
   return t.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
 }
 
+/** The repos whose LSL is read: every discovered repo in one of TEAMS (all of them for --team=all). */
 function discoveredRepos() {
   const candidates = [
     join(homedir(), '.coding', 'data', 'coding', 'var', 'projects.json'),
     join(homedir(), '.coding', 'var', 'projects.json'),
   ]
-  for (const f of candidates) {
-    if (existsSync(f)) return JSON.parse(readFileSync(f, 'utf8')).repos || []
-  }
-  return [{ path: REPO, name: 'coding' }]
+  const f = candidates.find((c) => existsSync(c))
+  const repos = f ? JSON.parse(readFileSync(f, 'utf8')).repos || [] : [{ path: REPO, name: 'coding' }]
+  if (!TEAMS) return repos
+  const doc = teamsConfig.loadTeams({ codingRoot: REPO })
+  const unknown = TEAMS.filter((t) => !doc.teams[t])
+  if (unknown.length) throw new Error(`unknown team ${unknown.join(', ')} (teams: ${Object.keys(doc.teams).join(', ')})`)
+  return repos.filter((r) => {
+    try { return teamsConfig.teamsOf(r.path, { teamsDoc: doc }).some((t) => TEAMS.includes(t)) } catch { return false }
+  })
 }
 
 function extractCorpus() {
@@ -678,6 +710,24 @@ const f3 = (x) => (Number.isFinite(x) ? x.toFixed(3) : 'n/a')
 const pct = (x) => `${(x * 100).toFixed(1)}%`
 
 /**
+ * The reference set: every prompt a committed taxonomy was scored on, with both
+ * teacher passes, and `class` where they agree (null where the teacher itself
+ * could not decide: the taxonomy is unclear there). Upserted by prompt id, so the
+ * held-out and the test run of one taxonomy version share one file.
+ */
+function writeReference(name, version, set, rows, t1, t2) {
+  const file = outFile(`reference-${name}-v${version}.jsonl`)
+  const byId = new Map(existsSync(file) ? readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).map((r) => [r.id, r]) : [])
+  rows.forEach((r, i) => {
+    if (t1[i] === 'invalid' || t2[i] === 'invalid') return
+    byId.set(r.id, { id: r.id, ts: r.ts, agent: r.agent, repo: r.repo, set, text: r.text, teacher: [t1[i], t2[i]], class: t1[i] === t2[i] ? t1[i] : null })
+  })
+  writeFileSync(file, [...byId.values()].map((r) => JSON.stringify(r)).join('\n') + '\n')
+  const agreed = [...byId.values()].filter((r) => r.class).length
+  console.log(`reference set: ${byId.size} prompts, ${agreed} with an agreed class -> ${file}`)
+}
+
+/**
  * A committed (hand-written) taxonomy instead of two derivations: nothing to
  * compare it with, so the question is only whether the teacher applies it
  * consistently and whether a cheap student reproduces the teacher. The teacher
@@ -701,6 +751,7 @@ async function committedRun(heldout, set) {
   const dist = distribution(t1.labels)
   const maxShare = dist.filter((d) => d.cls !== 'none').at(0)?.share || 0
   const students = opt('students', '') ? await scoreStudents(heldout, tax, t1.labels, t2.labels, (m) => `${tax.tag}-${slug(m)}`) : null
+  writeReference(name, raw.version ?? 0, set, heldout, t1.labels, t2.labels)
   writeJson(`report-${tax.tag}.json`, { generatedAt: new Date().toISOString(), taxonomy: tax.tag, n: heldout.length, teacher: t1.served, selfKappa: self, maxShare, dist, students })
   const md = [
     `# Committed taxonomy ${tax.tag} (${new Date().toISOString().slice(0, 10)})`, '',
@@ -725,7 +776,10 @@ async function main() {
   // corpus: the labels in the checkpoints were made for exactly that text, and
   // the window has moved since (the LSL is also rewritten in place, e.g. by a
   // redaction change, so the same prompt can come back with a different id).
-  const pinned = readCk('split.json')?.heldout
+  const split = readCk('split.json')
+  // A checkpoint written before --team existed was built from every repo.
+  if (split && (split.scope || 'all') !== SCOPE) throw new Error(`${OUT} holds a corpus for scope ${split.scope || 'all'}, not ${SCOPE} (use --out or --fresh)`)
+  const pinned = split?.heldout
   const oldCorpus = pinned && existsSync(outFile('corpus.jsonl'))
     ? new Map(readFileSync(outFile('corpus.jsonl'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).map((r) => [r.id, r]))
     : null
@@ -735,9 +789,10 @@ async function main() {
   const derivePool = ranked.filter((x) => !heldIds.has(x.r.id)).map((x) => x.r)
   if (pinned) console.log(`held-out: ${heldout.length} prompts from the checkpointed corpus`)
   else writeFileSync(outFile('corpus.jsonl'), rows.map((r) => JSON.stringify(r)).join('\n') + '\n')
-  writeJson('split.json', { heldout: heldout.map((r) => r.id), pool: derivePool.length })
+  writeJson('split.json', { scope: SCOPE, heldout: heldout.map((r) => r.id), pool: derivePool.length })
   const byAgent = {}
   for (const r of rows) byAgent[r.agent] = (byAgent[r.agent] || 0) + 1
+  console.log(`scope: ${SCOPE} (${TEAMS ? discoveredRepos().map((r) => r.name).join(', ') : 'every discovered repo'}) -> ${OUT}`)
   console.log(`corpus: ${rows.length} prompts over ${DAYS} days (dropped ${JSON.stringify(dropped)}); held-out ${heldout.length}, pool ${derivePool.length}`)
   console.log(`agents: ${JSON.stringify(byAgent)}`)
   if (has('--corpus-only')) return

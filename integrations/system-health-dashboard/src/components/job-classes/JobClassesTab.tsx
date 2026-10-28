@@ -21,6 +21,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { CoverageMap } from './CoverageMap'
 
 /** Student-vs-teacher agreement on 300 prompts nobody read while writing the taxonomy (claude-haiku-5.5, taxonomy v1). */
 const OFFLINE_AGREEMENT = 0.803
@@ -152,6 +153,8 @@ export function JobClassesTab({ proxyBase, hours }: { proxyBase: string; hours: 
           </div>
         </CardContent>
       </Card>
+
+      <CoverageMap proxyBase={proxyBase} hours={hours} />
 
       <Card>
         <CardHeader className="pb-2">
