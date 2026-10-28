@@ -1,0 +1,31 @@
+@startuml job-class-trial-routing
+!include _standard-style.puml
+skinparam defaultFontSize 16
+skinparam componentFontSize 16
+skinparam arrowFontSize 14
+skinparam shadowing false
+skinparam componentStyle rectangle
+hide stereotype
+title A class earns a cheaper model with evidence (trials: built per process · per class: next, P4)
+
+component "**turns labelled 'status'**" as turns <<core>>
+component "**current model answers**\nthe only answer you see" as inc <<agent>>
+component "**candidate answers too**\ncheaper model, sampled share,\nin the background" as cand <<agent>>
+component "**judge, blind, both orders**\nat least as good?\ndetails kept? same format?" as judge <<core>>
+component "**verdict**\n>= 20 pairs · 90 % at least as good\n90 % of details kept" as verdict <<core>>
+component "**you accept**\nnothing switches before" as accept <<cli>>
+file "**evidence/status.json**\nin the team repo" as ev <<storage>>
+file "**llm-routing.yaml**\nthe class's band floor\non this member's route" as cfg <<storage>>
+component "**next 'status' turn**\n-> the cheaper model" as next <<core>>
+
+turns -[#E53935,thickness=2]right-> inc
+turns -[#43A047,thickness=2,dashed]down-> cand
+inc -[#FF9800,thickness=2]right-> judge
+cand -[#FF9800,thickness=2]right-> judge
+judge -[#FF9800,thickness=2]right-> verdict
+verdict -[#9C27B0,thickness=2]down-> accept
+accept -[#9C27B0,thickness=2]left-> cfg
+accept -[#FF9800,thickness=2]down-> ev : shared with the team
+ev -[#757575,thickness=1,dotted]left-> cfg : other members
+cfg -[#9C27B0,thickness=2]left-> next
+@enduml

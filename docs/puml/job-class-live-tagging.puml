@@ -1,0 +1,32 @@
+@startuml job-class-live-tagging
+!include _standard-style.puml
+skinparam defaultFontSize 16
+skinparam componentFontSize 16
+skinparam arrowFontSize 14
+skinparam shadowing false
+skinparam componentStyle rectangle
+hide stereotype
+title Live labelling: one label per turn, never in the turn's way
+
+component "**your agent**\nclaude · copilot\nopencode · pi" as agent <<agent>>
+component "**LLM proxy :12435**\nforwards the call\nunchanged" as fwd <<core>>
+component "**model provider**" as model <<external>>
+component "**job-class tagger**\nfirst call of a human turn\nskips sub-agents, tool loops,\nharness text" as tagger <<core>>
+component "**clean + redact**\nreminders, pastes out\n27 patterns, fail closed" as redact <<util>>
+component "**student**\nclaude-haiku-5.5\n~2 s, every turn" as student <<agent>>
+component "**teacher**\nclaude-sonnet-5\n10 % of turns" as teacher <<agent>>
+database "**turn_job_class**\nbeside token_usage" as db <<storage>>
+component "**dashboard**\nToken Usage -> Classes" as dash <<api>>
+file "config/job-classes.yaml" as tax <<storage>>
+
+agent -[#E53935,thickness=2]right-> fwd : every call
+fwd -[#E53935,thickness=2]right-> model : the turn, unchanged
+fwd -[#43A047,thickness=2,dashed]down-> tagger : after forwarding
+tagger -[#FF9800,thickness=2]right-> redact
+redact -[#FF9800,thickness=2]right-> student
+redact -[#757575,thickness=1,dotted]down-> teacher : sampled
+student -[#FF9800,thickness=2]right-> db : class
+teacher -[#FF9800,thickness=2]right-> db : teacher class
+db -[#FF9800,thickness=2]right-> dash
+tax -[#757575,thickness=1,dotted]right-> tagger : hot-reloaded
+@enduml

@@ -183,6 +183,13 @@
   margin: 0;
 }
 
+/* Material centres everything in a <figure>; a code block in a slide's figure
+   must keep its own alignment, or YAML indentation reads as nonsense. */
+.overview-figure pre,
+.overview-figure table {
+  text-align: left;
+}
+
 .overview-figure a {
   cursor: zoom-in;
 }

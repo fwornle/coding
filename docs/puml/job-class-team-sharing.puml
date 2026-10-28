@@ -1,0 +1,33 @@
+@startuml job-class-team-sharing
+!include _standard-style.puml
+top to bottom direction
+skinparam defaultFontSize 15
+skinparam componentFontSize 15
+skinparam arrowFontSize 13
+skinparam shadowing false
+skinparam componentStyle rectangle
+hide stereotype
+title A team shares one taxonomy (next: P2 / P3)
+
+package "team repo  (bmw.ghe.com or github.com)" {
+  file "job-classes/taxonomy.yaml\nclasses, groups, prompt, version, maxClasses" as tax <<storage>>
+  file "job-classes/exemplars/<class>.jsonl\nsynthetic examples (real ones only on bmw.ghe, opt-in)" as ex <<storage>>
+  file "job-classes/evidence/<class>.json\ntrial verdicts per model" as ev <<storage>>
+  file "job-classes/proposals/<member>/\nnew classes, examples, verdicts" as prop <<storage>>
+}
+
+component "**first member**\ncoding job-classes init --team <id>\nseeds the taxonomy from their history" as first <<cli>>
+component "**maintainer run**\nabsorb / add / merge under the cap,\nre-score the reference set, bump the version" as maint <<core>>
+component "**each member's machine**\n$HOME/.coding/teams.yaml binds the team to the repo;\ncoding sync pulls it at launch" as member <<agent>>
+component "**that member's LLM proxy**\nlabels with the team's taxonomy" as proxy <<core>>
+
+first CONTROL_LINE tax : creates
+member DATA_LINE prop : coding sync --push\n(own folder only, no conflicts)
+prop DATA_LINE maint
+maint CONTROL_LINE tax : new version + CHANGELOG
+maint CONTROL_LINE ex
+tax DATA_LINE member : pull
+ex DATA_LINE member : pull
+ev DATA_LINE member : pull
+member DATA_LINE proxy
+@enduml
