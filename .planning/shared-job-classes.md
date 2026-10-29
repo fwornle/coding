@@ -420,6 +420,61 @@ process (as `model-trial-shadow` is) so their cost is visible.
 - Headless termination differs per agent (see the experiment harness notes);
   the spike uses Claude Code only.
 
+## P4 spike results (2026-10-28)
+
+Five real turns, two `explain` and three `status` (by the live labels), each
+replayed twice from a cut copy of its Claude transcript in a worktree at the
+commit of the turn's time: once with the incumbent (Opus 5.5, as in the real
+turn) and once with Haiku 5.5. Read-only tools only, user settings (and so all
+hooks) off, through the proxy. Judged by the trials judge route (Opus 5),
+blind, twice with the order swapped.
+
+**The mechanics work.** All ten replays finished (4–70 s each), resumed from
+the cut transcript with 120–250 k tokens of context, and nothing escaped the
+sandbox (coding, glass and the proxy checkouts unchanged). Replays of turns
+that already had a label were skipped by the tagger (`seen`); the two older
+turns were labelled again and those rows were deleted.
+
+| Pair | as good in both readings |
+|---|---|
+| floor: real answer vs incumbent replay | 1 of 5 |
+| trial: incumbent replay vs Haiku replay | 0 of 5 |
+| direct: real answer vs Haiku replay | 0 of 5 |
+
+**The floor fails, mostly for reasons of the instrument:**
+- *Sandbox fidelity.* A `status` turn about files in the git-ignored `.data/`
+  could not see them in a worktree; a turn that had run git was blocked by the
+  read-only rule. The replay then answers a different question. Answer-only
+  classes that look at local state cannot be replayed from a commit.
+- *Judge position bias.* 7 of the 15 pairs split (one reading "better", the
+  swapped one "worse"), almost always for whichever answer was shown second.
+  Only consistent pairs carry a verdict.
+- *Genuine variance.* On an advisory turn, the incumbent's own replay
+  recommended a different repo layout and a different sharing rule than the
+  real turn. An answer with no single right content has no stable reference.
+
+**What the consistent verdicts say about Haiku:** on both `explain` turns it
+gave the same core answer (same steps, same settings path) and was judged
+worse in both readings for leaving out rationale, caveats and fallbacks. Under
+the trials' rule ("at least as good") it fails; under a "same core answer, no
+contradiction" rule it would pass. Which rule is right is a product decision,
+not a measurement one. On the longest `status` turn it needed 18 agent turns
+and about 2.5× the cache reads of the incumbent's 7, so a cheaper model per
+token was not obviously cheaper per turn.
+
+**Conclusion.** Whole-turn replay is cheap and safe to run, but as measured
+here it cannot tell model quality from replay noise. Before more samples:
+(1) restrict replays to turns whose inputs are all in the snapshot (`explain`
+on code and docs, no live state, no ignored data), (2) a judge rubric for
+"same core answer, no contradiction" plus completeness as a separate score,
+and a judge checked for position bias on known-equal pairs, (3) then rerun the
+floor; at ≥ 4 of 5 consistent "same" it is worth sampling 20 per class.
+Otherwise P4 settles on option (c): reporting by class, routing only
+background processes.
+
+Spike scripts (not committed): `locate.mjs`, `replay.mjs`, `judge.mjs` in the
+session scratchpad.
+
 ## Open questions (yours to decide)
 
 1. **What is the class primarily for**: routing savings, or reporting plus trial
