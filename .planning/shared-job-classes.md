@@ -540,6 +540,65 @@ Spike scripts (not committed): `scan.mjs`, `replay.mjs` (shallow repo,
 path rewrite, sandbox profile `replay.sb`), `judge2.mjs` in the session
 scratchpad.
 
+## P4 build: on the existing isolation code, not beside it (2026-10-29)
+
+The spike re-discovered, by trial and error, controls that kgbench and the
+`/experiment` harness already have and document
+(`docs-content/_tiers/measurement/kgbench-experimental-design.deep.md`). The
+P4 replay is built on them; only what is specific to replaying a past turn is
+new.
+
+**Reused as is:**
+
+| Need | Existing code |
+|---|---|
+| Agent env: keys stripped, proxy pinned, knowledge injection off, inherited agent config dropped | `agentEnv()`, `assertProxyReachable()` (`lib/kgbench/runner.mjs`) |
+| Outcomes that cannot rank: timeout, no result, escape, starved host | `OUTCOMES` incl. `tool_escape`, `host_stalled` (same file) |
+| Audit what executed, not what was attempted; an unknown call counts as executed | the kgbench tool audit (`toolViolations`, `mergeToolTraces`) |
+| Capture at turn start: HEAD, dirty patch, untracked files | `lib/repro/capture-snapshot.mjs`, `git-state.mjs` |
+| Restore into a sandbox, `PWD` pinned, `OLDPWD` dropped | `lib/repro/restore-snapshot.mjs`, the experiment runner's cell env |
+| Proof that incumbent and candidate replays start identically | `digestRestoredState()`, `assertRepeatsIdentical()` (`lib/experiments/experiment-restore.mjs`) |
+| Record the served model, not the requested one | the kgbench judge's provenance rule |
+
+**Changed for replays,** because the threat is different. kgbench hides an
+answer key and equalises context across arms; a replay must hide *the future*
+and *reproduce* the turn's context.
+- *No git worktree.* A worktree shares the live repo's objects and refs, so
+  `git log main` or `git show main:<file>` shows what happened after the turn.
+  The snapshot is a standalone shallow fetch at the turn's commit, plus the
+  captured dirty patch and untracked files.
+- *Rewrite paths, do not strip inputs.* `neutralizeSandboxRules` and
+  `neutralizeSandboxKnowledge` delete `CLAUDE.md`, `.planning/` and the like;
+  for a replay those are the turn's inputs ("remove the answer key, never the
+  answers"). The cut transcript and the rule files get every spelling of the
+  live repo path (absolute, redacted, `~`) rewritten to the snapshot instead.
+- *An OS sandbox under the permission rules.* `sandbox-exec` denying reads of
+  the live repos and data dirs held where permission patterns failed (a prefix
+  rule matches at a word boundary only). The tool audit stays as the record.
+- *Knowledge injection off, as a recorded parity gap.* The real turn got that
+  day's knowledge digests; today's would hand the replay the future. The
+  replay runs without, and the report says so.
+
+**New code, small:** the transcript cut and path rewrite; a pre-run
+"no future" check (no commit after the turn's time reachable in the snapshot,
+no line after the cut in the transcript copy; refuse to run otherwise, as
+kgbench refuses a leaked tree); a replay marker the job-class tagger skips
+(replays were labelled as new turns: the self-reinforcing channel kgbench
+documents); the "same core answer" judge with completeness scored apart.
+
+**Found on the way, for kgbench itself:**
+- Its run tree is a git worktree too, and its leak scan skips `.git`. From
+  inside a tree, `git show HEAD:config/kgbench/questions/coding-v1.json`
+  returns the whole answer key the sandbox removed (probe, 2026-10-29). Claude
+  arms cannot run git (`Glob`/`Grep`/`Read`); copilot (`--allow-all-tools`,
+  built-ins not gated, no tool trace), opencode and pi have a shell. The
+  scoring backstop catches an answer that *cites* the ground truth, not one
+  that used it silently. Fix: a tree without the live `.git` (an export of the
+  commit, or a standalone shallow fetch).
+- kgbench refuses to build a run tree today: the leak scan finds a question's
+  prompt verbatim in `tests/fixtures/prompt-classifier-labels.json`, a fixture
+  added after the last run. The guard works; the exclude list needs the file.
+
 ## Open questions (yours to decide)
 
 1. **What is the class primarily for**: routing savings, or reporting plus trial
