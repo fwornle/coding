@@ -61,12 +61,12 @@ greps?
 
     | Requirement | Why | If missing |
     |-------------|-----|------------|
-    | A git checkout | Each run tree is a `git worktree` of the benchmark commit | Hard error — it will not run uncontained |
+    | A git checkout | Each run tree is an export of the benchmark commit, with no `.git` | Hard error — it will not run uncontained |
     | The LLM proxy on `:12435` | Every call is routed and measured | Preflight aborts and names the fix |
     | A built index per graph arm | The backend needs its graph to exist | Preflight names the reindex command |
 
     The containment requirement is not a formality. The whole comparison rests on each arm seeing
-    only what its strategy is supposed to see, and a run outside a worktree cannot promise that.
+    only what its strategy is supposed to see, and a run outside the sandbox cannot promise that.
 
     ## Reading a result honestly
 

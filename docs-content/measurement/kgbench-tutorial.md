@@ -7,7 +7,7 @@ backend and an agent.
 
     ## What must be true first
 
-    Three things must be true: you are in a **git checkout** (each run is a worktree), the **LLM
+    Three things must be true: you are in a **git checkout** (each run searches an export of a commit), the **LLM
     proxy is up on `:12435`**, and each graph arm has a **built index**.
 
     Preflight checks all three and tells you the fix for whichever is missing:

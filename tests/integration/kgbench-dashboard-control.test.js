@@ -156,8 +156,8 @@ describe('cancel safety', () => {
   });
 });
 
-describe('worktree cleanup is available before createRunTree returns', () => {
-  // A real worktree, but against a throwaway two-file repo rather than this one — the
+describe('run tree cleanup is available before createRunTree returns', () => {
+  // A real run tree, but against a throwaway two-file repo rather than this one — the
   // contract under test is WHEN the cleanup is handed over, which does not depend on repo size.
   let repo;
 
@@ -173,13 +173,10 @@ describe('worktree cleanup is available before createRunTree returns', () => {
   });
 
   afterAll(() => {
-    try {
-      execFileSync('git', ['-C', repo, 'worktree', 'prune'], { encoding: 'utf8' });
-    } catch { /* best effort */ }
     rmSync(repo, { recursive: true, force: true });
   });
 
-  it('fires onWorktreeCreated with a cleanup that really removes the worktree', () => {
+  it('fires onTreeCreated with a cleanup that really removes the tree', () => {
     let handed = null;
     let handedBeforeReturn = false;
 
@@ -188,9 +185,9 @@ describe('worktree cleanup is available before createRunTree returns', () => {
       questions: [],
       excludes: [],
       verify: false,
-      onWorktreeCreated: (info) => {
+      onTreeCreated: (info) => {
         handed = info;
-        // The worktree must ALREADY exist at callback time — that is the whole point. If it
+        // The tree must ALREADY exist at callback time — that is the whole point. If it
         // were handed over after construction finished, the cancel window would still be open.
         handedBeforeReturn = existsSync(info.dir);
       },
@@ -201,12 +198,40 @@ describe('worktree cleanup is available before createRunTree returns', () => {
     expect(handed.dir).toBe(tree.dir);
     expect(typeof handed.cleanup).toBe('function');
 
-    // The handed-over cleanup is the real one: it removes the directory AND deregisters the
-    // worktree, so the next `git worktree add` on that path is not wedged.
+    // The handed-over cleanup is the real one: it removes the directory.
     handed.cleanup();
     expect(existsSync(tree.dir)).toBe(false);
-    const list = execFileSync('git', ['-C', repo, 'worktree', 'list'], { encoding: 'utf8' });
-    expect(list).not.toContain(tree.dir);
+  });
+
+  it('an excluded file is gone from git too — the tree has no repository behind it', () => {
+    // As a git worktree, the tree shared the live repo's objects and refs: `git show
+    // HEAD:<excluded path>` printed the removed answer key, and any agent with a shell could.
+    writeFileSync(path.join(repo, 'secret.json'), '{"answer": 42}\n');
+    execFileSync('git', ['-C', repo, 'add', 'secret.json']);
+    execFileSync('git', ['-C', repo, 'commit', '--quiet', '-m', 'add a key']);
+    const tree = createRunTree({ repoRoot: repo, questions: [], excludes: ['secret.json'], verify: true });
+    try {
+      expect(existsSync(path.join(tree.dir, 'README.md'))).toBe(true);
+      expect(existsSync(path.join(tree.dir, 'secret.json'))).toBe(false);
+      expect(existsSync(path.join(tree.dir, '.git'))).toBe(false);
+      expect(() => execFileSync('git', ['-C', tree.dir, 'show', 'HEAD:secret.json'], { stdio: 'pipe' })).toThrow();
+    } finally {
+      tree.cleanup();
+    }
+  });
+
+  it('resolves a glob exclusion against the commit, though the tree has no .git', () => {
+    mkdirSync(path.join(repo, 'notes'), { recursive: true });
+    writeFileSync(path.join(repo, 'notes', 'a-meta.md'), 'x\n');
+    execFileSync('git', ['-C', repo, 'add', 'notes']);
+    execFileSync('git', ['-C', repo, 'commit', '--quiet', '-m', 'notes']);
+    const tree = createRunTree({ repoRoot: repo, questions: [], excludes: ['notes/*-meta.md'], verify: false });
+    try {
+      expect(tree.removed).toContain('notes/a-meta.md');
+      expect(existsSync(path.join(tree.dir, 'notes', 'a-meta.md'))).toBe(false);
+    } finally {
+      tree.cleanup();
+    }
   });
 
   it('survives a registration callback that throws — the tree is still built', () => {
@@ -215,7 +240,7 @@ describe('worktree cleanup is available before createRunTree returns', () => {
       questions: [],
       excludes: [],
       verify: false,
-      onWorktreeCreated: () => { throw new Error('caller blew up'); },
+      onTreeCreated: () => { throw new Error('caller blew up'); },
     });
     expect(existsSync(tree.dir)).toBe(true);
     tree.cleanup();

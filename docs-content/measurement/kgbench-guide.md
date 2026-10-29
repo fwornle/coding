@@ -8,7 +8,7 @@ kgbench is the worked example; the hazards are the point.
     ## The hazard
 
     Every control described here exists because a run without it produced a **plausible,
-    publishable, wrong** result. Among them: six distinct channels by which answers leaked into
+    publishable, wrong** result. Among them: several distinct channels by which answers leaked into
     the systems being tested, a comparison that turned out to be one configuration measured
     against itself, a token column that silently double-counted, and a report that published a
     grading model which had never graded anything.
@@ -67,9 +67,10 @@ kgbench is the worked example; the hazards are the point.
     matrix is the product of those axes, and the report aggregates cells that share a question
     across repetitions.
 
-    Each cell runs in its own git worktree of the benchmark commit. That containment is not
-    hygiene — it is what allows the claim that an arm saw only what its strategy permits. A run
-    outside a worktree cannot make that claim, so the harness refuses to start.
+    Each cell runs in an export of the benchmark commit: its tracked files, with no git history
+    behind them. That containment is not hygiene — it is what allows the claim that an arm saw
+    only what its strategy permits. A run without it cannot make that claim, so the harness
+    refuses to start.
 
     ## What comes out, and what to distrust
 

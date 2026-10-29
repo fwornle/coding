@@ -2,7 +2,7 @@ This is a guide to measuring systems that do **cognitive work with LLMs** — co
 retrieval layers, knowledge graphs, RAG pipelines — in a way whose numbers survive scrutiny.
 
 It documents `kgbench`, the benchmark harness in this repository. But the harness is the
-example, not the point. Nearly everything here was learned by getting it wrong first: six
+example, not the point. Nearly everything here was learned by getting it wrong first: several
 distinct channels by which the answers leaked — one of them structurally invisible to the
 sandbox built to prevent exactly that — a comparison that turned out to be one configuration
 measured against itself, a token column that silently double-counted, and a report that
@@ -164,8 +164,8 @@ read as "audited, clean".
 
 ### Isolation
 
-**Sandbox** — a throwaway copy of the repository, created per run as a git worktree of the exact
-commit under test, with sensitive paths removed. The agents search this, never the live
+**Sandbox** — a throwaway copy of the repository, created per run as an export of the exact
+commit under test (no git history behind it), with sensitive paths removed. The agents search this, never the live
 repository. It is discarded afterwards.
 
 **Containment** — the property that the sandbox does not contain the answers to the questions

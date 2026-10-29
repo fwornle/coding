@@ -46,7 +46,7 @@ not look like cheating in the data; it looks like retrieval working extremely we
 statistical signature to catch it after the fact. It has to be prevented, and the prevention has
 to be verified.
 
-### Six channels, only one of them obvious
+### Leak channels, only one of them obvious
 
 Removing the answer key was necessary and nowhere near sufficient. The leaks actually found:
 
@@ -58,6 +58,8 @@ Removing the answer key was necessary and nowhere near sufficient. The leaks act
 | 4 | The published report of a previous run | Publishing the questions was the right call for readers — a benchmark whose questions are secret cannot be judged — but it puts every prompt into the tree |
 | 5 | **Source comments explaining a previous leak** | Four separate times. Each was a comment written to explain the *previous* leak, and it quoted the thing it was explaining — including, once, the warning comment that said not to do this |
 | 6 | **A knowledge-injection hook, outside the tree entirely** | See below. The sandbox is structurally incapable of seeing this one |
+| 7 | **The git history behind the tree** | The tree was a git worktree, which shares the live repository's objects and refs: an excluded file was one `git show` away for any agent with a shell, and the leak scan skipped `.git`. See [the controls](#the-controls) |
+| 8 | A test fixture of recorded prompts | The prompt classifier's eval set is real prompts from real sessions, and this benchmark's sessions went through that classifier. The scan caught it and refused the run |
 
 Channel 5 generalises. The instinct on finding a leak is to document it thoroughly so it does
 not recur; if your documentation lives inside the measured surface, thorough documentation *is*
@@ -71,7 +73,7 @@ Everything above is about *what is in the tree*. That framing has a blind spot, 
 contaminated cell in a live run to expose it.
 
 This project registers a knowledge-injection hook at **user level**, so it fires for every agent
-session in every working directory — including a throwaway worktree with no project context. It
+session in every working directory — including a throwaway tree with no project context. It
 semantically retrieves the project's knowledge base **against the prompt** and prepends what it
 finds. Reproduced from an empty temporary directory:
 
@@ -120,9 +122,17 @@ visible to a check that inspects your data.
 
 ### The controls
 
-**A throwaway sandbox.** Each run creates a git worktree of the exact commit under test, removes
-the sensitive paths, and points the agents at that. The live repository is never searched. The
-worktree is discarded afterwards, so a run cannot contaminate the next one.
+**A throwaway sandbox.** Each run exports the exact commit under test (its tracked files, no
+`.git`), removes the sensitive paths, and points the agents at that. The live repository is never
+searched. The tree is discarded afterwards, so a run cannot contaminate the next one.
+
+Until 2026-10-29 the tree was a git **worktree**, and that was a seventh channel: a worktree
+shares the live repository's objects and refs, so removing the answer key from its files removed
+nothing from git. From inside the tree, `git show HEAD:<the answer key's path>` printed the whole
+file and `git log --all` reached every branch. Claude's arms have no shell, but copilot, opencode
+and pi do, and copilot leaves no tool trace to audit. The leak scan skipped `.git`, so it could not
+see this either. The tree is now an export, and the harness refuses one from which any git
+repository is reachable.
 
 **An exclusion set that is a category, not a list of files.** The removed paths are: the answer
 key; the telemetry and session-log directories; the project's agent-instruction files; the

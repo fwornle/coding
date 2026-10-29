@@ -74,7 +74,7 @@ const resultsFile = path.join(runDir, 'results.jsonl');
 // WHERE THE CODEGRAPH INDEX FOR THIS RUN LIVES. Three constraints, and they leave one shape.
 //
 // 1. The container can only read what compose mounts, and os.tmpdir() is not mounted, so an
-//    index over the arms' own tmp worktree is impossible — which is why the server answered
+//    index over the arms' own tmp tree is impossible — which is why the server answered
 //    about the main working tree instead, for every run up to r8.
 // 2. codegraph always writes its DB to `<project>/.codegraph/` and that cannot be relocated.
 //    The DB stores file_path and qualified_name for every symbol, so it is an answer key for
@@ -88,7 +88,7 @@ const resultsFile = path.join(runDir, 'results.jsonl');
 //    this very benchmark asks why. The harness reproduced the bug its own question set
 //    describes.
 //
-// So: stage the swept corpus on the host (a worktree, for provenance and identical
+// So: stage the swept corpus on the host (an export of the commit, for provenance and identical
 // exclusions), copy it into the CONTAINER'S OWN filesystem, and index it there. The DB never
 // touches a bind mount, and it is doubly out of the arms' reach — a different tree AND a
 // different filesystem.
@@ -205,27 +205,25 @@ try {
 let tree = null;
 let armCwd = repoRoot;
 
-// Always give the worktree back, including on Ctrl-C — a leaked worktree wedges the
-// next run's `git worktree add` and leaves a stale copy of the repo in /tmp.
+// Always give the run tree back, including on Ctrl-C — a leaked tree leaves a stale copy of
+// the repo in /tmp.
 //
 // REGISTERED BEFORE THE TREE IS BUILT, and holding a cleanup handed over the moment the
-// worktree exists rather than the one attached to the finished `tree` object. Building a tree
-// takes about a minute (worktree add, then the exclusion sweep, then containment
+// tree exists rather than the one attached to the finished `tree` object. Building a tree
+// takes about a minute (the export, then the exclusion sweep, then containment
 // verification), and this used to be registered AFTER it — so a signal arriving during
-// construction left a worktree nothing had a handle on. `git worktree prune` cannot reclaim
-// it either, because prune only drops entries whose directory is gone and this one's is not.
+// construction left a tree nothing had a handle on.
 //
 // That was a theoretical window while the only way to stop a run was Ctrl-C minutes in. The
 // dashboard's Cancel button makes stopping a run in its first seconds an ordinary act, and it
 // leaked on the first try.
-let releaseWorktree = null;
+let releaseRunTree = null;
 let releaseIndexTree = null;
 let releaseContainerIndex = null;
 const releaseTree = () => {
-  if (releaseWorktree) { const fn = releaseWorktree; releaseWorktree = null; tree = null; fn(); }
-  // The index tree carries a ~120MB .codegraph/ that git never tracked. `worktree remove
-  // --force` handles untracked content, but it is the second thing that can fail here and
-  // a throw would strand the first, so each releases independently.
+  if (releaseRunTree) { const fn = releaseRunTree; releaseRunTree = null; tree = null; fn(); }
+  // The index tree carries a ~120MB .codegraph/. Removing it is the second thing that can
+  // fail here and a throw would strand the first, so each releases independently.
   if (releaseIndexTree) { const fn = releaseIndexTree; releaseIndexTree = null; try { fn(); } catch { /* best effort */ } }
   // And the container-local copy, which nothing on the host would ever reclaim.
   if (releaseContainerIndex) {
@@ -248,8 +246,8 @@ if (flag('no-sandbox')) {
       repoRoot,
       questions,
       at: atCommit,
-      // Fires as soon as `git worktree add` succeeds — long before this call returns.
-      onWorktreeCreated: ({ cleanup }) => { releaseWorktree = cleanup; },
+      // Fires as soon as the tree exists — long before this call returns.
+      onTreeCreated: ({ cleanup }) => { releaseRunTree = cleanup; },
     });
     armCwd = tree.dir;
     out(`  tree     ${tree.dir}`);
@@ -260,7 +258,7 @@ if (flag('no-sandbox')) {
 }
 
 // ---- per-run code-graph index ----------------------------------------------
-// Built over a SECOND worktree of the same commit with the same exclusions, so the index
+// Built over a SECOND export of the same commit with the same exclusions, so the index
 // describes exactly the corpus the arms search — no more (the main working tree, which is
 // what it used to describe) and no less. Skipped unless an arm actually needs it, because
 // it costs ~40s and ~120MB.
@@ -292,7 +290,7 @@ if (tree && needsCodegraph) {
         questions,
         at: tree.commit,           // the SAME commit the arms search, not HEAD twice
         dir: indexStageHost,
-        onWorktreeCreated: ({ cleanup }) => { releaseIndexTree = cleanup; },
+        onTreeCreated: ({ cleanup }) => { releaseIndexTree = cleanup; },
       });
     const t0 = Date.now();
     // `init` BUILDS the index as part of initialising, so a fresh tree needs exactly one
@@ -364,7 +362,7 @@ if (tree && needsCodegraph) {
 } else if (needsCodegraph) {
   out('kgbench: --no-sandbox — codegraph serves /workspace/coding (the live working tree).');
 }
-// A worktree is built from the COMMIT, so uncommitted work is not what gets searched.
+// The run tree is built from the COMMIT, so uncommitted work is not what gets searched.
 if (dirty && tree) {
   out(`kgbench: NOTE — working tree is dirty; arms search ${tree.commit.slice(0, 9)}, not your edits.`);
 }
@@ -573,7 +571,9 @@ writeFileSync(runJsonPath, JSON.stringify({
   questions: questions.map((q) => q.id),
   sandbox: tree
     ? {
-      mode: 'worktree',
+      // An export of the commit with no .git (lib/kgbench/sandbox.mjs); runs before
+      // 2026-10-29 record 'worktree', whose excluded files were still reachable via git.
+      mode: 'export',
       tree_commit: tree.commit,
       excluded: tree.removed,
       verified: true,
@@ -768,7 +768,7 @@ for (const combo of combos) {
           die(`aborting: ${HOST_STALL_ABORT} consecutive host stalls.\n`
             + `  Last: ${res.error}\n`
             + '  The machine is too loaded to measure anything. Check for background load\n'
-            + '  (AV scanning this harness\'s /tmp worktrees is a known cause on managed macOS),\n'
+            + '  (AV scanning this harness\'s /tmp run trees is a known cause on managed macOS),\n'
             + `  then resume with --run-id ${runId} — completed cells are kept.`);
         }
       } else {

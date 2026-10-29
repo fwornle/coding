@@ -49,7 +49,7 @@ that will be refused, with reasons**, before anything is spent.
 
 | Requirement | Why | If missing |
 |---|---|---|
-| Git checkout | The run tree is a `git worktree` of the benchmark commit | Hard error — the harness will not run uncontained |
+| Git checkout | The run tree is an export of the benchmark commit, with no `.git` | Hard error — the harness will not run uncontained |
 | LLM proxy on `:12435` | Every call is routed and measured through the subscription provider | Preflight aborts with the `launchctl kickstart` command |
 | A built index per graph arm | `graph.json` / `codegraph.db` must exist | Preflight names the reindex command for that backend |
 
@@ -82,20 +82,23 @@ own benchmark was written, so its tracked telemetry exports echo the prompts ver
 the leak scanner finds complete prompts for three separate questions in
 `.data/knowledge-graph/exports/general.json` alone.
 
-So arms run against a sandboxed worktree instead of the repository:
+So arms run against a sandboxed export of the commit instead of the repository:
 
 ```mermaid
 graph TD
-    A[benchmark commit] --> B[git worktree, tracked files only]
+    A[benchmark commit] --> B[export: tracked files, no .git]
     B --> C[remove answer key,<br/>telemetry exports, session logs,<br/>agent rule files, benchmark tests]
     C --> D{grep tree for each<br/>question's own prompt}
     D -->|clean| E[arms run here]
     D -->|echo found| F[abort the run]
 ```
 
-Three things follow from using a worktree: it contains only *tracked* files, so no
+Four things follow from using an export: it contains only *tracked* files, so no
 `node_modules` and no scratch state; it is pinned to a commit, so what the arms searched
-is reproducible and recorded in `run.json`; and your working tree is never touched.
+is reproducible and recorded in `run.json`; your working tree is never touched; and there
+is no git history behind it, so an excluded file cannot come back through `git show`. (Runs
+before 2026-10-29 used a git worktree, which shared the live repository's history: their
+`run.json` records `sandbox.mode: worktree`.)
 
 Containment is **verified, not assumed**. After the tree is built it is grepped for each
 question's own prompt text, and the run aborts if anything survives. The denylist is the
