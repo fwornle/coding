@@ -475,6 +475,71 @@ background processes.
 Spike scripts (not committed): `locate.mjs`, `replay.mjs`, `judge.mjs` in the
 session scratchpad.
 
+## P4 fixes and the second run (2026-10-29)
+
+The four fixes from the spike, then the floor again.
+
+1. **Turns whose inputs are all in the snapshot.** A scan of a month of this
+   repo's Claude transcripts for question-like turns whose tool calls only read
+   tracked files in the repo found **five**; almost every question touches live
+   state (curl, gh, docker, env), the web, another repo or ignored data. The
+   second run uses five such turns (install steps and update steps from the
+   docs, two "what's next" from a plan, one features question from code).
+   Replayable answer-only turns are rare in real use: at this rate a class
+   gathers 20 samples in months, not weeks, for one member.
+2. **Judge rubric.** "Which is better" is replaced by: *same core answer* (would
+   a user act the same way or understand the same thing), *contradictions*
+   that would change what they do, and *completeness* 1–5 per answer, scored
+   apart and averaged over both orders so position cancels.
+3. **Position bias, measured.** On ten paraphrase pairs and ten identical pairs
+   the judge shows **no** position bias, under either rubric (old: 9 of 10
+   "same" in both readings, no split; new: 20 of 20 core-equivalent, mean
+   second-shown completeness bonus −0.05). The spike's splits were on answers
+   that really differed.
+4. **The floor again**, with a sandbox that holds. The first rerun still read
+   today's state, two ways: the agent's own habit from the history
+   (`cd <live repo>; …`, also in a redacted spelling of the path), and a git
+   worktree, which shares the live repo's commits and refs (`git log main`
+   showed the future). The replay now runs in a standalone shallow repo fetched
+   at the turn's commit, with every spelling of the repo path in the cut
+   transcript rewritten to it, under `sandbox-exec` denying reads of
+   `~/Agentic`, `~/.coding` and `~/.specstory`.
+
+| Pair (5 turns) | same core, both readings | and no contradiction |
+|---|---|---|
+| incumbent replay vs incumbent replay (A/A) | 5 | 3 |
+| real turn vs incumbent replay (two runs) | 4 and 4 | 3 and 1 |
+| incumbent replay vs Haiku replay | 2 | 1 |
+| real turn vs Haiku replay | 2 | 1 |
+
+**Reading it.** On "same core answer" the floor passes (4 of 5 against the real
+turn, 5 of 5 replay against replay); the one miss is a turn whose answer
+depended on a PR's live status. "No contradiction at all" is too strict: the
+same model on the same snapshot disagrees with itself on side points (is a
+file dead code, does an update restart a daemon). The verdict should be the
+core, with contradictions listed for a reader rather than counted.
+
+**Haiku** gave the same core answer in 2 of 5 (the two lookups from a doc) and
+a different one on the analytical turns and the update steps, with less
+detail (completeness −1.1 against the replay, −2.0 against the real turn). It
+used about as many tokens per turn as the incumbent (0.27–0.9 M per replay).
+On this evidence, Haiku is not as good for answer turns that need analysis;
+for a lookup it may be.
+
+**What P4 needs beyond this:**
+- Replay traffic must be marked so the tagger skips it: rewriting paths gave
+  each replay a new conversation key and six replay turns were labelled (the
+  rows were deleted).
+- The `UserPromptSubmit` capture, so a turn's untracked inputs are in the
+  snapshot; without it, only turns over tracked files qualify, and they are
+  rare.
+- Volume: sampling per class across a team, not one member, or the 20-pair
+  verdict never arrives.
+
+Spike scripts (not committed): `scan.mjs`, `replay.mjs` (shallow repo,
+path rewrite, sandbox profile `replay.sb`), `judge2.mjs` in the session
+scratchpad.
+
 ## Open questions (yours to decide)
 
 1. **What is the class primarily for**: routing savings, or reporting plus trial
