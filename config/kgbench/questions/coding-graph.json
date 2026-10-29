@@ -183,11 +183,11 @@
         {
           "id": "f4",
           "must": false,
-          "desc": "notes the claude adapter in lib/kgbench/agents.mjs builds the argv",
+          "desc": "notes runAgent in lib/kgbench/runner.mjs builds the argv the claude process is spawned with",
           "match": {
             "type": "any-of",
             "value": [
-              "agents.mjs",
+              "runAgent",
               "argv",
               "adapter"
             ]
@@ -196,11 +196,11 @@
       ],
       "provenance": {
         "verified_by": "human",
-        "note": "$allBackendTools -> resolveArm (arms.mjs) -> listEnabled + allowedToolsFor (registry.mjs) -> arm.allowedTools -> the claude adapter's argv() in agents.mjs -> --allowedTools. The intermediate hops share no substring with the token, so grepping $allBackendTools finds the expansion site and stops; the rest is edges.",
+        "note": "$allBackendTools -> resolveArm (arms.mjs) -> listEnabled + allowedToolsFor (registry.mjs) -> arm.allowedTools -> runAgent in runner.mjs, which spawns every cell and builds the claude argv -> --allowedTools. The intermediate hops share no substring with the token, so grepping $allBackendTools finds the expansion site and stops; the rest is edges. Evidence moved from agents.mjs (excluded from the run tree: it carries the answer-file directive) to runner.mjs, whose runAgent builds the same claude argv (2026-10-29).",
         "evidence": [
           "lib/kgbench/arms.mjs:73",
           "lib/code-graph/registry.mjs:1",
-          "lib/kgbench/agents.mjs:122",
+          "lib/kgbench/runner.mjs:277",
           "config/kgbench/arms.json:1"
         ]
       }
