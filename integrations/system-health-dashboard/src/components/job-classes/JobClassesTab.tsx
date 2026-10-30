@@ -11,8 +11,9 @@
  * token_usage on the turn identity, and the tagger's counters from
  * GET /api/job-classes.
  *
- * The teacher-agreement column is the P1 gate: the student's live precision per
- * class, set against what the offline measurement found on unseen prompts.
+ * The teacher-agreement column is the student's live precision per class, set
+ * against what the offline measurement found on unseen prompts; the P1 gate
+ * panel (GateProgress) reads the same counts over the whole taxonomy version.
  *
  * A team may share its own taxonomy (coding job-classes init/join, P2); its
  * projects are then labelled under it. The taxonomy picker chooses which one the
@@ -27,9 +28,10 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { CoverageMap } from './CoverageMap'
+import { GateProgress } from './GateProgress'
 
-/** Student-vs-teacher agreement on 300 prompts nobody read while writing the taxonomy (claude-haiku-5.5, taxonomy v1). */
-const OFFLINE_AGREEMENT = 0.803
+/** Student-vs-teacher agreement on the test set, prompts nobody read while writing the taxonomy (claude-haiku-5.5, taxonomy v2). */
+const OFFLINE_AGREEMENT = 0.855
 
 interface ClassRow {
   jobClass: string
@@ -190,6 +192,8 @@ export function JobClassesTab({ proxyBase, hours }: { proxyBase: string; hours: 
           </div>
         </CardContent>
       </Card>
+
+      {taxonomy && <GateProgress proxyBase={proxyBase} taxonomy={taxonomy} />}
 
       {taxonomy !== null && (() => {
         const entry = (tagger?.taxonomies ?? []).find(x => x.tag === taxonomy)

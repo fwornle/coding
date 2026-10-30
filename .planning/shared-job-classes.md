@@ -643,6 +643,26 @@ differs, so it was not measured again). The live tagger reads both files by
 mtime. Labels made under v1 stay readable under their own tag. The P1 gate
 counts `job-classes-coding-v2` labels from 2026-10-30.
 
+## The P1 gate, made concrete (2026-10-30)
+
+The plan named the gate "per-class precision" without a number. It is now
+the band classifier's: a class passes when the teacher agrees with at least
+90% of the student's labels for it, over at least 20 teacher-checked turns.
+It is counted over every label made under one taxonomy version, so a new
+version starts from zero. "none" has no gate. Token Usage → Classes shows
+the gate per class (`GateProgress.tsx`).
+
+Two things keep the count clean:
+- the tagger skips automated runs (rapid-llm-proxy PR #75): a task-bound
+  request, or Claude Code's headless entrypoint (`sdk-cli`), which is how
+  replays and tool probes arrive;
+- the teacher checks every turn (`teacher_sample_pct: 1.0`, PR #74) until each
+  class has a verdict.
+
+At about 15 to 30 labelled turns a day, the common classes (fix, ship, status,
+build) reach 20 checks in one to two weeks. The rare ones (relay, configure,
+reply) take longer, and a class that never collects 20 drives nothing.
+
 ## Open questions (yours to decide)
 
 1. **What is the class primarily for**: routing savings, or reporting plus trial
