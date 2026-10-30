@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { Map, RefreshCw, AlertTriangle, CheckCircle2, Info } from 'lucide-react'
+import { Map, AlertTriangle, CheckCircle2, Info } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { RefreshButton } from '@/components/ui/refresh-button'
 
 const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}`
@@ -327,10 +327,7 @@ export function CoveragePage() {
             <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-sm bg-[#cdbd91] border border-dashed border-[#9c8b5a]" /> no repo claims (not code-verifiable)</span>
           </div>
         </div>
-        <Button size="sm" variant="outline" onClick={loadAll} disabled={loading}>
-          <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <RefreshButton onRefresh={loadAll} busy={loading} />
       </div>
 
       {/* Corpus totals strip */}

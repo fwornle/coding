@@ -20,15 +20,15 @@
  * tab reads: labels made under two taxonomies are never counted together.
  */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { RefreshCw, Tags } from 'lucide-react'
+import { Tags } from 'lucide-react'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { CoverageMap } from './CoverageMap'
 import { GateProgress } from './GateProgress'
+import { RefreshButton } from '@/components/ui/refresh-button'
 
 /** Student-vs-teacher agreement on the test set, prompts nobody read while writing the taxonomy (claude-haiku-5.5, taxonomy v2). */
 const OFFLINE_AGREEMENT = 0.855
@@ -154,7 +154,7 @@ export function JobClassesTab({ proxyBase, hours, controls, measureCommand }: { 
                 routes on these labels yet.
               </CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={() => void load()}><RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh</Button>
+            <RefreshButton onRefresh={() => load()} iconClassName="h-3.5 w-3.5" />
           </div>
         </CardHeader>
         <CardContent className="text-sm space-y-2">

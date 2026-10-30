@@ -22,6 +22,7 @@ import {
   type Run,
 } from '@/store/slices/performanceSlice'
 import { effective, isExperimentCell, EXPERIMENT_DRIFT_NOTE, SCORE_DIMENSIONS } from './corrected-wins'
+import { RefreshButton } from '@/components/ui/refresh-button'
 
 // D-04 / D-05 / DASH-03 Saved Reports sub-view. Lives as a "Reports" TabsContent
 // INSIDE the Performance tab (NOT a top-level nav tab). ALL state comes from the
@@ -122,14 +123,11 @@ function ReportCard({ report }: { report: Report }) {
         >
           <CardTitle className="text-base">{report.title}</CardTitle>
         </button>
-        <Button
-          variant="outline"
-          size="sm"
-          disabled={refreshing}
-          onClick={() => dispatch(refreshReport(report.reportId))}
-        >
-          {refreshing ? 'Refreshing…' : 'Refresh snapshot'}
-        </Button>
+        <RefreshButton
+          label="Refresh snapshot"
+          busy={refreshing}
+          onRefresh={() => dispatch(refreshReport(report.reportId))}
+        />
       </CardHeader>
       <CardContent>
         <p className="text-sm text-muted-foreground">

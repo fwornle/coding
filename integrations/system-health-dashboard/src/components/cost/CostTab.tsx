@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { usePolledFetch } from '@/hooks/usePolledFetch'
-import { Settings, TrendingUp, Lightbulb, ArrowRight, Gauge, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Settings, TrendingUp, Lightbulb, ArrowRight, Gauge, AlertTriangle } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -24,6 +24,7 @@ import {
   copilotSeatCredit, recentDailyRate, catalogueFromRouting, failedTrialModels,
   type TrialAction, type TrialOutcome, type ModelCatalogue,
 } from './cost-model'
+import { RefreshButton } from '@/components/ui/refresh-button'
 
 /** The part of a model trial this tab shows (TrialsTab has the whole shape). */
 interface TrialRef extends TrialOutcome {
@@ -122,6 +123,9 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
   const [chartLog, setChartLog] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  // The placeholder is for the first load only: a later Refresh keeps the tab
+  // (and its Refresh button, mid-animation) on screen.
+  const [loaded, setLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -169,7 +173,7 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
       if (cs.settings?.consolidationCadence) setCadence(cs.settings.consolidationCadence as CadenceCfg)
     } catch (e: any) {
       setError(`Failed to load cost data: ${e.message}. Check that the LLM proxy is running at ${proxyBase || window.location.origin}.`)
-    } finally { setLoading(false) }
+    } finally { setLoading(false); setLoaded(true) }
   }, [proxyBase, months])
 
   // accountsRev: the account selection was saved — reload under the new filter.
@@ -305,7 +309,7 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
     } catch (e: any) { flash(`Cadence save failed: ${e.message}`) }
   }
 
-  if (loading) return <div className="py-16 text-center text-muted-foreground">Loading cost data…</div>
+  if (loading && !loaded) return <div className="py-16 text-center text-muted-foreground">Loading cost data…</div>
   if (error) return <Alert variant="destructive" className="mt-4"><AlertDescription>{error}</AlertDescription></Alert>
 
   // What the header states: the account-wide rule in force on the month shown
@@ -363,7 +367,7 @@ export function CostTab({ proxyBase, currency, onCurrency, coverage, accountsRev
           {/* Wrapped, not passed directly: onClick hands the handler a
               MouseEvent, which as `isAuto` is truthy and would suppress the
               spinner on the one path that should always show it. */}
-          <Button variant="outline" size="sm" onClick={() => void load(false)}><RefreshCw className="h-4 w-4 mr-1" />Refresh</Button>
+          <RefreshButton onRefresh={() => load(false)} />
           {settingsApi && (
             <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}><Settings className="h-4 w-4 mr-1" />Prices & Budgets</Button>
           )}

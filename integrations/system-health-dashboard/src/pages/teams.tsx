@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Download, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { AlertTriangle, Download, Loader2, Plus, Trash2 } from 'lucide-react'
 import { useAppDispatch, useAppSelector } from '@/store'
 import {
   fetchTeamsConfig, saveTeamsConfig, rescanRepos, syncSharedRepos,
   type DiscoveredRepo, type RepoRef, type TeamEntry,
 } from '@/store/slices/teamsConfigSlice'
 import { Badge } from '@/components/ui/badge'
+import { RefreshButton } from '@/components/ui/refresh-button'
 
 /**
  * Teams — a team is a set of repos.
@@ -110,16 +111,15 @@ export function TeamsPage() {
         </div>
         <div className="flex items-center gap-2">
           {(loading || saving) && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-          <button
-            type="button"
+          <RefreshButton
             data-testid="teams-rescan"
+            label="Rescan"
+            busyLabel="Scanning…"
             disabled={saving}
-            onClick={() => dispatch(rescanRepos())}
-            className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-border hover:bg-accent"
+            onRefresh={() => dispatch(rescanRepos())}
+            iconClassName="h-3.5 w-3.5"
             title={discovery ? `Scans ${discovery.roots.map(r => tilde(r, home)).join(', ')} to depth ${discovery.depth}` : ''}
-          >
-            <RefreshCw className="h-3.5 w-3.5" /> Rescan
-          </button>
+          />
         </div>
       </div>
 

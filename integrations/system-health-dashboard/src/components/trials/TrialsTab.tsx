@@ -12,7 +12,7 @@
  * serves a coding machine's store.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { FlaskConical, RefreshCw, Check, X, Square, ChevronLeft, ChevronRight } from 'lucide-react'
+import { FlaskConical, Check, X, Square, ChevronLeft, ChevronRight } from 'lucide-react'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -25,6 +25,7 @@ import {
   catalogueFromRouting, trialCandidates, autoTrialCandidates, failedTrialModels, setLocalProviders,
   type ModelCatalogue, type TrialCandidate,
 } from '@/components/cost/cost-model'
+import { RefreshButton } from '@/components/ui/refresh-button'
 
 interface Side { provider: string; complexity?: string; model: string }
 interface Summary {
@@ -391,7 +392,7 @@ export function TrialsTab({ proxyBase, canWrite, focusId, currency = 'EUR' }: {
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className={VERDICT_CLASS[detail.summary.verdict]}>{VERDICT_LABEL[detail.summary.verdict]}</Badge>
                     <Badge variant="outline">{detail.trial.status}</Badge>
-                    <Button size="sm" variant="ghost" onClick={() => { void loadList(); void loadDetail(detail.trial.id) }} aria-label="Refresh"><RefreshCw className="h-3.5 w-3.5" /></Button>
+                    <RefreshButton variant="ghost" iconOnly iconClassName="h-3.5 w-3.5" onRefresh={() => Promise.all([loadList(), loadDetail(detail.trial.id)])} />
                   </div>
                 </div>
               </CardHeader>

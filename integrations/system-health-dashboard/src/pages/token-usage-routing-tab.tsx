@@ -9,6 +9,7 @@ import type { Turn } from '@/components/llm-routing/turn-grouping'
 import type { RecentCall } from '@/components/llm-routing/recent-call'
 import { usePolledFetch } from '@/hooks/usePolledFetch'
 import type { ProviderInfo } from './token-usage-flow-tab'
+import { RefreshButton } from '@/components/ui/refresh-button'
 
 /**
  * Routing — how the system is configured, and what it actually did.
@@ -815,10 +816,11 @@ export function TokenUsageRoutingTab({ proxyBase, hours }: Props) {
                   ? (draftDirty ? 'paused — unsaved policy' : 'paused')
                   : `Refreshing in ${countdown}s`}
               </span>
-              <button
-                onClick={refreshNow}
-                className="text-[10px] px-2 py-0.5 rounded border hover:bg-muted/60"
-              >Refresh</button>
+              <RefreshButton
+                onRefresh={refreshNow}
+                className="h-auto text-[10px] px-2 py-0.5 gap-0 rounded font-normal"
+                iconClassName="h-3 w-3"
+              />
               <div className="flex rounded border overflow-hidden" title="Foreground = a conversation with a human waiting (agent adapter hashes). Background = cognitive services.">
                 {(['both', 'fg', 'bg'] as const).map(v => (
                   <button

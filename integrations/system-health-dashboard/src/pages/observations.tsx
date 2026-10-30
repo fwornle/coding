@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { RefreshCw, Eye, Filter, List, LayoutList } from 'lucide-react'
+import { Eye, Filter, List, LayoutList } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -8,6 +8,7 @@ import type { Observation } from '@/components/observation-card'
 import { ObservationFilters, getDefaultFilters } from '@/components/observation-filters'
 import type { FilterState } from '@/components/observation-filters'
 import { PaginationBar } from '@/components/pagination-bar'
+import { RefreshButton } from '@/components/ui/refresh-button'
 
 const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}`
@@ -155,9 +156,7 @@ export function ObservationsPage() {
     fetchObservations(filters, newPage)
   }
 
-  const handleRefresh = () => {
-    fetchObservations(filters, page)
-  }
+  const handleRefresh = () => fetchObservations(filters, page)
 
   const handleToggle = (id: string) => {
     setExpandedId(prev => (prev === id ? null : id))
@@ -181,9 +180,7 @@ export function ObservationsPage() {
           >
             {compact ? <LayoutList className="h-4 w-4" /> : <List className="h-4 w-4" />}
           </Button>
-          <Button variant="ghost" size="sm" onClick={handleRefresh} aria-label="Refresh observations">
-            <RefreshCw className={`h-4 w-4 ${fetching ? 'animate-spin text-muted-foreground' : ''}`} />
-          </Button>
+          <RefreshButton variant="ghost" iconOnly label="Refresh observations" onRefresh={handleRefresh} busy={fetching} />
           {/* Mobile filter toggle */}
           <Button
             variant="ghost"

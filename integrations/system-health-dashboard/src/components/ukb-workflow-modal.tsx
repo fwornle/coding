@@ -32,7 +32,6 @@ import {
   Folder,
   History,
   FileText,
-  RefreshCw,
   Trash2,
   BarChart3,
   MessageSquare,
@@ -125,6 +124,7 @@ import {
   type WorkflowTimingStats,
 } from '@/store/slices/ukbSlice'
 import { useWorkflowWebSocket } from '@/hooks/useWorkflowWebSocket'
+import { RefreshButton } from '@/components/ui/refresh-button'
 
 interface UKBWorkflowModalProps {
   open: boolean
@@ -1786,7 +1786,8 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
 
   // Render History Content
   const renderHistoryContent = () => {
-    if (loadingHistory) {
+    // First load only: a Refresh keeps the list (and its button) on screen.
+    if (loadingHistory && historicalWorkflows.length === 0) {
       return (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center space-y-2">
@@ -2041,10 +2042,7 @@ export default function UKBWorkflowModal({ open, onOpenChange, processes, apiBas
             {historyTotal > historicalWorkflows.length ? ` of ${historyTotal}` : ''} workflow
             {historicalWorkflows.length !== 1 ? 's' : ''} found
           </div>
-          <Button variant="outline" size="sm" onClick={loadHistoricalWorkflows}>
-            <RefreshCw className="h-3 w-3 mr-1" />
-            Refresh
-          </Button>
+          <RefreshButton onRefresh={loadHistoricalWorkflows} iconClassName="h-3 w-3" />
         </div>
 
         <ScrollArea className="flex-1">

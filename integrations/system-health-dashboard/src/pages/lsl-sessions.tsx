@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { RefreshCw, FileJson, FileText, Layers, ExternalLink } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { FileJson, FileText, Layers, ExternalLink } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { currentResolvedTheme, subscribeResolvedTheme } from '@/lib/theme'
+import { RefreshButton } from '@/components/ui/refresh-button'
 
 const API_PORT = process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}`
@@ -139,9 +139,7 @@ export function LslSessionsPage() {
               <option value="">All projects</option>
               {projects.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
-            <Button variant="ghost" size="sm" onClick={fetchSessions} aria-label="Refresh">
-              <RefreshCw className="h-4 w-4" />
-            </Button>
+            <RefreshButton variant="ghost" iconOnly onRefresh={fetchSessions} />
           </div>
         </div>
 

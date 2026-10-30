@@ -33,6 +33,7 @@ type JobClassesExtras = import('@/components/job-classes/JobClassesTab').JobClas
 import { AccountsDialog } from '@/components/cost/AccountsDialog'
 import { SeriesTooltip } from '@/components/cost/series-tooltip'
 import { fetchAccountSelection, type AccountSelection, type SourcesControl } from '@/components/cost/account-selection'
+import { RefreshButton } from '@/components/ui/refresh-button'
 
 /**
  * What every figure on the page is measured in. Tokens are what was consumed;
@@ -1001,16 +1002,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
               Settings
             </Button>
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => fetchData()}
-            disabled={loading}
-            aria-busy={loading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            {loading ? 'Refreshing…' : 'Refresh'}
-          </Button>
+          <RefreshButton onRefresh={() => fetchData()} busy={loading} iconClassName="h-4 w-4 mr-2" />
         </div>
       </div>
 

@@ -35,8 +35,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 export interface PolledFetch {
   /** Whole seconds until the next scheduled refresh; null while paused. */
   countdown: number | null
-  /** Refresh now and restart the interval. Safe to call from a click. */
-  refreshNow: () => void
+  /** Refresh now and restart the interval. Safe to call from a click; settles when the fetch does. */
+  refreshNow: () => Promise<void>
   /** True when polling is suspended — tab hidden, or `enabled` is false. */
   paused: boolean
 }
@@ -86,8 +86,9 @@ export function usePolledFetch(
   // than however much happened to be left on the clock.
   const [nonce, setNonce] = useState(0)
   const refreshNow = useCallback(() => {
-    void fetcherRef.current(false)
+    const done = Promise.resolve(fetcherRef.current(false))
     setNonce(n => n + 1)
+    return done
   }, [])
 
   useEffect(() => {
