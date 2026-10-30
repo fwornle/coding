@@ -245,6 +245,10 @@ what happens when one fails. Subscriptions are used before metered API keys.
 On the corporate network, small background calls can go to the **on-prem Qwen
 cluster** instead.
 
+The proxy also labels each of your prompts with its **kind of job** (fix, ship,
+status, …), the first step towards a cheaper model per kind:
+[Job classes](job-classes.md).
+
 </div>
 <figure class="overview-figure" markdown="1">
 

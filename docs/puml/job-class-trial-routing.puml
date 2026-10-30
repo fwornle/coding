@@ -6,7 +6,7 @@ skinparam arrowFontSize 14
 skinparam shadowing false
 skinparam componentStyle rectangle
 hide stereotype
-title A class earns a cheaper model with evidence (trials: built per process · per class: next, P4)
+title A class earns a cheaper model with evidence (trials: built per process · per class: next)
 
 component "**turns labelled 'status'**" as turns <<core>>
 component "**current model answers**\nthe only answer you see" as inc <<agent>>

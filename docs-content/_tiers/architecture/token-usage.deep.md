@@ -472,17 +472,22 @@ each kind cost?" — the step before routing a kind of job to a cheaper model. T
 mechanism, step by step, is the [job classes deck](../job-classes.md).
 
 - **Labels** — the proxy's shadow tagger (`rapid-llm-proxy/proxy-bridge/job-class.mjs`)
-  labels every foreground human turn once, in the background, with a cheap student model
-  (Haiku 5.5) against a taxonomy: each class has a test, examples and a group (build ·
-  repair · understand). A share of turns (`teacher_sample_pct`, 30 %) is labelled by the
-  teacher (Sonnet 5) as well. Sub-agent and utility calls carry no job of their own and are
-  skipped. Shadow only: nothing routes on the labels yet.
+  labels every foreground human turn once, in the background, with a cheap **student**
+  model (Haiku 5.5) against a taxonomy: each class has a test, examples and a group
+  (programming · operating · communicating). The **teacher**, a strong model (Sonnet 5)
+  whose labels count as the right answer, labels a share of turns as well
+  (`teacher_sample_pct`; every turn until each class has a gate verdict). Sub-agent and
+  utility calls carry no job of their own and are skipped, and so are automated runs: a
+  request bound to a task id (benchmark and experiment cells) or sent by headless
+  `claude -p` (replays, tool probes). Shadow only: nothing routes on the labels yet.
 - **The tab** — a taxonomy picker (the default `config/job-classes.yaml`, or a team's
   shared one), then:
   - **Taxonomy and coverage**, as a **Tree** (group → class, each with its share of the
     turns) or a **Map** (classes by project, with the gaps the taxonomy cannot place);
-  - **By class** — turns, tokens and the student's agreement with the teacher per class
-    (the gate before anything routes on a class);
+  - **Gate** — per class, the student's precision against the teacher: a class passes at
+    90 % over at least 20 teacher-checked turns, counted over the whole taxonomy version.
+    Only a class that passes may later drive a trial or a route;
+  - **By class** — turns, tokens and the student's agreement with the teacher per class;
   - **Recently labelled turns**, with the prompt preview (redacted).
 - **Teams** — a team may share its own taxonomy from a member's learning repo
   (`coding job-classes init` / `join`); its projects are labelled under it, and members
@@ -494,7 +499,7 @@ API on the proxy: `GET /api/job-classes` (the tagger's counters, `labelled` / `s
 `GET /api/job-classes/summary?days=7&taxonomy=<name>-v<n>` (tokens and agreement by class,
 joined to `token_usage` on the turn identity), `GET /api/job-classes/coverage`. Store: the
 `turn_job_class` table in the token DB. Plan: `.planning/shared-job-classes.md`. glass does
-not show this tab.
+not label turns or show this tab yet: that is planned as an opt-in, after the gate.
 
 ## Cognitive process reference
 

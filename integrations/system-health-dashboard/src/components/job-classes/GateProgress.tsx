@@ -1,5 +1,5 @@
 /**
- * Token Usage → Classes → P1 gate: how far each class is from the gate that lets
+ * Token Usage → Classes → Gate: how far each class is from the gate that lets
  * it drive anything (.planning/shared-job-classes.md, P1).
  *
  * The gate is the student's live PRECISION per class: of the teacher-checked
@@ -66,7 +66,7 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">P1 gate</CardTitle>
+        <CardTitle className="text-base">Gate</CardTitle>
         <CardDescription>
           A class passes when the teacher agrees with at least {pct(GATE_PRECISION)} of the student's labels for it,
           over at least {GATE_MIN_CHECKED} teacher-checked turns. Counted over every label made under{' '}

@@ -11,13 +11,13 @@ title Live labelling: one label per turn, never in the turn's way
 component "**your agent**\nclaude · copilot\nopencode · pi" as agent <<agent>>
 component "**LLM proxy :12435**\nforwards the call\nunchanged" as fwd <<core>>
 component "**model provider**" as model <<external>>
-component "**job-class tagger**\nfirst call of a human turn\nskips sub-agents, tool loops,\nharness text" as tagger <<core>>
+component "**job-class tagger**\nfirst call of a human turn\nskips sub-agents, tool loops,\nharness text, automated runs" as tagger <<core>>
 component "**clean + redact**\nreminders, pastes out\n27 patterns, fail closed" as redact <<util>>
 component "**student**\nclaude-haiku-5.5\n~2 s, every turn" as student <<agent>>
-component "**teacher**\nclaude-sonnet-5\n10 % of turns" as teacher <<agent>>
+component "**teacher**\nclaude-sonnet-5\na sample of turns\n(every turn until the gate)" as teacher <<agent>>
 database "**turn_job_class**\nbeside token_usage" as db <<storage>>
 component "**dashboard**\nToken Usage -> Classes" as dash <<api>>
-file "config/job-classes.yaml" as tax <<storage>>
+file "**taxonomy**\nthe team's, else\nconfig/job-classes.yaml" as tax <<storage>>
 
 agent -[#E53935,thickness=2]right-> fwd : every call
 fwd -[#E53935,thickness=2]right-> model : the turn, unchanged

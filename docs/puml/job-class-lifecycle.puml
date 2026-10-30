@@ -10,11 +10,11 @@ title From prompts to a cheaper model per kind of job
 
 component "**1  Define**\nconfig/job-classes.yaml\n11 classes · 3 groups\ntest + examples + prompt" as define <<core>>
 component "**2  Measure**\nteacher labels your history twice\nstudents scored against it\n-> reference set" as measure <<core>>
-component "**3  Label live**\nproxy labels each turn\nwith the student (haiku)\na sample re-checked by the teacher" as live <<core>>
+component "**3  Label live**\nproxy labels each turn\nwith the student (haiku)\nthe teacher re-checks a sample\n-> per-class gate" as live <<core>>
 component "**4  Read coverage**\nToken Usage -> Classes\ntree · map · gaps" as read <<core>>
 component "**5  Share with a team**\ninit · join · pull\npropose · fold under a cap" as share <<core>>
-component "**6  Trial per class**\nnext: P4\ncheaper model beside the current\none, judged blind" as trial <<external>>
-component "**7  Route by class**\nnext: P4\naccepted trial = evidence\n-> cheaper model for that class" as route <<external>>
+component "**6  Trial per class**\nnext\ncheaper model beside the current\none, judged blind" as trial <<external>>
+component "**7  Route by class**\nnext\naccepted trial = evidence\n-> cheaper model for that class" as route <<external>>
 
 define -[#9C27B0,thickness=2]right-> measure
 measure -[#9C27B0,thickness=2]right-> live

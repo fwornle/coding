@@ -27,6 +27,6 @@ tax -[#FF9800,thickness=2]down-> proxy : the file it names
 tax -[hidden]right- log
 
 legend right
-  built (P2)
+  built
 endlegend
 @enduml
