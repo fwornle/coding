@@ -635,8 +635,13 @@ edit generalises rather than fitting the prompts it was tuned on. What remains
 on dev: build↔docs and build↔cleanup on short follow-ups ("do the other ones
 too"), which need the conversation rather than the prompt.
 
-The live tagger picked v2 up by mtime. Live labels made under v1 stay readable
-under their own tag. The P1 gate counts v2 labels from 2026-10-29.
+`config/job-classes.yaml` is only the default taxonomy, for projects in no team.
+coding's projects are bound to the coding team's package (P2), which still held
+the v1 wording, so the live labels of 2026-10-29 were all `job-classes-coding-v1`.
+The package took the same wording as its v2 on 2026-10-30 (only its `name`
+differs, so it was not measured again). The live tagger reads both files by
+mtime. Labels made under v1 stay readable under their own tag. The P1 gate
+counts `job-classes-coding-v2` labels from 2026-10-30.
 
 ## Open questions (yours to decide)
 
