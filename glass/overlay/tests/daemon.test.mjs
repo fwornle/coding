@@ -79,6 +79,11 @@ function respond(req, body, res) {
     return res.end(JSON.stringify({ id: 'm2', model: 'claude-sonnet-5.5', content: [{ type: 'text', text: 'pong' }], usage: { input_tokens: 33, output_tokens: 4, cache_read_input_tokens: 16 } }));
   }
   if (req.url.endsWith('/chat/completions')) {
+    // glass's own job-class call (job-classes.mjs) on the user's Copilot account
+    if (String(req.headers['user-agent'] || '').startsWith('glass/')) {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      return res.end(JSON.stringify({ model: json.model, choices: [{ index: 0, message: { role: 'assistant', content: '{"class":"ship"}' } }] }));
+    }
     if (json.stream) {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'x-request-id': `oa_${reqSeq}` });
       const ev = [{ model: json.model, choices: [{ index: 0, delta: { content: 'pong' } }] }];
@@ -982,3 +987,38 @@ test('CLI: daemon unreachable → one warning, the agent runs unwired', { skip: 
   assert.equal(JSON.parse(run.stdout.trim()).base, null);
   fs.rmSync(cliHome, { recursive: true, force: true });
 });
+
+test("job classes: off by default, no model call of glass's own; switched on from the UI, a turn is labelled on the user's Copilot account", async () => {
+  const v = (await api('GET', '/api/job-classes/settings')).body;
+  assert.equal(v.config.enabled, false);
+  assert.equal(v.host, 'acme.ghe.com');
+  assert.equal(v.copilotApi, 'https://copilot-api.acme.ghe.com');
+  assert.match(v.taxonomy, /config[\\/]job-classes\.yaml$/);
+  const tools = [{ type: 'function', function: { name: 'shell', parameters: { type: 'object' } } }];
+  const turn = (text) => ({ model: 'gpt-5.1', tools, messages: [{ role: 'system', content: 'You are an agent.' }, { role: 'user', content: text }] });
+  const ownCalls = () => upSeen.filter((r) => String(r.headers['user-agent'] || '').startsWith('glass/'));
+
+  const s = await open('copilot');
+  await intercepted({ host: 'copilot-api.acme.ghe.com', token: s.token, route: '/chat/completions', body: turn('Commit this and push the release branch.') });
+  await settle();
+  assert.equal(ownCalls().length, 0, 'labelling off: glass calls no model of its own');
+
+  assert.equal((await api('PATCH', '/api/job-classes/settings', { enabled: true })).status, 403, 'no x-glass-ui header');
+  const on = await uiWrite('PATCH', '/api/job-classes/settings', { enabled: true, teacherSamplePct: 1 });
+  assert.equal(on.status, 200);
+  assert.equal(on.body.config.enabled, true);
+  await intercepted({ host: 'copilot-api.acme.ghe.com', token: s.token, route: '/chat/completions', body: turn('Tag 1.4.0 and publish the release notes.') });
+  const sum = await eventually(() => api('GET', '/api/job-classes/summary?days=1'), (r) => r.body.byClass?.length === 1);
+  assert.deepEqual(sum.body.byClass.map((r) => [r.jobClass, r.turns, r.teacherSampled, r.teacherAgree]), [['ship', 1, 1, 1]]);
+  const calls = ownCalls();
+  assert.deepEqual(calls.map((c) => [c.headers['x-test-host'], JSON.parse(c.body).model]),
+    [['copilot-api.acme.ghe.com', 'claude-haiku-5.5'], ['copilot-api.acme.ghe.com', 'claude-sonnet-5']]);
+  assert.notEqual(calls[0].headers.authorization, 'Bearer agent-own-login', "gh's login, not the agent's");
+  assert.ok(ghCalls.some((c) => c === 'auth token --hostname acme.ghe.com'));
+  const counters = (await api('GET', '/api/job-classes')).body;
+  assert.equal(counters.enabled, true);
+  assert.equal(counters.labelled, 1);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(home, 'job-classes.json')).mode & 0o777, 0o600);
+  await uiWrite('PATCH', '/api/job-classes/settings', { enabled: false });
+});
+

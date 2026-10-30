@@ -498,8 +498,14 @@ mechanism, step by step, is the [job classes deck](../job-classes.md).
 API on the proxy: `GET /api/job-classes` (the tagger's counters, `labelled` / `skipped`),
 `GET /api/job-classes/summary?days=7&taxonomy=<name>-v<n>` (tokens and agreement by class,
 joined to `token_usage` on the turn identity), `GET /api/job-classes/coverage`. Store: the
-`turn_job_class` table in the token DB. Plan: `.planning/shared-job-classes.md`. glass does
-not label turns or show this tab yet: that is planned as an opt-in, after the gate.
+`turn_job_class` table in the token DB. Plan: `.planning/shared-job-classes.md`.
+
+**In glass** (machines without coding) the same tagger and read side run in glass's daemon,
+opt-in: the student and teacher are the user's own Copilot account, reached with their `gh`
+login; `glass job-classes measure` takes its prompts from the agents' own transcripts
+(`lib/job-classes/prompts.mjs`) instead of the session logs, and shares the scoring with
+`measure-job-classes.mjs` (`lib/job-classes/measure.mjs`); a team's taxonomy is joined by its
+git URL. See glass's Job Classes page.
 
 ## Cognitive process reference
 

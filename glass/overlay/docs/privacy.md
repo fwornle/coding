@@ -1,7 +1,8 @@
 # Privacy & Data
 
 Everything glass stores is on your machine, in `~/.glass`. Nothing is sent anywhere
-except your agent's own model calls, to the host they always went to.
+except your agent's own model calls, to the host they always went to — and, only if you
+switch them on, offload's calls to your endpoint and job-class labels from your Copilot account.
 
 === "⚡ Quick (~3 min)"
 

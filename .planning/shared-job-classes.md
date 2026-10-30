@@ -176,7 +176,7 @@ nothing changes silently.
 | **P2 — shared repo, read side** ✅ | Package format + validator, `teams.yaml` binding, `job-classes init`, pull via `coding sync`, local KNN rebuild | Two machines resolve the same class for the same prompt |
 | **P3 — contributions + dedup** ✅ | `proposals/`, maintainer fold with absorb/add/merge/stability check, versioned CHANGELOG, tombstones | A forced cap overflow merges correctly and keeps old rows resolvable |
 | **P4 — per-class replay trials + evidence** | Whole-turn replays of sampled real turns in a sandbox, incumbent vs candidate, judged blind; `evidence/` in the team package; the class-aware floor for agents the proxy routes. Design below | Replays of one answer-only class reach a verdict, and the A/A noise floor is measured |
-| **P5 — glass** | Opt-in live labelling in glass (the user's own model), the read endpoints, the Classes tab; later a team taxonomy pulled read-only from a git URL. Design below | Starts after the P1 gate. Done when a glass user with labelling switched on sees the same class as coding for the same prompt and the same taxonomy, and with it off glass sends nothing new |
+| **P5 — glass** | For machines without coding: opt-in live labelling with the user's Copilot account, the Classes tab, a team taxonomy from a git URL, and the measurement over the agents' own transcripts. Design below | Independent of coding's gate. Done when a glass-only user with labelling on sees the same class as coding for the same prompt and taxonomy, and with it off glass sends nothing new |
 
 Touch points: coding (service, trainer, teacher, sync, teams, dashboard),
 rapid-llm-proxy (`job_class` column, trial keying, class-aware band floor in
@@ -306,54 +306,49 @@ loader text, "Base directory for this skill"), which the measurement's noise
 filter misses. They are noise to the teacher, not prompts. Fixed in fb36222f
 (`lib/job-classes/noise.mjs`, used by the measurement and by `propose`).
 
-## P5 — glass (design, 2026-10-28)
+## P5 — glass, for machines without coding (design, revised 2026-10-30)
 
-**Why it is off today.** glass 0.1.56 carries the pieces but none runs: the
-dashboard's Classes tab is in the bundle and not among glass's tabs, and
-`anthropic-forward.mjs` has the `onTurn` hook that glass never passes. That is
-deliberate. glass is a passive meter: it forwards and counts the agents'
-traffic and makes no model call of its own (offload is opt-in and goes to the
-user's own endpoint; trials are read-only in glass for the same reason). The
-tagger calls a student on every turn and a teacher on a share of them, through
-rapid-llm-proxy's routing and accounts, which glass does not have.
+The first version of this section (2026-10-28) put glass behind coding: it
+waited for coding's gate, left the measurement out because it reads coding's
+session logs, and made the team taxonomy "later". Most of the people this is
+for will only ever run glass, so that design gave them nothing. Revised:
 
-**What glass users would get, in order:**
+- **No dependency on coding's gate.** Labelling in shadow changes nothing; the
+  gate only guards what may later act on a class. A glass user's gate is
+  computed from their own teacher sample.
+- **The model is the user's own Copilot account** (decided 2026-10-30), called
+  with the token of the user's `gh` login for the host glass already uses for
+  the quota (enterprise hosts first). The token is read from `gh` per use and
+  never stored. A free plan may not offer the student model; the settings say
+  so instead of failing quietly. Student `claude-haiku-5.5`, teacher
+  `claude-sonnet-5`, as in coding. Off until the user switches it on.
+- **The measurement runs in glass**: its prompts come from the agents' own
+  transcripts (glass already reads them for tokens), not from coding's session
+  logs. Corpus extraction is the only new part; noise filter, teacher passes,
+  reference set and student score are coding's code, shared.
 
-1. **Opt-in live labelling** — off by default, switched on in Token Usage →
-   Settings like offload, with the same "what leaves your machine" wording.
-   - Manifest: `proxy-bridge/job-class.mjs` (and what it imports) selected; the
-     daemon creates the tagger and passes `onTurn` to the forwarder.
-   - The labelling model is the user's choice: their offload endpoint (a local
-     model, no cost) or a model on an account they already use, called with
-     their own credentials. No teacher by default; a teacher share is a
-     second, explicit setting, since it costs more per turn.
-   - The prompt is redacted before any model sees it (the daemon's redactor, as
-     in coding), and only the bounded preview is stored.
-   - Taxonomy: the shipped default (`config/job-classes.yaml`, copied by the
-     manifest).
-2. **Read side** — `GET /api/job-classes`, `/summary` and `/coverage` in the
-   glass daemon (shared code with server.mjs rather than a copy, the way the
-   trials reads are shared), the `turn_job_class` table in glass's token DB,
-   and `classes` added to glass's tab list. Coverage has no reference set in
-   glass (no session-log history), so the tab shows live labels only; the map's
-   reference toggle is hidden.
-3. **Team taxonomy, read-only (later)** — glass reads a team's
-   `job-classes/taxonomy.yaml` from a git URL it pulls itself, like `join`
-   without `teams.yaml` or `coding sync`. `propose` and `fold` stay in coding:
-   they need the session-log history and the maintainer's checkout.
+**What a glass-only machine gets:**
 
-**Not in glass:** the measurement (P0), the reference set, propose and fold,
-and routing by class (P4), until glass routes at all.
+1. **Live labelling, opt-in** — Token Usage → Settings, with the "what leaves
+   your machine" wording of offload. The daemon creates the tagger
+   (`job-class.mjs`, shipped) and passes its hook to both forwards (Anthropic
+   wire and OpenAI wire). Redacted before sending, with glass's patterns.
+   Labels in glass's token DB.
+2. **The read side** — the three `/api/job-classes` endpoints from shared proxy
+   code, and the Classes tab (gate, tree, map, by class) in glass's tab list.
+3. **Taxonomies** — the shipped default, or a team's: `glass job-classes join
+   <git-url>` clones the team's learning repo (only its `job-classes/`) and
+   labels every project with it; `glass job-classes pull` updates it.
+4. **Measurement** — `glass job-classes measure`: teacher twice and the student
+   once over the user's recent prompts from the transcripts, writing the
+   reference set the coverage map reads.
 
-**Checks:** `forbidden` stays as it is (the KNN model was dropped in P0, so
-there is no embedding dependency to ship); the extract is closed and
-deny-clean on both targets; a daemon test with labelling off sees no outbound
-call beyond the agent's own; one with a stub model sees the label row; the
-public tree carries no internal taxonomy or examples.
+Proposing and folding new classes stays with the taxonomy's maintainer (coding);
+routing by class comes when glass routes at all.
 
-**Open:** whether the default taxonomy, written from coding's own history,
-fits other teams well enough to ship as glass's default, or whether glass
-should start with labelling off until a team taxonomy is bound.
+**Checks:** the extract is closed and deny-clean on both targets; a daemon test
+with labelling off makes no model call; one with a stub Copilot endpoint stores
+a label row; the public tree carries no internal taxonomy or examples.
 
 ## P4 — per-class replay trials (design, 2026-10-28)
 

@@ -123,6 +123,7 @@ const teamsConfig = require('../lib/teams/config.cjs')
 const { varDir } = require('../lib/paths/data-home.cjs')
 const { defaultTeamsFor, parseTeams } = await import('../lib/teams/scope.mjs')
 const { isHarnessNoise } = await import('../lib/job-classes/noise.mjs')
+const { cleanPrompt, cohenKappa, distribution, mergeReference, pool } = await import('../lib/job-classes/measure.mjs')
 
 // The corpus scope: whose prompts a taxonomy is built and scored on.
 const TEAMS = opt('team', '') === 'all' ? null : parseTeams(opt('team', '') || defaultTeamsFor(process.cwd()))
@@ -184,27 +185,9 @@ async function completeJson(messages, route, tries = 3) {
   }
 }
 
-/** Run `fn` over `items` with at most `n` in flight, keeping order. */
-async function pool(items, n, fn) {
-  const out = new Array(items.length)
-  let next = 0
-  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => {
-    while (next < items.length) { const i = next++; out[i] = await fn(items[i], i) }
-  }))
-  return out
-}
-
 // ---------------------------------------------------------------------------
 // corpus
 // ---------------------------------------------------------------------------
-
-export function cleanPrompt(raw) {
-  let t = String(raw || '')
-  t = t.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, ' ')
-  t = t.replace(/<pasted_content[^>]*>([\s\S]*?)<\/pasted_content>/g, (_, body) => ` [pasted ${body.length} chars] `)
-  t = t.replace(/\[Image[^\]]*\]/g, ' [image] ')
-  return t.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim()
-}
 
 /** The repos whose LSL is read: every discovered repo in one of TEAMS (all of them for --team=all). */
 function discoveredRepos() {
@@ -578,22 +561,6 @@ function studentTable(st, ceiling) {
 // agreement
 // ---------------------------------------------------------------------------
 
-function cohenKappa(a, b) {
-  const n = a.length
-  if (!n) return NaN
-  let agree = 0
-  const pa = new Map(), pb = new Map()
-  for (let i = 0; i < n; i++) {
-    if (a[i] === b[i]) agree++
-    pa.set(a[i], (pa.get(a[i]) || 0) + 1)
-    pb.set(b[i], (pb.get(b[i]) || 0) + 1)
-  }
-  const po = agree / n
-  let pe = 0
-  for (const [k, v] of pa) pe += (v / n) * ((pb.get(k) || 0) / n)
-  return pe === 1 ? 1 : (po - pe) / (1 - pe)
-}
-
 function adjustedRand(a, b) {
   const n = a.length
   const c2 = (x) => (x * (x - 1)) / 2
@@ -666,12 +633,6 @@ function matchClasses(a, b) {
   return { pairs: pairs.sort((x, y) => y.both - x.both), mapB }
 }
 
-function distribution(labels) {
-  const m = new Map()
-  for (const l of labels) m.set(l, (m.get(l) || 0) + 1)
-  return [...m.entries()].sort((x, y) => y[1] - x[1]).map(([cls, n]) => ({ cls, n, share: n / labels.length }))
-}
-
 // ---------------------------------------------------------------------------
 // student (optional)
 // ---------------------------------------------------------------------------
@@ -711,14 +672,9 @@ const pct = (x) => `${(x * 100).toFixed(1)}%`
  */
 function writeReference(name, version, set, rows, t1, t2) {
   const file = outFile(`reference-${name}-v${version}.jsonl`)
-  const byId = new Map(existsSync(file) ? readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)).map((r) => [r.id, r]) : [])
-  rows.forEach((r, i) => {
-    if (t1[i] === 'invalid' || t2[i] === 'invalid') return
-    byId.set(r.id, { id: r.id, ts: r.ts, agent: r.agent, repo: r.repo, set, text: r.text, teacher: [t1[i], t2[i]], class: t1[i] === t2[i] ? t1[i] : null })
-  })
-  writeFileSync(file, [...byId.values()].map((r) => JSON.stringify(r)).join('\n') + '\n')
-  const agreed = [...byId.values()].filter((r) => r.class).length
-  console.log(`reference set: ${byId.size} prompts, ${agreed} with an agreed class -> ${file}`)
+  const r = mergeReference(existsSync(file) ? readFileSync(file, 'utf8') : '', { set, rows, t1, t2 })
+  writeFileSync(file, r.text)
+  console.log(`reference set: ${r.size} prompts, ${r.agreed} with an agreed class -> ${file}`)
 }
 
 /**

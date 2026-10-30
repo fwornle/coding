@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { SessionsPage } from './sessions'
 import { ModelsPage } from './models'
 import { OffloadPill, OffloadProvider, useOffload } from './offload'
+import { JobClassSettings } from './job-classes'
 
 // glass records only the sessions it launched — plus, where coding is installed
 // and the Accounts dialog includes it, the calls coding's proxy records on this
@@ -107,14 +108,18 @@ function Brand() {
 const tab = ({ isActive }: { isActive: boolean }) =>
   cn('px-3 py-1.5 text-sm rounded-md', isActive ? 'bg-muted font-medium' : 'text-muted-foreground hover:text-foreground')
 
+// The Classes tab's settings live on the tab itself; the reference set comes from the CLI.
+const JOB_CLASSES = { controls: <JobClassSettings />, measureCommand: 'glass job-classes measure' }
+
 function TokenUsage() {
   const { openSettings } = useOffload()
   const sources = useSources()
   return (
     <TokenUsagePage
-      proxyBase="" tabs={['overview', 'evolution', 'cost', 'trials', 'recent']} settings={false} onSettings={openSettings}
+      proxyBase="" tabs={['overview', 'evolution', 'cost', 'trials', 'classes', 'recent']} settings={false} onSettings={openSettings}
       coverage={coverage(sources.coding, sources.vscode)}
       sources={sources.control} writeHeaders={WRITE_HEADERS}
+      jobClasses={JOB_CLASSES}
     />
   )
 }

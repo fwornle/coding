@@ -7,6 +7,7 @@
 | `glass status` | Daemon state, live sessions, the latest recorded calls |
 | `glass doctor` | Node version, data home, CA, egress proxy, each agent's path and version, daemon state, and warnings when another local LLM proxy or tmux session overlaps with glass. Exit code 1 when something needs fixing |
 | `glass watch [--task <id>]` | A live one-line status bar for the newest session, or the given one |
+| `glass job-classes [on\|off\|measure\|join <url>\|pull\|leave]` | [Job classes](job-classes.md): switch labelling, measure your recent prompts, use a team's taxonomy. Without an argument: the current state |
 | `glass statusline [--format plain\|ansi\|tmux] [--task <id>]` | Print the status line once |
 | `glass report ctx\|net [--task <id>]` | The context or network report (what a status-line click shows) |
 | `glass stop` | Stop the daemon; open agent tunnels are closed, so it exits at once |
@@ -65,6 +66,7 @@
 | `~/.glass/daemon.json` | Running daemon's pid and port |
 | `~/.glass/run/copilot-quota.json` | GitHub's last month-to-date Copilot figure, and the host it came from |
 | `~/.glass/offload.json`, `offload.key` | [Offload](offload.md) settings and the endpoint key (owner-only) |
+| `~/.glass/job-classes.json`, `job-classes/` | [Job classes](job-classes.md) settings (owner-only) and a joined team's taxonomy |
 | `~/.glass/cost.json` | Optional: contract discount and FX for the € / $ views ([How cost is calculated](token-usage.md#how-cost-is-calculated)) |
 
 ## Read API

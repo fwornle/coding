@@ -29,6 +29,7 @@ const TokenUsageRoutingTab = lazy(() => import('./token-usage-routing-tab').then
 const CostTab = lazy(() => import('@/components/cost/CostTab').then((m) => ({ default: m.CostTab })))
 const TrialsTab = lazy(() => import('@/components/trials/TrialsTab').then((m) => ({ default: m.TrialsTab })))
 const JobClassesTab = lazy(() => import('@/components/job-classes/JobClassesTab').then((m) => ({ default: m.JobClassesTab })))
+type JobClassesExtras = import('@/components/job-classes/JobClassesTab').JobClassesExtras
 import { AccountsDialog } from '@/components/cost/AccountsDialog'
 import { SeriesTooltip } from '@/components/cost/series-tooltip'
 import { fetchAccountSelection, type AccountSelection, type SourcesControl } from '@/components/cost/account-selection'
@@ -528,7 +529,7 @@ const ALL_TABS: TokenUsageTab[] = ['overview', 'evolution', 'cost', 'trials', 'c
  * tab, no LLM Routing dialog). onSettings: the Settings button opens the caller's own dialog
  * instead of this proxy's LLM Routing one (glass: its offload settings).
  */
-export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settings = true, onSettings, coverage, sources, writeHeaders }: {
+export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settings = true, onSettings, coverage, sources, writeHeaders, jobClasses }: {
   proxyBase?: string
   tabs?: TokenUsageTab[]
   settings?: boolean
@@ -539,6 +540,8 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
   sources?: SourcesControl
   /** Extra headers on settings writes (glass's daemon wants its UI's). */
   writeHeaders?: Record<string, string>
+  /** The Classes tab's extras where labelling is set up from the page (glass): its settings, and the measure command. */
+  jobClasses?: JobClassesExtras
 } = {}) {
   const has = (tab: TokenUsageTab) => tabs.includes(tab)
   const [activeTab, setActiveTab] = useState<string>(() => linkedTab(tabs) ?? tabs[0])
@@ -1565,7 +1568,7 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
         {has('classes') && (
           <TabsContent value="classes" className="mt-4">
             <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Loading…</div>}>
-              <JobClassesTab proxyBase={proxyBase} hours={hoursWindow} />
+              <JobClassesTab proxyBase={proxyBase} hours={hoursWindow} controls={jobClasses?.controls} measureCommand={jobClasses?.measureCommand} />
             </Suspense>
           </TabsContent>
         )}

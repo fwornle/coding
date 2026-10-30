@@ -1,6 +1,6 @@
 {
   "name": "glass",
-  "version": "0.1.56",
+  "version": "0.1.57",
   "description": "Token measurement and context-window insight for coding agents",
   "private": true,
   "type": "module",
@@ -23,7 +23,8 @@
   ],
   "dependencies": {
     "node-forge": "^1.4.0",
-    "undici": "^7.30.0"
+    "undici": "^7.30.0",
+    "yaml": "^2.8.2"
   },
   "bundleDependencies": [
     "node-forge",

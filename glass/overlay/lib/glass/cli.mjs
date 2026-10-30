@@ -24,6 +24,7 @@ import { tmuxWanted, launchInTmux, configureStatus, popup, message, selfCommand 
 import { update, RELEASE_REPO } from './update.mjs';
 import { loadCostDefaults } from './cost.mjs';
 import { billingProblems } from '../cost/billing-rules.mjs';
+import { jobClassesCmd } from './job-classes-cli.mjs';
 
 const out = (line = '') => process.stdout.write(`${line}\n`);
 const err = (line) => process.stderr.write(`${line}\n`);
@@ -41,6 +42,8 @@ const HELP = `glass ${VERSION} — token measurement and context insight for cod
   glass update       install the latest release (needs gh; --check only reports)
   glass uninstall    stop the daemon and delete ${glassHome()} (asks first; --yes skips)
   glass watch        a live status line for the newest session (--task <id> for another)
+  glass job-classes  what kind of job each turn is, labelled with your Copilot account (off
+                     until \`glass job-classes on\`); join <url> a team's taxonomy; measure
 
 Data: GLASS_HOME (default ~/.glass). Port: GLASS_PORT (default 12445).
 --no-intercept: copilot/opencode/pi run without TLS interception (not measured by the proxy).
@@ -453,6 +456,7 @@ export async function main(argv) {
     case 'click': return click(rest);
     case 'watch': return watch(rest);
     case 'status': return status();
+    case 'job-classes': return jobClassesCmd(rest, { out, err });
     case 'doctor': return doctor();
     case 'stop': {
       const stopped = await stopDaemon(glassPort());

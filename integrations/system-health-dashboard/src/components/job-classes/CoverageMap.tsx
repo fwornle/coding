@@ -66,7 +66,7 @@ function shade(share: number) {
 }
 
 /** `taxonomy` is a tag from GET /api/job-classes ('' = the default), `taxonomyFile` where it lives (for the measurement hint). */
-export function CoverageMap({ proxyBase, hours, taxonomy = '', taxonomyFile = 'config/job-classes.yaml', taxonomyTeam = null }: { proxyBase: string; hours: string; taxonomy?: string; taxonomyFile?: string; taxonomyTeam?: string | null }) {
+export function CoverageMap({ proxyBase, hours, taxonomy = '', taxonomyFile = 'config/job-classes.yaml', taxonomyTeam = null, measureCommand }: { proxyBase: string; hours: string; taxonomy?: string; taxonomyFile?: string; taxonomyTeam?: string | null; measureCommand?: string }) {
   const [data, setData] = useState<Coverage | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [teams, setTeams] = useState<Team[]>([])
@@ -205,7 +205,7 @@ export function CoverageMap({ proxyBase, hours, taxonomy = '', taxonomyFile = 'c
         {view && view.all === 0 && (
           <div className="py-6 text-center text-muted-foreground">
             {source === 'reference'
-              ? `No reference set yet. Run scripts/measure-job-classes.mjs${taxonomyTeam ? ` --team=${taxonomyTeam}` : ''} --taxonomy=${taxonomyFile} to make one.`
+              ? `No reference set yet. Run ${measureCommand || `scripts/measure-job-classes.mjs${taxonomyTeam ? ` --team=${taxonomyTeam}` : ''} --taxonomy=${taxonomyFile}`} to make one.`
               : 'No labelled turns in this window.'}
           </div>
         )}

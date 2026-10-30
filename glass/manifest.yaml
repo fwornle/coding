@@ -56,6 +56,14 @@ select:
       - lib/proxy/proxy-paths.cjs
       # raw-body redaction patterns (the daemon passes LLM_PROXY_REDACTION_CONFIG)
       - config/redaction/redaction-patterns.json
+      # job classes: the default taxonomy (a team may bind its own), and the
+      # harness-noise filter the measurement drops before labelling
+      - config/job-classes.yaml
+      - lib/job-classes/noise.mjs
+      # glass job-classes measure: the agents' own transcripts as the corpus, and
+      # the measurement's shared parts (coding's measure-job-classes.mjs uses them too)
+      - lib/job-classes/prompts.mjs
+      - lib/job-classes/measure.mjs
 
   - source: proxy
     to: proxy
@@ -85,6 +93,9 @@ select:
       - proxy-bridge/turn-band.mjs
       # errorDetail() for the forward / intercept error lines (imported by anthropic-forward.mjs)
       - proxy-bridge/log-format.mjs
+      # job classes, opt-in (lib/glass/job-classes.mjs): the tagger and its read side
+      - proxy-bridge/job-class.mjs
+      - proxy-bridge/job-class-api.mjs
 
 # TypeScript compiled with the proxy's own tsc and compilerOptions (no maps, no
 # declarations). The proxy's dist/ is never copied — it can be stale.

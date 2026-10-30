@@ -89,6 +89,7 @@ nav:
     - Token Usage: token-usage.md
     - Models & Accounts: models.md
     - Offload Easy Calls: offload.md
+    - Job Classes: job-classes.md
     - Context Window: context-window.md
     - Comparing Runs (A/B): comparing-runs.md
     - Status Line: status-line.md

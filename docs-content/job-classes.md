@@ -30,10 +30,10 @@ from a trial, not by reputation.
 <div class="overview-benefits" markdown="1">
 
 **Built and running**  
-define · measure · label live · gate each class · read the coverage · share and grow as a team
+define · measure · label live · gate each class · read the coverage · share and grow as a team · in glass too
 
 **Next**  
-trial per class · route by class · the same in glass
+trial per class · route by class
 
 </div>
 
@@ -418,7 +418,33 @@ has passed its gate and a passing verdict exists for the model it would go to on
 <p class="overview-takeaway">The class picks which jobs to try; the evidence decides the model.</p>
 </section>
 
-<section class="overview-slide" id="slide-14" aria-labelledby="jc-status" markdown="1">
+<section class="overview-slide" id="slide-14" aria-labelledby="jc-glass" markdown="1">
+<div class="overview-copy" markdown="1">
+
+<p class="overview-kicker">In glass · built</p>
+
+## The same, on machines without coding {#jc-glass}
+
+Most people will only ever run **glass**. It labels their turns the same way, opt-in:
+
+- the **student and teacher are their own Copilot account**, reached with their `gh` login;
+- prompts are redacted first, and nothing is sent until they tick **Label my turns**;
+- `glass job-classes measure` reads their recent prompts from the **agents' own transcripts** (Claude Code, Copilot CLI, VS Code), so no session logs are needed;
+- a team's taxonomy is joined by its git URL: `glass job-classes join <url>`.
+
+The Classes tab, the gate and the coverage map are the same as here.
+
+</div>
+<figure class="overview-figure" markdown="1">
+
+[![glass's Classes tab: the labelling switch, the user's Copilot account, the student and teacher models, the teacher's share of turns, a button to try the account, and a field to join a team's taxonomy by git URL.](images/glass-job-classes-settings.png)](images/glass-job-classes-settings.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+
+<figcaption>glass → Token Usage → Classes: off until the user switches it on.</figcaption>
+</figure>
+<p class="overview-takeaway">One taxonomy, one gate, whether a colleague runs coding or only glass.</p>
+</section>
+
+<section class="overview-slide" id="slide-15" aria-labelledby="jc-status" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Where it stands</p>
@@ -444,7 +470,7 @@ See it yourself:
 | Share with a team | ✅ | `init` / `join`, pulled on sync |
 | Grow the taxonomy | ✅ | `propose` / `fold`, stability check |
 | Trials and routing per class | next | replays per class, evidence, band floor |
-| glass | later | opt-in, with your own model, after the gate |
+| glass, without coding | ✅ | opt-in, your Copilot account; measure from transcripts |
 
 <figcaption>The plan: .planning/shared-job-classes.md</figcaption>
 </figure>

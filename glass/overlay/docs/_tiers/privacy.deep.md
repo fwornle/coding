@@ -33,6 +33,14 @@ request body goes to the endpoint you named, with that endpoint's key — never 
 login or headers. Everything else, and any call the endpoint fails, goes where it went before.
 The endpoint key is kept owner-only in `~/.glass/offload.key` and no API returns it.
 
+## With job classes on
+
+Only if you switch [job classes](job-classes.md) on: each human turn's prompt, redacted
+first, goes to your own GitHub Copilot account to be labelled, with the token of your `gh`
+login (read from `gh` when needed, never stored). `glass job-classes measure` sends your
+recent prompts from the agents' transcripts the same way, redacted, when you run it. The
+label and a 120-character redacted preview are kept in the token DB.
+
 ## The interception CA
 
 | | |

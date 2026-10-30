@@ -15,6 +15,9 @@
 //   GET  /api/statusline[?task_id=]   status-line facts of a live session (statusline.mjs)
 //   GET|PATCH /api/offload, PUT /api/offload/key, POST /api/offload/test
 //                           the opt-in offload (offload-store.mjs), from the UI
+//   GET  /api/job-classes[/summary|/coverage|/settings], PATCH …/settings,
+//        POST …/test, PUT|DELETE …/team, POST …/team/pull
+//                           job classes, opt-in (job-classes.mjs)
 //
 // Every `glass <agent>` run is a session with its own task id; its rows, context
 // turns and breakdown are keyed by it, and closing it archives the span and lets
@@ -56,6 +59,7 @@ import { loadCostDefaults, saveExcludedAccounts, saveSources } from './cost.mjs'
 import { createNetworkMonitor } from './network.mjs';
 import { createOffloadStore } from './offload-store.mjs';
 import { createCopilotQuota } from './copilot-quota.mjs';
+import { createGlassJobClasses } from './job-classes.mjs';
 import { createOffloader, createTargetHealth, OFFLOAD_AGENTS } from '../../proxy/proxy-bridge/offload.mjs';
 
 const PKG = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8'));
@@ -221,10 +225,11 @@ export async function startDaemon({
   });
 
   const tokenDb = initTokenDb(p.data);
+  const redactRawBody = makeRedactRawBody(loadRawBodyRedactionPatterns(PKG_ROOT, process.env.LLM_PROXY_REDACTION_CONFIG));
   const measurement = createMeasurement({
     dataDir: p.data,
     tokenDb: () => tokenDb,
-    redactRawBody: makeRedactRawBody(loadRawBodyRedactionPatterns(PKG_ROOT, process.env.LLM_PROXY_REDACTION_CONFIG)),
+    redactRawBody,
     canonicalModel: canonicalizeModelName,
     log,
     logErr,
@@ -253,6 +258,14 @@ export async function startDaemon({
 
   // ── opt-in offload ──
   const offloadStore = createOffloadStore(home);
+  // Job classes (job-classes.mjs): off until the user switches labelling on; then
+  // the user's own Copilot account labels each human turn in the background.
+  const jobClasses = createGlassJobClasses({
+    home, dataDir: p.data, db: tokenDb.db, redact: redactRawBody, pkgRoot: PKG_ROOT,
+    githubHost: () => copilotQuota.view().host, version: VERSION, log, logErr,
+    fetch: (...a) => egress(...a), ghEnv: () => ({ ...process.env, ...egressEnv }), ...(gh ? { run: gh } : {}),
+  });
+  const onTurn = jobClasses.onTurn;
   const targetFetch = (url, init) => {
     let host = '';
     try { host = new URL(url).hostname; } catch { /* egress */ }
@@ -396,12 +409,12 @@ export async function startDaemon({
     if (req.method === 'POST' && pathOnly.startsWith('/v1/messages')) {
       return handleAnthropicMessages(req, res, {
         measurement, fetch: egress, upstreamBase, agent, provider, subscription: '',
-        bindTaskId: () => taskId, logErr,
+        bindTaskId: () => taskId, logErr, onTurn,
       });
     }
     if (req.method === 'POST' && openAIWireOf(req.url)) {
       return handleOpenAIPassthrough(req, res, {
-        measurement, fetch: egress, upstreamBase, provider, agent, taskId, project: s?.project || '', logErr, offload,
+        measurement, fetch: egress, upstreamBase, provider, agent, taskId, project: s?.project || '', logErr, offload, onTurn,
       });
     }
     return forwardPlain(req, res, { fetch: egress, upstreamBase, logErr });
@@ -422,11 +435,11 @@ export async function startDaemon({
     if (req.method === 'POST' && pathOnly.endsWith('/messages')) {
       return handleAnthropicMessages(req, res, {
         measurement, fetch: via, upstreamBase, agent: s.agent, provider, subscription: '',
-        bindTaskId: () => s.taskId, logErr,
+        bindTaskId: () => s.taskId, logErr, onTurn,
       });
     }
     return handleOpenAIPassthrough(req, res, {
-      measurement, fetch: via, upstreamBase, provider, agent: s.agent, taskId: s.taskId, project: s.project, logErr, offload,
+      measurement, fetch: via, upstreamBase, provider, agent: s.agent, taskId: s.taskId, project: s.project, logErr, offload, onTurn,
     });
   }
 
@@ -506,9 +519,12 @@ export async function startDaemon({
         // account itself (x-llm-provider), which takes precedence in the forward.
         const provider = req.headers['x-api-key'] ? 'anthropic-api' : 'anthropic';
         return handleAnthropicMessages(req, res, {
-          measurement, fetch: egress, upstreamBase, provider, subscription: '', logErr,
+          measurement, fetch: egress, upstreamBase, provider, subscription: '', logErr, onTurn,
         });
       }
+      if (url.startsWith('/api/job-classes') && await jobClasses.handle(req, res, {
+        json, readJson, writeAllowed: (r) => uiWriteAllowed(r, selfPort),
+      })) return undefined;
       if (url === '/api/offload' && req.method === 'GET') return json(res, 200, offloadView());
       if (url.startsWith('/api/offload') && req.method !== 'GET') {
         if (!uiWriteAllowed(req, selfPort)) return json(res, 403, { error: 'offload settings change only from the glass UI or CLI' });

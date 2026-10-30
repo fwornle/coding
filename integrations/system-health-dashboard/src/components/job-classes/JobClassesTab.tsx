@@ -19,7 +19,7 @@
  * projects are then labelled under it. The taxonomy picker chooses which one the
  * tab reads: labels made under two taxonomies are never counted together.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { RefreshCw, Tags } from 'lucide-react'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -101,8 +101,15 @@ function ShareBar({ share }: { share: number }) {
   )
 }
 
+/** Where labelling is set up from the page itself (glass): its settings card, and how to make a reference set. */
+export interface JobClassesExtras {
+  controls?: ReactNode
+  /** The command that writes a reference set, in place of coding's measurement script. */
+  measureCommand?: string
+}
+
 /** `hours` is the page's window: a number of hours, or 'all' (the proxy's longest, 90 days). */
-export function JobClassesTab({ proxyBase, hours }: { proxyBase: string; hours: string }) {
+export function JobClassesTab({ proxyBase, hours, controls, measureCommand }: { proxyBase: string; hours: string } & JobClassesExtras) {
   const [summary, setSummary] = useState<Summary | null>(null)
   const [tagger, setTagger] = useState<TaggerState | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -193,11 +200,13 @@ export function JobClassesTab({ proxyBase, hours }: { proxyBase: string; hours: 
         </CardContent>
       </Card>
 
+      {controls}
+
       {taxonomy && <GateProgress proxyBase={proxyBase} taxonomy={taxonomy} />}
 
       {taxonomy !== null && (() => {
         const entry = (tagger?.taxonomies ?? []).find(x => x.tag === taxonomy)
-        return <CoverageMap proxyBase={proxyBase} hours={hours} taxonomy={taxonomy} taxonomyFile={entry?.team ? entry.file : undefined} taxonomyTeam={entry?.team ?? null} />
+        return <CoverageMap proxyBase={proxyBase} hours={hours} taxonomy={taxonomy} taxonomyFile={entry?.team ? entry.file : undefined} taxonomyTeam={entry?.team ?? null} measureCommand={measureCommand} />
       })()}
 
       <Card>

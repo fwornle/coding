@@ -80,10 +80,10 @@ and names the first that does the job as well. The tab lists each trial's verdic
 model's standing, the pairs side by side and what each answer missed. glass shows them read-only; they are started and accepted in coding's
 dashboard, where accepting one switches the job's model.
 
-**Classes** are not in glass yet. coding labels each of your prompts with its kind of job
-(fix, ship, status, explain, …) using a cheap model that a strong one spot-checks, and
-measures per kind whether a cheaper model would do. glass will offer the same as an opt-in,
-with your own model, once those labels have proven reliable.
+**Classes** shows what kind of job each turn was (fix, build, ship, status, explain, …),
+once you switch labelling on: a cheap model of your own Copilot account labels every turn
+and a strong one re-checks a share. The tab has the switch, the gate per class, the taxonomy
+as a tree or a map, and the tokens per class. See [Job Classes](job-classes.md).
 
 ### How cost is calculated
 

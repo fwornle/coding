@@ -13,6 +13,7 @@ Every command, environment variable and setting.
     | `glass status` | daemon, live sessions, latest calls |
     | `glass doctor` | check the setup |
     | `glass watch` | live status line for the newest session |
+    | `glass job-classes [on\|off\|measure\|join <url>]` | [job classes](job-classes.md), opt-in |
     | `glass stop` | stop the daemon |
     | `glass update [--check]` | install the latest release |
     | `glass uninstall [--yes]` | stop the daemon, delete `~/.glass` |
