@@ -226,7 +226,7 @@ try {
     const info = JSON.parse(r.stdout.slice(r.stdout.indexOf('[')))[0];
     tarball = path.join(box, info.filename);
     const paths = info.files.map((f) => f.path);
-    check(['undici', 'node-forge'].every((d) => info.bundled.includes(d)), `tarball bundles its dependencies (${info.bundled.join(', ') || 'none'})`);
+    check(['undici', 'node-forge', 'yaml'].every((d) => info.bundled.includes(d)), `tarball bundles its dependencies (${info.bundled.join(', ') || 'none'})`);
     check(!paths.some((p) => p.startsWith('tests/') || p.startsWith('.github/')), 'tarball carries no tests or CI files');
     check(paths.includes('ui/index.html') && paths.includes('bin/glass.mjs'), 'tarball carries the CLI and the UI');
     process.stdout.write(`  ${info.filename}: ${(info.size / 1024).toFixed(0)} KB packed, ${info.entryCount} files\n`);
