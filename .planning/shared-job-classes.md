@@ -172,7 +172,7 @@ nothing changes silently.
 | # | Deliverable | Gate to the next |
 |---|---|---|
 | **P0 — measure** | Offline script: teacher labels ~2 weeks of captured first-call prompts from `context_turns`, at cap 16, twice | kappa ≥ 0.7 between the two derivations, and a class distribution not dominated by one bucket. **If this fails, stop: there is no stable taxonomy to share** |
-| **P1 — local class, shadow** | Service returns `class` (KNN + closed-set LLM fallback); `job_class`/`job_class_source` columns; "by class" view; no routing effect | Student vs teacher per-class precision on held-out data |
+| **P1 — local class, shadow** | Service returns `class` (KNN + closed-set LLM fallback); `job_class`/`job_class_source` columns; "by class" view; no routing effect | Student vs teacher per-class precision on held-out data. Measured 2026-10-30: no cheap student reaches it, so live labels come from the teacher until a class must route (see below) |
 | **P2 — shared repo, read side** ✅ | Package format + validator, `teams.yaml` binding, `job-classes init`, pull via `coding sync`, local KNN rebuild | Two machines resolve the same class for the same prompt |
 | **P3 — contributions + dedup** ✅ | `proposals/`, maintainer fold with absorb/add/merge/stability check, versioned CHANGELOG, tombstones | A forced cap overflow merges correctly and keeps old rows resolvable |
 | **P4 — per-class replay trials + evidence** | Whole-turn replays of sampled real turns in a sandbox, incumbent vs candidate, judged blind; `evidence/` in the team package; the class-aware floor for agents the proxy routes. Design below | Replays of one answer-only class reach a verdict, and the A/A noise floor is measured |
@@ -321,7 +321,9 @@ for will only ever run glass, so that design gave them nothing. Revised:
   the quota (enterprise hosts first). The token is read from `gh` per use and
   never stored. A free plan may not offer the student model; the settings say
   so instead of failing quietly. Student `claude-haiku-5.5`, teacher
-  `claude-sonnet-5`, as in coding. Off until the user switches it on.
+  `claude-sonnet-5`, as in coding until 2026-10-30 (coding's live label is now
+  the teacher's, see "The P1 gate, measured offline" below; glass keeps Haiku
+  for now). Off until the user switches it on.
 - **The measurement runs in glass**: its prompts come from the agents' own
   transcripts (glass already reads them for tokens), not from coding's session
   logs. Corpus extraction is the only new part; noise filter, teacher passes,
@@ -657,6 +659,65 @@ Two things keep the count clean:
 At about 15 to 30 labelled turns a day, the common classes (fix, ship, status,
 build) reach 20 checks in one to two weeks. The rare ones (relay, configure,
 reply) take longer, and a class that never collects 20 drives nothing.
+
+## The P1 gate, measured offline; live labels from the teacher (2026-10-30)
+
+The live gate filled at about 3 labels an hour (of 108 turns in 75 minutes,
+104 were skipped as mid-loop, utility or noise), so the gate was computed
+offline as well. The measurement's labels already are the gate's pairs: the
+same student and teacher, one prompt per call, over all 488 prompts of the
+28-day corpus (dev = the 300 held-out prompts the taxonomy was tuned on, test
+= 190 from the pool nobody tuning it read). Precision is counted on the items
+where the teacher's two passes agree.
+
+**Taxonomy v2, Haiku:** run 94%, relay 96% and explain 95% pass; fix 89%,
+ship 89%, status 80%, build 77%, docs 75% and cleanup 75% are below; reply and
+configure have too few items. Waiting for live labels would not change this:
+the misses are confusions between neighbours (status/explain, build/reply/run,
+docs and cleanup/build/ship), not small samples.
+
+**v3 — the confusions written into the taxonomy — did not help.** Each
+confused pair got a rule (several jobs take the earliest in precedence even
+when named last; "check it is live" is run; a how/why/should question is
+explain even when it says "check"; dropping a step or migrating is build). Dev
+84.4% → 84.2%, test 84.7% → **81.1%**, student kappa on test 0.788 → 0.752.
+Ship passed; run and explain fell below, because the new rules pulled prompts
+into them. Not committed.
+
+**Stronger students did not help either** (taxonomy v2, dev + test):
+
+| | Haiku 5.5 | gpt-5.6-terra | gpt-5.6-luna | teacher pass 2 vs 1 |
+|---|---:|---:|---:|---:|
+| overall precision | 84.5% | 84.0% | 82.7% | 94.2% |
+| test set only | 84.7% | 82.6% | 78.9% | 95.7% |
+| classes passing | 3 | 2 | 1 | 6 of 11 |
+| p50 latency | 2.0 s | 1.3 s | 1.5 s | |
+
+Three cheap models stop at about 85%. The teacher itself fails run (88%) and
+docs (89%) against its own first pass, so on those classes no student can be
+held to 90%. (The terra/luna run first failed on every call: on corporate the
+offload moved a call that named a route's profile model to qwen-local, which
+rejects Copilot ids with a 400 that no retry class covers. Fixed in
+rapid-llm-proxy #79; live labels were not affected, they name no profile.)
+
+**Decision: live labels come from the teacher** (rapid-llm-proxy #80).
+`student_process: job-class-teacher`; the sampled second call is a second
+teacher pass on 1 turn in 10, which measures the teacher's consistency (a drift
+check, ~94%), not a student gate. While a class only feeds reporting, latency
+does not matter and 15 to 30 Sonnet calls a day are cheap, so reporting gets
+the reliable label. `bg-job-class-student` stays for the measurement.
+
+What this defers rather than settles:
+- **A student comes back when a class must act before the turn is answered**
+  (routing by class, P4). Its gate then should be relative to the teacher's own
+  consistency per class (for example within 5 points of it, over at least 20
+  checks), not an absolute 90% that the teacher does not reach on every class.
+- **The dashboard's Gate panel** now compares two teacher passes. Its wording
+  ("student precision") is wrong for that until it is relabelled.
+- **glass (P5)** still labels with Haiku through the user's Copilot account. The
+  same reasoning applies there, but a Sonnet call per turn on someone else's
+  Copilot plan is their quota, so glass changes only when that is decided.
+- Labels made before #80 are Haiku's; `student_model` on each row says which.
 
 ## Open questions (yours to decide)
 
