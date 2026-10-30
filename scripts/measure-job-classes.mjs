@@ -532,12 +532,13 @@ async function decide(tax, text, model) {
 }
 
 /** Score each student's labels against the teacher's `ref`, with `ref2` (a second teacher pass) for "sure". */
-async function scoreStudents(rows, tax, ref, ref2, tagOf) {
+async function scoreStudents(rows, tax, ref, ref2, tagOf, pick = (a) => a) {
   const sure = ref.map((x, i) => (x === ref2[i] ? i : -1)).filter((i) => i >= 0)
   const list = []
   for (const model of opt('students', '').split(',').map((m) => m.trim()).filter(Boolean)) {
     const st = await singleLabels(rows, tax, studentRoute(model), tagOf(model))
-    const l = st.labels
+    const l = pick(st.labels)
+    if (st.confidences) st.confidences = pick(st.confidences)
     const both = l.map((x, i) => (x !== 'none' && ref[i] !== 'none' ? i : -1)).filter((i) => i >= 0)
     list.push({
       model, served: st.served, latencyMs: st.latencyMs,
@@ -739,14 +740,25 @@ async function committedRun(heldout, set) {
   for (const id of tax.precedence || []) if (!ids.includes(id)) throw new Error(`${file}: precedence names unknown class ${id}`)
   console.log(`taxonomy ${tax.tag}: ${ids.length} classes from ${file}`)
   const teacher = { process: 'job-class-teacher' }
-  const t1 = await singleLabels(heldout, tax, teacher, `${tax.tag}-teacher1`)
-  const t2 = await singleLabels(heldout, tax, teacher, `${tax.tag}-teacher2`)
+  // Every prompt of a checkpointed set is labelled, so the checkpoints stay valid,
+  // but harness noise (lib/job-classes/noise.mjs) is scored nowhere: a set sampled
+  // before a noise pattern existed still holds such text, and the teacher and the
+  // students disagree on it for reasons no taxonomy edit can fix.
+  const all = heldout
+  const keep = all.map((r, i) => (isHarnessNoise(r.text) ? -1 : i)).filter((i) => i >= 0)
+  const pick = (a) => keep.map((i) => a[i])
+  heldout = pick(all)
+  if (keep.length < all.length) console.log(`scoring ${keep.length} of ${all.length}: ${all.length - keep.length} harness-noise prompts left out`)
+  const t1 = await singleLabels(all, tax, teacher, `${tax.tag}-teacher1`)
+  const t2 = await singleLabels(all, tax, teacher, `${tax.tag}-teacher2`)
+  t1.labels = pick(t1.labels)
+  t2.labels = pick(t2.labels)
   const self = cohenKappa(t1.labels, t2.labels)
   const dist = distribution(t1.labels)
   const maxShare = dist.filter((d) => d.cls !== 'none').at(0)?.share || 0
-  const students = opt('students', '') ? await scoreStudents(heldout, tax, t1.labels, t2.labels, (m) => `${tax.tag}-${slug(m)}`) : null
+  const students = opt('students', '') ? await scoreStudents(all, tax, t1.labels, t2.labels, (m) => `${tax.tag}-${slug(m)}`, pick) : null
   writeReference(name, raw.version ?? 0, set, heldout, t1.labels, t2.labels)
-  writeJson(`report-${tax.tag}.json`, { generatedAt: new Date().toISOString(), taxonomy: tax.tag, n: heldout.length, teacher: t1.served, selfKappa: self, maxShare, dist, students })
+  writeJson(`report-${tax.tag}.json`, { generatedAt: new Date().toISOString(), taxonomy: tax.tag, n: heldout.length, noise: all.length - heldout.length, teacher: t1.served, selfKappa: self, maxShare, dist, students })
   const md = [
     `# Committed taxonomy ${tax.tag} (${new Date().toISOString().slice(0, 10)})`, '',
     `${set === 'heldout' ? `Held-out ${heldout.length} prompts (the P0 set, which the taxonomy was tuned on)` : `Test set: ${heldout.length} prompts from the P0 derivation pool, never read while tuning`}. Teacher: ${t1.served.join(', ')}, one prompt per call, two passes.`, '',

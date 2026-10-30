@@ -599,6 +599,45 @@ documents); the "same core answer" judge with completeness scored apart.
   prompt verbatim in `tests/fixtures/prompt-classifier-labels.json`, a fixture
   added after the last run. The guard works; the exclude list needs the file.
 
+## Taxonomy v2: the run/status line (2026-10-29)
+
+The live P1 gate fills slowly (a few teacher-checked turns a day), so the next
+gain came from the offline sets instead. A per-class breakdown of Haiku against
+the teacher on the dev set showed that the confusions named in the P0 results
+were not the large ones. The weakest class was **run** (half its prompts went to
+status or ship), then configure (few prompts, mostly mixed requests).
+
+The cause was the taxonomy's own wording: run said "verify end to end" and
+status said "check / look at". "Check that it shows up now" was both. v2 draws
+the line by what finding out takes:
+
+- trying the thing (use the feature, render the page, re-run the check) is **run**;
+- reading what is already recorded (a log, a release, a diff) is **status**;
+- pulling, syncing or upgrading a local copy is run, not ship;
+- pointing the agent at something to study ("look into X") is explain.
+
+The examples added for this are written for the file, not taken from the dev set.
+
+The measurement also stopped scoring harness noise. The dev and test sets were
+sampled before `lib/job-classes/noise.mjs` existed and still held skill
+expansions and bash-mode lines (about one prompt in twenty-five). They are still
+labelled, so the checkpoints stay valid, but are left out of every score.
+
+| | v1 dev | v2 dev | v1 test | v2 test |
+|---|---|---|---|---|
+| teacher pass 1 vs 2 | 0.920 | 0.956 | 0.937 | 0.960 |
+| claude-haiku-5.5 (kappa) | 0.781 | 0.793 | 0.770 | 0.833 |
+| claude-haiku-5.5 (agree) | 81% | 82% | 80% | 86% |
+
+v1 is shown re-scored without the noise. Run went from 50% to 88% on dev. The
+test set, which nobody read while tuning, gained more than the dev set, so the
+edit generalises rather than fitting the prompts it was tuned on. What remains
+on dev: build↔docs and build↔cleanup on short follow-ups ("do the other ones
+too"), which need the conversation rather than the prompt.
+
+The live tagger picked v2 up by mtime. Live labels made under v1 stay readable
+under their own tag. The P1 gate counts v2 labels from 2026-10-29.
+
 ## Open questions (yours to decide)
 
 1. **What is the class primarily for**: routing savings, or reporting plus trial

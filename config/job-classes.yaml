@@ -20,7 +20,13 @@
 # the boundaries the students and the teacher disagreed on are spelled out —
 # a "yes" that names an action is that action, pasted output is not a relay,
 # "check / look at / list" is status, and "why did X go wrong" is fix.
-version: 1
+#
+# v2 (after v1 on the held-out set: students missed run most, at ~43%): the
+# line between run and status is whether finding out means making the thing
+# happen (try it, render it, re-check it live: run) or reading what is already
+# recorded (a log, a release, a diff: status); pulling or upgrading a local copy
+# is run, not ship; pointing the agent at something to study is explain.
+version: 2
 none: >-
   Answer "none" ONLY for a prompt that is no engineering job at all (a test
   message, trivia, small talk) or so fragmentary that no class can be read from
@@ -105,28 +111,31 @@ classes:
       - "Regenerate the architecture diagram, the arrows are wrong."
   - id: ship
     group: operating
-    test: A version-control or release operation on finished work - commit, push, open or merge a PR, rebase, tag, bump a version, publish a release.
+    test: A version-control or release operation on finished work - commit, push, open or merge a PR, rebase, tag, bump a version, publish a release. Pulling, syncing or upgrading a local copy to what was already published is run, not ship.
     examples:
       - "Commit this and push."
       - "Merge the PR, tag 0.1.56 and publish the release."
   - id: run
     group: operating
-    test: Execute something that already exists, to make something happen - run or rerun tests, a script, a benchmark, a build or a workflow; restart a service; deploy; verify end to end. Reading or inspecting state (logs, files, a release, a diff) is status, not run.
+    test: Execute something that already exists, to make something happen or to see it work - run or rerun tests, a script, a benchmark, a build or a workflow; restart a service; deploy; pull or upgrade a local checkout or install; try a feature live and say whether it works ("check it shows up now", "see if it still works"). Reading state that is already recorded (logs, files, a release, a diff) is status, not run.
     examples:
+      - "Try the login again now that the token is refreshed, and tell me if it works."
+      - "Update my local install to the release we just published."
       - "Run the full test suite again."
       - "Restart the proxy so it picks up the new config."
       - "Start the benchmark with the open-book arm."
   - id: status
     group: operating
-    test: Asks for the state of something, or to check / look at / list / diff it and report back - is it finished, what is left, what is running, what changed, what a log, a release or a metric shows - with nothing to execute or change. Pasted output with no request attached is status.
+    test: Asks for the state of something, or to look at / list / diff / read it and report back - is it finished, what is left, what is running, what changed, what a log, a release or a metric already shows - with nothing to execute or change. If finding out means running or trying the thing itself (using the feature, re-running a check), it is run. Pasted output with no request attached is status.
     examples:
       - "Is the wave analysis finished?"
       - "What's still open from yesterday's plan?"
       - "Merged both - check the 0.2.0 release."
   - id: explain
     group: communicating
-    test: Asks how or why something works, where something is, or how options compare - a question about a system that is working as intended, or about an idea, with no change requested. "Why did it go wrong" is fix.
+    test: Asks how or why something works, where something is, or how options compare - a question about a system that is working as intended, or about an idea, with no change requested; also pointing the agent at something to study and discuss ("look into X", "have you considered this design?"). "Why did it go wrong" is fix.
     examples:
+      - "Look into how the scheduler picks the next job."
       - "How does the classifier decide the band?"
       - "Where are the trial samples stored?"
       - "Would a KNN or an LLM be the better student here?"
