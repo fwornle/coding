@@ -5,6 +5,7 @@
 // fetch ignores them on the Node 22 floor. A proxy URL that points back at glass
 // itself is dropped: following it would loop.
 import { fetch as undiciFetch, EnvHttpProxyAgent } from 'undici';
+import { LOCAL_PROXY_PORT } from '../network/location-probe.mjs';
 
 const LOOPBACK = new Set(['127.0.0.1', 'localhost', '::1', '[::1]']);
 
@@ -37,6 +38,53 @@ export function proxyEnvOf(env = {}) {
 /** NO_PROXY of an environment, '' when unset. */
 export function noProxyOf(env = {}) {
   return env.NO_PROXY ?? env.no_proxy ?? '';
+}
+
+const LOCAL_PROXY = `http://127.0.0.1:${LOCAL_PROXY_PORT}`;
+
+/** Does this proxy URL name the local proxy (proxydetox on :3128)? */
+function isLocalProxy(proxy) {
+  try {
+    const u = new URL(proxy);
+    return LOCAL_PROXY_PORT === Number(u.port || 80) && LOOPBACK.has(u.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The proxy settings egress uses: the newest session's shell, unless the network
+ * monitor's last completed probe shows them wrong for where the machine is now.
+ * A shell keeps the proxy variables of the network it was opened on, so a
+ * session from a VPN shell left glass tunnelling through a :3128 that refused
+ * every CONNECT at home (2026-10-24), and a session from a home shell left it
+ * going direct on the corporate network, where direct egress is blocked.
+ *   open internet, the shell names the local proxy, which does not forward → direct
+ *   CN / VPN, the shell names no proxy, the local proxy forwards → the local proxy
+ * Anything else — another proxy, an unprobed network, a proxy that forwards — is
+ * the shell's choice and kept.
+ * @param {object} shellEnv  proxyEnvOf() of the newest session's shell
+ * @param {object|null} network  createNetworkMonitor().facts()
+ * @param {number} port  glass's own port
+ * @returns {{ env: object, why: string }}  why: '' when the shell's settings stand
+ */
+export function egressEnvFor(shellEnv, network, port) {
+  if (!network?.last_probe_end) return { env: shellEnv, why: '' };
+  const proxy = upstreamProxy(shellEnv, port);
+  const forwards = Boolean(network.proxy_running && network.proxy_functional);
+  const open = network.location === 'open' || network.location === 'home';
+  const corporate = network.location === 'corporate' || network.location === 'vpn';
+  if (proxy && isLocalProxy(proxy) && open && !forwards) {
+    return { env: {}, why: `open internet and the local proxy on :${LOCAL_PROXY_PORT} does not forward` };
+  }
+  if (!proxy && corporate && forwards) {
+    const noProxy = noProxyOf(shellEnv) || 'localhost,127.0.0.1,::1';
+    return {
+      env: { HTTPS_PROXY: LOCAL_PROXY, HTTP_PROXY: LOCAL_PROXY, NO_PROXY: noProxy },
+      why: `${network.location === 'vpn' ? 'VPN' : 'corporate network'}: direct egress is blocked and the local proxy forwards`,
+    };
+  }
+  return { env: shellEnv, why: '' };
 }
 
 // How long a refused tunnel is remembered per host. The forward retries a

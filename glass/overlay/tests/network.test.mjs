@@ -162,3 +162,33 @@ test('nobody at the machine: the interval probes every 5 min, not every 15 s', a
   t = Date.parse(m.facts().last_probe_end) + 15_000;
   assert.equal(m.due(), true, 'present again: every interval');
 });
+
+test('egress: the network monitor corrects a shell opened on another network (2026-10-24)', async () => {
+  const { egressEnvFor } = await import('../lib/glass/egress.mjs');
+  const at = { last_probe_end: '2026-10-24T16:59:00.000Z' };
+  const local = { HTTPS_PROXY: 'http://127.0.0.1:3128', NO_PROXY: 'localhost' };
+  const home = { ...at, location: 'open', proxy_running: true, proxy_functional: false };
+  assert.deepEqual(egressEnvFor(local, home, 12445).env, {}, 'home, :3128 refuses: direct');
+  assert.match(egressEnvFor(local, home, 12445).why, /open internet/);
+  assert.deepEqual(egressEnvFor(local, { ...home, proxy_functional: true }, 12445).env, local, 'a :3128 that forwards at home is kept');
+  assert.deepEqual(egressEnvFor(local, { location: 'open', proxy_functional: false }, 12445).env, local, 'no completed probe: the shell stands');
+  const other = { HTTPS_PROXY: 'http://proxy.example:8080' };
+  assert.deepEqual(egressEnvFor(other, home, 12445).env, other, 'another proxy is never second-guessed');
+  const vpn = { ...at, location: 'vpn', proxy_running: true, proxy_functional: true };
+  const fixed = egressEnvFor({}, vpn, 12445);
+  assert.equal(fixed.env.HTTPS_PROXY, 'http://127.0.0.1:3128', 'a home shell on VPN: the local proxy');
+  assert.match(fixed.env.NO_PROXY, /localhost/);
+  assert.match(fixed.why, /VPN/);
+  assert.deepEqual(egressEnvFor({}, { ...vpn, proxy_functional: false }, 12445).env, {}, 'a local proxy that does not forward is not adopted');
+  assert.deepEqual(egressEnvFor({}, { ...at, location: 'unknown' }, 12445).env, {}, 'an unknown location changes nothing');
+});
+
+test('the monitor tells its subscribers after each probe round', async () => {
+  const m = monitor({ location: ['open', 'vpn'], port: [true, true], functional: [true, true] });
+  const seen = [];
+  const off = m.subscribe((f) => seen.push(f.location));
+  await m.tick();
+  off();
+  await m.tick();
+  assert.deepEqual(seen, ['open']);
+});

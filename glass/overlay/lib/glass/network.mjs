@@ -5,8 +5,8 @@
 // are coding's own (lib/network/location-probe.mjs, location-hysteresis.mjs,
 // network-change-watcher.mjs — extracted, not copied), so glass shows exactly
 // what coding's status line shows. Unlike coding's health coordinator, glass
-// only observes: it never restarts proxydetox and never changes proxy
-// variables.
+// never restarts proxydetox and never changes anyone's proxy variables; the
+// daemon only reads the facts to pick its own egress (egress.mjs egressEnvFor).
 import {
   observeLocation, probePortListening, probeProxyFunctional, probeKerberosTicket, requestKerberosTicket, readProxyEnabledByUser, probeInternetDirect,
   countFunctionalFailures, publishedFunctional, FUNCTIONAL_FAIL_THRESHOLD, AWAY_NETWORK_PROBE_INTERVAL_MS,
@@ -41,6 +41,7 @@ export function createNetworkMonitor({ probes = {}, watch = true, log = () => {}
   };
   let running = null;
   let timer = null;
+  const listeners = new Set();
   let stopWatch = () => {};
 
   async function probe() {
@@ -80,6 +81,9 @@ export function createNetworkMonitor({ probes = {}, watch = true, log = () => {}
       }).catch(() => {});
     }
     state.last_probe_end = new Date().toISOString();
+    for (const fn of listeners) {
+      try { fn({ ...state }); } catch (err) { log(`network listener failed: ${err?.message || err}`); }
+    }
   }
 
   /** Whether the interval timer should probe now: always, unless nobody has been at the machine and the last round is under 5 min old. */
@@ -98,6 +102,11 @@ export function createNetworkMonitor({ probes = {}, watch = true, log = () => {}
   return {
     /** The published facts (networkBadge() input). */
     facts: () => ({ ...state }),
+    /** Call `fn(facts)` after every completed probe round; returns the unsubscribe. */
+    subscribe(fn) {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
     tick,
     due,
     /** Poll every interval while `active()` says a session is live; every 5 min while nobody is at the machine. */

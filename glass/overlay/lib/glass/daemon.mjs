@@ -51,7 +51,7 @@ import { sweepAgedCaptures } from '../measurement/context-turns-retention.mjs';
 import { captureForegroundTokens } from '../lsl/token/stop-adapter-registry.mjs';
 import { sweepVscodeTokenRows } from '../lsl/token/vscode-token-rows.mjs';
 import { glassPaths, PKG_ROOT } from './home.mjs';
-import { createEgressFetch, upstreamProxy, proxyEnvOf, noProxyOf } from './egress.mjs';
+import { createEgressFetch, upstreamProxy, proxyEnvOf, noProxyOf, egressEnvFor } from './egress.mjs';
 import { createUiApi } from './ui-api.mjs';
 import { statuslineData, renderReport, TAGS } from './statusline.mjs';
 import { createUsageSource, codingTokenDb, VSCODE_AGENT } from './combined.mjs';
@@ -196,24 +196,31 @@ export async function startDaemon({
       logErr(`upstream proxy refused the tunnel to ${r.host} (HTTP ${r.status})`);
     },
   });
-  // The proxy settings egress uses. They start as the daemon's own environment
-  // (the shell of the first `glass` command) and follow each new session's shell:
-  // a daemon started at home must not keep going direct after you join VPN.
-  let egressEnv = proxyEnvOf(process.env);
+  // The proxy settings of the newest session's shell. They start as the daemon's
+  // own environment (the shell of the first `glass` command) and follow each new
+  // session: a daemon started at home must not keep going direct after you join VPN.
+  let shellEnv = proxyEnvOf(process.env);
+  // What egress uses: the shell's settings, corrected by the network monitor's
+  // last probe when the machine has moved since that shell was opened.
+  let egressEnv = shellEnv;
   // glass's own port, for "a proxy pointing back at glass is no proxy": the
   // requested one until the server is bound (port 0 binds a random one).
   let selfPort = port;
   let egress = fetch || makeEgress(egressEnv);
-  function adoptProxyEnv(env) {
-    if (!env || typeof env !== 'object') return;
-    const next = proxyEnvOf(env);
+  function applyEgress(network, cause) {
+    const { env: next, why } = egressEnvFor(shellEnv, network, selfPort);
     const before = upstreamProxy(egressEnv, selfPort);
     const after = upstreamProxy(next, selfPort);
     if (before === after && noProxyOf(egressEnv) === noProxyOf(next)) return;
     egressEnv = next;
     if (!fetch) egress = makeEgress(next);
     intercept.setUpstream({ upstreamProxy: after, noProxy: noProxyOf(next) });
-    log(`egress proxy ${before || 'direct'} → ${after || 'direct'} (proxy settings of the newest glass session)`);
+    log(`egress proxy ${before || 'direct'} → ${after || 'direct'} (${why || cause})`);
+  }
+  function adoptProxyEnv(env) {
+    if (!env || typeof env !== 'object') return;
+    shellEnv = proxyEnvOf(env);
+    applyEgress(netMonitor.facts(), 'proxy settings of the newest glass session');
   }
   const direct = fetch || createEgressFetch({}, port); // a relay to loopback never takes the corporate proxy
   const config = readConfig(p.config);
@@ -328,6 +335,8 @@ export async function startDaemon({
   // [N:… P:…]: probed only while a session is live (nothing else reads it).
   const netMonitor = network || createNetworkMonitor({ log });
   netMonitor.start({ active: () => sessions.size > 0 });
+  // A network change after the session's shell was opened: re-pick egress.
+  netMonitor.subscribe?.((facts) => applyEgress(facts, 'proxy settings of the newest glass session'));
   let lastActivity = Date.now();
   const touch = () => { lastActivity = Date.now(); };
 

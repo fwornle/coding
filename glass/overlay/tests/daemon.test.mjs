@@ -713,6 +713,38 @@ test('egress proxy follows the newest session\'s shell, not the shell that start
   for (const s of [home, vpn, old, own]) await api('DELETE', `/sessions/${encodeURIComponent(s.token)}`);
 });
 
+test('egress follows a network change after the session\'s shell was opened (2026-10-24)', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-netchange-'));
+  const main = daemon;
+  const listeners = [];
+  let facts = { location: 'unknown' };
+  const network = { ...stubNetwork, facts: () => facts, subscribe: (fn) => listeners.push(fn) };
+  const lines = [];
+  const probed = (f) => { facts = { ...f, last_probe_end: new Date().toISOString() }; for (const fn of listeners) fn(facts); };
+  try {
+    daemon = await startDaemon({ home: dir, port: 0, fetch: stubFetch, log: (l) => lines.push(l), network, gh: stubGh, vscodeUserDirs: [] });
+    const egressOf = async (s) => (await api('GET', `/api/statusline?task_id=${s.taskId}`)).body.egress_url || 'direct';
+    const vpnShell = await open('opencode', { pid: process.pid, proxyEnv: { HTTPS_PROXY: 'http://127.0.0.1:3128' } });
+    assert.equal(await egressOf(vpnShell), 'http://127.0.0.1:3128', 'no probe yet: the shell\'s proxy');
+    probed({ location: 'open', proxy_running: true, proxy_functional: false });
+    assert.equal(await egressOf(vpnShell), 'direct', 'home, :3128 refuses: direct');
+    assert.ok(lines.some((l) => /egress proxy http:\/\/127\.0\.0\.1:3128 → direct \(open internet/.test(l)), 'the switch is logged with its reason');
+    probed({ location: 'vpn', proxy_running: true, proxy_functional: true });
+    assert.equal(await egressOf(vpnShell), 'http://127.0.0.1:3128', 'back on VPN: the shell\'s proxy again');
+    const homeShell = await open('claude', { pid: process.pid, proxyEnv: {} });
+    assert.equal(await egressOf(homeShell), 'http://127.0.0.1:3128', 'a home shell on VPN: the local proxy, not blocked direct egress');
+    probed({ location: 'open', proxy_running: true, proxy_functional: true });
+    assert.equal(await egressOf(homeShell), 'direct', 'home again: the home shell\'s direct');
+    const other = await open('claude', { pid: process.pid, proxyEnv: { HTTPS_PROXY: 'http://proxy.example:8080' } });
+    probed({ location: 'open', proxy_running: false, proxy_functional: false });
+    assert.equal(await egressOf(other), 'http://proxy.example:8080', 'a proxy that is not the local one is the shell\'s business');
+  } finally {
+    await daemon.close();
+    daemon = main;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('UI static: page, assets, client routes; no escape from the UI dir', async () => {
   const { createUiApi } = await import('../lib/glass/ui-api.mjs');
   const uiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-ui-'));
