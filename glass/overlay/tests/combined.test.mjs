@@ -87,6 +87,29 @@ test("coding's rebuild of a glass session from the agent's own files is dropped;
   }
 });
 
+test("the model mix names coding's background jobs by process; an unbound glass call stays agentless", async () => {
+  const { modelMix } = await import('../lib/glass/ui-api.mjs');
+  const rows = (dir, list) => {
+    const h = initTokenDb(dir);
+    const ins = h.db.prepare(`INSERT INTO token_usage (id, timestamp, provider, model, process, input_tokens, output_tokens, total_tokens, user_hash, task_id, agent)
+      VALUES (?, ?, 'gh-copilot', 'm', ?, 1, 0, 1, 'u', '', ?)`);
+    list.forEach((r, i) => ins.run(i + 1, at(5), r.process, r.agent));
+    h.db.close();
+    return resolveTokenDbPath(dir);
+  };
+  const glass = rows(tmp(), [{ process: 'token-adapter-unknown', agent: 'unknown' }, { process: 'token-adapter-claude', agent: 'claude' }]);
+  const coding = rows(tmp(), [{ process: 'consolidator-mentions', agent: '' }, { process: 'consolidator-mentions', agent: '' }, { process: 'observation-writer', agent: '' }]);
+  const c = openCombined(glass, coding);
+  try {
+    const got = modelMix(c.db, { hours: 1 }).groups.map((g) => [g.agent, g.process, g.calls]);
+    assert.deepEqual(got.sort(), [
+      ['', 'consolidator-mentions', 2], ['', 'observation-writer', 1], ['claude', '', 1], ['unknown', '', 1],
+    ].sort());
+  } finally {
+    c.db.close();
+  }
+});
+
 test('read-only: nothing can be written to either file through the combined handle', () => {
   const { glass, coding } = pair();
   const h = openCombined(glass, coding);

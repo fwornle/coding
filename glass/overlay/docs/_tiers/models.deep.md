@@ -33,7 +33,7 @@ The **Flow** card on the Models tab draws the same rows as the table, in three c
 
 | Column | Node | Number on the node |
 |---|---|---|
-| **Agents** — who asked | one per agent; **no session** = calls glass measured but could not tie to a session (see below) | tokens, calls |
+| **Agents** — who asked | one per agent; **no session** = calls glass measured but could not tie to a session (see below); with coding installed, each of coding's background jobs under its process name (see below) | tokens, calls |
 | **Models** — what the agent chose | one per model, split into loop and side calls | — |
 | **Accounts** — who answered | one per account, with the hosts its calls went to | tokens |
 
@@ -63,6 +63,11 @@ session. That happens when an intercepted request names no session and more than
 intercepting session is open. glass never guesses which session such a call belongs to.
 These calls count in **Token Usage** but not in any session row; on the Models tab their
 agent shows as **no session**.
+
+When coding is installed on the same machine, glass also shows coding's figures. coding's
+background jobs (knowledge consolidation, observation writing, titles …) call its proxy
+without an agent but name the job they belong to. The Models tab shows each of them under
+that name — for example `consolidator-mentions` — instead of under **no session**.
 
 ## Why glass does not route
 
