@@ -13,8 +13,8 @@ component "**2  Measure**\nteacher labels your history twice\nstudents scored ag
 component "**3  Label live**\nproxy labels each turn\nwith the student (haiku)\nthe teacher re-checks a sample\n-> per-class gate" as live <<core>>
 component "**4  Read coverage**\nToken Usage -> Classes\ntree · map · gaps" as read <<core>>
 component "**5  Share with a team**\ninit · join · pull\npropose · fold under a cap" as share <<core>>
-component "**6  Trial per class**\nnext\ncheaper model beside the current\none, judged blind" as trial <<external>>
-component "**7  Route by class**\nnext\naccepted trial = evidence\n-> cheaper model for that class" as route <<external>>
+component "**6  Replay per class**\nkept turns re-run on a cheaper\nmodel, judged blind\n-> evidence in the team repo" as trial <<core>>
+component "**7  Route by class**\nnext\nthe proxy reads the evidence\n-> cheaper model for that class" as route <<external>>
 
 define -[#9C27B0,thickness=2]right-> measure
 measure -[#9C27B0,thickness=2]right-> live

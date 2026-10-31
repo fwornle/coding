@@ -30,24 +30,54 @@ from a trial, not by reputation.
 <div class="overview-benefits" markdown="1">
 
 **Built and running**  
-define · measure · label live · gate each class · read the coverage · share and grow as a team · in glass too
+define · measure · label live · gate each class · read the coverage · share and grow as a team · replay per class · in glass too
 
 **Next**  
-trial per class · route by class
+route by class
 
 </div>
 
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Seven steps: define, measure, label live with a per-class gate, read the coverage, share with a team (built, green); trial per class, route by class (next, gray). Gaps found in the coverage feed back into the definition.](images/job-class-lifecycle.png)](images/job-class-lifecycle.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
+[![Seven steps: define, measure, label live with a per-class gate, read the coverage, share with a team, replay per class (built, green); route by class (next, gray). Gaps found in the coverage feed back into the definition.](images/job-class-lifecycle.png)](images/job-class-lifecycle.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
 
 <figcaption>Green: built and running. Gray: next. Gaps found in step 4 feed back into step 1.</figcaption>
 </figure>
 <p class="overview-takeaway">Labels first, evidence second, cheaper routing last.</p>
 </section>
 
-<section class="overview-slide" id="slide-2" aria-labelledby="jc-plain" markdown="1">
+<section class="overview-slide" id="slide-2" aria-labelledby="jc-glance" markdown="1">
+<div class="overview-copy" markdown="1">
+
+<p class="overview-kicker">At a glance</p>
+
+## Save, learn, share {#jc-glance}
+
+**Save.** Routine jobs such as status, ship and run are about 40 % of the
+coding team's prompts, and today the strong model answers every one of them.
+Once a kind of job has proven a cheaper model, every prompt of that kind goes
+to it. Hard jobs like fix stay on the strong one.
+
+**Learn.** A cheap model labels every prompt. A strong model checks a sample
+of those labels. Past prompts of one kind are replayed on the cheaper model,
+and a blind judge compares its answers with the current model's. Nothing
+switches without that evidence.
+
+**Share.** The kinds of job and the evidence go into the team's repo, with no
+prompts in it. One member's proof spares the rest of the team from repeating it.
+
+</div>
+<figure class="overview-figure" markdown="1">
+
+[![Your prompt is labelled by the proxy's cheap model (step 1); a strong model checks a sample of labels (step 2); past turns of a class are replayed on a cheaper model and judged blind (step 3), and the evidence goes to the team repo with the classes, but no prompts; pulled on sync, it lets every member route that class to the cheaper model (step 4, next). Prompts no class fits become proposals for a new class.](images/job-class-at-a-glance.png)](images/job-class-at-a-glance.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
+
+<figcaption>Steps 1 to 3 run today. Step 4, the switch itself, comes next.</figcaption>
+</figure>
+<p class="overview-takeaway">The label picks the jobs to try; the evidence picks the model; the team shares both.</p>
+</section>
+
+<section class="overview-slide" id="slide-3" aria-labelledby="jc-plain" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">The idea in plain words</p>
@@ -62,12 +92,12 @@ The idea, in three steps:
 
 1. **Sort** every prompt into a kind of job. A cheap, fast model does the
    sorting. A strong model checks a sample of its work.
-2. **Try** a cheaper model on one kind of job, beside the current one, and
-   compare the answers.
+2. **Try** a cheaper model on past jobs of one kind: replay them on it and
+   compare its answers with the current model's.
 3. **Switch** that kind of job to the cheaper model only if it does the job
    as well, and nothing else.
 
-Step 1 is built and running. Steps 2 and 3 come next.
+Steps 1 and 2 are built. Step 3 comes next.
 
 </div>
 <figure class="overview-figure" markdown="1">
@@ -85,7 +115,7 @@ Step 1 is built and running. Steps 2 and 3 come next.
 <p class="overview-takeaway">Sort the jobs, try a cheaper model per kind, switch only on evidence.</p>
 </section>
 
-<section class="overview-slide" id="slide-3" aria-labelledby="jc-words" markdown="1">
+<section class="overview-slide" id="slide-4" aria-labelledby="jc-words" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Words used in this deck</p>
@@ -113,13 +143,13 @@ Step 1 is built and running. Steps 2 and 3 come next.
 | **precision** | Of the turns the student put in a class, the share the teacher put there too. |
 | **gate** | The bar a class must clear before anything acts on it: 90 % precision over at least 20 checked turns. |
 | **band** | How hard the router thinks a prompt is (small, medium, high). A class says what kind of job it is. |
-| **trial · judge** | A cheaper model answers beside the current one. A strong judge compares the two answers without knowing which is which. |
+| **replay · judge** | A past turn is run again, once on the current model and once on a cheaper one. A strong judge compares the two answers without knowing which is which. |
 
 </figure>
 <p class="overview-takeaway">The student labels, the teacher checks, the gate decides when a label can be trusted.</p>
 </section>
 
-<section class="overview-slide" id="slide-4" aria-labelledby="jc-why" markdown="1">
+<section class="overview-slide" id="slide-5" aria-labelledby="jc-why" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Why classes</p>
@@ -148,7 +178,7 @@ As one class it would hide those differences.
 <p class="overview-takeaway">Route by kind of job, not only by how hard a prompt looks.</p>
 </section>
 
-<section class="overview-slide" id="slide-5" aria-labelledby="jc-define" markdown="1">
+<section class="overview-slide" id="slide-6" aria-labelledby="jc-define" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Step 1 · built</p>
@@ -191,7 +221,7 @@ precedence: [relay, fix, build, cleanup, ...]
 <p class="overview-takeaway">Write the tests sharply, because the student only knows what they say.</p>
 </section>
 
-<section class="overview-slide" id="slide-6" aria-labelledby="jc-measure" markdown="1">
+<section class="overview-slide" id="slide-7" aria-labelledby="jc-measure" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Step 2 · built</p>
@@ -228,7 +258,7 @@ are never committed, because they are your real prompts.
 <p class="overview-takeaway">A cheap student agrees with the strong teacher more than 4 times in 5.</p>
 </section>
 
-<section class="overview-slide" id="slide-7" aria-labelledby="jc-live" markdown="1">
+<section class="overview-slide" id="slide-8" aria-labelledby="jc-live" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Step 3 · built</p>
@@ -255,7 +285,7 @@ never changed by it.
 <p class="overview-takeaway">Labels arrive about 2 s after the turn; nothing routes on them yet.</p>
 </section>
 
-<section class="overview-slide" id="slide-8" aria-labelledby="jc-gate" markdown="1">
+<section class="overview-slide" id="slide-9" aria-labelledby="jc-gate" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Step 3, continued · built</p>
@@ -270,7 +300,7 @@ too?**
 - Below 90 % it is **below the gate**: its test needs sharpening.
 - With fewer than 20 checks it is still **collecting**.
 
-Only a class that passes may later drive a trial or a route. The count starts
+Only a class that passes may later drive a route. The count starts
 again at zero with every new taxonomy version, because the tests changed.
 
 </div>
@@ -283,7 +313,7 @@ again at zero with every new taxonomy version, because the tests changed.
 <p class="overview-takeaway">No class acts on its label until the teacher has confirmed it enough times.</p>
 </section>
 
-<section class="overview-slide" id="slide-9" aria-labelledby="jc-coverage" markdown="1">
+<section class="overview-slide" id="slide-10" aria-labelledby="jc-coverage" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Step 4 · built</p>
@@ -312,7 +342,7 @@ Then edit the YAML, bump the `version` and measure again.
 <p class="overview-takeaway">Every gap is either a class to add or a test to sharpen.</p>
 </section>
 
-<section class="overview-slide" id="slide-10" aria-labelledby="jc-team" markdown="1">
+<section class="overview-slide" id="slide-11" aria-labelledby="jc-team" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Step 5 · built</p>
@@ -338,7 +368,7 @@ version, and **Classes** has a picker for which one to read.
 <p class="overview-takeaway">A project in two teams with two taxonomies is not labelled, not guessed.</p>
 </section>
 
-<section class="overview-slide" id="slide-11" aria-labelledby="jc-grow" markdown="1">
+<section class="overview-slide" id="slide-12" aria-labelledby="jc-grow" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Step 5, continued · built</p>
@@ -360,65 +390,88 @@ version, and **Classes** has a picker for which one to read.
 <p class="overview-takeaway">One maintainer writes the taxonomy; every member can propose.</p>
 </section>
 
-<section class="overview-slide" id="slide-12" aria-labelledby="jc-trial" markdown="1">
+<section class="overview-slide" id="slide-13" aria-labelledby="jc-trial" markdown="1">
 <div class="overview-copy" markdown="1">
 
-<p class="overview-kicker">Step 6 · built per process, per class next</p>
+<p class="overview-kicker">Step 6 · built</p>
 
-## Trial a cheaper model {#jc-trial}
+## Replay past turns on a cheaper model {#jc-trial}
 
-**Token Usage → Trials** runs a cheaper candidate **beside** the current model
-on real calls:
+For a turn labelled with a kept class (`status`, `explain`), the proxy keeps
+what a replay needs: the prompt as sent, the conversation before it, the
+answer you read, and the repo as it was when the turn began. Everything passes
+the redactor first. This works the same for Claude Code, Copilot CLI, opencode
+and pi, because every agent's turns pass through the proxy.
 
-- you only ever get the current model's answer;
-- a judge compares each pair **blind, in both orders**;
-- it passes with ≥ 20 pairs, ≥ 90 % "at least as good" and ≥ 90 % of details kept.
+```bash
+coding job-classes replay candidates --class status
+coding job-classes replay run --candidate claude-haiku-5.5
+coding job-classes replay report
+```
 
-Here haiku-5.5 **failed** on `consolidator-insight`: it was at least as good on only
-56 % of pairs and kept 87 % of the details. That's why the process stays on sonnet.
-
-**Next:** a trial keyed by **job class**, sampling only, say, `status` turns.
+Each turn runs twice in a sandbox, in the agent that ran it: once on the
+current model and once on the candidate. A judge compares the two answers
+blind, in both orders. A class passes for that agent and model after at least
+20 pairs, with at least 90 % giving the same core answer.
 
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![The Trials tab: the list of trials with their verdicts and the form to start one, and the selected consolidator-insight trial of claude-haiku-5.5 against claude-sonnet-5: 16 of 16 pairs judged (needs 20), 56 % at least as good (needs 90 %), 87 % of details kept (needs 90 %), with the per-pair verdicts below.](images/job-classes-trials.png)](images/job-classes-trials.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![Turns labelled status are answered as usual while the proxy keeps the prompt, the conversation, the answer read and the repo state; the current model and the cheaper candidate each replay the turn in a sandbox; a blind judge compares the answers; the verdict per class, agent and model needs 20 pairs and 90 % the same core; the maintainer records it as evidence/status.json in the team repo, and routing the next status turn to the cheaper model is next.](images/job-class-trial-routing.png)](images/job-class-trial-routing.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
 
-<figcaption>A failed trial: nothing switches unless you accept one.</figcaption>
+<figcaption>A replay never touches your live repos, data or agent sessions, and its own calls are not labelled.</figcaption>
 </figure>
-<p class="overview-takeaway">No model gets cheaper without evidence from your own traffic.</p>
+<p class="overview-takeaway">No model gets cheaper without evidence from your own past turns.</p>
 </section>
 
-<section class="overview-slide" id="slide-13" aria-labelledby="jc-route" markdown="1">
+<section class="overview-slide" id="slide-14" aria-labelledby="jc-route" markdown="1">
 <div class="overview-copy" markdown="1">
 
-<p class="overview-kicker">Step 7 · next</p>
+<p class="overview-kicker">Step 7 · evidence built, routing next</p>
 
 ## Change the config for one kind of job {#jc-route}
 
-**Today**, accepting a trial writes the model into **one process's route**:
+**Built:** the team's maintainer records a passing verdict as
+`evidence/<class>.json` in the team repo. The file holds counts and models,
+never prompts. `coding sync --push` shares it, and every member pulls it.
 
-```yaml
-# llm-routing.yaml: the band, or a model pin
-bg-consolidator-insight: { provider: gh-copilot, complexity: medium }
+```bash
+coding job-classes replay evidence --team coding \
+  --class status --candidate claude-haiku-5.5
 ```
 
-**Next:** an accepted class trial writes `evidence/<class>.json` to the team
-repo. A class may then be **downgraded** on a member's machine **only** if it
-has passed its gate and a passing verdict exists for the model it would go to on
-*that* member's route. Downgrade-only and fail-open still apply: no evidence, no change.
+**Next:** the proxy reads that evidence. A class may then be **downgraded** on a
+member's machine **only** if it has passed its gate and a passing verdict exists
+for the agent and model it would go to on *that* member's route. Downgrades
+only, and fail open: with no evidence, nothing changes.
 
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Turns labelled status are answered by the current model while a cheaper candidate answers in the background; a blind judge compares them; a passing verdict is accepted by you, written to evidence/status.json in the team repo and to the class's band floor in llm-routing.yaml, and the next status turn goes to the cheaper model.](images/job-class-trial-routing.png)](images/job-class-trial-routing.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
+```json
+{
+  "schema": 1,
+  "class": "status",
+  "verdicts": [{
+    "candidate": "claude-haiku-5.5",
+    "incumbents": ["claude-opus-5"],
+    "agent": "claude",
+    "pairs": 24,
+    "sameCore": 23,
+    "sameRate": 0.96,
+    "floorRate": 0.95,
+    "judge": "bg-model-trial-judge",
+    "recordedAt": "…"
+  }]
+}
+```
 
-<figcaption>One member's accepted trial spares the rest of the team from running it.</figcaption>
+<figcaption>The shape of evidence/status.json, shortened, with made-up numbers. One member's replays spare the rest of the team from running them.</figcaption>
 </figure>
 <p class="overview-takeaway">The class picks which jobs to try; the evidence decides the model.</p>
 </section>
 
-<section class="overview-slide" id="slide-14" aria-labelledby="jc-glass" markdown="1">
+<section class="overview-slide" id="slide-15" aria-labelledby="jc-glass" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">In glass · built</p>
@@ -444,15 +497,16 @@ The Classes tab, the gate and the coverage map are the same as here.
 <p class="overview-takeaway">One taxonomy, one gate, whether a colleague runs coding or only glass.</p>
 </section>
 
-<section class="overview-slide" id="slide-15" aria-labelledby="jc-status" markdown="1">
+<section class="overview-slide" id="slide-16" aria-labelledby="jc-status" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Where it stands</p>
 
 ## What runs today, what comes next {#jc-status}
 
-Labelling runs on every human turn, and the gate is collecting. Once a class
-passes it, that class can be trialled on a cheaper model.
+Labelling runs on every human turn, and the gate is collecting. Kept
+`status` and `explain` turns are recorded for replay, so the evidence can
+build up while the gate does.
 
 See it yourself:
 
@@ -469,12 +523,13 @@ See it yourself:
 | The gate | ⏳ | collecting: 90 % over 20 checked turns |
 | Share with a team | ✅ | `init` / `join`, pulled on sync |
 | Grow the taxonomy | ✅ | `propose` / `fold`, stability check |
-| Trials and routing per class | next | replays per class, evidence, band floor |
-| glass, without coding | ✅ | opt-in, your Copilot account; measure from transcripts |
+| Replay per class | ✅ | any agent, sandboxed, judged blind; evidence to the team repo |
+| Route by class | next | the proxy reads the evidence: a class floor |
+| glass, without coding | ✅ | opt-in, your Copilot account; measure from transcripts; no replay yet |
 
 <figcaption>The plan: .planning/shared-job-classes.md</figcaption>
 </figure>
-<p class="overview-takeaway">Today: classes, counts and the gate. Next: cheaper routing per class, backed by trials.</p>
+<p class="overview-takeaway">Today: classes, the gate and replay evidence. Next: cheaper routing per class, backed by that evidence.</p>
 </section>
 
 </div>
