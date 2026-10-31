@@ -9,7 +9,7 @@ import { EventEmitter } from 'node:events';
 
 import {
   classifyLocation, observeLocation, networkBadge, countFunctionalFailures, publishedFunctional,
-  readProxyEnabledByUser, probePacResolves, probeProxyFunctional, probeKerberosTicket, requestKerberosTicket, networkProbeIntervalMs, probeVpnConnected, isWsl, FUNCTIONAL_FAIL_THRESHOLD, PROXY_PROBE_HOST,
+  readProxyEnabledByUser, probePacResolves, probeProxyFunctional, probeKerberosTicket, requestKerberosTicket, networkProbeIntervalMs, AWAY_NETWORK_PROBE_INTERVAL_MS, probeVpnConnected, isWsl, FUNCTIONAL_FAIL_THRESHOLD, PROXY_PROBE_HOST,
 } from '../../lib/network/location-probe.mjs';
 
 describe('classifyLocation', () => {
@@ -205,5 +205,11 @@ describe('networkProbeIntervalMs — faster only while the corporate path is bro
   it('off the corporate network a broken local proxy is no reason to hurry', () => {
     assert.equal(networkProbeIntervalMs({ location: 'open', proxy_functional: false, kerberos_ticket: false }), 15_000);
     assert.equal(networkProbeIntervalMs({}), 15_000);
+  });
+  it('every 5 min while nobody is at the machine, broken or not', () => {
+    assert.equal(AWAY_NETWORK_PROBE_INTERVAL_MS, 300_000);
+    assert.equal(networkProbeIntervalMs({ location: 'open', proxy_functional: true }, { away: true }), 300_000);
+    assert.equal(networkProbeIntervalMs({ location: 'vpn', proxy_functional: false }, { away: true }), 300_000);
+    assert.equal(networkProbeIntervalMs({ location: 'vpn', proxy_functional: false }, { away: false }), 5_000);
   });
 });

@@ -9,16 +9,17 @@
 // variables.
 import {
   observeLocation, probePortListening, probeProxyFunctional, probeKerberosTicket, requestKerberosTicket, readProxyEnabledByUser, probeInternetDirect,
-  countFunctionalFailures, publishedFunctional, FUNCTIONAL_FAIL_THRESHOLD,
+  countFunctionalFailures, publishedFunctional, FUNCTIONAL_FAIL_THRESHOLD, AWAY_NETWORK_PROBE_INTERVAL_MS,
 } from '../network/location-probe.mjs';
 import { settleLocation } from '../network/location-hysteresis.mjs';
 import { startNetworkChangeWatcher, networkChangeRecent } from '../network/network-change-watcher.mjs';
+import { humanPresentByHid } from '../presence/hid-idle.mjs';
 
 export const NETWORK_PROBE_INTERVAL_MS = 15_000; // the coordinator's cadence
 
 /**
  * @param {object} [o]
- * @param {object} [o.probes]   { location, port, functional, enabled, kerberos, renewTicket, internet } — injectable for tests
+ * @param {object} [o.probes]   { location, port, functional, enabled, kerberos, renewTicket, internet, away } — injectable for tests
  * @param {boolean} [o.watch]   subscribe to the OS's network changes (macOS, Linux / WSL; Windows polls)
  * @param {(line: string) => void} [o.log]
  */
@@ -31,6 +32,8 @@ export function createNetworkMonitor({ probes = {}, watch = true, log = () => {}
   const renewTicket = probes.renewTicket || requestKerberosTicket;
   const internet = probes.internet || probeInternetDirect;
   const now = probes.now || Date.now;
+  // Nobody at the machine: probe every 5 min, not every 15 s (location-probe.mjs networkProbeIntervalMs).
+  const away = probes.away || (() => humanPresentByHid() === false);
   let lastTicketRequest = 0;
   const state = {
     location: 'unknown', proxy_running: false, proxy_functional: false, proxy_enabled_by_user: false, kerberos_ticket: null, internet_reachable: null,
@@ -79,6 +82,13 @@ export function createNetworkMonitor({ probes = {}, watch = true, log = () => {}
     state.last_probe_end = new Date().toISOString();
   }
 
+  /** Whether the interval timer should probe now: always, unless nobody has been at the machine and the last round is under 5 min old. */
+  function due() {
+    if (!away()) return true;
+    const last = Date.parse(state.last_probe_end || '') || 0;
+    return now() - last >= AWAY_NETWORK_PROBE_INTERVAL_MS;
+  }
+
   /** One probe round; concurrent callers share it. */
   function tick() {
     if (!running) running = probe().catch((err) => log(`network probe failed: ${err?.message || err}`)).finally(() => { running = null; });
@@ -89,10 +99,11 @@ export function createNetworkMonitor({ probes = {}, watch = true, log = () => {}
     /** The published facts (networkBadge() input). */
     facts: () => ({ ...state }),
     tick,
-    /** Poll every interval while `active()` says a session is live. */
+    due,
+    /** Poll every interval while `active()` says a session is live; every 5 min while nobody is at the machine. */
     start({ active = () => true, intervalMs = NETWORK_PROBE_INTERVAL_MS } = {}) {
       if (timer) return;
-      timer = setInterval(() => { if (active()) tick(); }, intervalMs);
+      timer = setInterval(() => { if (active() && due()) tick(); }, intervalMs);
       timer.unref?.();
       if (watch) {
         stopWatch = startNetworkChangeWatcher({

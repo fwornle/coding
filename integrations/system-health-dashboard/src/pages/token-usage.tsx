@@ -34,6 +34,7 @@ import { AccountsDialog } from '@/components/cost/AccountsDialog'
 import { SeriesTooltip } from '@/components/cost/series-tooltip'
 import { fetchAccountSelection, type AccountSelection, type SourcesControl } from '@/components/cost/account-selection'
 import { RefreshButton } from '@/components/ui/refresh-button'
+import { usePageAttended } from '@/hooks/usePageAttended'
 
 /**
  * What every figure on the page is measured in. Tokens are what was consumed;
@@ -654,11 +655,22 @@ export function TokenUsagePage({ proxyBase = PROXY_BASE, tabs = ALL_TABS, settin
     }
   }, [hoursWindow, scopeParam, proxyBase, money, evoAccumulate, mtdKey, accountsRev])
 
+  useEffect(() => { fetchData() }, [fetchData])
+
+  // Poll only while someone is looking (lib/attention.ts): hidden, or 10 min
+  // without input, stops the loop; coming back refreshes at once. This page's
+  // month-to-date summary is the heaviest read either server answers, and a
+  // tab left open overnight asked for it every 30 s (2026-10-30).
+  const attended = usePageAttended()
+  const lastAttended = useRef(attended)
   useEffect(() => {
-    fetchData()
+    const returning = attended && !lastAttended.current
+    lastAttended.current = attended
+    if (!attended) return
+    if (returning) void fetchData(true)
     intervalRef.current = setInterval(() => fetchData(true), REFRESH_INTERVAL)
     return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
-  }, [fetchData])
+  }, [fetchData, attended])
 
   if (loading && !summary) {
     return (

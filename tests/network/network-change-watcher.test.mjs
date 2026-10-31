@@ -17,6 +17,7 @@ import {
   NETWORK_CHANGE_NOTIFICATION,
   NETWORK_CHANGE_WINDOW_MS,
   PARENT_GUARD,
+  parentGuard,
 } from '../../lib/network/network-change-watcher.mjs';
 
 function fakeSpawn() {
@@ -122,7 +123,7 @@ describe('network-change watcher', () => {
     const { spawn, execFileSync } = await import('node:child_process');
     const parent = spawn(process.execPath, ['-e', `
       const { spawn } = require('node:child_process');
-      const c = spawn('/bin/sh', ['-c', ${JSON.stringify(PARENT_GUARD)}, 'sh', 'sleep', '300'], { stdio: 'ignore' });
+      const c = spawn('/bin/sh', ['-c', ${JSON.stringify(parentGuard(1))}, 'sh', 'sleep', '300'], { stdio: 'ignore' });
       console.log(c.pid); setInterval(() => {}, 1000);`], { stdio: ['ignore', 'pipe', 'ignore'] });
     const guardPid = Number(await new Promise((r) => parent.stdout.once('data', (d) => r(String(d).trim()))));
     await tick(300);
@@ -132,7 +133,7 @@ describe('network-change watcher', () => {
     const watched = sleeps().split('\n').filter(Boolean);
     assert.ok(watched.length >= 1, 'the guard started the command');
     parent.kill('SIGKILL');
-    await tick(3500);
+    await tick(2500);
     const alive = (pid) => { try { process.kill(Number(pid), 0); return true; } catch { return false; } };
     assert.equal(watched.some(alive), false, 'command ended within one guard interval');
     assert.equal(alive(guardPid), false, 'guard ended too');

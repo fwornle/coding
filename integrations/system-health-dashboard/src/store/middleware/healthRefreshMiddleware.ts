@@ -18,6 +18,7 @@ import {
 } from '../slices/ukbSlice'
 import { reindexSuccess, reindexFailure } from '../slices/cgrSlice'
 import { Logger, LogCategories } from '../../utils/logging'
+import { isPageAttended, onPageAttendedChange } from '../../lib/attention'
 
 const API_PORT = process.env.NEXT_PUBLIC_SYSTEM_HEALTH_API_PORT || process.env.SYSTEM_HEALTH_API_PORT || '3033'
 const API_BASE_URL = `http://localhost:${API_PORT}/api/health-verifier`
@@ -31,7 +32,7 @@ const CGR_API_URL = `http://localhost:${API_PORT}/api/cgr`
 //                        dashboard still needs to learn when one starts.
 // At idle the loop is the only thing running 24/7, so the order-of-magnitude
 // gap matters: 500 ms idle polling burns ~9% sustained CPU per backgrounded
-// dashboard tab. A backgrounded tab with hidden visibility pauses entirely.
+// dashboard tab. A hidden or idle tab pauses entirely (lib/attention.ts).
 const ACTIVE_INTERVAL_MS = 500
 const IDLE_INTERVAL_MS = 2000
 
@@ -74,27 +75,27 @@ class HealthRefreshManager {
   }
 
   /**
-   * Pause polling when the tab is hidden, resume (with an immediate refresh)
-   * when it becomes visible again. Eliminates overnight CPU burn from
-   * minimised/backgrounded dashboard tabs that browsers keep alive.
+   * Pause polling while nobody is looking — tab hidden, or visible but without
+   * input for 10 min (lib/attention.ts) — and resume with an immediate refresh
+   * when someone is back. Hidden alone missed the tab left open in a visible
+   * window, which polled every 2 s all night (2026-10-30).
    */
   private installVisibilityListener() {
     if (typeof document === 'undefined') return // SSR
     if (this.visibilityHandler) return
-    this.visibilityHandler = () => {
-      if (document.visibilityState === 'visible') {
-        Logger.debug(LogCategories.REFRESH, 'Tab visible — resuming auto-refresh')
+    this.visibilityHandler = onPageAttendedChange((attended) => {
+      if (attended) {
+        Logger.debug(LogCategories.REFRESH, 'Page attended — resuming auto-refresh')
         this.fetchAllData()
         this.startAutoRefresh()
       } else {
-        Logger.debug(LogCategories.REFRESH, 'Tab hidden — pausing auto-refresh')
+        Logger.debug(LogCategories.REFRESH, 'Page hidden or idle — pausing auto-refresh')
         if (this.refreshInterval) {
           clearInterval(this.refreshInterval)
           this.refreshInterval = null
         }
       }
-    }
-    document.addEventListener('visibilitychange', this.visibilityHandler)
+    })
   }
 
   /**
@@ -294,10 +295,10 @@ class HealthRefreshManager {
   }
 
   startAutoRefresh() {
-    // Don't start polling for hidden tabs — the visibility listener will
-    // resume us when the tab is shown again.
-    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-      Logger.debug(LogCategories.REFRESH, 'Skipping auto-refresh start: tab is hidden')
+    // Don't start polling for a page nobody is looking at — the attention
+    // listener resumes us when someone is back.
+    if (typeof document !== 'undefined' && !isPageAttended()) {
+      Logger.debug(LogCategories.REFRESH, 'Skipping auto-refresh start: page hidden or idle')
       return
     }
     if (this.refreshInterval) return

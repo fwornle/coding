@@ -48,6 +48,7 @@ import {
   publishedFunctional, probeVpnConnected, probePacResolves, probePacOnSite, classifyLocation,
   networkProbeIntervalMs,
 } from '../lib/network/location-probe.mjs';
+import { hidIdleMs, humanPresentByHid, HUMAN_HID_IDLE_MAX_MS } from '../lib/presence/hid-idle.mjs';
 import { settleModeFlip, classifyNetClass } from '../lib/network/proxy-mode-flip.mjs';
 import { decidePostKickstartRecovery } from '../lib/network/post-kickstart-recovery.mjs';
 import { loadFeatures, FeatureConfigError, loadProfiles, profileAliases, configPaths } from '../lib/features/index.mjs';
@@ -875,44 +876,8 @@ const USER_ACTIVE_CONTENT_MAX_AGE_MS = 15 * 60_000;
 // machine being kept awake. When a human has been idle longer than this, treat
 // them as away and suppress deferrable background LLM work regardless of
 // transcript churn.
-const HUMAN_HID_IDLE_MAX_MS =
-  parseInt(process.env.HUMAN_HID_IDLE_MAX_MS || '', 10) || 10 * 60_000;
-let _hidIdleCache = { at: 0, ms: null };
-
-/**
- * macOS HID idle time in ms (time since last real keyboard/mouse input), or
- * null when it cannot be determined (non-darwin, or ioreg failure). Cached for
- * 3s so multiple userActiveNow() calls in one tick don't each spawn ioreg.
- */
-function hidIdleMs() {
-  const now = Date.now();
-  if (now - _hidIdleCache.at < 3000) return _hidIdleCache.ms;
-  let ms = null;
-  if (process.platform === 'darwin') {
-    try {
-      const out = execSync('ioreg -c IOHIDSystem', {
-        encoding: 'utf8', timeout: 2000, maxBuffer: 8 * 1024 * 1024,
-      });
-      const m = out.match(/"HIDIdleTime"\s*=\s*(\d+)/);
-      if (m) ms = Number(m[1]) / 1e6; // nanoseconds → ms
-    } catch { ms = null; }
-  }
-  _hidIdleCache = { at: now, ms };
-  return ms;
-}
-
-/**
- * Tri-state human-presence signal from HID idle time:
- *   true  — a person used input within HUMAN_HID_IDLE_MAX_MS
- *   false — demonstrably idle longer than that (away / asleep / lid closed)
- *   null  — unknown (non-darwin or ioreg unavailable) → callers must fall back
- *           to the transcript-mtime signal rather than over-suppressing.
- */
-function humanPresentByHid() {
-  const idle = hidIdleMs();
-  if (idle === null) return null;
-  return idle < HUMAN_HID_IDLE_MAX_MS;
-}
+// hidIdleMs / humanPresentByHid / HUMAN_HID_IDLE_MAX_MS: lib/presence/hid-idle.mjs
+// (shared with the network probe cadence here and in glass).
 
 /**
  * True when at least one tracked ETM is heartbeating fresh. The ETM
@@ -3680,12 +3645,12 @@ async function runAllChecks() {
   // Detect sleep/wake transitions — forces immediate network re-probe
   detectWakeFromSleep();
 
-  // ----- Network environment detection (every 15s, or 5s if proxy is broken) -----
+  // ----- Network environment detection (every 15s, 5s if proxy is broken, 5 min while nobody is at the machine) -----
   const _netProbeAge = currentState.network.last_probe_end
     ? Date.now() - new Date(currentState.network.last_probe_end).getTime()
     : Infinity;
   // Faster while the corporate path is broken (healing, or a ticket on its way).
-  const _effectiveProbeInterval = networkProbeIntervalMs(currentState.network);
+  const _effectiveProbeInterval = networkProbeIntervalMs(currentState.network, { away: humanPresentByHid() === false });
   if (_netProbeAge >= _effectiveProbeInterval) {
     try {
       // Hard ceiling: pollNetworkStatus must complete within 15s or we abandon it.

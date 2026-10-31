@@ -38,6 +38,7 @@ select:
       - lib/network/location-probe.mjs
       - lib/network/location-hysteresis.mjs
       - lib/network/network-change-watcher.mjs
+      - lib/presence/hid-idle.mjs
       # status line fields
       - lib/statusline/context-gauge.cjs
       - lib/statusline/model-limits.cjs

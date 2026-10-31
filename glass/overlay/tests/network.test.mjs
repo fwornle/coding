@@ -138,3 +138,27 @@ test('egress: a refused tunnel names the proxy and the host, and is not asked ag
     px.close();
   }
 });
+
+test('nobody at the machine: the interval probes every 5 min, not every 15 s', async () => {
+  let t = Date.parse('2026-10-31T02:00:00Z');
+  let away = true;
+  const m = createNetworkMonitor({
+    watch: false,
+    probes: {
+      location: async () => ({ observed: 'open' }), port: async () => true, functional: async () => true,
+      enabled: () => false, kerberos: async () => null, internet: async () => true,
+      now: () => t, away: () => away,
+    },
+  });
+  assert.equal(m.due(), true, 'never probed: due even while away');
+  await m.tick();
+  // last_probe_end is wall-clock ISO; pin the clock to it
+  t = Date.parse(m.facts().last_probe_end);
+  t += 15_000;
+  assert.equal(m.due(), false, 'away: 15 s later is not due');
+  t += 5 * 60_000;
+  assert.equal(m.due(), true, 'away: due after 5 min');
+  away = false;
+  t = Date.parse(m.facts().last_probe_end) + 15_000;
+  assert.equal(m.due(), true, 'present again: every interval');
+});

@@ -673,4 +673,37 @@ branch: main
       await handle.stop();
     }
   });
+
+  test('Test 14 — a lock-free session dir is not listed again until it changes, and its lock is still seen', async () => {
+    const sessionDir = makeSession('uuid-14', { eventsLines: [], locked: false });
+
+    const realReaddirSync = fs.readdirSync;
+    let listings = 0;
+    jest.spyOn(fs, 'readdirSync').mockImplementation((p, opts) => {
+      if (p === sessionDir) listings += 1;
+      return realReaddirSync(p, opts);
+    });
+
+    const handle = await mod.startCopilotWatcher({
+      sessionStateDir: tmpRoot,
+      registry,
+      observationWriter: writer,
+      projectRoot: PROJECT_ROOT,
+      liveSessionScanIntervalMs: 50,
+    });
+    try {
+      await waitForNextScan(handle);
+      await waitForNextScan(handle);
+      expect(listings).toBe(1);
+      expect(handle.getStats().watching_sessions).toBe(0);
+
+      // Copilot starting in this session creates the lock, which moves the dir's mtime.
+      fs.writeFileSync(path.join(sessionDir, 'inuse.1234.lock'), '1234');
+      await waitForAttach(handle);
+      expect(handle.getStats().watching_sessions).toBe(1);
+    } finally {
+      fs.readdirSync.mockRestore();
+      await handle.stop();
+    }
+  });
 });

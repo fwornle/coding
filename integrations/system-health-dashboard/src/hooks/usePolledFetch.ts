@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { usePageAttended } from '@/hooks/usePageAttended'
 
 /**
  * Re-run a fetch on an interval, and say when the next one is due.
@@ -37,7 +38,7 @@ export interface PolledFetch {
   countdown: number | null
   /** Refresh now and restart the interval. Safe to call from a click; settles when the fetch does. */
   refreshNow: () => Promise<void>
-  /** True when polling is suspended — tab hidden, or `enabled` is false. */
+  /** True when polling is suspended — tab hidden or unattended, or `enabled` is false. */
   paused: boolean
 }
 
@@ -61,9 +62,9 @@ export function usePolledFetch(
   { intervalMs = 30_000, enabled = true }: PolledFetchOptions = {}
 ): PolledFetch {
   const [countdown, setCountdown] = useState<number | null>(null)
-  const [visible, setVisible] = useState(
-    () => (typeof document === 'undefined' ? true : !document.hidden)
-  )
+  // Visible AND used within the last 10 min (lib/attention.ts): a tab left
+  // open in a visible window overnight is not being read either.
+  const attended = usePageAttended()
 
   // The fetcher is read through a ref inside the tick so that a caller who
   // cannot memoise theirs does not restart the interval — and, more importantly,
@@ -72,14 +73,7 @@ export function usePolledFetch(
   const fetcherRef = useRef(fetcher)
   useEffect(() => { fetcherRef.current = fetcher }, [fetcher])
 
-  const paused = !enabled || !visible
-
-  useEffect(() => {
-    if (typeof document === 'undefined') return
-    const onVisibility = () => setVisible(!document.hidden)
-    document.addEventListener('visibilitychange', onVisibility)
-    return () => document.removeEventListener('visibilitychange', onVisibility)
-  }, [])
+  const paused = !enabled || !attended
 
   // `nonce` restarts the loop for an explicit refresh: the caller asked for
   // fresh data now, so the next automatic one is a full interval away rather
@@ -110,7 +104,7 @@ export function usePolledFetch(
     return () => clearInterval(id)
   }, [paused, intervalMs, nonce])
 
-  // Coming back to a hidden tab refreshes immediately rather than showing a
+  // Coming back to a hidden or unattended tab refreshes immediately rather than showing a
   // stale frame for the remainder of an interval. Deliberately not merged into
   // the interval effect: that one re-runs on `nonce` too, and refetching on an
   // explicit refresh would double every manual click.
