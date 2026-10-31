@@ -122,6 +122,21 @@ proxy (calls already in flight keep their route). A proxy that points back at gl
 adopted. A daemon started at home therefore moves to the VPN proxy with the first session
 started on VPN.
 
+A shell keeps the proxy settings of the network it was opened on, so after each network probe
+the daemon checks them against where the machine is now (`egressEnvFor` in
+`lib/glass/egress.mjs`):
+
+| The shell names | The probe finds | Egress |
+|---|---|---|
+| the local proxy (`127.0.0.1:3128`) | open internet, and the local proxy does not forward | direct |
+| no proxy | CN or VPN, and the local proxy forwards | the local proxy |
+| anything else, or no probe has completed yet | — | the shell's settings |
+
+When the network changes back, the shell's settings apply again. Every switch is written to
+`daemon.log` with its reason, for example
+`egress proxy http://127.0.0.1:3128 → direct (open internet and the local proxy on :3128 does not forward)`.
+A proxy other than the local one is never overridden, because glass cannot probe it.
+
 ![What breaks, who notices it, what happens](images/glass-connectivity-recovery.png)
 
 | Failure | Noticed by | What happens | Where |
