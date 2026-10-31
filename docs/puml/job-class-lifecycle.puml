@@ -14,7 +14,7 @@ component "**3  Label live**\nproxy labels each turn\nwith the student (haiku)\n
 component "**4  Read coverage**\nToken Usage -> Classes\ntree · map · gaps" as read <<core>>
 component "**5  Share with a team**\ninit · join · pull\npropose · fold under a cap" as share <<core>>
 component "**6  Replay per class**\nkept turns re-run on a cheaper\nmodel, judged blind\n-> evidence in the team repo" as trial <<core>>
-component "**7  Route by class**\nnext\nthe proxy reads the evidence\n-> cheaper model for that class" as route <<external>>
+component "**7  Route by class**\nthe proxy reads the evidence\n-> cheaper model for the rest\nof that class's turns" as route <<core>>
 
 define -[#9C27B0,thickness=2]right-> measure
 measure -[#9C27B0,thickness=2]right-> live
@@ -25,8 +25,4 @@ trial -[#9C27B0,thickness=2]left-> route
 define -[hidden]down- route
 read -[#757575,thickness=1,dotted,norank]-> define : gaps -> new taxonomy version
 
-legend right
-  green: built and running
-  gray: next
-endlegend
 @enduml

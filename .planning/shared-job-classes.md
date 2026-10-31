@@ -175,7 +175,7 @@ nothing changes silently.
 | **P1 — local class, shadow** | Service returns `class` (KNN + closed-set LLM fallback); `job_class`/`job_class_source` columns; "by class" view; no routing effect | Student vs teacher per-class precision on held-out data. Measured 2026-10-30: no cheap student reaches it, so live labels come from the teacher until a class must route (see below) |
 | **P2 — shared repo, read side** ✅ | Package format + validator, `teams.yaml` binding, `job-classes init`, pull via `coding sync`, local KNN rebuild | Two machines resolve the same class for the same prompt |
 | **P3 — contributions + dedup** ✅ | `proposals/`, maintainer fold with absorb/add/merge/stability check, versioned CHANGELOG, tombstones | A forced cap overflow merges correctly and keeps old rows resolvable |
-| **P4 — per-class replay trials + evidence** | Whole-turn replays of sampled real turns in a sandbox, incumbent vs candidate, judged blind; `evidence/` in the team package; the class-aware floor for agents the proxy routes. Design below. Infrastructure built 2026-10-31 for every agent, from the proxy ("P4 infrastructure" below); the proxy-side floor is not | Replays of one answer-only class reach a verdict, and the A/A noise floor is measured |
+| **P4 — per-class replay trials + evidence** | Whole-turn replays of sampled real turns in a sandbox, incumbent vs candidate, judged blind; `evidence/` in the team package; the class-aware floor for agents the proxy routes. Design below. Infrastructure built 2026-10-31 for every agent, from the proxy ("P4 infrastructure" below), and the proxy-side class floor the same day ("Routing by class" below) | Replays of one answer-only class reach a verdict, and the A/A noise floor is measured |
 | **P5 — glass** | For machines without coding: opt-in live labelling with the user's Copilot account, the Classes tab, a team taxonomy from a git URL, and the measurement over the agents' own transcripts. Design below | Independent of coding's gate. Done when a glass-only user with labelling on sees the same class as coding for the same prompt and taxonomy, and with it off glass sends nothing new |
 
 Touch points: coding (service, trainer, teacher, sync, teams, dashboard),
@@ -770,9 +770,40 @@ all tools was blocked by this session's permission classifier; claude has no
 record yet, because the tagger began recording with this change. The first real
 records arrive from the next labelled `status`/`explain` turn of any agent.
 
-**Not built:** the proxy-side class floor (step 5, "Use"); replays inside glass
-(its daemon carries the recorder, inert until its config names classes to keep,
-but not the runner).
+**Not built:** replays inside glass (its daemon carries the recorder, inert until
+its config names classes to keep, but not the runner).
+
+## Routing by class: the proxy's class floor (2026-10-31)
+
+Step 5 ("Use") of the loop, in rapid-llm-proxy `proxy-bridge/class-floor.mjs`,
+switched on by `job_classes.routing` in `llm-routing.yaml` (`enabled`, `agents`).
+
+| Decision | What was chosen, and why |
+|---|---|
+| **A model, not a band** | The evidence says "candidate X was as good as incumbent Y for this class in this agent", which is about two models. Lowering the band instead would let the semantic offload move the call to a local model nobody replayed. So the floor names the candidate, as the replay pin does (`resolveRoute({classModel})`): the route's own provider, a model it serves, no offload, band and `band_source: job-class` recorded on the row. |
+| **When it applies** | All of: the turn is labelled; its class passes the gate (`GATE` in `job-class.mjs`, the same rule as the dashboard: ≥ 90 % teacher agreement over ≥ 20 checked turns, across the taxonomy's version tags, 90 days, recounted at most every 5 min); a verdict in `evidence/<class>.json` beside the turn's taxonomy file passes the judge's rule again (≥ 20 pairs, ≥ 90 % same core, A/A floor not below 90 %); it is for this agent; the call would otherwise go to one of its incumbents; and the candidate is in a lower band of the provider's table. Anything missing or unreadable leaves the call as routed. |
+| **Which calls** | The label is made after a turn's first call is forwarded, so the floor reaches the calls after it: the tool loop and the final answer. The first call stays on the incumbent, which is at least as strong as what the replay proved (the whole turn on the candidate). Waiting for the label at the first call would add seconds to every turn. |
+| **Which agents** | pi, opencode and Copilot CLI, the agents whose model the proxy picks on `/api/complete`. Claude Code's `/v1/messages` is a verbatim passthrough; for it the evidence remains a recommendation, as decided in the P4 design. The config refuses `claude` in `routing.agents`. |
+| **Which taxonomies** | Evidence lives in a team package, so only projects bound to a team taxonomy can be floored. A project on the default taxonomy has no `evidence/`. |
+
+Shared code: the per-class agreement count moved into `classAgreement()`
+(`job-class.mjs`), which the summary API and the floor's gate both read. The
+tagger remembers each turn's class (`turnClass`) for the turn's later calls.
+`GET /api/job-classes` reports the floor as `routing`: applied per class, and
+the reasons it declined.
+
+**Verified 2026-10-31, on the live proxy:** a pi-shaped turn sent through the
+shim (`x-project: coding`) was labelled `status` under `job-classes-coding-v2`.
+Its first call counted as "turn not labelled yet". Its tool-loop call found the
+label and declined with "status: gate collecting" (status has 8 checked turns of
+20), and was served `claude-opus-5` as before. The test turn's rows, record and
+snapshot were deleted. The positive path (gate passes, evidence present → the
+candidate on the same provider, never offloaded) is covered by unit tests with
+the real tagger and an evidence file. It cannot be shown live until a class passes
+its gate and a maintainer records evidence.
+
+**Today it routes nothing.** No class has passed its gate (all collecting) and
+the coding team's package has no `evidence/` yet.
 
 ## Open questions (yours to decide)
 

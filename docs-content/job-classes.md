@@ -30,19 +30,19 @@ from a trial, not by reputation.
 <div class="overview-benefits" markdown="1">
 
 **Built and running**  
-define · measure · label live · gate each class · read the coverage · share and grow as a team · replay per class · in glass too
+define · measure · label live · gate each class · read the coverage · share and grow as a team · replay per class · route by class · in glass too
 
-**Next**  
-route by class
+**Waiting on data**  
+no class has passed its gate or has evidence yet, so nothing is routed cheaper today
 
 </div>
 
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Seven steps: define, measure, label live with a per-class gate, read the coverage, share with a team, replay per class (built, green); route by class (next, gray). Gaps found in the coverage feed back into the definition.](images/job-class-lifecycle.png)](images/job-class-lifecycle.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
+[![Seven steps: define, measure, label live with a per-class gate, read the coverage, share with a team, replay per class, route by class. Gaps found in the coverage feed back into the definition.](images/job-class-lifecycle.png)](images/job-class-lifecycle.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
 
-<figcaption>Green: built and running. Gray: next. Gaps found in step 4 feed back into step 1.</figcaption>
+<figcaption>All seven steps are built. Gaps found in step 4 feed back into step 1.</figcaption>
 </figure>
 <p class="overview-takeaway">Labels first, evidence second, cheaper routing last.</p>
 </section>
@@ -56,8 +56,9 @@ route by class
 
 **Save.** Routine jobs such as status, ship and run are about 40 % of the
 coding team's prompts, and today the strong model answers every one of them.
-Once a kind of job has proven a cheaper model, every prompt of that kind goes
-to it. Hard jobs like fix stay on the strong one.
+Once a kind of job has proven a cheaper model, the proxy sends that kind of job
+to it. Hard jobs like fix stay on the strong one. This works for pi, opencode
+and Copilot CLI, whose model the proxy picks; Claude Code picks its own.
 
 **Learn.** A cheap model labels every prompt. A strong model checks a sample
 of those labels. Past prompts of one kind are replayed on the cheaper model,
@@ -70,9 +71,9 @@ prompts in it. One member's proof spares the rest of the team from repeating it.
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Your prompt is labelled by the proxy's cheap model (step 1); a strong model checks a sample of labels (step 2); past turns of a class are replayed on a cheaper model and judged blind (step 3), and the evidence goes to the team repo with the classes, but no prompts; pulled on sync, it lets every member route that class to the cheaper model (step 4, next). Prompts no class fits become proposals for a new class.](images/job-class-at-a-glance.png)](images/job-class-at-a-glance.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
+[![Your prompt is labelled by the proxy's cheap model (step 1); a strong model checks a sample of labels (step 2); past turns of a class are replayed on a cheaper model and judged blind (step 3), and the evidence goes to the team repo with the classes, but no prompts; pulled on sync, it lets every member route that class to the cheaper model (step 4). Prompts no class fits become proposals for a new class.](images/job-class-at-a-glance.png)](images/job-class-at-a-glance.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
 
-<figcaption>Steps 1 to 3 run today. Step 4, the switch itself, comes next.</figcaption>
+<figcaption>All four steps run today. Step 4 switches a class only once steps 2 and 3 have proven it.</figcaption>
 </figure>
 <p class="overview-takeaway">The label picks the jobs to try; the evidence picks the model; the team shares both.</p>
 </section>
@@ -97,7 +98,7 @@ The idea, in three steps:
 3. **Switch** that kind of job to the cheaper model only if it does the job
    as well, and nothing else.
 
-Steps 1 and 2 are built. Step 3 comes next.
+All three steps are built. Step 3 waits for the evidence from step 2.
 
 </div>
 <figure class="overview-figure" markdown="1">
@@ -136,7 +137,7 @@ Steps 1 and 2 are built. Step 3 comes next.
 
 | Word | Meaning |
 |---|---|
-| **shadow** | Labels are recorded; nothing acts on them yet. |
+| **shadow** | Labels are recorded; nothing acts on a class until it has passed its gate and has evidence. |
 | **reference set** | Past prompts the teacher labelled twice, giving the same class both times. |
 | **dev / test set** | Prompts read while writing the tests (dev), and prompts never read (test). Only the test set gives an honest score. |
 | **agreement · kappa** | How often two labellers give the same class. Kappa removes the agreement luck alone would give: 0 is chance, 1 is perfect. |
@@ -282,7 +283,7 @@ never changed by it.
 
 <figcaption>Labelling happens after the turn has been forwarded, so nothing it does can slow a turn down.</figcaption>
 </figure>
-<p class="overview-takeaway">Labels arrive about 2 s after the turn; nothing routes on them yet.</p>
+<p class="overview-takeaway">Labels arrive seconds after the turn starts; the turn's later calls can use them (step 7).</p>
 </section>
 
 <section class="overview-slide" id="slide-9" aria-labelledby="jc-gate" markdown="1">
@@ -417,7 +418,7 @@ blind, in both orders. A class passes for that agent and model after at least
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Turns labelled status are answered as usual while the proxy keeps the prompt, the conversation, the answer read and the repo state; the current model and the cheaper candidate each replay the turn in a sandbox; a blind judge compares the answers; the verdict per class, agent and model needs 20 pairs and 90 % the same core; the maintainer records it as evidence/status.json in the team repo, and routing the next status turn to the cheaper model is next.](images/job-class-trial-routing.png)](images/job-class-trial-routing.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
+[![Turns labelled status are answered as usual while the proxy keeps the prompt, the conversation, the answer read and the repo state; the current model and the cheaper candidate each replay the turn in a sandbox; a blind judge compares the answers; the verdict per class, agent and model needs 20 pairs and 90 % the same core; the maintainer records it as evidence/status.json in the team repo, and the proxy's class floor sends the rest of each status turn to the cheaper model.](images/job-class-trial-routing.png)](images/job-class-trial-routing.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
 
 <figcaption>A replay never touches your live repos, data or agent sessions, and its own calls are not labelled.</figcaption>
 </figure>
@@ -427,23 +428,29 @@ blind, in both orders. A class passes for that agent and model after at least
 <section class="overview-slide" id="slide-14" aria-labelledby="jc-route" markdown="1">
 <div class="overview-copy" markdown="1">
 
-<p class="overview-kicker">Step 7 · evidence built, routing next</p>
+<p class="overview-kicker">Step 7 · built</p>
 
-## Change the config for one kind of job {#jc-route}
+## Route one kind of job to a cheaper model {#jc-route}
 
-**Built:** the team's maintainer records a passing verdict as
-`evidence/<class>.json` in the team repo. The file holds counts and models,
-never prompts. `coding sync --push` shares it, and every member pulls it.
+The team's maintainer records a passing verdict as `evidence/<class>.json` in
+the team repo. The file holds counts and models, never prompts. `coding sync
+--push` shares it, and every member pulls it.
 
 ```bash
 coding job-classes replay evidence --team coding \
   --class status --candidate claude-haiku-5.5
 ```
 
-**Next:** the proxy reads that evidence. A class may then be **downgraded** on a
-member's machine **only** if it has passed its gate and a passing verdict exists
-for the agent and model it would go to on *that* member's route. Downgrades
-only, and fail open: with no evidence, nothing changes.
+The proxy's **class floor** reads it. Once a turn is labelled, its later calls
+(the tool loop and the answer) go to the cheaper model, but only if all of
+these hold:
+
+- the class has **passed its gate**;
+- the evidence is for **this agent**, and was measured against the model the call would otherwise get;
+- the route's **own provider** serves the cheaper model, in a **lower band**.
+
+Otherwise nothing changes. This works for pi, opencode and Copilot CLI. Claude
+Code picks its own model, so for it the evidence is a recommendation.
 
 </div>
 <figure class="overview-figure" markdown="1">
@@ -455,7 +462,7 @@ only, and fail open: with no evidence, nothing changes.
   "verdicts": [{
     "candidate": "claude-haiku-5.5",
     "incumbents": ["claude-opus-5"],
-    "agent": "claude",
+    "agent": "pi",
     "pairs": 24,
     "sameCore": 23,
     "sameRate": 0.96,
@@ -466,7 +473,7 @@ only, and fail open: with no evidence, nothing changes.
 }
 ```
 
-<figcaption>The shape of evidence/status.json, shortened, with made-up numbers. One member's replays spare the rest of the team from running them.</figcaption>
+<figcaption>The shape of evidence/status.json, shortened, with made-up numbers. One member's replays spare the rest of the team from running them. <code>curl -s localhost:12435/api/job-classes</code> shows under <code>routing</code> how often the floor applied, and why it did not.</figcaption>
 </figure>
 <p class="overview-takeaway">The class picks which jobs to try; the evidence decides the model.</p>
 </section>
@@ -502,16 +509,17 @@ The Classes tab, the gate and the coverage map are the same as here.
 
 <p class="overview-kicker">Where it stands</p>
 
-## What runs today, what comes next {#jc-status}
+## What runs today, what it waits for {#jc-status}
 
-Labelling runs on every human turn, and the gate is collecting. Kept
-`status` and `explain` turns are recorded for replay, so the evidence can
-build up while the gate does.
+Every step runs. Labelling runs on every human turn, and the gate is
+collecting. Kept `status` and `explain` turns are recorded for replay, so the
+evidence can build up while the gate does. The class floor is on, and routes
+nothing until a class has both.
 
 See it yourself:
 
 - **Token Usage → Classes** on the dashboard (`localhost:3032/token-usage`): the gate, the tree and the map.
-- `curl -s localhost:12435/api/job-classes`: is the proxy labelling, and what did it skip?
+- `curl -s localhost:12435/api/job-classes`: is the proxy labelling, what did it skip, and what did the floor route?
 
 </div>
 <figure class="overview-figure" markdown="1">
@@ -524,12 +532,12 @@ See it yourself:
 | Share with a team | ✅ | `init` / `join`, pulled on sync |
 | Grow the taxonomy | ✅ | `propose` / `fold`, stability check |
 | Replay per class | ✅ | any agent, sandboxed, judged blind; evidence to the team repo |
-| Route by class | next | the proxy reads the evidence: a class floor |
+| Route by class | ✅ | the class floor: pi, opencode, Copilot CLI; waits for a gate and evidence |
 | glass, without coding | ✅ | opt-in, your Copilot account; measure from transcripts; no replay yet |
 
 <figcaption>The plan: .planning/shared-job-classes.md</figcaption>
 </figure>
-<p class="overview-takeaway">Today: classes, the gate and replay evidence. Next: cheaper routing per class, backed by that evidence.</p>
+<p class="overview-takeaway">Built end to end; what remains is evidence, gathered from your own turns.</p>
 </section>
 
 </div>

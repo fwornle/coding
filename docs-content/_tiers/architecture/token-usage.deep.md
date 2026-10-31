@@ -479,7 +479,7 @@ mechanism, step by step, is the [job classes deck](../job-classes.md).
   (`teacher_sample_pct`; every turn until each class has a gate verdict). Sub-agent and
   utility calls carry no job of their own and are skipped, and so are automated runs: a
   request bound to a task id (benchmark and experiment cells) or sent by headless
-  `claude -p` (replays, tool probes). Shadow only: nothing routes on the labels yet.
+  `claude -p` (replays, tool probes). A label routes nothing by itself; see **Routing** below.
 - **The tab** — a taxonomy picker (the default `config/job-classes.yaml`, or a team's
   shared one), then:
   - **Taxonomy and coverage**, as a **Tree** (group → class, each with its share of the
@@ -500,7 +500,18 @@ mechanism, step by step, is the [job classes deck](../job-classes.md).
   the model it asks for, on the route's own provider only. A blind judge compares the
   answers; ≥ 20 pairs at ≥ 90 % the same core answer pass for that class, agent and
   model, and the maintainer records the verdict as `evidence/<class>.json` in the team
-  package. The proxy routing on that evidence is next.
+  package.
+- **Routing** — the class floor (`rapid-llm-proxy/proxy-bridge/class-floor.mjs`,
+  `job_classes.routing` in `llm-routing.yaml`). Once a turn is labelled, its later calls
+  (the tool loop and the answer; the first call is what triggers the label) go to the
+  evidence's candidate model when all of these hold: the class passes the gate; a verdict
+  in `evidence/<class>.json` beside the team's taxonomy still passes the judge's rule
+  (≥ 20 pairs, ≥ 90 %, A/A floor not below), is for this agent, and was measured against
+  the model the call would otherwise get; and the route's own provider serves the
+  candidate in a lower band. The call keeps its provider and is never offloaded, and its
+  row's `band_source` is `job-class`. pi, opencode and Copilot CLI only: Claude Code's
+  `/v1/messages` is a passthrough and the proxy does not pick its model. Fail open:
+  anything missing leaves the call as routed.
 - **Teams** — a team may share its own taxonomy from a member's learning repo
   (`coding job-classes init` / `join`); its projects are labelled under it, and members
   grow it with `coding job-classes propose` and the maintainer's `fold`. A class merged
@@ -508,7 +519,8 @@ mechanism, step by step, is the [job classes deck](../job-classes.md).
   under two different taxonomies are never counted together.
 
 API on the proxy: `GET /api/job-classes` (the tagger's counters, `labelled` / `skipped`,
-and `replay`: turns pending and awaiting their answer),
+`replay`: turns pending and awaiting their answer, and `routing`: how often the floor
+applied, per class, and why it declined),
 `GET /api/job-classes/summary?days=7&taxonomy=<name>-v<n>` (tokens and agreement by class,
 joined to `token_usage` on the turn identity), `GET /api/job-classes/coverage`. Store: the
 `turn_job_class` table in the token DB. Plan: `.planning/shared-job-classes.md`.
