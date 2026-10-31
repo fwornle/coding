@@ -11,6 +11,12 @@
  * window, 90 days), not the page's window: the gate is a property of the
  * taxonomy version, which a new version starts from zero. "none" is no class
  * and has no gate.
+ *
+ * When the live labeller IS the teacher (student_process == teacher_process —
+ * coding since 2026-10-30, after no cheap student cleared the gate offline),
+ * there is no student to gate. The same counts then measure the teacher's
+ * consistency: a second teacher pass on a sample of turns, agreeing with the
+ * first. The panel says so rather than calling that "the student's precision".
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -32,20 +38,31 @@ function verdictOf(checked: number, agree: number): Verdict {
 }
 
 const VERDICT_LABEL: Record<Verdict, string> = { passes: 'passes', below: 'below the gate', collecting: 'collecting' }
+const SELF_CHECK_LABEL: Record<Verdict, string> = { passes: 'consistent', below: 'inconsistent', collecting: 'collecting' }
 const VERDICT_BADGE: Record<Verdict, 'default' | 'destructive' | 'secondary'> = { passes: 'default', below: 'destructive', collecting: 'secondary' }
 
 export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxonomy: string }) {
   const [classes, setClasses] = useState<string[] | null>(null)
   const [counts, setCounts] = useState<ClassCount[]>([])
   const [error, setError] = useState<string | null>(null)
+  // The teacher labels live turns itself; its second pass is a consistency check.
+  const [selfCheck, setSelfCheck] = useState(false)
+  const [samplePct, setSamplePct] = useState<number | null>(null)
 
   const load = useCallback(async () => {
     try {
       const q = `taxonomy=${encodeURIComponent(taxonomy)}`
       const get = (path: string) => fetch(`${proxyBase}${path}`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
-      const [cov, sum] = await Promise.all([get(`/api/job-classes/coverage?days=90&${q}`), get(`/api/job-classes/summary?days=90&${q}`)])
+      const [cov, sum, tagger] = await Promise.all([
+        get(`/api/job-classes/coverage?days=90&${q}`),
+        get(`/api/job-classes/summary?days=90&${q}`),
+        get('/api/job-classes').catch(() => null),
+      ])
       setClasses(((cov?.taxonomy?.classes ?? []) as { id: string }[]).map(c => c.id))
       setCounts(sum?.byClass ?? [])
+      const cfg = tagger?.config
+      setSelfCheck(!!cfg?.studentProcess && cfg.studentProcess === cfg.teacherProcess)
+      setSamplePct(typeof cfg?.teacherSamplePct === 'number' ? cfg.teacherSamplePct : null)
       setError(sum?.error ?? null)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
@@ -62,23 +79,37 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
   }), [classes, counts])
   const passing = rows.filter(r => r.verdict === 'passes').length
   const below = rows.filter(r => r.verdict === 'below').length
+  const label = selfCheck ? SELF_CHECK_LABEL : VERDICT_LABEL
+  const sample = samplePct !== null ? `1 turn in ${Math.round(1 / samplePct)}` : 'a sample of turns'
 
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">Gate</CardTitle>
         <CardDescription>
-          A class passes when the teacher agrees with at least {pct(GATE_PRECISION)} of the student's labels for it,
-          over at least {GATE_MIN_CHECKED} teacher-checked turns. Counted over every label made under{' '}
-          <span className="font-mono">{taxonomy}</span>, whatever the page's window.
+          {selfCheck ? (
+            <>
+              Live labels come from the teacher itself, so there is no student to gate. Instead the teacher labels{' '}
+              {sample} a second time: a class is consistent when the second pass agrees with the first on at least{' '}
+              {pct(GATE_PRECISION)}, over at least {GATE_MIN_CHECKED} re-checked turns. Counted over every label made under{' '}
+              <span className="font-mono">{taxonomy}</span>, whatever the page's window, including any a student made
+              before the teacher took over.
+            </>
+          ) : (
+            <>
+              A class passes when the teacher agrees with at least {pct(GATE_PRECISION)} of the student's labels for it,
+              over at least {GATE_MIN_CHECKED} teacher-checked turns. Counted over every label made under{' '}
+              <span className="font-mono">{taxonomy}</span>, whatever the page's window.
+            </>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {error && <div className="text-sm text-destructive">{error}</div>}
         {classes && (
           <div className="text-sm" data-testid="gate-headline">
-            <span className="font-medium">{passing} of {rows.length}</span> classes pass
-            {below > 0 && <>, <span className="font-medium">{below}</span> below the gate</>}
+            <span className="font-medium">{passing} of {rows.length}</span> classes {selfCheck ? 'consistent' : 'pass'}
+            {below > 0 && <>, <span className="font-medium">{below}</span> {label.below}</>}
             , {rows.length - passing - below} still collecting.
           </div>
         )}
@@ -88,10 +119,10 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
               <TableRow>
                 <TableHead>Class</TableHead>
                 <TableHead className="text-right">Labelled</TableHead>
-                <TableHead>Checked by the teacher</TableHead>
-                <TableHead className="text-right">Teacher agrees</TableHead>
-                <TableHead className="text-right">Precision</TableHead>
-                <TableHead>Gate</TableHead>
+                <TableHead>{selfCheck ? 'Re-checked by the teacher' : 'Checked by the teacher'}</TableHead>
+                <TableHead className="text-right">{selfCheck ? 'Second pass agrees' : 'Teacher agrees'}</TableHead>
+                <TableHead className="text-right">{selfCheck ? 'Agreement' : 'Precision'}</TableHead>
+                <TableHead>{selfCheck ? 'Consistency' : 'Gate'}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -109,7 +140,7 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
                   </TableCell>
                   <TableCell className="text-right tabular-nums">{r.checked ? r.agree : '—'}</TableCell>
                   <TableCell className="text-right tabular-nums">{r.checked ? pct(r.agree / r.checked) : '—'}</TableCell>
-                  <TableCell><Badge variant={VERDICT_BADGE[r.verdict]}>{VERDICT_LABEL[r.verdict]}</Badge></TableCell>
+                  <TableCell><Badge variant={VERDICT_BADGE[r.verdict]}>{label[r.verdict]}</Badge></TableCell>
                 </TableRow>
               ))}
             </TableBody>
