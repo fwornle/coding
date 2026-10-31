@@ -1,0 +1,29 @@
+@startuml job-class-at-a-glance
+!include _standard-style.puml
+skinparam defaultFontSize 16
+skinparam componentFontSize 16
+skinparam arrowFontSize 14
+skinparam shadowing false
+skinparam componentStyle rectangle
+hide stereotype
+title Pay for the strong model only where the job needs it
+
+component "**Your prompt**\n“Is the benchmark finished?”" as turn <<agent>>
+component "**1  Label**  (saves nothing yet)\nthe proxy's cheap model says:\nthis is a **status** job" as label <<core>>
+component "**2  Check the label**  (learn)\na strong model re-labels a sample;\na class counts once 90 % of\n20+ checked labels are right" as check <<core>>
+component "**3  Prove a cheaper model**  (learn)\nreplay past status turns on it,\na blind judge compares the answers:\n20+ pairs, 90 % the same answer" as prove <<core>>
+file "**Team repo**  (share)\nclasses + evidence\nno prompts" as repo <<storage>>
+component "**4  Route by class**  (save)\nstatus jobs -> the cheaper model,\non every member's machine;\nfix jobs stay on the strong one" as route <<external>>
+
+turn -[#E53935,thickness=2]down-> label
+label -[#9C27B0,thickness=2]right-> check
+check -[#9C27B0,thickness=2]down-> prove
+prove -[#FF9800,thickness=2]left-> repo : evidence
+repo -[#FF9800,thickness=2]down-> route : pulled on sync
+check -[#757575,thickness=1,dotted]up-> repo : prompts no class fits\n-> a new class
+
+legend right
+  green: built and running
+  gray: next
+endlegend
+@enduml

@@ -486,16 +486,29 @@ mechanism, step by step, is the [job classes deck](../job-classes.md).
     turns) or a **Map** (classes by project, with the gaps the taxonomy cannot place);
   - **Gate** — per class, the student's precision against the teacher: a class passes at
     90 % over at least 20 teacher-checked turns, counted over the whole taxonomy version.
-    Only a class that passes may later drive a trial or a route;
+    Only a class that passes may later drive a route;
   - **By class** — turns, tokens and the student's agreement with the teacher per class;
   - **Recently labelled turns**, with the prompt preview (redacted).
+- **Replay** — for a turn of a kept class (`job_classes.replay.keep`: `status`, `explain`)
+  the tagger records the prompt as sent, the conversation before it and, when the next
+  turn arrives, the answer that was read, all redacted, in one shape for every agent
+  (`rapid-llm-proxy/proxy-bridge/turn-record.mjs`). At the turn's first call it starts
+  `lib/job-classes/turn-capture.mjs`, which snapshots the repo before the turn's tools
+  run. `coding job-classes replay candidates | run | report | evidence` re-runs such turns
+  in a sandbox, in the agent that ran them, on the current model and on a cheaper
+  candidate. Each arm is bound to a `jcr-` task, so it is not labelled, and it is served
+  the model it asks for, on the route's own provider only. A blind judge compares the
+  answers; ≥ 20 pairs at ≥ 90 % the same core answer pass for that class, agent and
+  model, and the maintainer records the verdict as `evidence/<class>.json` in the team
+  package. The proxy routing on that evidence is next.
 - **Teams** — a team may share its own taxonomy from a member's learning repo
   (`coding job-classes init` / `join`); its projects are labelled under it, and members
   grow it with `coding job-classes propose` and the maintainer's `fold`. A class merged
   away keeps its history: its labels count for the class it was merged into. Labels made
   under two different taxonomies are never counted together.
 
-API on the proxy: `GET /api/job-classes` (the tagger's counters, `labelled` / `skipped`),
+API on the proxy: `GET /api/job-classes` (the tagger's counters, `labelled` / `skipped`,
+and `replay`: turns pending and awaiting their answer),
 `GET /api/job-classes/summary?days=7&taxonomy=<name>-v<n>` (tokens and agreement by class,
 joined to `token_usage` on the turn identity), `GET /api/job-classes/coverage`. Store: the
 `turn_job_class` table in the token DB. Plan: `.planning/shared-job-classes.md`.

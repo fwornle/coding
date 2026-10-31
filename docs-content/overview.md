@@ -246,8 +246,8 @@ On the corporate network, small background calls can go to the **on-prem Qwen
 cluster** instead.
 
 The proxy also labels each of your prompts with its **kind of job** (fix, ship,
-status, …), the first step towards a cheaper model per kind:
-[Job classes](job-classes.md).
+status, …) and replays past jobs of one kind on a cheaper model, so that kind
+can switch to it once the evidence holds: [Job classes](job-classes.md).
 
 </div>
 <figure class="overview-figure" markdown="1">
