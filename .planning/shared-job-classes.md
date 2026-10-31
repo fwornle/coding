@@ -175,7 +175,7 @@ nothing changes silently.
 | **P1 — local class, shadow** | Service returns `class` (KNN + closed-set LLM fallback); `job_class`/`job_class_source` columns; "by class" view; no routing effect | Student vs teacher per-class precision on held-out data. Measured 2026-10-30: no cheap student reaches it, so live labels come from the teacher until a class must route (see below) |
 | **P2 — shared repo, read side** ✅ | Package format + validator, `teams.yaml` binding, `job-classes init`, pull via `coding sync`, local KNN rebuild | Two machines resolve the same class for the same prompt |
 | **P3 — contributions + dedup** ✅ | `proposals/`, maintainer fold with absorb/add/merge/stability check, versioned CHANGELOG, tombstones | A forced cap overflow merges correctly and keeps old rows resolvable |
-| **P4 — per-class replay trials + evidence** | Whole-turn replays of sampled real turns in a sandbox, incumbent vs candidate, judged blind; `evidence/` in the team package; the class-aware floor for agents the proxy routes. Design below | Replays of one answer-only class reach a verdict, and the A/A noise floor is measured |
+| **P4 — per-class replay trials + evidence** | Whole-turn replays of sampled real turns in a sandbox, incumbent vs candidate, judged blind; `evidence/` in the team package; the class-aware floor for agents the proxy routes. Design below. Infrastructure built 2026-10-31 for every agent, from the proxy ("P4 infrastructure" below); the proxy-side floor is not | Replays of one answer-only class reach a verdict, and the A/A noise floor is measured |
 | **P5 — glass** | For machines without coding: opt-in live labelling with the user's Copilot account, the Classes tab, a team taxonomy from a git URL, and the measurement over the agents' own transcripts. Design below | Independent of coding's gate. Done when a glass-only user with labelling on sees the same class as coding for the same prompt and taxonomy, and with it off glass sends nothing new |
 
 Touch points: coding (service, trainer, teacher, sync, teams, dashboard),
@@ -718,6 +718,61 @@ What this defers rather than settles:
   same reasoning applies there, but a Sonnet call per turn on someone else's
   Copilot plan is their quota, so glass changes only when that is decided.
 - Labels made before #80 are Haiku's; `student_model` on each row says which.
+
+## P4 infrastructure (2026-10-31)
+
+The loop above, for every agent, built on the kgbench/experiment isolation code.
+A first version read Claude Code's transcripts and resumed a cut copy of the
+session; it worked for claude only and needed a long-lived token, because the cut
+had to live in a fresh config dir with no login. It was replaced the same day by
+this one, which takes the turn from the one place every agent's turns pass
+through — the proxy — and so also works in glass, which has no session logs.
+
+| Step | Code | What it does |
+|---|---|---|
+| Record | rapid-llm-proxy `proxy-bridge/turn-record.mjs`, called by the tagger (`job-class.mjs`) | For a turn labelled with a class in `job_classes.replay.keep` (`status`, `explain`): the person's message as sent (pasted blocks kept, reminders dropped) and the conversation before it, in one neutral shape for both wires (`{role, name?, text}`; tool calls and results included, system prompt and tool schemas not). Every item through the daemon's redactor in bounded slices; a prompt that fails redaction is not recorded. Newest 120 k characters, 4 k per item. When the conversation's next turn arrives, the reply the person read is added as `answer`. Written to `<data>/var/job-classes/replay/turns/<conversation>-t<turn>.json`. |
+| Capture | `job_classes.replay.capture_script` → `lib/job-classes/turn-capture.mjs --worker` | Started detached by the proxy at the first call of every labelled turn, before any of the turn's tools can run. The proxy knows the project, not the directory: the repo is the discovered checkout whose project id that is (`lib/teams/discover.mjs`), and an ambiguous or unknown project is a capture marked incomplete with the reason. Keeps HEAD, the dirty patch, untracked files and submodule HEADs/patches (`git-state.mjs`); caps mark a capture incomplete rather than partial. |
+| Retention | `sweep()` in `turn-capture.mjs` | Runs inside a capture, at most once an hour, so an idle machine does nothing. A capture whose turn is labelled with a kept class moves to `kept/<class>/`, everything else is deleted (unlabelled ones after 6 h); kept captures and turn records are capped at 300 each. |
+| Locate | `lib/job-classes/replay-locate.mjs` | label → record → capture, all keyed by the proxy's turn identity `(conversation_key, turn_index)`. No transcript of any agent is read. The incumbent model is the one that served the turn's last call. |
+| Sandbox | `lib/job-classes/replay-sandbox.mjs` | A standalone repo holding one commit (depth-1 fetch by SHA), then the captured patch and untracked files; submodules the same way. `renderPrompt()` gives a FRESH session the earlier conversation as context, then the person's message, with every spelling of the repo path rewritten. `sandbox-exec` denies reads and writes of `~/Agentic`, `~/.coding`, `~/.specstory` and the agents' session stores (`~/.claude/projects`, `~/.copilot/session-state`, `~/.pi/agent/sessions`), allows writes to the sandbox, temp and the agents' own config dirs, and all network but the proxy port. A no-future check refuses a tree with more than one commit, a commit after the turn, a remote, or a live path in the prompt. |
+| Run | `lib/job-classes/replay-run.mjs` | The turn's own agent through kgbench's adapters (`resolveAgent`) and `runAgent`, with `agentEnv`. Each arm is task-bound through the launcher's wiring (`wireAgentEnv`: claude header, copilot/opencode task path, pi header extension), so the tagger skips it; an arm that cannot be bound is refused. No credential of its own: each agent runs under its normal login and stays out of its session history (claude `--no-session-persistence`, pi `--no-session`, copilot `COPILOT_HOME` in the sandbox). The model that actually served each arm is read back from `token_usage` by task id; an arm the asked-for model did not answer is `wrong_model` and is not judged. Each arm gets its own tree; the run refuses when their digests differ. |
+| Model | rapid-llm-proxy `routing-config.mjs` `resolveRoute({replayModel})` | On the OpenAI wire the route's band picks the model and the request's `model` is ignored, so a candidate arm was being answered by the route's model. A request bound to a replay task (`job_classes.replay.task_prefix`, `jcr-`) is now served the model it names, on the route's own provider and only if that provider serves it, so the account never changes. Claude's `/v1/messages` passthrough already forwards the model asked for. |
+| Judge | `lib/job-classes/replay-judge.mjs` | Same core (both orders must agree), contradictions listed, completeness 1–5 averaged per answer, route `bg-model-trial-judge`. Floor = incumbent replay vs the real answer, or replay vs replay with `--aa`. Verdict per class, **agent** and candidate: ≥ 20 pairs and ≥ 90 % same core; `floor-too-low` when the floor is under 90 %. |
+| CLI | `coding job-classes replay candidates\|run\|report\|evidence` (`replay-cli.mjs`) | `--agent` narrows to one agent; `run --dry-run` builds and checks the sandboxes without spawning anything; `evidence` writes a passing verdict, with its agent, to the maintainer's `evidence/<class>.json` (counts and models, no prompt text). |
+
+**Labels were never claude-only.** Every label so far is a claude turn, but that
+is because no copilot, opencode or pi session has run since the tagger went live
+(2026-10-28); only smoke tests, correctly skipped as too short. A turn in each
+agent's wire shape, sent to the live proxy without a task binding, was labelled
+`explain` for pi, opencode and copilot alike (2026-10-31; the test rows were
+deleted).
+
+**Verified 2026-10-31, on the live proxy:** a two-turn conversation in copilot's
+and in pi's request shape each produced a record (redacted prompt, four history
+items, then the answer from the next turn) and a complete capture of this repo.
+A dry run of the copilot turn built three identical arm trees. A live replay of
+the pi turn ran both arms in the OS sandbox, task-bound (no new label): before the
+model fix both arms were served `claude-sonnet-5` whatever they asked for; after
+it, the incumbent `claude-opus-5` (58 s) and the candidate `claude-haiku-5.5`
+(23 s), judged the same core answer, and the real answer agreed with the
+incumbent's replay. All test turns, captures and runs were deleted afterwards.
+
+**Recorded gaps, on every result:** the earlier conversation arrives as text in a
+fresh session, not as the agent's own session; knowledge injection and hooks are
+absent; git-ignored files are not in the tree; live services are unreachable. Per
+agent: copilot, opencode and pi run with built-in tools ungated (no verified
+mapping of their tool names); copilot runs with an empty `COPILOT_HOME`;
+opencode's session database stays readable and its replay sessions land in its
+history (it has no ephemeral switch).
+
+**Not verified live:** a claude, copilot or opencode arm. Spawning copilot with
+all tools was blocked by this session's permission classifier; claude has no
+record yet, because the tagger began recording with this change. The first real
+records arrive from the next labelled `status`/`explain` turn of any agent.
+
+**Not built:** the proxy-side class floor (step 5, "Use"); replays inside glass
+(its daemon carries the recorder, inert until its config names classes to keep,
+but not the runner).
 
 ## Open questions (yours to decide)
 
