@@ -6,7 +6,7 @@ skinparam arrowFontSize 14
 skinparam shadowing false
 skinparam componentStyle rectangle
 hide stereotype
-title A class earns a cheaper model with evidence (replay: built · routing by class: next)
+title A class earns a cheaper model with evidence
 
 component "**turns labelled 'status'**\nanswered as usual; the proxy keeps\nthe prompt, the conversation before it,\nthe answer read, and the repo as it was" as turns <<core>>
 component "**current model, replayed**\nsame agent, same repo state,\nin a sandbox" as inc <<agent>>
@@ -15,7 +15,7 @@ component "**judge, blind, both orders**\nthe same core answer?\ncontradictions?
 component "**verdict per class, agent, model**\n>= 20 pairs · 90 % the same core" as verdict <<core>>
 component "**the maintainer records it**\njob-classes replay evidence" as accept <<cli>>
 file "**evidence/status.json**\nin the team repo\ncounts and models, no prompts" as ev <<storage>>
-component "**next 'status' turn**\n-> the cheaper model\n(next: the proxy's class floor)" as next <<external>>
+component "**the proxy's class floor**\nthe rest of a 'status' turn\n-> the cheaper model\n(gate passed, same provider)" as next <<core>>
 
 turns -[#9C27B0,thickness=2]right-> inc
 turns -[#9C27B0,thickness=2]down-> cand

@@ -13,7 +13,7 @@ component "**1  Label**  (saves nothing yet)\nthe proxy's cheap model says:\nthi
 component "**2  Check the label**  (learn)\na strong model re-labels a sample;\na class counts once 90 % of\n20+ checked labels are right" as check <<core>>
 component "**3  Prove a cheaper model**  (learn)\nreplay past status turns on it,\na blind judge compares the answers:\n20+ pairs, 90 % the same answer" as prove <<core>>
 file "**Team repo**  (share)\nclasses + evidence\nno prompts" as repo <<storage>>
-component "**4  Route by class**  (save)\nstatus jobs -> the cheaper model,\non every member's machine;\nfix jobs stay on the strong one" as route <<external>>
+component "**4  Route by class**  (save)\nstatus jobs -> the cheaper model,\non every member's machine;\nfix jobs stay on the strong one" as route <<core>>
 
 turn -[#E53935,thickness=2]down-> label
 label -[#9C27B0,thickness=2]right-> check
@@ -22,8 +22,4 @@ prove -[#FF9800,thickness=2]left-> repo : evidence
 repo -[#FF9800,thickness=2]down-> route : pulled on sync
 check -[#757575,thickness=1,dotted]up-> repo : prompts no class fits\n-> a new class
 
-legend right
-  green: built and running
-  gray: next
-endlegend
 @enduml
