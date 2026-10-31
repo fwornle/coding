@@ -66,6 +66,16 @@ The other proxy records the call too, under glass's session id. Where that proxy
 coding's, glass's usage views read its figures as well and drop its copy of any glass
 session, so each call counts once.
 
+**pi refuses the other tool's provider.** pi fills a header value written as `$NAME` in
+`~/.pi/agent/models.json` from its environment, and a provider whose variable is unset
+cannot send a turn: `Failed to resolve provider "rapid-proxy-pi" header "x-project" from
+environment variable: CODING_PROJECT_ID`. A shell the other tool's launcher did not set up
+has no such variable, so `glass pi` stops there. coding writes only `x-agent` into the file
+and adds project and task from a pi extension of its own
+(`~/.pi/agent/extensions/coding-proxy-headers.ts`) when they are set; starting pi once from
+coding rewrites an older file that way. glass's relay extension changes only the base URL,
+so the headers of such an extension stay, and the relay then sets the glass session's own.
+
 On a machine without such a proxy, the agents' defaults are their own providers and
 `glass opencode` / `glass pi` measure them without any option.
 

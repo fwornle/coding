@@ -46,7 +46,8 @@ opencode skips them for its model calls too. glass gives it a session-only confi
 pi's providers on plain HTTP take the same relay. pi has no session-only config in the
 environment, so `glass pi` loads a small extension of glass's (`pi -e`) that sets each
 such provider's base URL to its relay for the run; models, keys and headers stay those
-of `~/.pi/agent/models.json`.
+of `~/.pi/agent/models.json` and of any other extension that sets them (pi merges a
+provider's registrations field by field).
 
 A call relayed to an address on 127.0.0.1 carries the session's `x-task-id`, `x-agent`
 and `x-project`, so another local proxy on that address files its own record of the call
