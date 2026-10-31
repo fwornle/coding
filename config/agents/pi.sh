@@ -15,7 +15,8 @@
 # first-class agent rather than a like-for-like port:
 #
 #   1. Its custom-provider seam CAN attach request headers, so `x-agent: pi` and
-#      `x-task-id: $TASK_ID` bind every call per-request. mastracode could attach
+#      the x-task-id the coding-proxy-headers extension adds from TASK_ID bind
+#      every call per-request. mastracode could attach
 #      neither a header nor a body.agent field, which is why it needed a
 #      dedicated /v1/mastra proxy sub-route to derive the agent from the URL
 #      path, and why it was stuck ambient-bound with task_id=''.

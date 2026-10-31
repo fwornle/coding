@@ -14,7 +14,7 @@
 //
 // The contract, mirroring writePiSettings for settings.json:
 //   a. We own `rapid-proxy-pi` and `qwen-laptop` outright and rewrite them every
-//      launch — the proxy port, the x-task-id header and the qwen base URL all
+//      launch — the proxy port and the qwen base URL
 //      move between launches, so a stale entry is worse than no entry.
 //   b. Every other provider, and every other top-level key, survives untouched.
 //   c. An absent or unparseable file is not an error: we start from {}.
@@ -133,7 +133,8 @@ test('a top-level JSON array is treated as absent rather than crashing', () => {
 test('no scratch or temp files are left behind', () => {
   withTempDir((dir) => {
     writeModels(dir);
-    assert.deepEqual(readdirSync(dir), ['models.json']);
+    assert.deepEqual(readdirSync(dir).sort(), ['extensions', 'models.json']);
+    assert.deepEqual(readdirSync(path.join(dir, 'extensions')), ['coding-proxy-headers.ts']);
     assert.ok(!existsSync(path.join(dir, 'models.json.coding-ours')));
     assert.ok(!existsSync(path.join(dir, 'models.json.tmp')));
   });
@@ -141,8 +142,7 @@ test('no scratch or temp files are left behind', () => {
 
 // ── the one-time backup ──────────────────────────────────────────────────────
 //
-// models.json is rewritten on EVERY launch (the proxy port and the x-task-id
-// header move), so a per-launch backup would litter the config dir. What is
+// models.json is rewritten on EVERY launch (the proxy port moves), so a per-launch backup would litter the config dir. What is
 // worth keeping is the original as it stood before this project first touched
 // it — the same one-time-original approach install.sh takes with .coding-orig
 // and build-claude-runtime-config.mjs with .coding-pre-global.

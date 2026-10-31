@@ -516,7 +516,9 @@ test('configureProxyRoutingEnv: a pi cell writes its config into the cell sandbo
     assert.equal(env.TASK_ID, 't-pi');
     assert.ok(!('ANTHROPIC_API_KEY' in env));
     const models = JSON.parse(fs.readFileSync(path.join(box, 'data', 'pi-agent', 'models.json'), 'utf8'));
-    assert.equal(models.providers['rapid-proxy-pi'].headers['x-task-id'], '$TASK_ID');
+    // x-task-id comes from the headers extension, which reads TASK_ID from pi's env.
+    assert.deepEqual(models.providers['rapid-proxy-pi'].headers, { 'x-agent': 'pi' });
+    assert.ok(fs.existsSync(path.join(box, 'data', 'pi-agent', 'extensions', 'coding-proxy-headers.ts')));
     assert.ok(!fs.existsSync(path.join(box, 'home', '.pi')), 'the user\'s ~/.pi is never touched');
     assert.ok(fs.existsSync(path.join(box, 'wt', '.observations', 'pi-sessions')));
   } finally {
