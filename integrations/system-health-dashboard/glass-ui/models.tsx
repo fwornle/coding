@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -68,6 +68,12 @@ function useAnsweredBy() {
   return useCallback((provider: string) => target(provider) ?? answeredBy(provider), [target])
 }
 const agentLabel = (agent: string) => (!agent || agent === 'unknown' ? 'no session' : agent)
+// A background job of coding's (combined.mjs) has no agent either, but names
+// itself in `process`: shown under that name, in the table and the flow alike.
+const byJob = (g: MixGroup): MixGroup => (g.process ? { ...g, agent: g.process } : g)
+const rowTitle = (g: MixGroup) => g.process
+  ? `A background job of coding's (process ${g.process}): no agent asked`
+  : agentLabel(g.agent) === 'no session' ? 'Measured, but not tied to a glass session — see the note below the table' : undefined
 
 const KIND: Record<CallKind, { label: string; title: string; className: string }> = {
   main: { label: 'main', title: 'Sent tool definitions: the agent\'s own loop', className: 'bg-primary/10 text-foreground' },
@@ -230,6 +236,8 @@ export function UnboundCalls() {
 
 interface MixGroup extends Group {
   agent: string
+  /** a background job's name when no agent asked; '' otherwise */
+  process?: string
   sessions: number
 }
 
@@ -265,7 +273,7 @@ export function ModelsPage() {
     return () => { alive = false; clearInterval(t) }
   }, [hours])
 
-  const rows = groups ?? []
+  const rows = useMemo(() => (groups ?? []).map(byJob), [groups])
   const calls = rows.reduce((n, g) => n + g.calls, 0)
   const models = new Set(rows.map((g) => g.model)).size
   const allTokens = rows.reduce((n, g) => n + tokensOf(g), 0)
@@ -361,7 +369,7 @@ export function ModelsPage() {
               <TableBody>
                 {rows.map((g) => (
                   <TableRow key={`${g.agent}|${g.model}|${g.provider}|${g.upstream}|${g.call_kind}`} data-kind={g.call_kind || 'unrecorded'}>
-                    <TableCell><Badge variant="secondary" className="text-xs" title={agentLabel(g.agent) === 'no session' ? 'Measured, but not tied to a glass session — see the note below the table' : undefined}>{agentLabel(g.agent)}</Badge></TableCell>
+                    <TableCell><Badge variant="secondary" className="text-xs" title={rowTitle(g)}>{agentLabel(g.agent)}</Badge></TableCell>
                     <TableCell className="font-mono text-xs">{normalizeModel(g.model)}</TableCell>
                     <TableCell><KindBadge kind={g.call_kind} /></TableCell>
                     <TableCell className="text-xs">{answered(g.provider)}</TableCell>

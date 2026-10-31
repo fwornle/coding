@@ -102,13 +102,18 @@ export function modelMix(db, { hours = 24, accounts = { sql: '', params: [] } } 
   const cw = cache ? 'COALESCE(cache_write_tokens,0)' : '0';
   const since = hours > 0 ? new Date(Date.now() - hours * 3_600_000).toISOString() : '';
   const ac = accounts;
+  // A row with no agent is either a call glass could not bind (process
+  // token-adapter-unknown) or a background job of coding's (combined.mjs), which
+  // names its job in `process` — that name is the row's `process`, '' otherwise.
   const groups = db.prepare(`
-    SELECT agent, model, provider, ${f.upstream} AS upstream, ${f.callKind} AS call_kind, COUNT(*) AS calls,
+    SELECT agent, job AS process, model, provider, ${f.upstream} AS upstream, ${f.callKind} AS call_kind, COUNT(*) AS calls,
            COUNT(DISTINCT NULLIF(task_id, '')) AS sessions,
            SUM(input_tokens) AS input, SUM(output_tokens) AS output,
            SUM(${cr}) AS cache_read, SUM(${cw}) AS cache_write
-    FROM token_usage WHERE timestamp >= ?${ac.sql}
-    GROUP BY agent, model, provider, upstream, call_kind ORDER BY calls DESC, agent, model
+    FROM (SELECT *, CASE WHEN COALESCE(agent, '') IN ('', 'unknown') AND COALESCE(process, '') <> ''
+                           AND process NOT LIKE 'token-adapter%' THEN process ELSE '' END AS job
+          FROM token_usage) WHERE timestamp >= ?${ac.sql}
+    GROUP BY agent, job, model, provider, upstream, call_kind ORDER BY calls DESC, agent, model
   `).all(since, ...ac.params);
   return { hours, groups };
 }
