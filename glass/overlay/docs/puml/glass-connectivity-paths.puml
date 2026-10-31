@@ -26,17 +26,17 @@ cloud "Internet" {
   component "Model hosts\napi.anthropic.com · api.openai.com\napi.githubcopilot.com · copilot-api.<tenant>.ghe.com" as hosts <<external>>
 }
 
-component "opencode plain-HTTP provider\n(e.g. a local model server)" as relayed <<external>>
+component "opencode / pi plain-HTTP provider\n(a local model server, another local proxy)" as relayed <<external>>
 
 claude SYNC_LINE glass : ANTHROPIC_BASE_URL\n(plain HTTP, loopback)
 others SYNC_LINE glass : HTTPS_PROXY = glass\n(CONNECT, TLS by glass's CA)
-others OPTIONAL_LINE glass : opencode: /relay/<provider>
+others OPTIONAL_LINE glass : opencode, pi: /relay/<provider>
 glass SYNC_LINE hosts : at home: direct\n(no HTTPS_PROXY)
 glass SYNC_LINE px : on VPN / corporate:\nHTTPS_PROXY = :3128
 px SYNC_LINE corp : CONNECT + Negotiate
 krb DATA_LINE px : ticket
 corp SYNC_LINE hosts : verified TLS
-glass OPTIONAL_LINE relayed : relay, loopback direct
+glass OPTIONAL_LINE relayed : relay, loopback direct\n+ x-task-id of the session
 mon OPTIONAL_LINE px : probes :3128\nevery 15 s
 mon OPTIONAL_LINE krb : klist -s;\nmissing → macOS: asks SSO
 @enduml

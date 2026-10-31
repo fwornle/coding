@@ -4,10 +4,11 @@
 //   claude    an ANTHROPIC_BASE_URL on loopback that is not glass: glass forwards
 //             there, so the call is recorded twice (both counts are right, the
 //             sum is not) and the other tool files it under glass's session id
-//   opencode  the default provider has a plain-HTTP base URL: glass relays it for
-//             the run (measured); another tool's proxy there records the calls too
-//   pi        the default provider has a plain-HTTP base URL: glass only decrypts
-//             HTTPS model hosts, so that traffic is not measured
+//   opencode, providers with a plain-HTTP base URL (a local model server, another
+//   pi        tool's proxy) are relayed through the daemon for the run: measured, and
+//             named with the glass session, so a proxy there files its copy under
+//             glass's task id and the combined usage view counts the call once. No
+//             warning: nothing is left to fix.
 //   tmux      started inside an existing tmux session, glass takes over its status
 //             bar for the run (and puts it back afterwards)
 //
@@ -60,14 +61,6 @@ export function opencodeConfig(env = process.env, home = os.homedir()) {
   return { model, providers };
 }
 
-/** opencode's default model and its provider's base URL. */
-export function opencodeDefault(env = process.env, home = os.homedir()) {
-  const { model, providers } = opencodeConfig(env, home);
-  if (!model || !model.includes('/')) return null;
-  const provider = model.slice(0, model.indexOf('/'));
-  return { model, provider, baseURL: providers[provider]?.options?.baseURL || null };
-}
-
 /** opencode providers with a plain-HTTP base URL: id → URL. glass relays these for a run. */
 export function opencodeHttpProviders(env = process.env, home = os.homedir()) {
   const out = {};
@@ -95,14 +88,15 @@ export function opencodeCopilotUpstream(env = process.env, home = os.homedir()) 
   return domain ? `https://copilot-api.${domain}` : 'https://api.githubcopilot.com';
 }
 
-/** pi's default provider and its base URL (PI_CODING_AGENT_DIR, else ~/.pi/agent). */
-export function piDefault(env = process.env, home = os.homedir()) {
+/** pi providers (models.json) with a plain-HTTP base URL: id → URL. glass relays these for a run. */
+export function piHttpProviders(env = process.env, home = os.homedir()) {
   const dir = env.PI_CODING_AGENT_DIR || path.join(home, '.pi', 'agent');
-  const settings = readJson(path.join(dir, 'settings.json'));
-  const provider = settings?.defaultProvider;
-  if (!provider) return null;
-  const models = readJson(path.join(dir, 'models.json'));
-  return { provider, model: settings.defaultModel || null, baseURL: models?.providers?.[provider]?.baseUrl || null };
+  const out = {};
+  for (const [id, p] of Object.entries(readJson(path.join(dir, 'models.json'))?.providers || {})) {
+    const url = p?.baseUrl;
+    if (typeof url === 'string' && /^http:\/\//i.test(url)) out[id] = url;
+  }
+  return out;
 }
 
 /**
@@ -114,15 +108,6 @@ export function coexistWarnings({ env = process.env, home = os.homedir(), port, 
   const base = env.ANTHROPIC_BASE_URL && loopbackUrl(env.ANTHROPIC_BASE_URL);
   if (base && Number(base.port) !== port) {
     lines.push(`claude: ANTHROPIC_BASE_URL=${env.ANTHROPIC_BASE_URL} is another local proxy — glass claude forwards through it and both record each call. Start glass from a terminal that tool's launcher did not set up.`);
-  }
-  const oc = opencodeDefault(env, home);
-  if (oc?.baseURL && /^http:/i.test(oc.baseURL)) {
-    lines.push(`opencode: default provider ${oc.provider} (${oc.model}) is plain HTTP at ${oc.baseURL} — glass opencode relays and measures it; if that is another tool's proxy, it records the calls too.`);
-  }
-  const pi = piDefault(env, home);
-  if (pi?.baseURL && /^http:/i.test(pi.baseURL)) {
-    const what = pi.model ? `${pi.provider} (${pi.model})` : pi.provider;
-    lines.push(`pi: default provider ${what} is plain HTTP at ${pi.baseURL} — glass cannot measure it. Pick a provider of pi's own: glass pi --model <provider>/<model>.`);
   }
   if (env.TMUX && !glassTmux) {
     lines.push('tmux: inside an existing tmux session — glass <agent> shows its status bar there for the run and restores yours afterwards. --no-tmux leaves it alone.');

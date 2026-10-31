@@ -62,7 +62,7 @@ you had one set.
 
 **copilot, opencode and pi** use glass as their `HTTPS_PROXY`. glass decrypts
 only the **five model hosts** with its own CA; every other host is a blind
-tunnel. opencode's plain-HTTP providers go through a relay.
+tunnel. opencode's and pi's plain-HTTP providers go through a relay.
 
 `--no-intercept` leaves copilot, opencode and pi unwired: totals come from their
 own files instead.

@@ -17,7 +17,7 @@ import {
 import { ghDoctorLines, ghEnvIn, runGh } from './copilot-quota.mjs';
 import { runAgent } from './spawn.mjs';
 import { upstreamProxy, proxyEnvOf } from './egress.mjs';
-import { coexistWarnings, opencodeCopilotUpstream, opencodeHttpProviders } from './coexist.mjs';
+import { coexistWarnings, opencodeCopilotUpstream, opencodeHttpProviders, piHttpProviders } from './coexist.mjs';
 import { openUrl } from './open-url.mjs';
 import { renderStatusline, renderReport, uiLinks, TAGS } from './statusline.mjs';
 import { tmuxWanted, launchInTmux, configureStatus, popup, message, selfCommand } from './tmux.mjs';
@@ -25,6 +25,8 @@ import { update, RELEASE_REPO } from './update.mjs';
 import { loadCostDefaults } from './cost.mjs';
 import { billingProblems } from '../cost/billing-rules.mjs';
 import { jobClassesCmd } from './job-classes-cli.mjs';
+
+const PI_RELAY_EXTENSION = path.join(PKG_ROOT, 'lib', 'glass', 'pi-relay-extension.mjs');
 
 const out = (line = '') => process.stdout.write(`${line}\n`);
 const err = (line) => process.stderr.write(`${line}\n`);
@@ -161,13 +163,14 @@ async function runMeasured(agent, argv) {
     if (code !== null) return code;
   }
 
-  // opencode providers on plain HTTP never reach HTTPS_PROXY: the daemon relays them.
-  // A provider already on this daemon (a nested glass run) is left as it is.
+  // opencode and pi providers on plain HTTP never reach HTTPS_PROXY: the daemon relays
+  // them. A provider already on this daemon (a nested glass run) is left as it is.
   // github-copilot is relayed too, to its Copilot API host: opencode then sends its own
   // login to the daemon by configuration, and its calls need no interception — so
   // that relay stays on under --no-intercept.
-  const relays = agent === 'opencode' && intercept
-    ? Object.fromEntries(Object.entries(opencodeHttpProviders(baseEnv)).filter(([, url]) => !url.startsWith(`http://127.0.0.1:${port}/relay/`)))
+  const plainHttp = agent === 'opencode' ? opencodeHttpProviders(baseEnv) : agent === 'pi' ? piHttpProviders(baseEnv) : {};
+  const relays = intercept
+    ? Object.fromEntries(Object.entries(plainHttp).filter(([, url]) => !url.startsWith(`http://127.0.0.1:${port}/relay/`)))
     : {};
   const copilot = agent === 'opencode' && !relays['github-copilot'] ? opencodeCopilotUpstream(baseEnv) : null;
   if (copilot) relays['github-copilot'] = copilot;
@@ -199,6 +202,8 @@ async function runMeasured(agent, argv) {
     const hint = watchHint(agent);
     if (hint) err(hint);
   }
+  // pi takes its relays from glass's extension, for this run (wiring.mjs GLASS_PI_RELAYS).
+  if (env.GLASS_PI_RELAYS) agentArgs = ['-e', PI_RELAY_EXTENSION, ...agentArgs];
   const code = await runAgent(bin, agentArgs, env);
   restore();
   if (settings) fs.rmSync(settings, { force: true });

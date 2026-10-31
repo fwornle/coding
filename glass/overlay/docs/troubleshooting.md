@@ -16,7 +16,7 @@ Start with `glass doctor`; most problems show up there.
     | Calls fail on VPN although `P:` and `K:` look fine, or work at home only | The daemon uses the proxy settings of the newest `glass <agent>` shell (`glass report net` shows its egress). Start the agent from a shell that has the proxy settings of the network you are on |
     | In WSL: `npm install` fails with `ENOENT … \\wsl.localhost\…`, `glass doctor` says `(win32)` or an old version, or an agent stops with `exec: node: not found` | The shell is running Windows' `npm`, `glass` and agents, which WSL puts on its `PATH`. Install Node inside WSL (e.g. nvm) and open a new shell, so that `which node npm` shows Linux paths; then install glass and the agents inside WSL. To keep Windows programs from shadowing them, set `[interop]` `appendWindowsPath=false` in `/etc/wsl.conf` and run `wsl --shutdown` |
     | In WSL a status-line click opens no browser (glass ≥ 0.1.32 says so on the status line) | glass tries `$BROWSER`, then `wslview` (package `wslu`), then Windows' `cmd.exe`. Set `BROWSER` to your Windows browser, e.g. `export BROWSER="/mnt/c/Program Files/Google/Chrome/Application/chrome.exe"`, or `sudo apt install wslu` |
-    | `glass doctor` warns about another local proxy | Start glass from a plain terminal; for pi add `--model <provider>/<model>` with one of pi's own providers (opencode is relayed and measured) — see *glass next to another local LLM proxy* |
+    | `glass doctor` warns that claude's base URL is another local proxy | Start glass from a terminal that tool's launcher did not set up — see *glass next to another local LLM proxy* |
 
 === "📚 Deep Dive (full)"
 

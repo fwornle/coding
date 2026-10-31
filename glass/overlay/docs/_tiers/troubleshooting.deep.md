@@ -57,19 +57,14 @@ the other tool's launcher did not set up.
 **opencode or pi default to the other proxy.** coding, for example, sets `rapid-proxy/…`
 in `~/.config/opencode/opencode.json` and `rapid-proxy-pi` in `~/.pi/agent/settings.json`,
 both plain HTTP on `localhost:12435`. Plain-HTTP traffic never passes `HTTPS_PROXY`, so
-glass treats the two agents differently:
+for the run glass points every provider with a plain-HTTP base URL at the daemon:
+opencode through `OPENCODE_CONFIG_CONTENT`, pi through a small extension of glass's
+(`pi -e`). Neither config file is changed. The daemon records each call and forwards it
+to the original URL with the glass session's `x-task-id`, `x-agent` and `x-project`.
 
-- **opencode is measured anyway.** For the run, `glass opencode` points every provider
-  with a plain-HTTP base URL at the daemon (through `OPENCODE_CONFIG_CONTENT`, your
-  config file is not changed). The daemon forwards each call to the original URL and
-  records it. If that URL is another tool's proxy, it records the call too: both counts
-  are right, but do not add them up.
-- **pi is not measured** while its default provider is plain HTTP. Pick one of pi's own
-  providers for the run:
-
-```sh
-glass pi --model github-copilot/claude-haiku-5.5
-```
+The other proxy records the call too, under glass's session id. Where that proxy is
+coding's, glass's usage views read its figures as well and drop its copy of any glass
+session, so each call counts once.
 
 On a machine without such a proxy, the agents' defaults are their own providers and
 `glass opencode` / `glass pi` measure them without any option.

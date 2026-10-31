@@ -282,6 +282,9 @@ test('opencode relay: a plain-HTTP provider is forwarded to its own URL and meas
   assert.match(await chat.text(), /\[DONE\]/);
   assert.equal(upSeen.at(-1).url, '/v1/chat/completions', 'the provider\'s own path, then the request\'s');
   assert.equal(upSeen.at(-1).headers.authorization, 'Bearer placeholder', 'the agent\'s credential is forwarded');
+  // A proxy on loopback learns the session, so its copy of the call is filed under it.
+  assert.equal(upSeen.at(-1).headers['x-task-id'], s.taskId);
+  assert.equal(upSeen.at(-1).headers['x-agent'], 'opencode');
   const msg = await relay('rapid-proxy', '/messages', { model: 'claude-sonnet-5', max_tokens: 8, messages: msgs });
   assert.equal(msg.status, 200);
   assert.equal(upSeen.at(-1).url, '/v1/messages');
@@ -292,6 +295,22 @@ test('opencode relay: a plain-HTTP provider is forwarded to its own URL and meas
   assert.equal((await relay('rapid-proxy', '/chat/completions', {}, 'not-a-session')).status, 404);
   assert.equal((await relay('bad', '/chat/completions', {})).status, 404, 'https providers are intercepted, never relayed');
   assert.equal((await api('GET', '/sessions')).body.sessions.find((x) => x.taskId === s.taskId).relays, undefined);
+});
+
+test('pi relay: a plain-HTTP provider is measured as pi and named with the session upstream', async () => {
+  const s = await open('pi', { relays: { 'rapid-proxy-pi': `http://127.0.0.1:${upPort}/v1` } });
+  const r = await fetch(`${daemon.url}/relay/${encodeURIComponent(s.token)}/rapid-proxy-pi/chat/completions`, {
+    method: 'POST', headers: { 'content-type': 'application/json', authorization: 'Bearer placeholder', 'x-project': 'from-models-json' },
+    body: JSON.stringify({ model: 'claude-sonnet-5', stream: true, messages: msgs }),
+  });
+  assert.match(await r.text(), /\[DONE\]/);
+  assert.equal(upSeen.at(-1).headers['x-task-id'], s.taskId);
+  assert.equal(upSeen.at(-1).headers['x-agent'], 'pi');
+  await settle();
+  const rows = await rowsFor(s.taskId);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].agent, 'pi');
+  assert.equal(rows[0].provider, 'rapid-proxy-pi');
 });
 
 test('opencode relay for github-copilot: HTTPS to a Copilot API host only, the agent\'s own login forwarded, measured as github-copilot', async () => {
@@ -774,7 +793,22 @@ test('wiring: opencode relays plain-HTTP providers through OPENCODE_CONFIG_CONTE
   assert.equal(JSON.parse(env.OPENCODE_CONFIG_CONTENT).provider.local.options.baseURL, 'http://127.0.0.1:12445/relay/tok/local');
   assert.match(note, /relaying local/);
   assert.equal(sessionEnv('opencode', {}, { port: 12445, taskId: 'T', token: 'tok', caPath: ca, project: 'p' }).env.OPENCODE_CONFIG_CONTENT, undefined);
-  assert.equal(sessionEnv('pi', {}, { port: 12445, taskId: 'T', token: 'tok', caPath: ca, project: 'p', relays: { local: 'http://x' } }).env.OPENCODE_CONFIG_CONTENT, undefined);
+  const pi = sessionEnv('pi', {}, { port: 12445, taskId: 'T', token: 'tok', caPath: ca, project: 'p', relays: { local: 'http://x' } });
+  assert.equal(pi.env.OPENCODE_CONFIG_CONTENT, undefined);
+  assert.deepEqual(JSON.parse(pi.env.GLASS_PI_RELAYS), { local: 'http://127.0.0.1:12445/relay/tok/local' }, 'pi\'s relays reach its extension');
+  assert.match(pi.note, /relaying local/);
+  assert.equal(sessionEnv('pi', {}, { port: 12445, taskId: 'T', token: 'tok', caPath: ca, project: 'p' }).env.GLASS_PI_RELAYS, undefined);
+});
+
+test('pi extension: each relay becomes the provider\'s base URL for the run; nothing outside glass pi', async () => {
+  const { default: glassPiRelays } = await import('../lib/glass/pi-relay-extension.mjs');
+  const seen = [];
+  const pi = { registerProvider: (id, cfg) => seen.push([id, cfg]) };
+  glassPiRelays(pi, { GLASS_PI_RELAYS: JSON.stringify({ 'rapid-proxy-pi': 'http://127.0.0.1:12445/relay/tok/rapid-proxy-pi' }) });
+  assert.deepEqual(seen, [['rapid-proxy-pi', { baseUrl: 'http://127.0.0.1:12445/relay/tok/rapid-proxy-pi' }]]);
+  glassPiRelays(pi, {});
+  glassPiRelays(pi, { GLASS_PI_RELAYS: 'not json' });
+  assert.equal(seen.length, 1);
 });
 
 test('wiring: claude keeps the user\'s keys and gateway; intercepted agents get the proxy + CA', () => {

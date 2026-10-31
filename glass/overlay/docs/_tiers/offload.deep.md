@@ -26,7 +26,7 @@ paid provider takes one.
 | Agent | How its calls reach glass | Offloaded |
 |---|---|---|
 | opencode | by its configuration (the relay) | yes |
-| pi | intercepted (HTTPS_PROXY) | yes — glass answers in place of the provider |
+| pi | intercepted (HTTPS_PROXY); plain-HTTP providers by the relay | yes — glass answers in place of the provider |
 | Copilot CLI | intercepted (HTTPS_PROXY) | yes — glass answers in place of the provider |
 | Claude Code | `ANTHROPIC_BASE_URL` | no — it speaks the Anthropic wire, which the endpoint does not |
 

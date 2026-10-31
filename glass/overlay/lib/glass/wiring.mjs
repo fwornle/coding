@@ -15,6 +15,10 @@
 //             to the original URL. github-copilot is relayed the same way, to its
 //             Copilot API host: opencode sends its own login there by configuration,
 //             no interception. opencode merges it over its own config.
+//   pi        also: its plain-HTTP providers are relayed the same way. pi has no
+//             config override in the environment, so GLASS_PI_RELAYS names each
+//             relay URL and glass's pi extension (pi-relay-extension.mjs, loaded
+//             with `pi -e`) points the provider at it for the run.
 //
 // --no-intercept leaves copilot / opencode / pi unwired: unmeasured by the proxy —
 // except opencode's github-copilot relay, which needs no interception.
@@ -55,7 +59,7 @@ export function withHeaders(existing, headers) {
  * @param {string} s.project
  * @param {boolean} [s.intercept=true]
  * @param {string} [s.bundleDir] where a combined CA bundle may be written
- * @param {Record<string, string>} [s.relays]  opencode: provider id → plain-HTTP base URL
+ * @param {Record<string, string>} [s.relays]  opencode, pi: provider id → plain-HTTP base URL
  * @returns {{ env: Record<string, string>, wired: boolean, note: string }}
  */
 export function sessionEnv(agent, baseEnv, { port, taskId, token, caPath, project, intercept = true, bundleDir, relays = {} }) {
@@ -94,9 +98,15 @@ export function sessionEnv(agent, baseEnv, { port, taskId, token, caPath, projec
   } else {
     env.NODE_EXTRA_CA_CERTS = caPath;
   }
-  const relayed = agent === 'opencode' ? Object.keys(relays) : [];
-  if (relayed.length) env.OPENCODE_CONFIG_CONTENT = opencodeRelayContent(baseEnv.OPENCODE_CONFIG_CONTENT, relayed, { port, token });
+  const relayed = agent === 'opencode' || agent === 'pi' ? Object.keys(relays) : [];
+  if (relayed.length && agent === 'opencode') env.OPENCODE_CONFIG_CONTENT = opencodeRelayContent(baseEnv.OPENCODE_CONFIG_CONTENT, relayed, { port, token });
+  if (relayed.length && agent === 'pi') env.GLASS_PI_RELAYS = JSON.stringify(Object.fromEntries(relayed.map((id) => [id, relayUrl(port, token, id)])));
   return { env, wired: true, note: `${agent} → glass (intercepting model hosts${relayed.length ? `; relaying ${relayed.join(', ')}` : ''})` };
+}
+
+/** The daemon's relay for one provider of a session. */
+function relayUrl(port, token, id) {
+  return `http://127.0.0.1:${port}/relay/${encodeURIComponent(token)}/${encodeURIComponent(id)}`;
 }
 
 /** OPENCODE_CONFIG_CONTENT with each relayed provider's baseURL on the daemon, the rest kept. */
@@ -106,8 +116,7 @@ export function opencodeRelayContent(existing, providerIds, { port, token }) {
   if (!cfg || typeof cfg !== 'object' || Array.isArray(cfg)) cfg = {};
   const provider = { ...cfg.provider };
   for (const id of providerIds) {
-    const baseURL = `http://127.0.0.1:${port}/relay/${encodeURIComponent(token)}/${encodeURIComponent(id)}`;
-    provider[id] = { ...provider[id], options: { ...provider[id]?.options, baseURL } };
+    provider[id] = { ...provider[id], options: { ...provider[id]?.options, baseURL: relayUrl(port, token, id) } };
   }
   return JSON.stringify({ ...cfg, provider });
 }

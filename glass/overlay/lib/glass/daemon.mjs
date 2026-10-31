@@ -431,6 +431,13 @@ export async function startDaemon({
     req.url = `${relay.path}${m[3]}` || '/';
     const upstreamBase = relay.origin;
     const via = relay.loopback ? direct : egress;
+    // Another local proxy (coding's, on 12435) records the call too. Named with this
+    // session, its copy is filed under glass's task id, which the combined usage
+    // view drops (combined.mjs) — so the call counts once. A model server ignores them.
+    if (relay.loopback) {
+      Object.assign(req.headers, { 'x-task-id': s.taskId, 'x-agent': s.agent });
+      if (s.project) req.headers['x-project'] = s.project;
+    }
     const pathOnly = req.url.split('?')[0];
     if (req.method === 'POST' && pathOnly.endsWith('/messages')) {
       return handleAnthropicMessages(req, res, {
