@@ -97,6 +97,8 @@ select:
       # job classes, opt-in (lib/glass/job-classes.mjs): the tagger and its read side
       - proxy-bridge/job-class.mjs
       - proxy-bridge/job-class-api.mjs
+      # turns kept for replay (inert until a config names classes to keep)
+      - proxy-bridge/turn-record.mjs
 
 # TypeScript compiled with the proxy's own tsc and compilerOptions (no maps, no
 # declarations). The proxy's dist/ is never copied — it can be stale.
