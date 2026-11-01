@@ -33,7 +33,7 @@ The **Flow** card on the Models tab draws the same rows as the table, in three c
 
 | Column | Node | Number on the node |
 |---|---|---|
-| **Agents** — who asked | one per agent; **no session** = calls glass measured but could not tie to a session (see below); with coding installed, each of coding's background jobs under its process name (see below) | tokens, calls |
+| **Agents** — who asked | one per agent; **no session** (grey, listed last) = calls glass measured but could not tie to a session — not an agent (see below); with coding installed, each of coding's background jobs under its process name (see below) | tokens, calls |
 | **Models** — what the agent chose | one per model, split into loop and side calls | — |
 | **Accounts** — who answered | one per account, with the hosts its calls went to | tokens |
 
@@ -44,6 +44,11 @@ The **Flow** card on the Models tab draws the same rows as the table, in three c
   the per-agent split is in the table.
 - Accounts are merged by who answered, not by spelling: `github-copilot` and `gh-copilot`
   rows are one Copilot node.
+- One machine is one account node. Your [offload](offload.md) endpoint's node also takes
+  the calls another router sent to the same host under its own name — coding's proxy
+  offloads to the same cluster as `qwen-local` — and every call under that name, even from
+  before the host's address changed. Its subtitle then counts calls by sender
+  (`1952 by qwen-local · 1 by glass`); the switch moves glass's own calls only.
 
 coding's dashboard has a flow with the same left and right columns and a decision column in
 the middle — the router choosing an account per call. glass has no router, so the middle

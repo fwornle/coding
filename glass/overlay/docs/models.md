@@ -27,7 +27,7 @@ agent's own loop rather than side requests.
     chose, to the account that answered. Edge thickness is tokens; dashed edges are side
     calls. Hover a node to isolate its paths.
 
-    ![Models flow over 7 days: claude, pi, copilot, opencode and coding's background services, to models grouped by vendor (Anthropic opened, OpenAI folded), to the Claude subscription and GitHub Copilot; the offload endpoint dashed, with no calls in the window](images/ui-models-flow.png)
+    ![Models flow over 30 days: claude, opencode, copilot, vscode, pi and coding's background services, to models grouped by vendor (Anthropic and OpenAI folded, one open-weight Qwen model), to the Claude subscription, GitHub Copilot and the offload endpoint local in green, whose node counts 1952 calls by coding's qwen-local and 1 by glass](images/ui-models-flow.png)
 
     By default there is no decision in the middle: every edge is a choice the agent made,
     and glass forwarded the call to the host the agent addressed. With

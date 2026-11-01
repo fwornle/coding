@@ -289,17 +289,17 @@ Every call from **the agent, to the model it chose, to the account that answered
 the last day, week, month or all time. Thicker edges carried more tokens.
 
 Solid edges are the agent's own loop. **Dashed** edges are side calls it makes on its
-own, such as a session title or a summary, often on a smaller model. The table below the
-flow has the numbers.
+own, such as a session title or a summary, often on a smaller model. Calls your offload
+endpoint answered are **green**. The table below the flow has the numbers.
 
 For one session, select its row in **Sessions**: the same view, call by call.
 
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Models flow over 7 days: claude, pi, copilot, opencode and coding's background services, to models grouped by vendor (Anthropic opened, OpenAI folded), to the Claude subscription and GitHub Copilot; the offload endpoint dashed, with no calls in the window.](images/ui-models-flow.png)](images/ui-models-flow.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![Models flow over 30 days: claude, opencode, copilot, vscode, pi and coding's background services, to models grouped by vendor (Anthropic and OpenAI folded, one open-weight Qwen model), to the Claude subscription, GitHub Copilot and the offload endpoint local in green, whose node counts 1952 calls by coding's qwen-local and 1 by glass.](images/ui-models-flow.png)](images/ui-models-flow.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
-<figcaption>A week on one machine. No decision in the middle: every model here is one the agent chose; glass measures, it does not route.</figcaption>
+<figcaption>A month on one machine. No decision in the middle: every model here is one the agent chose, or your offload endpoint's (green). One machine is one account node, whoever sent it the calls.</figcaption>
 </figure>
 <p class="overview-takeaway" markdown="1">
 Know which model you are paying for before you switch one.
