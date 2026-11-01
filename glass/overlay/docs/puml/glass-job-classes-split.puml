@@ -1,0 +1,32 @@
+@startuml glass-job-classes-split
+!include _standard-style.puml
+skinparam defaultFontSize 16
+skinparam componentFontSize 16
+skinparam arrowFontSize 14
+skinparam shadowing false
+skinparam componentStyle rectangle
+hide stereotype
+title glass sorts and shows; coding proves and routes
+
+rectangle "Your machine, glass" {
+  component "**Your prompt**\n“Is the benchmark finished?”" as turn <<agent>>
+  component "**1  Label**\nthe student (your Copilot account)\nsays: this is a **status** job" as label <<core>>
+  component "**2  Check the label**\nthe teacher re-labels a share;\nthe gate: 90 % of 20+ checks" as check <<core>>
+  component "**Classes tab**\ntree · map · gate\nwhat your work consists of" as tab <<api>>
+}
+
+file "**Team repo**\nclasses + evidence\nno prompts" as repo <<storage>>
+
+rectangle "A machine running coding" {
+  component "**3  Prove a cheaper model**\nreplay past turns of a class,\na blind judge compares the answers" as prove <<core>>
+  component "**4  Route by class**\nproven classes go to the cheaper\nmodel (pi, opencode, Copilot CLI)" as route <<core>>
+}
+
+turn -[#E53935,thickness=2]down-> label
+label -[#9C27B0,thickness=2]down-> check
+check -[#9C27B0,thickness=2]down-> tab
+repo -[#FF9800,thickness=2]left-> label : classes, joined by URL
+prove -[#FF9800,thickness=2]up-> repo : evidence
+prove -[#9C27B0,thickness=2]down-> route
+
+@enduml

@@ -15,7 +15,7 @@ hide:
 
 <div class="overview-stage" markdown="1">
 
-<section class="overview-slide overview-cover" id="slide-1" aria-labelledby="jc-title" markdown="1">
+<section class="overview-slide overview-cover overview-essential" id="slide-1" aria-labelledby="jc-title" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">What kind of job is this prompt?</p>
@@ -47,7 +47,7 @@ no class has passed its gate or has evidence yet, so nothing is routed cheaper t
 <p class="overview-takeaway">Labels first, evidence second, cheaper routing last.</p>
 </section>
 
-<section class="overview-slide" id="slide-2" aria-labelledby="jc-glance" markdown="1">
+<section class="overview-slide overview-essential" id="slide-2" aria-labelledby="jc-glance" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">At a glance</p>
@@ -78,7 +78,7 @@ prompts in it. One member's proof spares the rest of the team from repeating it.
 <p class="overview-takeaway">The label picks the jobs to try; the evidence picks the model; the team shares both.</p>
 </section>
 
-<section class="overview-slide" id="slide-3" aria-labelledby="jc-plain" markdown="1">
+<section class="overview-slide overview-essential" id="slide-3" aria-labelledby="jc-plain" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">The idea in plain words</p>
@@ -286,7 +286,7 @@ never changed by it.
 <p class="overview-takeaway">Labels arrive seconds after the turn starts; the turn's later calls can use them (step 7).</p>
 </section>
 
-<section class="overview-slide" id="slide-9" aria-labelledby="jc-gate" markdown="1">
+<section class="overview-slide overview-essential" id="slide-9" aria-labelledby="jc-gate" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Step 3, continued · built</p>
@@ -391,7 +391,7 @@ version, and **Classes** has a picker for which one to read.
 <p class="overview-takeaway">One maintainer writes the taxonomy; every member can propose.</p>
 </section>
 
-<section class="overview-slide" id="slide-13" aria-labelledby="jc-trial" markdown="1">
+<section class="overview-slide overview-essential" id="slide-13" aria-labelledby="jc-trial" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Step 6 · built</p>
@@ -425,7 +425,7 @@ blind, in both orders. A class passes for that agent and model after at least
 <p class="overview-takeaway">No model gets cheaper without evidence from your own past turns.</p>
 </section>
 
-<section class="overview-slide" id="slide-14" aria-labelledby="jc-route" markdown="1">
+<section class="overview-slide overview-essential" id="slide-14" aria-labelledby="jc-route" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Step 7 · built</p>
@@ -502,42 +502,6 @@ The Classes tab, the gate and the coverage map are the same as here.
 <figcaption>glass → Token Usage → Classes: off until the user switches it on.</figcaption>
 </figure>
 <p class="overview-takeaway">One taxonomy, one gate, whether a colleague runs coding or only glass.</p>
-</section>
-
-<section class="overview-slide" id="slide-16" aria-labelledby="jc-status" markdown="1">
-<div class="overview-copy" markdown="1">
-
-<p class="overview-kicker">Where it stands</p>
-
-## What runs today, what it waits for {#jc-status}
-
-Every step runs. Labelling runs on every human turn, and the gate is
-collecting. Kept `status` and `explain` turns are recorded for replay, so the
-evidence can build up while the gate does. The class floor is on, and routes
-nothing until a class has both.
-
-See it yourself:
-
-- **Token Usage → Classes** on the dashboard (`localhost:3032/token-usage`): the gate, the tree and the map.
-- `curl -s localhost:12435/api/job-classes`: is the proxy labelling, what did it skip, and what did the floor route?
-
-</div>
-<figure class="overview-figure" markdown="1">
-
-| Step | | |
-|---|---|---|
-| Measure | ✅ | taxonomy version 2: the student agrees 86 % |
-| Label live, in shadow | ✅ | every human turn; automated runs skipped |
-| The gate | ⏳ | collecting: 90 % over 20 checked turns |
-| Share with a team | ✅ | `init` / `join`, pulled on sync |
-| Grow the taxonomy | ✅ | `propose` / `fold`, stability check |
-| Replay per class | ✅ | any agent, sandboxed, judged blind; evidence to the team repo |
-| Route by class | ✅ | the class floor: pi, opencode, Copilot CLI; waits for a gate and evidence |
-| glass, without coding | ✅ | opt-in, your Copilot account; measure from transcripts; no replay yet |
-
-<figcaption>The plan: .planning/shared-job-classes.md</figcaption>
-</figure>
-<p class="overview-takeaway">Built end to end; what remains is evidence, gathered from your own turns.</p>
 </section>
 
 </div>

@@ -6,6 +6,8 @@ labelled in the background with your own Copilot account. Opt-in, off by default
 !!! tip "First time?"
     [Tutorial: Job Classes](tutorial-job-classes.md) walks through it step by step, with a
     screenshot of each step: switch it on, measure, read the tree, join your team.
+    The [overview deck](job-classes-overview.md) shows the whole idea on six slides, and
+    how glass and coding share the work.
 
 === "⚡ Quick (~3 min)"
 

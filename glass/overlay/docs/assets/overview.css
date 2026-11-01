@@ -331,6 +331,11 @@
     break-inside: avoid;
   }
 
+  /* Essentials mode prints the essential slides only. */
+  .overview-deck .overview-slide[data-skipped] {
+    display: none !important;
+  }
+
   .overview-figure img {
     max-height: none;
   }

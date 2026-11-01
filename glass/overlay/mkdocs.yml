@@ -112,6 +112,9 @@ extra:
     - title: Connectivity — every path, and how it recovers
       link: connectivity/
       icon: material/lan-connect
+    - title: Job classes — what kind of job each prompt is
+      link: job-classes-overview/
+      icon: material/shape-outline
   social:
     - icon: fontawesome/brands/github
       link: https://bmw.ghe.com/AIMAAD/glass
