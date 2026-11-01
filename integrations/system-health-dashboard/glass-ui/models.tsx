@@ -6,7 +6,7 @@ import { normalizeModel } from '@/components/performance/models'
 import { accountLabel } from '@/lib/providers'
 import { cn } from '@/lib/utils'
 import { ModelFlow } from './flow'
-import { OFFLOAD_AGENTS, offloadStatus, targetProviderId, useOffload, useTargetLabel } from './offload'
+import { OFFLOAD_AGENTS, offloadStatus, targetAliases, targetProviderId, useOffload, useTargetLabel } from './offload'
 
 const POLL_MS = 10_000
 
@@ -62,9 +62,13 @@ const answeredBy = (provider: string) =>
   (CLAUDE_SUBSCRIPTION.has(provider) ? 'Claude subscription' : accountLabel(provider))
 
 // A call the daemon measured but could not tie to a glass session has no agent.
-/** answeredBy, plus the offload endpoint's own name for the rows it answered. */
-function useAnsweredBy() {
-  const target = useTargetLabel()
+/**
+ * answeredBy, plus the offload endpoint's own name for the rows it answered —
+ * `aliases` (targetAliases) extends that to every row of a router id that
+ * reached the endpoint.
+ */
+function useAnsweredBy(aliases?: Set<string>) {
+  const target = useTargetLabel(aliases)
   return useCallback((provider: string, upstream?: string) => target(provider, upstream) ?? answeredBy(provider), [target])
 }
 const agentLabel = (agent: string) => (!agent || agent === 'unknown' ? 'no session' : agent)
@@ -254,7 +258,6 @@ const WINDOWS: Array<{ hours: number; label: string }> = [
  * card under Sessions (SessionModels).
  */
 export function ModelsPage() {
-  const answered = useAnsweredBy()
   const off = useOffload()
   const cfg = off.view?.config
   const [hours, setHours] = useState(24)
@@ -274,6 +277,8 @@ export function ModelsPage() {
   }, [hours])
 
   const rows = useMemo(() => (groups ?? []).map(byJob), [groups])
+  const aliases = useMemo(() => targetAliases(rows, cfg?.target.url || ''), [rows, cfg?.target.url])
+  const answered = useAnsweredBy(aliases)
   const calls = rows.reduce((n, g) => n + g.calls, 0)
   const models = new Set(rows.map((g) => g.model)).size
   const allTokens = rows.reduce((n, g) => n + tokensOf(g), 0)

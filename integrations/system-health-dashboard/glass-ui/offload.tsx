@@ -53,6 +53,17 @@ export function hostOf(url: string): string {
   try { return new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : `http://${url}`).host } catch { return '' }
 }
 
+/**
+ * Provider ids that reached the endpoint's host in these rows. A router's id
+ * names one endpoint even after the host moved — coding's proxy sent
+ * `qwen-local` to the same cluster at two earlier addresses — so every row
+ * under such an id is the endpoint's, not only those addressed to today's host.
+ */
+export function targetAliases(rows: { provider: string; upstream?: string }[], url: string): Set<string> {
+  const host = url ? hostOf(url) : ''
+  return new Set(host ? rows.filter((r) => r.upstream === host).map((r) => r.provider) : [])
+}
+
 const write = async (method: string, route: string, body: unknown): Promise<OffloadView> => {
   // A daemon that stopped answers nothing: say that, not the browser's "Failed to fetch".
   const r = await fetch(route, {
@@ -130,10 +141,13 @@ export function OffloadProvider({ children }: { children: ReactNode }) {
 }
 
 /** The endpoint's display name for a row it answered, else null. */
-export function useTargetLabel(): (provider: string, upstream?: string) => string | null {
+export function useTargetLabel(aliases?: Set<string>): (provider: string, upstream?: string) => string | null {
   const { view, isTarget } = useOffload()
   const name = view?.config.target.name || ''
-  return useCallback((provider: string, upstream?: string) => (isTarget(provider, upstream) ? name : null), [isTarget, name])
+  return useCallback(
+    (provider: string, upstream?: string) => (isTarget(provider, upstream) || aliases?.has(provider) ? name : null),
+    [isTarget, name, aliases],
+  )
 }
 
 /** Header: where the switch is, visible on every tab. */
