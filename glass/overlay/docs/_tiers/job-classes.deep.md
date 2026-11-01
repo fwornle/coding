@@ -60,6 +60,42 @@ last one stopped.
 | `glass job-classes join <git URL>` | use a team's taxonomy (its learning repo's `job-classes/`) |
 | `glass job-classes pull` / `leave` | update the team's taxonomy / go back to the shipped default |
 
+## For a team's maintainer
+
+A team's classes live in one member's **learning repo**, the git repo coding keeps a
+member's shared learning in, under `job-classes/`. Someone who runs coding sets it up once:
+
+1. Declare the team and its repos in `~/.coding/teams.yaml`, or in coding's dashboard (**Teams**).
+2. `coding job-classes init --team <id>` writes `job-classes/taxonomy.yaml` and its
+   `CHANGELOG.md` into that learning repo; `coding sync --push` publishes it.
+3. Give the repo's git URL to everyone who runs glass. They need read access to it, nothing
+   more; `glass job-classes join <url>` clones only `job-classes/`.
+4. To grow the classes: members who run coding propose (`coding job-classes propose --team <id>`),
+   and the maintainer folds the proposals into a new version (`coding job-classes fold --team <id>`,
+   `--dry-run` first) and pushes it. glass users get it with `glass job-classes pull` or
+   **Update**.
+
+The repo never holds prompts: only the classes, their changelog, proposals (classes the
+teacher drafted, with examples it wrote itself) and, from replays, evidence files with
+counts and model names.
+
+## Why glass does not route by class
+
+coding's proxy can send the rest of a turn to a cheaper model once that turn's class has
+earned it (the **class floor**). Three things together count as earned: the class has passed
+its gate; a replay has shown that the cheaper model answers this class as well, recorded in
+the team repo as `job-classes/evidence/<class>.json`; and the same provider serves the
+cheaper model in a lower band. glass doesn't apply the floor:
+
+- glass sends every call to the model the agent chose. It changes a call only when you
+  switch [offload](offload.md) on, and then only to send easy calls to your own endpoint.
+- Replays run each past turn in a sandbox, in the agent that ran it, on the current model
+  and on the cheaper one. They need coding's recordings of those turns, so the evidence is
+  always produced on a coding machine.
+
+A glass user who joined the team repo gets its `evidence/` folder along with the classes,
+but nothing in glass reads it.
+
 ## Files
 
 | Path | Content |

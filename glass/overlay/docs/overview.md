@@ -344,7 +344,67 @@ Off, glass is exactly what the previous slides show.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-11" aria-labelledby="overview-compare" markdown="1">
+<section class="overview-slide" id="slide-11" aria-labelledby="overview-classes" markdown="1">
+<div class="overview-copy" markdown="1">
+
+<p class="overview-kicker">Opt-in, off by default / What kind of work was it?</p>
+
+## Sort your prompts into kinds of job {#overview-classes}
+
+Some of what you ask an agent is hard: find out why something broke. Much of it is
+routine: commit and push, is it finished, rerun the tests. One strong model answers all of it.
+
+Switch on **Token Usage → Classes** and glass labels every turn: fix, build, ship, status,
+explain, and so on. A cheap **student** model of **your own Copilot account** labels each
+turn, and a strong **teacher** re-checks a share of them. Prompts are redacted first.
+
+`glass job-classes measure` labels your past prompts as well, so the tree fills in at once.
+
+A team shares its own classes from a git repo: `glass job-classes join <url>`.
+
+</div>
+<figure class="overview-figure" markdown="1">
+
+[![The taxonomy tree of 18 example prompts: Programming 28 %, Operating 44 %, Communicating 28 %, each with its classes.](images/ui-job-classes-tree.png)](images/ui-job-classes-tree.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+
+<figcaption>18 made-up prompts, each labelled twice by the teacher. A label changes nothing about the turn.</figcaption>
+</figure>
+<p class="overview-takeaway" markdown="1">
+Know which jobs are routine before you try a cheaper model on them.
+[Tutorial: Job Classes](tutorial-job-classes.md)
+</p>
+</section>
+
+<section class="overview-slide" id="slide-12" aria-labelledby="overview-trials" markdown="1">
+<div class="overview-copy" markdown="1">
+
+<p class="overview-kicker">Where coding runs too / Can a cheaper model do it?</p>
+
+## Evidence before a cheaper model {#overview-trials}
+
+A **trial** runs a cheaper model beside the current one on a share of a background job's
+real calls. A strong judge compares each pair of answers blind: details kept, nothing invented.
+
+| | glass | coding |
+|---|---|---|
+| Label, measure, join a team | ✅ | ✅ |
+| Trials (**Token Usage → Trials**) | read, where coding runs too | start, accept |
+| Route a proven kind of job | — | ✅ |
+
+</div>
+<figure class="overview-figure" markdown="1">
+
+[![A trial of claude-haiku-5.5 against claude-sonnet-5 on one background job: 16 of 20 pairs judged, at least as good in 56 %, details kept 87 %, so it fails.](images/ui-trials.png)](images/ui-trials.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+
+<figcaption>A real trial that failed: the cheaper answer was at least as good in only 56 % of pairs. Nothing switched.</figcaption>
+</figure>
+<p class="overview-takeaway" markdown="1">
+No model gets cheaper without evidence from your own calls.
+[Job Classes → glass and coding](job-classes.md#glass-and-coding)
+</p>
+</section>
+
+<section class="overview-slide" id="slide-13" aria-labelledby="overview-compare" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Question 4 / Which setup fits my task?</p>
@@ -378,7 +438,7 @@ Try it on your next real task: `glass <agent>`, then `glass ui`.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-12" aria-labelledby="overview-built" markdown="1">
+<section class="overview-slide" id="slide-14" aria-labelledby="overview-built" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Behind the scenes / How glass is made</p>
