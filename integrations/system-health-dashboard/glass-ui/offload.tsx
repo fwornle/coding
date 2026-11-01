@@ -48,6 +48,11 @@ export function targetProviderId(name: string): string {
   return id || 'local'
 }
 
+/** host[:port] of an endpoint URL — the form rows record as `upstream`. */
+export function hostOf(url: string): string {
+  try { return new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(url) ? url : `http://${url}`).host } catch { return '' }
+}
+
 const write = async (method: string, route: string, body: unknown): Promise<OffloadView> => {
   // A daemon that stopped answers nothing: say that, not the browser's "Failed to fetch".
   const r = await fetch(route, {
@@ -63,8 +68,12 @@ interface Ctx {
   error: string
   openSettings: () => void
   patch: (p: Partial<OffloadConfig> | Record<string, unknown>) => Promise<void>
-  /** Is this row provider the endpoint? */
-  isTarget: (provider: string) => boolean
+  /**
+   * Did the endpoint answer this row? Its own provider id, or any row that reached
+   * the endpoint's host: another router (coding's proxy names it `qwen-local`)
+   * may send to the same machine under its own name.
+   */
+  isTarget: (provider: string, upstream?: string) => boolean
 }
 
 const OffloadContext = createContext<Ctx>({
@@ -105,7 +114,11 @@ export function OffloadProvider({ children }: { children: ReactNode }) {
     error,
     openSettings: () => setOpen(true),
     patch,
-    isTarget: (provider: string) => Boolean(view?.config.target.url) && provider === targetProviderId(view?.config.target.name || ''),
+    isTarget: (provider: string, upstream?: string) => {
+      const url = view?.config.target.url
+      if (!url) return false
+      return provider === targetProviderId(view?.config.target.name || '') || Boolean(upstream && upstream === hostOf(url))
+    },
   }), [view, error, patch])
 
   return (
@@ -116,11 +129,11 @@ export function OffloadProvider({ children }: { children: ReactNode }) {
   )
 }
 
-/** The endpoint's display name for its rows' provider id, else null. */
-export function useTargetLabel(): (provider: string) => string | null {
+/** The endpoint's display name for a row it answered, else null. */
+export function useTargetLabel(): (provider: string, upstream?: string) => string | null {
   const { view, isTarget } = useOffload()
   const name = view?.config.target.name || ''
-  return useCallback((provider: string) => (isTarget(provider) ? name : null), [isTarget, name])
+  return useCallback((provider: string, upstream?: string) => (isTarget(provider, upstream) ? name : null), [isTarget, name])
 }
 
 /** Header: where the switch is, visible on every tab. */

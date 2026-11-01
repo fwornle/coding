@@ -50,6 +50,8 @@ export interface FlowOffload {
   label: string
   /** false: no endpoint URL yet — the node is a placeholder that opens the settings. */
   configured: boolean
+  /** The provider id glass's own offload stamps on its rows; any other provider on the node was sent by another router. */
+  providerId: string
   enabled: boolean
   status: { label: string; tone: 'off' | 'ok' | 'warn' }
   agentsOn: string[]
@@ -62,7 +64,7 @@ interface Props {
   groups: FlowGroup[]
   offload?: FlowOffload
   /** The account's display name — the Models table's "Answered by". */
-  answeredBy: (provider: string) => string
+  answeredBy: (provider: string, upstream?: string) => string
   /** The agent's display name — the Models table's "Agent". */
   agentLabel: (agent: string) => string
 }
@@ -137,6 +139,10 @@ const clip = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1
 
 interface Node {
   id: string; label: string; sub: string; tokens: number; color: string; ghost?: boolean
+  /** the hosts that answered (accounts column only), for the tooltip when `sub` says something else */
+  hosts?: string
+  /** the endpoint's node only: `sub` splits its calls by sender (glass, another router) */
+  split?: boolean
   /** which kind of caller (agents column only) */
   kind?: 'fg' | 'bg'
   /** a faint card wash: the caller's kind, or the model's vendor */
@@ -174,6 +180,9 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
     const modelCalls = new Map<string, { main: number; side: number }>()
     const acctTok = new Map<string, number>()
     const acctHosts = new Map<string, Set<string>>()
+    // Calls per provider id on each account node: the endpoint's node can carry
+    // glass's own offload and another router's calls to the same machine.
+    const acctSenders = new Map<string, Map<string, number>>()
     // The account that carried most of an agent's tokens colours its node, as an
     // account colours a caller in the dashboard's flow.
     const agentAcct = new Map<string, Map<string, number>>()
@@ -201,7 +210,7 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
       const model = folded(vendor) ? vendorId(vendor) : `m:${modelName}`
       // By the account that answered, not the provider spelling: rows say both
       // `github-copilot` and `gh-copilot` for one Copilot login.
-      const acct = `p:${answeredBy(r.provider) || '—'}`
+      const acct = `p:${answeredBy(r.provider, r.upstream) || '—'}`
       const side = r.call_kind === 'side'
       // The endpoint's calls take coding's "offloaded" colour, not a grey unknown account.
       const color = offload && acct === `p:${offload.label}` ? OFFLOADED : getProviderColor(r.provider)
@@ -213,6 +222,9 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
       modelCalls.set(model, mc)
       addTo(acctTok, acct, t)
       if (r.upstream) acctHosts.set(acct, (acctHosts.get(acct) ?? new Set()).add(r.upstream))
+      const ss = acctSenders.get(acct) ?? new Map<string, number>()
+      addTo(ss, r.provider, r.calls)
+      acctSenders.set(acct, ss)
       const aa = agentAcct.get(agent) ?? new Map<string, number>()
       addTo(aa, r.provider, t)
       agentAcct.set(agent, aa)
@@ -286,13 +298,23 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
       }
     }
     const acctColor = new Map(groups.map((r) => {
-      const id = `p:${answeredBy(r.provider) || '—'}`
+      const id = `p:${answeredBy(r.provider, r.upstream) || '—'}`
       return [id, offload && id === `p:${offload.label}` ? OFFLOADED : getProviderColor(r.provider)]
     }))
+    // The endpoint's node, when another router sent there too, says who sent what:
+    // the switch moves glass's share only.
+    const senders = (id: string) => {
+      const s = acctSenders.get(id)
+      if (!offload || id !== `p:${offload.label}` || !s || [...s.keys()].every((p) => p === offload.providerId)) return ''
+      return [...s.entries()].sort((a, b) => b[1] - a[1])
+        .map(([p, n]) => `${n} by ${p === offload.providerId ? 'glass' : p}`).join(' · ')
+    }
     const accounts: Node[] = byTokens(acctTok).map((id) => ({
       id,
       label: id.slice(2),
-      sub: [...(acctHosts.get(id) ?? [])].join(', ') || 'host not recorded',
+      hosts: [...(acctHosts.get(id) ?? [])].join(', '),
+      split: Boolean(senders(id)),
+      sub: senders(id) || [...(acctHosts.get(id) ?? [])].join(', ') || 'host not recorded',
       tokens: acctTok.get(id) ?? 0,
       color: acctColor.get(id) ?? getProviderColor(''),
       ghost: Boolean(offload && id.slice(2) === offload.label && !offload.enabled),
@@ -362,7 +384,8 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
         style={{ cursor: clickable ? 'pointer' : 'default' }}
         opacity={hover === null || hover === n.id || g.left.concat(g.right).some((e) => touches(e) && (e.from === n.id || e.to === n.id)) ? 1 : 0.4}>
         {isTarget && <title>{offload!.configured
-          ? `${n.label} — offload ${offload!.status.label}. Click to switch or change it.`
+          ? `${n.label}${n.hosts ? ` (${n.hosts})` : ''} — offload ${offload!.status.label}. Click to switch or change it.`
+            + (n.split ? ` Calls: ${n.sub}. The switch moves glass's own calls only; another router sending to the same host decides its own.` : '')
           : 'No offload endpoint set up. Click to add one: easy calls of opencode, pi and copilot can go to a model server of your own.'}</title>}
         {n.fold && <title>{n.fold.title}</title>}
         {!n.fold && n.kind === 'bg' && <title>{`A background service of coding (process ${n.label}): no agent asked.`}</title>}
