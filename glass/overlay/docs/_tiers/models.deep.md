@@ -45,10 +45,10 @@ The **Flow** card on the Models tab draws the same rows as the table, in three c
 - Accounts are merged by who answered, not by spelling: `github-copilot` and `gh-copilot`
   rows are one Copilot node.
 - One machine is one account node. Your [offload](offload.md) endpoint's node also takes
-  the calls another router sent to the same host under its own name — coding's proxy
-  offloads to the same cluster as `qwen-local` — and every call under that name, even from
-  before the host's address changed. Its subtitle then counts calls by sender
-  (`1952 by qwen-local · 1 by glass`); the switch moves glass's own calls only.
+  the calls another router — coding's LLM proxy, say — sent to the same host under its own
+  name, and every call under that name, even from before the host's address changed. Its
+  subtitle then counts calls by sender (`1952 by lab-proxy · 1 by glass`); the switch moves
+  glass's own calls only.
 
 coding's dashboard has a flow with the same left and right columns and a decision column in
 the middle — the router choosing an account per call. glass has no router, so the middle
