@@ -16,10 +16,20 @@ import { normalizeModel } from '@/components/performance/models'
  * where calls go is the worst outcome of a misfire. With none configured, a dashed
  * "Your endpoint — not set up" node stands in its place and opens the settings, so
  * the feature can be found where its traffic would show.
+ *
+ * Callers come in two kinds, each with its own faint card colour: coding agents
+ * (top) and, with coding installed, its background services (bottom, named by
+ * process). There can be dozens of the latter, so they start folded into one
+ * "background services" node; a click on it unfolds them, and on its header
+ * folds them again. A switch above the flow orders the column by class (agents,
+ * then services) or by contribution (tokens, mixed); both choices are remembered
+ * per viewer.
  */
 
 export interface FlowGroup {
   agent: string
+  /** set when the caller is a background service (no agent; the job's process name) */
+  process?: string
   model: string
   provider: string
   upstream: string
@@ -65,6 +75,24 @@ const NODE_H = 36
 const TOP = 56
 
 const OFFLOADED = getOutcomeColor('offloaded', false)
+// Faint card washes: which kind of caller a node is.
+const WASH = { fg: '#0ea5e9', bg: '#a855f7' }
+const WASH_OPACITY = 0.08
+// The folded background services, and their header once unfolded.
+const BG_ID = 'a:\u0000background'
+const BG_OPEN_KEY = 'glass.models.flow.bgOpen'
+// The agents column's order: by class (coding agents, then background services)
+// or by contribution (tokens, the two kinds mixed).
+type Order = 'class' | 'tokens'
+const ORDER_KEY = 'glass.models.flow.order'
+
+// Per-viewer conveniences: a blocked or empty storage reads as the default.
+function readPref(key: string): string | null {
+  try { return localStorage.getItem(key) } catch { return null }
+}
+function writePref(key: string, value: string) {
+  try { localStorage.setItem(key, value) } catch { /* a viewer convenience only */ }
+}
 
 const tokensOf = (r: FlowGroup) => r.input + r.output + r.cache_read + r.cache_write
 
@@ -80,7 +108,13 @@ function fmtTokens(n: number): string {
 // column reads as part of it.
 const clip = (s: string, max: number) => (s.length > max ? `${s.slice(0, max - 1)}…` : s)
 
-interface Node { id: string; label: string; sub: string; tokens: number; color: string; ghost?: boolean }
+interface Node {
+  id: string; label: string; sub: string; tokens: number; color: string; ghost?: boolean
+  /** which kind of caller (agents column only) */
+  kind?: 'fg' | 'bg'
+  /** the fold / unfold node of the background services */
+  fold?: boolean
+}
 interface Edge { from: string; to: string; tokens: number; side: boolean; color: string }
 
 function addTo<K>(m: Map<K, number>, k: K, v: number) { m.set(k, (m.get(k) ?? 0) + v) }
@@ -89,6 +123,10 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
   const [hover, setHover] = useState<string | null>(null)
   const [card, setCard] = useState(false)
   const [toggle, setToggle] = useState<{ busy: boolean; error: string }>({ busy: false, error: '' })
+  const [bgOpen, setBgOpen] = useState(() => readPref(BG_OPEN_KEY) === '1')
+  const flipBg = () => setBgOpen((o) => { writePref(BG_OPEN_KEY, o ? '0' : '1'); return !o })
+  const [order, setOrder] = useState<Order>(() => (readPref(ORDER_KEY) === 'tokens' ? 'tokens' : 'class'))
+  const pickOrder = (o: Order) => { writePref(ORDER_KEY, o); setOrder(o) }
 
   const g = useMemo(() => {
     const agentTok = new Map<string, number>()
@@ -103,9 +141,12 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
     const left = new Map<string, Edge>()
     const right = new Map<string, Edge>()
 
+    const bgIds = new Set<string>()
     for (const r of groups) {
       const t = tokensOf(r)
-      const agent = `a:${agentLabel(r.agent)}`
+      // Folded, every background service is the one BG_ID node.
+      const agent = !r.process ? `a:${agentLabel(r.agent)}` : bgOpen ? `a:${r.process}` : BG_ID
+      if (r.process) bgIds.add(`a:${r.process}`)
       const model = `m:${normalizeModel(r.model) || '—'}`
       // By the account that answered, not the provider spelling: rows say both
       // `github-copilot` and `gh-copilot` for one Copilot login.
@@ -133,12 +174,31 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
     }
 
     const byTokens = (m: Map<string, number>) => [...m.keys()].sort((a, b) => (m.get(b) ?? 0) - (m.get(a) ?? 0))
-    const agents: Node[] = byTokens(agentTok).map((id) => {
+    const callsText = (n: number) => `${n} call${n === 1 ? '' : 's'}`
+    const services = `${bgIds.size} background service${bgIds.size === 1 ? '' : 's'}`
+    const callers: Node[] = byTokens(agentTok).map((id) => {
       const top = [...(agentAcct.get(id) ?? new Map()).entries()].sort((a, b) => b[1] - a[1])[0]?.[0]
       const n = agentCalls.get(id) ?? 0
-      const on = offload?.enabled && offload.agentsOn.includes(id.slice(2))
-      return { id, label: id.slice(2), sub: `${n} call${n === 1 ? '' : 's'}${on ? ' · offload on' : ''}`, tokens: agentTok.get(id) ?? 0, color: getProviderColor(top) }
+      const color = getProviderColor(top)
+      if (id === BG_ID) {
+        return { id, label: `▸ ${services}`, sub: `${callsText(n)} · click to show`, tokens: agentTok.get(id) ?? 0, color, kind: 'bg' as const, fold: true }
+      }
+      const kind = bgIds.has(id) ? 'bg' as const : 'fg' as const
+      const on = kind === 'fg' && offload?.enabled && offload.agentsOn.includes(id.slice(2))
+      return { id, label: id.slice(2), sub: `${callsText(n)}${on ? ' · offload on' : ''}`, tokens: agentTok.get(id) ?? 0, color, kind }
     })
+    // Coding agents on top, background services below — each by tokens. Unfolded,
+    // the services sit under a header that folds them again.
+    const fg = callers.filter((n) => n.kind === 'fg')
+    const bg = callers.filter((n) => n.kind === 'bg')
+    const header: Node[] = bgOpen && bg.length
+      ? [{ id: BG_ID, label: `▾ ${services}`, sub: 'click to fold', tokens: 0, color: getProviderColor(''), kind: 'bg', fold: true }]
+      : []
+    // By contribution the callers keep their token order; an unfolded header goes
+    // just above the first background service.
+    const firstBg = callers.findIndex((n) => n.kind === 'bg')
+    const agents = order === 'class' ? [...fg, ...header, ...bg]
+      : firstBg < 0 ? callers : [...callers.slice(0, firstBg), ...header, ...callers.slice(firstBg)]
     const models: Node[] = byTokens(modelTok).map((id) => {
       const c = modelCalls.get(id) ?? { main: 0, side: 0 }
       const parts = [c.main && `${c.main} loop`, c.side && `${c.side} side`].filter(Boolean)
@@ -164,7 +224,7 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
     }
     const max = Math.max(1, ...[...left.values()].map((e) => e.tokens))
     return { agents, models, accounts, left: [...left.values()], right: [...right.values()], max }
-  }, [groups, answeredBy, agentLabel, offload])
+  }, [groups, answeredBy, agentLabel, offload, bgOpen, order])
 
   if (!groups.length) return null
 
@@ -207,19 +267,28 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
   const node = (n: Node, x: number, w: number, opts: { mono?: boolean; total?: boolean }) => {
     const y = ys.get(n.id) ?? 0
     const isTarget = Boolean(offload && n.id === `p:${offload.label}`)
+    const clickable = isTarget || Boolean(n.fold)
     return (
       <g key={n.id} data-node={n.id} data-offload-target={isTarget ? '1' : undefined}
+        data-kind={n.kind} data-fold={n.fold ? (bgOpen ? 'open' : 'folded') : undefined}
         onMouseEnter={() => setHover(n.id)} onMouseLeave={() => setHover(null)}
-        onClick={!isTarget ? undefined : offload!.configured
+        onClick={n.fold ? flipBg : !isTarget ? undefined : offload!.configured
           ? () => { setCard((c) => !c); setToggle({ busy: false, error: '' }) }
           : offload!.onSettings}
-        style={{ cursor: isTarget ? 'pointer' : 'default' }}
+        style={{ cursor: clickable ? 'pointer' : 'default' }}
         opacity={hover === null || hover === n.id || g.left.concat(g.right).some((e) => touches(e) && (e.from === n.id || e.to === n.id)) ? 1 : 0.4}>
         {isTarget && <title>{offload!.configured
           ? `${n.label} — offload ${offload!.status.label}. Click to switch or change it.`
           : 'No offload endpoint set up. Click to add one: easy calls of opencode, pi and copilot can go to a model server of your own.'}</title>}
+        {n.fold && <title>{bgOpen
+          ? 'Click to fold the background services back into one node.'
+          : 'Background services of coding (no agent asked; named by process). Click to show each one.'}</title>}
+        {!n.fold && n.kind === 'bg' && <title>{`A background service of coding (process ${n.label}): no agent asked.`}</title>}
         <rect x={x} y={y} width={w} height={NODE_H} rx={5} className="fill-background stroke-border" strokeWidth={isTarget ? 1.5 : 1}
-          strokeDasharray={n.ghost ? '4 3' : undefined} />
+          strokeDasharray={n.ghost || (n.fold && bgOpen) ? '4 3' : undefined} />
+        {n.kind && (
+          <rect x={x} y={y} width={w} height={NODE_H} rx={5} fill={WASH[n.kind]} fillOpacity={WASH_OPACITY} pointerEvents="none" />
+        )}
         {/* Selected (its card open): a faint wash of the offloaded colour marks which node the card belongs to. */}
         {isTarget && card && (
           <rect data-testid="offload-node-selected" x={x} y={y} width={w} height={NODE_H} rx={5}
@@ -241,6 +310,20 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
 
   return (
     <div className="space-y-3" data-testid="models-flow">
+      {g.agents.some((n) => n.kind === 'bg') && (
+        <div className="flex items-center justify-end gap-2 text-xs text-muted-foreground" data-testid="models-flow-order">
+          <span>Order agents</span>
+          <div className="inline-flex rounded-md border p-0.5">
+            {([['class', 'by class'], ['tokens', 'by contribution']] as const).map(([o, label]) => (
+              <button key={o} data-order={o} aria-pressed={order === o} onClick={() => pickOrder(o)}
+                title={o === 'class' ? 'Coding agents on top, background services below' : 'By tokens, coding agents and background services mixed'}
+                className={`rounded px-2 py-0.5 ${order === o ? 'bg-muted text-foreground font-medium' : 'hover:text-foreground'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <div className="relative">
         <div className="border rounded-md overflow-x-auto bg-muted/10">
           <svg viewBox={`0 0 ${W} ${height}`} width="100%" style={{ minWidth: 760, display: 'block' }}
@@ -321,6 +404,12 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
           side calls (titles, summaries — no tools)
         </span>
         <span>thickness = tokens · colour = the account that answered</span>
+        {g.agents.some((n) => n.kind === 'bg') && (
+          <span className="flex items-center gap-1.5">
+            <svg width="12" height="10"><rect width="12" height="10" rx="2" fill={WASH.fg} fillOpacity={WASH_OPACITY * 2} /></svg>coding agents
+            <svg width="12" height="10" className="ml-2"><rect width="12" height="10" rx="2" fill={WASH.bg} fillOpacity={WASH_OPACITY * 2} /></svg>background services
+          </span>
+        )}
         {offload && <span>{offload.configured
           ? 'dashed node = your offload endpoint while it is off or has no calls · click it to switch'
           : 'dashed node = an offload endpoint of your own, not set up yet · click it to add one'}</span>}

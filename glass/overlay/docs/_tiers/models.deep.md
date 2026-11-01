@@ -69,6 +69,12 @@ background jobs (knowledge consolidation, observation writing, titles …) call 
 without an agent but name the job they belong to. The Models tab shows each of them under
 that name — for example `consolidator-mentions` — instead of under **no session**.
 
+In the flow, coding agents and background services have their own faint card colour.
+The services start folded into one **N background services** node; click it to show
+each one, and click its header to fold them again. **Order agents** above the flow puts
+the agents first and the services below (*by class*) or orders both by tokens (*by
+contribution*). Both choices are remembered in this browser.
+
 ## Why glass does not route
 
 coding, the project glass is extracted from, has a router that moves calls between accounts
