@@ -6,7 +6,7 @@ import { normalizeModel } from '@/components/performance/models'
 import { accountLabel } from '@/lib/providers'
 import { cn } from '@/lib/utils'
 import { ModelFlow } from './flow'
-import { OFFLOAD_AGENTS, offloadStatus, useOffload, useTargetLabel } from './offload'
+import { OFFLOAD_AGENTS, offloadStatus, targetProviderId, useOffload, useTargetLabel } from './offload'
 
 const POLL_MS = 10_000
 
@@ -62,10 +62,10 @@ const answeredBy = (provider: string) =>
   (CLAUDE_SUBSCRIPTION.has(provider) ? 'Claude subscription' : accountLabel(provider))
 
 // A call the daemon measured but could not tie to a glass session has no agent.
-/** answeredBy, plus the offload endpoint's own name for its rows. */
+/** answeredBy, plus the offload endpoint's own name for the rows it answered. */
 function useAnsweredBy() {
   const target = useTargetLabel()
-  return useCallback((provider: string) => target(provider) ?? answeredBy(provider), [target])
+  return useCallback((provider: string, upstream?: string) => target(provider, upstream) ?? answeredBy(provider), [target])
 }
 const agentLabel = (agent: string) => (!agent || agent === 'unknown' ? 'no session' : agent)
 // A background job of coding's (combined.mjs) has no agent either, but names
@@ -163,7 +163,7 @@ export function SessionModels({ taskId }: { taskId: string }) {
                 <TableRow key={`${g.model}|${g.provider}|${g.upstream}|${g.call_kind}`} data-kind={g.call_kind || 'unrecorded'}>
                   <TableCell className="font-mono text-xs">{normalizeModel(g.model)}</TableCell>
                   <TableCell><KindBadge kind={g.call_kind} /></TableCell>
-                  <TableCell className="text-xs">{answered(g.provider)}</TableCell>
+                  <TableCell className="text-xs">{answered(g.provider, g.upstream)}</TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">{g.upstream || '—'}</TableCell>
                   <TableCell className="text-right font-mono text-xs">{g.calls}</TableCell>
                   <TableCell className="text-right font-mono text-xs">{fmtTokens(g.input)}</TableCell>
@@ -197,7 +197,7 @@ export function SessionModels({ taskId }: { taskId: string }) {
                     <TableCell className="text-xs whitespace-nowrap">{new Date(c.timestamp).toLocaleTimeString()}</TableCell>
                     <TableCell className="font-mono text-xs">{normalizeModel(c.model)}</TableCell>
                     <TableCell><KindBadge kind={c.call_kind} /></TableCell>
-                    <TableCell className="text-xs">{answered(c.provider)}</TableCell>
+                    <TableCell className="text-xs">{answered(c.provider, c.upstream)}</TableCell>
                     <TableCell className="text-right font-mono text-xs">{fmtTokens(tokensOf(c))}</TableCell>
                     <TableCell className="text-right font-mono text-xs">{c.latency_ms ? `${(c.latency_ms / 1000).toFixed(1)} s` : '—'}</TableCell>
                   </TableRow>
@@ -324,6 +324,7 @@ export function ModelsPage() {
                 // No URL yet: a placeholder node that opens the settings.
                 label: cfg.target.url ? cfg.target.name : 'Your endpoint',
                 configured: Boolean(cfg.target.url),
+                providerId: targetProviderId(cfg.target.name),
                 enabled: cfg.enabled,
                 status: offloadStatus(off.view),
                 agentsOn: OFFLOAD_AGENTS.filter((a) => cfg.agents[a]),
@@ -372,7 +373,7 @@ export function ModelsPage() {
                     <TableCell><Badge variant="secondary" className="text-xs" title={rowTitle(g)}>{agentLabel(g.agent)}</Badge></TableCell>
                     <TableCell className="font-mono text-xs">{normalizeModel(g.model)}</TableCell>
                     <TableCell><KindBadge kind={g.call_kind} /></TableCell>
-                    <TableCell className="text-xs">{answered(g.provider)}</TableCell>
+                    <TableCell className="text-xs">{answered(g.provider, g.upstream)}</TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">{g.upstream || '—'}</TableCell>
                     <TableCell className="text-right font-mono text-xs">{g.sessions || '—'}</TableCell>
                     <TableCell className="text-right font-mono text-xs">{g.calls}</TableCell>
