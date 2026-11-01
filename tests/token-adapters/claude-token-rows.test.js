@@ -110,6 +110,23 @@ test('a malformed JSONL line is skipped without throwing', () => {
   }
 });
 
+test('a <synthetic> assistant line (Claude Code\'s own reply, no API call) yields no row', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'claude-token-rows-synth-'));
+  const dst = path.join(dir, 'session.jsonl');
+  try {
+    const good = fs.readFileSync(FIXTURE, 'utf-8').trim().split('\n')[1]; // a real assistant line
+    const synth = JSON.parse(good);
+    synth.message = { ...synth.message, model: '<synthetic>', usage: { input_tokens: 0, output_tokens: 0 } };
+    if (synth.model) synth.model = '<synthetic>';
+    fs.writeFileSync(dst, `${good}\n${JSON.stringify(synth)}\n`);
+    const perTurn = buildClaudeTokenRows(dst).filter((r) => r.granularity_tier === 'per-turn');
+    expect(perTurn.length).toBe(1);
+    expect(perTurn[0].model).not.toBe('<synthetic>');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('a non-existent / unreadable file yields [] without throwing', () => {
   let rows;
   expect(() => {
