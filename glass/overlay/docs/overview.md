@@ -297,7 +297,7 @@ For one session, select its row in **Sessions**: the same view, call by call.
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Models flow over 30 days: claude, opencode, copilot, vscode, pi and coding's background services, to models grouped by vendor (Anthropic and OpenAI folded, one open-weight Qwen model), to the Claude subscription, GitHub Copilot and the offload endpoint local in green, whose node counts 1952 calls by coding's qwen-local and 1 by glass.](images/ui-models-flow.png)](images/ui-models-flow.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![Models flow over 30 days: claude, opencode, copilot, vscode, pi and coding's background services, to models grouped by vendor (Anthropic and OpenAI folded, one open-weight model), to the Claude subscription, GitHub Copilot and the offload endpoint local in green, whose node counts 1952 calls by another router on the same machine and 1 by glass.](images/ui-models-flow.png)](images/ui-models-flow.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
 <figcaption>A month on one machine. No decision in the middle: every model here is one the agent chose, or your offload endpoint's (green). One machine is one account node, whoever sent it the calls.</figcaption>
 </figure>

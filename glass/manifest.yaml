@@ -310,6 +310,11 @@ targets:
         find: "--target bmw --publish"
         replace: "--target public --publish"
         count: 1
+      # Two more Models-flow screenshots, public site only (images in this target's overlay).
+      - file: docs/models.md
+        find: "    click on its node opens the switch.\n"
+        replace: "    click on its node opens the switch.\n\n    Ordered **by contribution**, with a vendor group opened to its models:\n\n    ![Models flow over 30 days ordered by contribution: the Anthropic group opened to its seven models, OpenAI folded, one open-weight model answered by the offload endpoint local in green](images/ui-models-flow-anthropic.png)\n\n    Click the endpoint's node and its paths stay lit while the rest fades; its card says\n    what offload does now and holds the switch:\n\n    ![Models flow with the offload endpoint selected: its green paths from opencode, pi and coding's background services stay lit, and its card reads offload on, local unreachable, with Turn offload off and Settings](images/ui-models-flow-endpoint-card.png)\n"
+        count: 1
     deny:
       - 'bmw'
       - 'aimaad'
