@@ -487,7 +487,7 @@ The two tables above are exact, but answering *"what goes where"* from them mean
 35 route rows and 5 chains in your head at once. The **Flow** tab draws the same data — it
 is the same payload, not a second source of truth.
 
-![LLM Routing settings — Flow tab](../images/llm-routing-flow.png)
+![LLM Routing — Flow: the four agents and the folded background services, through the offload decision, to the accounts](../images/llm-routing-flow.png)
 
 Two things are kept deliberately distinct, because conflating them is the failure mode this
 whole page exists to avoid:
@@ -497,18 +497,26 @@ whole page exists to avoid:
 | **Config** | Where a call is **declared** to go | Solid edges, always drawn — even for a provider that has served nothing |
 | **Traffic** | Where calls **actually went** | Edge thickness and the per-account token totals, from `token_usage` over the page's window |
 
-So a thick edge to a provider no route names means work is **arriving by fallback**. The
-screenshot above is that state: `gh-copilot` is the declared target of nearly every route
-and served **zero tokens**, while `claude-code-max` carries the traffic through the chain —
-because the Copilot quota is exhausted. Neither table shows this.
+So a thick edge to a provider no route names means work is **arriving by fallback** — for
+example while the Copilot quota is exhausted: `gh-copilot` stays the declared target of
+nearly every route and serves nothing, while `claude-code-max` carries the traffic through
+the chain. Neither table shows this.
 
 Reading it:
 
-- The 31 background routes collapse to the **three `(provider, band)` pairs they actually
-  target**. That fan-in is the point; 31 near-identical nodes would bury it. Hover a group
-  for its member list.
+- The middle column is the proxy's **offload decision**: each caller's edge lands on the
+  gate that decided it, and each gate's exit goes to the account that serves it. Gates no
+  route reaches fold into one row.
+- The background routes are grouped by **where the proxy sends them** — the gate, the
+  account and the band. The groups start **folded into one "N background services" node**,
+  with an edge to every gate any of them reaches; click it to show each group, and click
+  the dashed header to fold them again (remembered in this browser). Hover a group for its
+  member list. Folding changes the drawing only: the gate counts are the same either way.
 - The four foreground routes stay individual, because there the **agent identity is the
   route key**.
+- Caller cards have a faint colour by kind, the same as glass's Models flow: **coding
+  agents** sky, **background services** purple, the catch-all **defaults** grey. A dashed
+  **also in glass** band marks the callers and accounts glass also measures.
 - Accounts are ordered subscriptions → metered keys → disabled, the config's own grouping,
   and the one that answers *who is paying*.
 - Dashed edges are fallback chains; dotted are chains with a guard.
