@@ -3,6 +3,10 @@
 What kind of job each prompt you give an agent is — fix, build, ship, status, explain, … —
 labelled in the background with your own Copilot account. Opt-in, off by default.
 
+!!! tip "First time?"
+    [Tutorial: Job Classes](tutorial-job-classes.md) walks through it step by step, with a
+    screenshot of each step: switch it on, measure, read the tree, join your team.
+
 === "⚡ Quick (~3 min)"
 
     ## What it is for
@@ -42,9 +46,30 @@ labelled in the background with your own Copilot account. Opt-in, off by default
 
     A team can share its own classes from a member's learning repo (folder `job-classes/`).
     Join it with the repo's git URL — in the tab, or `glass job-classes join <url>`;
-    `glass job-classes pull` updates it.
+    `glass job-classes pull` updates it. The repo itself is set up by someone who runs
+    coding (see below).
 
-    **Next:** what is sent, the commands, and how the gate is counted — open the deep dive.
+    ## glass and coding
+
+    Most people only install glass, and it labels, measures and shows on its own. Building
+    a team's classes, trials and routing by class run in coding:
+
+    | | glass alone | needs coding |
+    |---|---|---|
+    | Label your turns (student + teacher, your Copilot account) | ✅ | |
+    | Measure your past prompts; tree, map, gate | ✅ | |
+    | Join and update a team's classes | ✅ | |
+    | Create a team's classes, propose and fold new ones | | ✅ `coding job-classes init` / `propose` / `fold` |
+    | Trials: can a cheaper model take over a background job? | read-only, on a machine that also runs coding | ✅ started and accepted in coding's dashboard |
+    | Replay a class's past turns on a cheaper model; record the evidence | | ✅ `coding job-classes replay …` |
+    | Route a proven class to a cheaper model (the class floor) | ✗ glass shows the label, the agent keeps its model | ✅ for pi, opencode and Copilot CLI |
+    | Offload easy calls to your own endpoint | ✅ [Offload](offload.md) | |
+
+    Labels and gate counts stay on the machine that made them, in glass and in coding alike.
+    What a team shares is its classes and, from coding, the evidence of replays.
+
+    **Next:** what is sent, the commands, how the gate is counted, and what a team's
+    maintainer sets up — open the deep dive.
 
 === "📚 Deep Dive (full)"
 

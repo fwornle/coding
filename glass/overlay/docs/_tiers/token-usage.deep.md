@@ -72,7 +72,7 @@ older model of the cheap family can cost several times the newest one. glass can
 coding's routing, so each suggestion says where to make the change; coding's own dashboard
 shows the same list, and starts a **trial** from it rather than switching outright.
 
-**Trials** (where coding is installed) show whether a cheaper model can take over a
+**Trials** (on a machine that also runs coding: glass reads them next to coding's token DB) show whether a cheaper model can take over a
 background job: for a few days it runs beside the current model on a share of the job's
 real calls, and a strong judge compares each pair of answers blind, for details kept and
 nothing invented. An automatic trial tries several cheaper models in turn, cheapest first,

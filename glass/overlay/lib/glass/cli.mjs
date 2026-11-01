@@ -20,7 +20,7 @@ import { upstreamProxy, proxyEnvOf } from './egress.mjs';
 import { coexistWarnings, opencodeCopilotUpstream, opencodeHttpProviders, piHttpProviders } from './coexist.mjs';
 import { openUrl } from './open-url.mjs';
 import { renderStatusline, renderReport, uiLinks, TAGS } from './statusline.mjs';
-import { tmuxWanted, launchInTmux, configureStatus, popup, message, selfCommand } from './tmux.mjs';
+import { tmuxWanted, launchInTmux, configureStatus, popup, message, selfCommand, agentMouseEnv } from './tmux.mjs';
 import { update, RELEASE_REPO } from './update.mjs';
 import { loadCostDefaults } from './cost.mjs';
 import { billingProblems } from '../cost/billing-rules.mjs';
@@ -195,6 +195,8 @@ async function runMeasured(agent, argv) {
   let settings = null;
   if (useTmux && process.env.TMUX) {
     restore = configureStatus({ taskId: session.taskId, port, tmpDir: p.run });
+    // A drag selects text only while the agent does not hold the mouse (tmux.mjs).
+    Object.assign(env, agentMouseEnv(agent, baseEnv));
   } else if (agent === 'claude' && !process.env.GLASS_NO_STATUSLINE && !args.includes('--settings')) {
     settings = claudeStatusSettings(path.join(p.run, `${session.taskId}.settings.json`), { port, taskId: session.taskId });
     agentArgs = ['--settings', settings, ...args];

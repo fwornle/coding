@@ -114,17 +114,105 @@ export function currentClickCommand() {
 function bindClicks(tmpDir) {
   const previous = currentClickCommand();
   if (previous.includes(MARK)) return; // already glass's (it keeps the original as fallback)
-  const snippet = path.join(tmpDir, `glass-click-${process.pid}.tmux`);
-  fs.writeFileSync(snippet, clickBinding(previous));
+  sourceSnippet(tmpDir, 'click', clickBinding(previous));
+}
+
+// Bindings chain commands with ';' and braces, which survive only in a sourced
+// file: a ';' handed to `tmux bind-key` as an argument ends the bind-key.
+function sourceSnippet(tmpDir, name, text) {
+  const snippet = path.join(tmpDir, `glass-${name}-${process.pid}.tmux`);
+  fs.writeFileSync(snippet, text);
   tmux(['source-file', snippet]);
   fs.rmSync(snippet, { force: true });
 }
+
+// ── Selecting text with the mouse ─────────────────────────────────────────────
+// The clickable status line needs `mouse on`, which hands the mouse to tmux. Two
+// things then break selection, and coding's session wrapper fixes both
+// (scripts/tmux-session-wrapper.sh); this is the same fix:
+//
+//   1. Claude Code and opencode ask for ANY-EVENT mouse tracking (DECSET 1003).
+//      tmux's default drag binding forwards a drag to such an app, which ignores
+//      it, and when a drag does open copy-mode, tmux drops the terminal from 1003
+//      to 1002 mid-gesture and the terminal stops reporting the motion: a 30-column
+//      drag copied 6 bytes. So under tmux both agents start with their mouse grab
+//      off (agentMouseEnv). pi and Copilot CLI never take the mouse.
+//   2. tmux's default bindings put a selection in tmux's buffer only. The
+//      bindings below copy it to the clipboard, and hand the wheel to the agent
+//      as PageUp / PageDown, since it no longer reads the wheel itself.
+//
+// prefix + S switches the mouse off for the session: the terminal's own
+// selection (scrollback, survives repaints) at the price of status-line clicks.
+
+/**
+ * What the agent's environment needs under tmux so a drag selects text: its own
+ * mouse grab off. An explicit value, or GLASS_AGENT_MOUSE=keep, is left alone.
+ */
+export function agentMouseEnv(agent, env = process.env) {
+  if (env.GLASS_AGENT_MOUSE === 'keep') return {};
+  const key = { claude: 'CLAUDE_CODE_DISABLE_MOUSE', opencode: 'OPENCODE_DISABLE_MOUSE' }[agent];
+  return key && !env[key] ? { [key]: '1' } : {};
+}
+
+/** The command a finished selection is piped to, or '' (then tmux's buffer and OSC 52 only). */
+export function clipboardCommand(which) {
+  for (const c of ['pbcopy', 'wl-copy', 'xclip -selection clipboard', 'xsel --clipboard --input', 'clip.exe']) {
+    if (which(c.split(' ')[0])) return c;
+  }
+  return '';
+}
+
+/**
+ * Each selection binding: the table and key, when the current binding may be
+ * replaced (tmux's default, or nothing), and glass's line. A binding the user
+ * (or coding) changed is left as it is.
+ */
+export function mouseCopyBindings(copy) {
+  const pipe = copy ? ` "${copy}"` : '';
+  const isDefaultSelect = (cur) => cur.includes('mouse_any_flag');
+  const isDefaultWheel = (cur) => cur.includes('mouse_any_flag') && !cur.includes('PageUp') && !cur.includes('PageDown');
+  const isDefaultDragEnd = (cur) => /^send-keys -X copy-pipe-and-cancel\s*$/.test(cur.trim());
+  return [
+    { table: 'root', key: 'MouseDrag1Pane', replace: isDefaultSelect,
+      line: 'bind-key -T root MouseDrag1Pane if-shell -F "#{pane_in_mode}" { send-keys -M } { copy-mode -M }' },
+    { table: 'root', key: 'DoubleClick1Pane', replace: isDefaultSelect,
+      line: `bind-key -T root DoubleClick1Pane { select-pane -t = ; if-shell -F "#{pane_in_mode}" { send-keys -M } { copy-mode -H ; send-keys -X select-word ; run-shell -d 0.3 ; send-keys -X copy-pipe-and-cancel${pipe} } }` },
+    { table: 'root', key: 'TripleClick1Pane', replace: isDefaultSelect,
+      line: `bind-key -T root TripleClick1Pane { select-pane -t = ; if-shell -F "#{pane_in_mode}" { send-keys -M } { copy-mode -H ; send-keys -X select-line ; run-shell -d 0.3 ; send-keys -X copy-pipe-and-cancel${pipe} } }` },
+    { table: 'root', key: 'WheelUpPane', replace: isDefaultWheel,
+      line: 'bind-key -T root WheelUpPane if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { if-shell -F "#{alternate_on}" { send-keys PageUp } { copy-mode -e } }' },
+    { table: 'root', key: 'WheelDownPane', replace: isDefaultWheel,
+      line: 'bind-key -T root WheelDownPane if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { if-shell -F "#{alternate_on}" { send-keys PageDown } { send-keys -M } }' },
+    { table: 'copy-mode', key: 'MouseDragEnd1Pane', replace: isDefaultDragEnd,
+      line: `bind-key -T copy-mode MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel${pipe}` },
+    { table: 'copy-mode-vi', key: 'MouseDragEnd1Pane', replace: isDefaultDragEnd,
+      line: `bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel${pipe}` },
+    { table: 'prefix', key: 'S', replace: () => false,
+      line: 'bind-key -T prefix S { if-shell -F "#{mouse}" { set-option mouse off ; display-message -d 2500 "mouse OFF: the terminal\'s own selection. Status-line clicks are off. prefix+S restores." } { set-option mouse on ; display-message -d 2500 "mouse ON: drag selects to the clipboard, the status line is clickable. prefix+S for the terminal\'s own selection." } }' },
+  ];
+}
+
+/** What `table key` runs now, '' when unbound. */
+function currentBinding(table, key) {
+  const r = tmux(['list-keys', '-T', table, key]);
+  const line = (r.status === 0 ? r.stdout : '').split('\n').find((l) => l.includes(` ${key} `)) || '';
+  return line.replace(new RegExp(`^bind-key\\s+(?:-r\\s+)?-T\\s+${table}\\s+${key}\\s+`), '');
+}
+
+function bindMouseCopy(tmpDir, which) {
+  const lines = mouseCopyBindings(clipboardCommand(which))
+    .filter((b) => { const cur = currentBinding(b.table, b.key); return cur === '' || b.replace(cur); })
+    .map((b) => `${b.line}\n`);
+  if (lines.length) sourceSnippet(tmpDir, 'mouse', lines.join(''));
+}
+
+const onPath = (bin) => spawnSync(process.platform === 'win32' ? 'where' : 'which', [bin], { stdio: 'ignore' }).status === 0;
 
 /**
  * Inner run, inside tmux: point this session's status bar at `taskId`.
  * @returns {() => void} puts the session's own options back (no-op for a session glass owns)
  */
-export function configureStatus({ taskId, port, env = process.env, tmpDir = os.tmpdir() }) {
+export function configureStatus({ taskId, port, env = process.env, tmpDir = os.tmpdir(), which = onPath }) {
   const session = tmux(['display-message', '-p', '#{session_id}']).stdout?.trim();
   if (!session) return () => {};
   const saved = {};
@@ -144,6 +232,7 @@ export function configureStatus({ taskId, port, env = process.env, tmpDir = os.t
   set('status-right', statusCommand(port));
   set('mouse', 'on');
   bindClicks(tmpDir);
+  bindMouseCopy(tmpDir, which);
   if (env.GLASS_TMUX_OWNED) return () => {};
   return () => {
     for (const [o, v] of Object.entries(saved)) {

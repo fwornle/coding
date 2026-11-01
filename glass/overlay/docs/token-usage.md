@@ -16,8 +16,8 @@ How many tokens your agents used — totals, trends and every single call.
     | Overview | Which agent and which model used the most? |
     | Evolution | When did usage happen, and how did it grow? |
     | Cost | What did each account cost this month, and where is it heading? |
-    | Trials | Can a cheaper model take over a background job? (where coding is installed) |
-    | Classes | What kind of job was each turn? ([Job classes](job-classes.md), opt-in) |
+    | Trials | Can a cheaper model take over a background job? Read-only, on a machine that also runs coding ([glass and coding](job-classes.md#glass-and-coding)) |
+    | Classes | What kind of job was each turn? ([Job classes](job-classes.md), opt-in; [tutorial](tutorial-job-classes.md)) |
     | Recent Calls | What exactly did each call cost? |
 
     ![Token Usage overview](images/ui-token-usage-overview.png)

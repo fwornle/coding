@@ -85,6 +85,8 @@ validation:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
+  - Tutorials:
+    - Job Classes, step by step: tutorial-job-classes.md
   - Using glass:
     - Token Usage: token-usage.md
     - Models & Accounts: models.md
