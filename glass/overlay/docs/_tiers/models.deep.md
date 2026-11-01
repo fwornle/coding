@@ -75,6 +75,12 @@ each one, and click its header to fold them again. **Order agents** above the fl
 the agents first and the services below (*by class*) or orders both by tokens (*by
 contribution*). Both choices are remembered in this browser.
 
+The models column is grouped by vendor — Anthropic, OpenAI, open-weight (Qwen, Llama,
+gpt-oss …), Google, others — each with a faint colour of its own, listed in the legend.
+A vendor with more than one model starts folded into one **Vendor · N models** node;
+click it to show the models, and click its header to fold them again. Which vendors are
+open is remembered in this browser too.
+
 ## Why glass does not route
 
 coding, the project glass is extracted from, has a router that moves calls between accounts
