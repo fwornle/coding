@@ -17,6 +17,9 @@ import { normalizeModel } from '@/components/performance/models'
  * "Your endpoint — not set up" node stands in its place and opens the settings, so
  * the feature can be found where its traffic would show.
  *
+ * Calls glass could not tie to a session ("no session") get a grey card of their
+ * own, last in class order: the agent that asked is not known.
+ *
  * Callers come in two kinds, each with its own faint card colour: coding agents
  * (top) and, with coding installed, its background services (bottom, named by
  * process). There can be dozens of the latter, so they start folded into one
@@ -82,7 +85,7 @@ const TOP = 56
 
 const OFFLOADED = getOutcomeColor('offloaded', false)
 // Faint card washes: which kind of caller a node is.
-const WASH = { fg: '#0ea5e9', bg: '#a855f7' }
+const WASH = { fg: '#0ea5e9', bg: '#a855f7', none: '#64748b' }
 const WASH_OPACITY = 0.08
 // The folded background services, and their header once unfolded.
 const BG_ID = 'a:\u0000background'
@@ -144,7 +147,7 @@ interface Node {
   /** the endpoint's node only: `sub` splits its calls by sender (glass, another router) */
   split?: boolean
   /** which kind of caller (agents column only) */
-  kind?: 'fg' | 'bg'
+  kind?: 'fg' | 'bg' | 'none'
   /** a faint card wash: the caller's kind, or the model's vendor */
   wash?: string
   /** a fold / unfold node: background services, or one vendor's models */
@@ -251,21 +254,23 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
       if (id === BG_ID) {
         return { id, label: `▸ ${services}`, sub: `${callsText(n)} · click to show`, tokens: agentTok.get(id) ?? 0, color, kind: 'bg' as const, wash: WASH.bg, fold: bgFold }
       }
-      const kind = bgIds.has(id) ? 'bg' as const : 'fg' as const
+      // Calls not tied to a session have no agent: not a coding agent, a kind of their own.
+      const kind = bgIds.has(id) ? 'bg' as const : id === `a:${agentLabel('')}` ? 'none' as const : 'fg' as const
       const on = kind === 'fg' && offload?.enabled && offload.agentsOn.includes(id.slice(2))
       return { id, label: nameOf(id), sub: `${callsText(n)}${on ? ' · offload on' : ''}`, tokens: agentTok.get(id) ?? 0, color, kind, wash: WASH[kind] }
     })
-    // Coding agents on top, background services below — each by tokens. Unfolded,
-    // the services sit under a header that folds them again.
+    // Coding agents on top, background services below, calls of no session last —
+    // each by tokens. Unfolded, the services sit under a header that folds them again.
     const fg = callers.filter((n) => n.kind === 'fg')
     const bg = callers.filter((n) => n.kind === 'bg')
+    const none = callers.filter((n) => n.kind === 'none')
     const header: Node[] = bgOpen && bg.length
       ? [{ id: BG_ID, label: `▾ ${services}`, sub: 'click to fold', tokens: 0, color: getProviderColor(''), kind: 'bg', wash: WASH.bg, fold: bgFold }]
       : []
     // By contribution the callers keep their token order; an unfolded header goes
     // just above the first background service.
     const firstBg = callers.findIndex((n) => n.kind === 'bg')
-    const agents = order === 'class' ? [...fg, ...header, ...bg]
+    const agents = order === 'class' ? [...fg, ...header, ...bg, ...none]
       : firstBg < 0 ? callers : [...callers.slice(0, firstBg), ...header, ...callers.slice(firstBg)]
     // Models clustered by vendor: vendors by tokens, each one's models by tokens.
     // A folded vendor is one node; an unfolded one with several models gets a
@@ -389,6 +394,7 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
           : 'No offload endpoint set up. Click to add one: easy calls of opencode, pi and copilot can go to a model server of your own.'}</title>}
         {n.fold && <title>{n.fold.title}</title>}
         {!n.fold && n.kind === 'bg' && <title>{`A background service of coding (process ${n.label}): no agent asked.`}</title>}
+        {n.kind === 'none' && <title>Calls glass measured but could not tie to a glass session, so the agent that asked is not known. Not a coding agent: the provider and model say where the calls went.</title>}
         <rect x={x} y={y} width={w} height={NODE_H} rx={5} className="fill-background stroke-border" strokeWidth={isTarget ? 1.5 : 1}
           strokeDasharray={n.ghost || n.fold?.open ? '4 3' : undefined} />
         {n.wash && (
@@ -509,10 +515,15 @@ export function ModelFlow({ groups, answeredBy, agentLabel, offload }: Props) {
           side calls (titles, summaries — no tools)
         </span>
         <span>thickness = tokens · colour = the account that answered</span>
-        {g.agents.some((n) => n.kind === 'bg') && (
+        {g.agents.some((n) => n.kind === 'bg' || n.kind === 'none') && (
           <span className="flex items-center gap-1.5">
             <svg width="12" height="10"><rect width="12" height="10" rx="2" fill={WASH.fg} fillOpacity={WASH_OPACITY * 2} /></svg>coding agents
-            <svg width="12" height="10" className="ml-2"><rect width="12" height="10" rx="2" fill={WASH.bg} fillOpacity={WASH_OPACITY * 2} /></svg>background services
+            {g.agents.some((n) => n.kind === 'bg') && <>
+              <svg width="12" height="10" className="ml-2"><rect width="12" height="10" rx="2" fill={WASH.bg} fillOpacity={WASH_OPACITY * 2} /></svg>background services
+            </>}
+            {g.agents.some((n) => n.kind === 'none') && <>
+              <svg width="12" height="10" className="ml-2"><rect width="12" height="10" rx="2" fill={WASH.none} fillOpacity={WASH_OPACITY * 2} /></svg>no session (agent not known)
+            </>}
           </span>
         )}
         <span className="flex items-center gap-1.5" data-testid="models-flow-vendors">
