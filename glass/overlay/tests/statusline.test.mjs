@@ -9,7 +9,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const { renderStatusline, renderReport, uiLinks, TAGS } = await import('../lib/glass/statusline.mjs');
-const { clickBinding, tmuxWanted, innerEnv, configureStatus } = await import('../lib/glass/tmux.mjs');
+const { clickBinding, tmuxWanted, innerEnv, configureStatus, agentMouseEnv, clipboardCommand, mouseCopyBindings } = await import('../lib/glass/tmux.mjs');
 const { claudeStatusSettings, isTerminalReport, watchHint, clickTarget } = await import('../lib/glass/cli.mjs');
 
 const D = {
@@ -136,6 +136,29 @@ test('tmux: when, the inner env, the chained click binding', () => {
 
 const hasTmux = spawnSync('tmux', ['-V']).status === 0;
 
+test('tmux selection: the agent lets go of the mouse; drags copy to the clipboard', () => {
+  assert.deepEqual(agentMouseEnv('claude', {}), { CLAUDE_CODE_DISABLE_MOUSE: '1' });
+  assert.deepEqual(agentMouseEnv('opencode', {}), { OPENCODE_DISABLE_MOUSE: '1' });
+  assert.deepEqual(agentMouseEnv('pi', {}), {}, 'pi never takes the mouse');
+  assert.deepEqual(agentMouseEnv('copilot', {}), {}, 'nor does Copilot CLI');
+  assert.deepEqual(agentMouseEnv('claude', { CLAUDE_CODE_DISABLE_MOUSE: '0' }), {}, 'an explicit value stands');
+  assert.deepEqual(agentMouseEnv('claude', { GLASS_AGENT_MOUSE: 'keep' }), {}, 'opted out');
+  assert.equal(clipboardCommand((b) => b === 'pbcopy'), 'pbcopy');
+  assert.equal(clipboardCommand((b) => b === 'xclip'), 'xclip -selection clipboard');
+  assert.equal(clipboardCommand(() => false), '');
+  const b = Object.fromEntries(mouseCopyBindings('pbcopy').map((x) => [`${x.table} ${x.key}`, x]));
+  assert.doesNotMatch(b['root MouseDrag1Pane'].line, /mouse_any_flag/, 'a drag opens copy-mode even if an agent holds the mouse');
+  assert.match(b['copy-mode MouseDragEnd1Pane'].line, /copy-pipe-and-cancel "pbcopy"$/);
+  assert.match(b['copy-mode-vi MouseDragEnd1Pane'].line, /copy-pipe-and-cancel "pbcopy"$/);
+  assert.match(b['root WheelUpPane'].line, /send-keys PageUp/);
+  const tmuxDefaultDrag = 'if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { copy-mode -M }';
+  assert.equal(b['root MouseDrag1Pane'].replace(tmuxDefaultDrag), true, "tmux's default is replaced");
+  assert.equal(b['root MouseDrag1Pane'].replace('copy-mode -M'), false, "a user's own binding is not");
+  assert.equal(b['copy-mode MouseDragEnd1Pane'].replace('send-keys -X copy-pipe-and-cancel'), true);
+  assert.equal(b['copy-mode MouseDragEnd1Pane'].replace('send-keys -X copy-pipe-and-cancel "pbcopy"'), false, "coding's is kept");
+  assert.equal(b['prefix S'].replace('choose-session'), false, 'prefix+S only where nothing is bound');
+});
+
 test('tmux: configureStatus on a real server — options set, clicks bound, user session restored', { skip: !hasTmux && 'no tmux' }, () => {
   const sock = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'glass-tmux-')), 's');
   const t = (...a) => spawnSync('tmux', ['-S', sock, ...a], { encoding: 'utf8' });
@@ -148,6 +171,8 @@ test('tmux: configureStatus on a real server — options set, clicks bound, user
   process.env.TMUX_PANE = t('display-message', '-p', '-t', 'mine', '#{pane_id}').stdout.trim();
   // tmux's own default differs by version (3.4: select-window, 3.6: switch-client).
   const before = t('list-keys', '-T', 'root', 'MouseDown1Status').stdout.replace(/^bind-key\s+(?:-r\s+)?-T\s+root\s+MouseDown1Status\s+/, '').trim();
+  // A binding the user made their own is not glass's to change.
+  t('bind-key', '-T', 'root', 'TripleClick1Pane', 'select-pane');
   try {
     const restore = configureStatus({ taskId: 'glass-claude-x', port: 12999, env: {}, tmpDir: path.dirname(sock) });
     const opt = (o) => t('show-options', '-v', '-t', 'mine', o).stdout.trim();
@@ -161,6 +186,13 @@ test('tmux: configureStatus on a real server — options set, clicks bound, user
     assert.ok(keys.includes(`{ ${before} }`), `the previous binding (${before}) is the fallback`);
     configureStatus({ taskId: 'glass-claude-y', port: 12999, env: {}, tmpDir: path.dirname(sock) })();
     assert.equal(t('list-keys', '-T', 'root', 'MouseDown1Status').stdout.match(/--src glass-tmux/g).length, 1, 'bound once');
+    const key = (table, k) => t('list-keys', '-T', table, k).stdout;
+    assert.doesNotMatch(key('root', 'MouseDrag1Pane'), /mouse_any_flag/, 'drag → copy-mode');
+    assert.match(key('root', 'DoubleClick1Pane'), /select-word/);
+    assert.match(key('copy-mode', 'MouseDragEnd1Pane'), /copy-pipe-and-cancel/);
+    assert.match(key('root', 'WheelUpPane'), /PageUp/);
+    assert.match(key('prefix', 'S'), /mouse off/);
+    assert.match(key('root', 'TripleClick1Pane'), /TripleClick1Pane\s+select-pane\s*$/m, "the user's own TripleClick1Pane is kept");
     restore();
     assert.equal(opt('status-right'), 'MINE', 'the user\'s session gets its own options back');
     assert.equal(opt('status-style'), 'bg=green,fg=black');

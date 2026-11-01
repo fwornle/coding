@@ -9,6 +9,7 @@ Start with `glass doctor`; most problems show up there.
     | Symptom | Fix |
     |---|---|
     | "daemon not reachable … running unmeasured" | See `~/.glass/logs/daemon.log`; port taken → `GLASS_PORT=<free port>` |
+    | In tmux, dragging the mouse selects nothing, or nothing reaches the clipboard | Restart the agent with `glass <agent>`: an agent started by an older glass still holds the mouse. A drag copies when you let go; `prefix` + `S` switches to the terminal's own selection ([Status Line → Selecting text](status-line.md)) |
     | No rows for copilot | `copilot --version` must be ≥ 1.0.93, and the npm CLI first on `PATH` |
     | Certificate error in an agent | Try `--no-intercept`, then send the daemon log to the maintainers |
     | No status line | Install tmux, or use Claude Code's status line / `glass watch` |

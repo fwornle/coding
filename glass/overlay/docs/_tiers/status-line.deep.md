@@ -61,6 +61,27 @@ The context report as it appears in the popup:
 
 The same reports are available on the command line: `glass report ctx`, `glass report net`.
 
+## Selecting text in tmux
+
+Clickable fields need tmux's mouse on, so glass sets up selection to keep working:
+
+| You do | What happens |
+|---|---|
+| Drag | Selects text and copies it to the clipboard when you release (`pbcopy`, `wl-copy`, `xclip`, `xsel` or `clip.exe`, whichever exists) |
+| Double-click / triple-click | Copies the word / the line |
+| Mouse wheel | Scrolls the agent (sent as PageUp / PageDown) |
+| `prefix` + `S` | Mouse off for this session: the terminal's own selection, across the scrollback; the status line is not clickable until you press it again |
+
+For this, glass starts Claude Code and opencode with their own mouse handling off
+(`CLAUDE_CODE_DISABLE_MOUSE`, `OPENCODE_DISABLE_MOUSE`). While an agent holds the mouse,
+tmux passes a drag to the agent and nothing is selected. pi and Copilot CLI never take
+the mouse. `GLASS_AGENT_MOUSE=keep` leaves the agents' mouse alone, and a value you set for
+either variable is never overridden.
+
+tmux's key bindings apply to the whole tmux server. glass replaces only tmux's own
+defaults for these keys, and binds `prefix` + `S` only where nothing is bound, so bindings
+you made yourself (or coding's) stay as they are.
+
 ## Refresh
 
 The tmux bar refreshes every 5 seconds; Claude Code refreshes its status line after
