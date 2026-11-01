@@ -38,6 +38,12 @@ import { GLASS_NOTE, GLASS_TINT, inGlassAccount, inGlassCaller, runsOf } from '@
  *
  * Rendered in two places (the Settings dialog and the Routing tab) so the
  * picture cannot drift between them.
+ *
+ * Its look follows glass's Models flow (glass-ui/flow.tsx), so the two read as
+ * one family: each caller card has a faint wash of its kind — coding agents,
+ * background services, the catch-all defaults — and the background services
+ * start folded into one node that a click opens (and its header folds again),
+ * remembered per viewer.
  */
 
 // ── Shapes ───────────────────────────────────────────────────────────────────
@@ -145,6 +151,23 @@ const GEOM = {
 
 const { W, COL_CALLER, CALLER_W, COL_GATE, GATE_W, COL_ACCT, ACCT_W, ROW_H, NODE_H, TOP } = GEOM
 
+// Faint card washes, one per kind of caller — the same hues and strength as
+// glass's Models flow, so a coding agent or a background service looks alike in both.
+const WASH = { fg: '#0ea5e9', bg: '#a855f7', default: '#64748b' } as const
+const WASH_OPACITY = 0.08
+type CallerKind = keyof typeof WASH
+// The folded background services, and their header once unfolded.
+const BG_ID = 'bg:\u0000all'
+const BG_OPEN_KEY = 'coding.routing.flow.bgOpen'
+
+// A per-viewer convenience: blocked or empty storage reads as the default.
+function readPref(key: string): string | null {
+  try { return localStorage.getItem(key) } catch { return null }
+}
+function writePref(key: string, value: string) {
+  try { localStorage.setItem(key, value) } catch { /* a viewer convenience only */ }
+}
+
 /** Model a (provider, band) pair resolves to — mirrors the proxy's resolveRoute(). */
 function modelFor(providers: ProviderInfo[], id: string, band: string): string {
   const p = providers.find(x => x.id === id)
@@ -169,6 +192,8 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
   const [hover, setHover] = useState<string | null>(null)
   // Folded runs the operator has opened, keyed by the run's first rung.
   const [expandedRuns, setExpandedRuns] = useState<Set<number>>(new Set())
+  const [bgOpen, setBgOpen] = useState(() => readPref(BG_OPEN_KEY) === '1')
+  const flipBg = useCallback(() => setBgOpen((o) => { writePref(BG_OPEN_KEY, o ? '0' : '1'); return !o }), [])
 
   // Traffic is fetched separately from config on purpose: if token_usage is
   // unreachable the graph still draws the configuration, just without weights.
@@ -258,7 +283,7 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
   // because `offload: false` pins the model that answers. Grouped by the declared
   // pair they would share one node and one edge, and the diagram would show them
   // exiting somewhere one of them does not.
-  const callers = useMemo(() => {
+  const { callers, routeCallers } = useMemo(() => {
     const fg = Object.keys(data.routes)
       .filter(k => k.startsWith('fg-'))
       .sort()
@@ -269,7 +294,7 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
         entry: data.routes[k],
         verdict: verdictOf(k, data.routes[k]),
         members: [k],
-        kind: 'fg' as const,
+        kind: 'fg' as CallerKind,
       }))
 
     const bgKeys = Object.keys(data.routes).filter(k => !k.startsWith('fg-')).sort()
@@ -291,7 +316,7 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
           entry,
           verdict: verdictOf(members[0], entry),
           members,
-          kind: 'bg' as const,
+          kind: 'bg' as CallerKind,
         }
       })
 
@@ -302,11 +327,36 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
       entry: data.defaults[cls],
       verdict: verdictOf(`defaults.${cls}`, data.defaults[cls]),
       members: [],
-      kind: 'default' as const,
+      kind: 'default' as CallerKind,
     }))
 
-    return [...fg, ...bg, ...defs]
-  }, [data, verdictOf])
+    // Folded, the background groups are one node with an edge to every rung any
+    // of them reaches; unfolded, they sit under a header that folds them again.
+    const total = bg.reduce((n, c) => n + c.members.length, 0)
+    const services = `${total} background service${total === 1 ? '' : 's'}`
+    const fold = (open: boolean) => ({
+      open, toggle: flipBg,
+      title: open ? 'Click to fold the background services back into one node.'
+        : `Background services of coding, in ${bg.length} group${bg.length === 1 ? '' : 's'} by where the proxy sends them. Click to show each group.`,
+    })
+    const top = bg[0]
+    const head = top && {
+      ...top, id: BG_ID, members: bg.flatMap(c => c.members),
+      label: `${bgOpen ? '▾' : '▸'} ${services}`,
+      sub: bgOpen ? 'click to fold' : `${bg.length} group${bg.length === 1 ? '' : 's'} · click to show`,
+      rungs: [...new Map(bg.map(c => [`${c.verdict.rung}|${c.verdict.provider}`, c.verdict])).values()],
+      fold: fold(bgOpen),
+    }
+    const shown = !head ? [] : bgOpen ? [head, ...bg] : [head]
+    return {
+      callers: [...fg, ...shown, ...defs].map(c => ({
+        rungs: [c.verdict], fold: undefined as ReturnType<typeof fold> | undefined, ...c,
+      })),
+      // Every route group, folded or not: what the counts, pins and exits are made
+      // of. The folded node only draws them; it is not a route of its own.
+      routeCallers: [...fg, ...bg, ...defs],
+    }
+  }, [data, verdictOf, bgOpen, flipBg])
 
   // ── Account nodes ──
   // Ordered subscriptions first, then metered keys, then disabled — the same
@@ -323,7 +373,7 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
 
   // ── Edge sets ──
   const routedProviders = useMemo(
-    () => new Set(callers.map(c => c.verdict.provider)), [callers])
+    () => new Set(routeCallers.map(c => c.verdict.provider)), [routeCallers])
 
   // A provider is a fallback target if some chain names it. Drawn dashed, and
   // only from the chain head — a chain is flat, so B's own chain is not consulted.
@@ -343,23 +393,23 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
   // 3 where the config has 31.
   const configRungs = useMemo<LadderRung[]>(() => {
     const counts = new Array(GATES.length).fill(0)
-    for (const c of callers) counts[c.verdict.rung] += Math.max(c.members.length, 1)
+    for (const c of routeCallers) counts[c.verdict.rung] += Math.max(c.members.length, 1)
     return GATES.map((_, i) => {
       let detail: string | undefined
       if (i === 1) {
-        const pinned = callers.flatMap(c => (c.verdict.rung === 1 ? c.members : []))
+        const pinned = routeCallers.flatMap(c => (c.verdict.rung === 1 ? c.members : []))
         detail = pinned.length ? pinned.join(', ') : undefined
       } else if (i === 2 && policy) {
         detail = `offload_bands: ${policy.offloadBands.join(', ') || 'none'}`
       } else if (i === 3 && policy) {
         detail = describeTargets(policy)
       } else if (i === RUNG_OFFLOADED) {
-        const moved = callers.find(c => c.verdict.rung === RUNG_OFFLOADED)
+        const moved = routeCallers.find(c => c.verdict.rung === RUNG_OFFLOADED)
         detail = moved ? `→ ${moved.verdict.provider}` : undefined
       }
       return { count: counts[i], detail }
     })
-  }, [callers, policy])
+  }, [routeCallers, policy])
 
   const ladderRungs = gates?.rungs ?? configRungs
   const ladderUnit = gates?.unit ?? 'routes'
@@ -381,11 +431,11 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
       // whether or not any of them was called in the window. Without this the
       // fold would swallow a gate with live edges pointing at it, and those edges
       // would terminate on a row labelled "nothing reached".
-      ...callers.map(c => c.verdict.rung),
+      ...routeCallers.map(c => c.verdict.rung),
       gates?.activeRung, gates?.selectedRung,
     ].filter((r): r is number => r != null),
     expanded: expandedRuns,
-  }), [ladderRungs, callers, gates?.activeRung, gates?.selectedRung, expandedRuns])
+  }), [ladderRungs, routeCallers, gates?.activeRung, gates?.selectedRung, expandedRuns])
 
   // The ladder can be the tallest element, so it is part of the height budget
   // rather than something assumed to fit between the two columns.
@@ -416,12 +466,12 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
    */
   const exitEdges = useMemo(() => {
     const seen = new Map<string, { rung: number; provider: string }>()
-    for (const c of callers) {
+    for (const c of routeCallers) {
       const k = `${c.verdict.rung}|${c.verdict.provider}`
       if (!seen.has(k)) seen.set(k, { rung: c.verdict.rung, provider: c.verdict.provider })
     }
     return [...seen.values()]
-  }, [callers])
+  }, [routeCallers])
 
   const acctIndex = new Map(accounts.map((p, i) => [p.id, i]))
 
@@ -507,22 +557,26 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
               Not caller → one hub. Landing each edge on its own rung is what
               makes "this caller's answer is this gate" a single saccade, and it
               is the only thing the gate column adds over the box it replaced. */}
-          {callers.map((c, i) => {
+          {callers.flatMap((c, i) => {
+            // An unfolded header is a label, not a caller: its groups draw their own edges.
+            if (c.fold?.open) return []
             const y = callerY(i) + NODE_H / 2
             const x1 = COL_CALLER + CALLER_W
             const x2 = COL_GATE
             const mid = (x1 + x2) / 2
-            const ry = rungY(c.verdict.rung)
-            return (
-              <path
-                key={`e-in-${c.id}`}
-                d={`M ${x1} ${y} C ${mid} ${y}, ${mid} ${ry}, ${x2} ${ry}`}
-                fill="none"
-                stroke={getProviderColor(c.verdict.provider)}
-                strokeWidth={1.25}
-                opacity={dim(c.id) ? 0.12 : 0.45}
-              />
-            )
+            return c.rungs.map(v => {
+              const ry = rungY(v.rung)
+              return (
+                <path
+                  key={`e-in-${c.id}-${v.rung}-${v.provider}`}
+                  d={`M ${x1} ${y} C ${mid} ${y}, ${mid} ${ry}, ${x2} ${ry}`}
+                  fill="none"
+                  stroke={getProviderColor(v.provider)}
+                  strokeWidth={1.25}
+                  opacity={dim(c.id) ? 0.12 : 0.45}
+                />
+              )
+            })
           })}
 
           {/* ── Edges: rung exit → account ── */}
@@ -610,13 +664,16 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
             const color = getProviderColor(c.verdict.provider)
             const moved = c.verdict.offloadedFrom
             return (
-              <g key={c.id}
+              <g key={c.id} data-caller={c.id} data-kind={c.kind}
+                data-fold={c.fold ? (c.fold.open ? 'open' : 'folded') : undefined}
                 onMouseEnter={() => setHover(c.id)}
                 onMouseLeave={() => setHover(null)}
-                style={{ cursor: c.members.length > 1 ? 'help' : 'default' }}
+                onClick={c.fold?.toggle}
+                style={{ cursor: c.fold ? 'pointer' : c.members.length > 1 ? 'help' : 'default' }}
                 opacity={dim(c.id) ? 0.35 : 1}
               >
                 <title>
+                  {c.fold ? `${c.fold.title}\n\n` : ''}
                   {c.members.length > 1 ? `${c.members.join('\n')}\n\n` : ''}
                   {`declared: ${c.entry.provider} / ${c.entry.complexity}`}
                   {moved
@@ -625,7 +682,10 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
                   {c.verdict.reason ? `\n${c.verdict.reason}` : ''}
                 </title>
                 <rect x={COL_CALLER} y={y} width={CALLER_W} height={NODE_H} rx={5}
-                  className="fill-background stroke-border" strokeWidth={1} />
+                  className="fill-background stroke-border" strokeWidth={1}
+                  strokeDasharray={c.fold?.open ? '4 3' : undefined} />
+                <rect x={COL_CALLER} y={y} width={CALLER_W} height={NODE_H} rx={5}
+                  fill={WASH[c.kind]} fillOpacity={WASH_OPACITY} pointerEvents="none" />
                 <rect x={COL_CALLER} y={y} width={3} height={NODE_H} rx={1.5} fill={color} />
                 <text x={COL_CALLER + 10} y={y + 15} className="fill-foreground"
                   fontSize={11} fontWeight={c.kind === 'default' ? 400 : 600}
@@ -633,7 +693,7 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
                   {c.label}
                 </text>
                 <text x={COL_CALLER + 10} y={y + 28} className="fill-muted-foreground" fontSize={9.5}>
-                  {c.sub} → {modelFor(data.providers, c.verdict.provider, c.entry.complexity)}
+                  {c.fold ? c.sub : `${c.sub} → ${modelFor(data.providers, c.verdict.provider, c.entry.complexity)}`}
                 </text>
               </g>
             )
@@ -705,12 +765,19 @@ export function FlowTab({ data, proxyBase, hours, gates }: Props) {
           <svg width="26" height="8"><line x1="0" y1="4" x2="26" y2="4" stroke="currentColor" strokeWidth="2" strokeDasharray="2 4" /></svg>
           fallback with a guard
         </span>
+        <span className="flex items-center gap-1.5">
+          {([['fg', 'coding agents'], ['bg', 'background services'], ['default', 'defaults (anything not named)']] as const).map(([k, label]) => (
+            <span key={k} className="flex items-center gap-1">
+              <svg width="12" height="10"><rect width="12" height="10" rx="2" fill={WASH[k]} fillOpacity={WASH_OPACITY * 2} /></svg>{label}
+            </span>
+          ))}
+        </span>
         <span className="flex items-center gap-1.5" title={GLASS_NOTE}>
           <svg width="26" height="12"><rect x="1" y="1" width="24" height="10" rx="3" fill={GLASS_TINT} fillOpacity={0.09}
             stroke={GLASS_TINT} strokeOpacity={0.35} strokeDasharray="3 3" /></svg>
           also in glass (measured, not routed) — the rest is coding only
         </span>
-        <span>hover a node to isolate it · hover for the full member list</span>
+        <span>hover a node to isolate it · hover for the full member list · click the background services to show or fold them</span>
       </div>
     </div>
   )
