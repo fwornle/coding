@@ -279,12 +279,13 @@ describe('Session capture — pi (native session JSONL)', () => {
   // Executes the generator rather than grepping it: the bug was in WHICH BRANCH ran,
   // which a source grep for "x-task-id" passes either way.
   describe('models.json task binding', () => {
-    const generate = async (env) => {
+    const generate = async (env, { withDir = false } = {}) => {
       const dir = mkdtempSync(path.join(os.tmpdir(), 'pi-models-'));
       const { writePiModelsJson } = await import('../../lib/agents/proxy-routing.mjs');
       writePiModelsJson(dir, env);
-      return JSON.parse(readFileSync(path.join(dir, 'models.json'), 'utf8'))
+      const provider = JSON.parse(readFileSync(path.join(dir, 'models.json'), 'utf8'))
         .providers['rapid-proxy-pi'];
+      return withDir ? { provider, dir } : provider;
     };
 
     it('omits x-task-id when there is no task, so interactive launches work', async () => {
@@ -295,13 +296,17 @@ describe('Session capture — pi (native session JSONL)', () => {
       expect(provider.headers).not.toHaveProperty('x-task-id');
     });
 
-    it('keeps the $TASK_ID reference when a measured run binds a cell', async () => {
-      const provider = await generate({ TASK_ID: 'exp-cell-42' });
-      expect(provider.headers['x-agent']).toBe('pi');
-      // The literal reference, not the resolved value: ONE static file serves every
-      // cell because pi re-interpolates it per process (the cell's TASK_ID is set per
-      // process by wireAgentEnv).
-      expect(provider.headers['x-task-id']).toBe('$TASK_ID');
+    // Since cc1c2395 (2026-10-31) models.json names NO `$VAR` header at all, also for a
+    // measured run: under global scope it is ~/.pi/agent/models.json, read by every
+    // `pi`, and one naming an unset variable stops pi outside coding. A cell's
+    // x-task-id comes from the coding-proxy-headers extension, which reads TASK_ID
+    // from pi's env per process (set by wireAgentEnv) — so it is installed beside it.
+    it('names no $VAR header for a measured run either; the headers extension sends x-task-id', async () => {
+      const { provider, dir } = await generate({ TASK_ID: 'exp-cell-42' }, { withDir: true });
+      expect(provider.headers).toEqual({ 'x-agent': 'pi' });
+      const ext = readFileSync(path.join(dir, 'extensions', 'coding-proxy-headers.ts'), 'utf8');
+      expect(ext).toContain('x-task-id');
+      expect(ext).toContain('TASK_ID');
     });
   });
 });
