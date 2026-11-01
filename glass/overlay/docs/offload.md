@@ -30,7 +30,7 @@ opt-in, off by default, switched in the UI at any time.
     It applies to the next call: no restart, no relaunch of the agent. Switch it off the same
     way, or from the endpoint's node in **Models → Flow**:
 
-    ![Models flow with the endpoint as an account; its card holds the switch](images/ui-models-flow-offload.png)
+    ![Models flow with the endpoint as an account: opencode's easy calls go to m-small and are answered by Team Box (green); the endpoint's card, open, holds the switch](images/ui-models-flow-offload.png)
 
     While it is on for a session's agent, the status line counts **`[L:n]`** — calls your
     endpoint answered — and **`[D:n]`** — calls the classifier judged easier than their model
