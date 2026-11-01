@@ -177,7 +177,7 @@ Drag the brush under the chart to zoom into one stretch of work.
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Token Usage Evolution: thirty days in euros, stacked by provider, month-to-date — the Claude subscription and GitHub Copilot each rising through the month — demo data.](images/ui-token-usage-evolution.png)](images/ui-token-usage-evolution.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![Token Usage Evolution: thirty days in euros, stacked by provider, month-to-date — the Claude subscription and GitHub Copilot each rising through the month.](images/ui-token-usage-evolution.png)](images/ui-token-usage-evolution.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
 <figcaption>Example runs on one machine, not a benchmark. Month-to-date in €: each step is a session's spend; the slope is the burn rate.</figcaption>
 </figure>
@@ -205,7 +205,7 @@ The status line carries the Copilot figure as **`GH €`**; one click opens this
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Cost tab: tiles for GitHub Copilot with spend, month-end projection and foreground / background split, the Claude subscription as notional cost, and cost by month below — demo data.](images/ui-token-usage-cost.png)](images/ui-token-usage-cost.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![Cost tab: tiles for GitHub Copilot with spend, month-end projection and foreground / background split, the Claude subscription as notional cost, and cost by month below.](images/ui-token-usage-cost.png)](images/ui-token-usage-cost.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
 <figcaption>A contract discount or a fixed euro rate goes into <code>~/.glass/cost.json</code>.</figcaption>
 </figure>
@@ -297,7 +297,7 @@ For one session, select its row in **Sessions**: the same view, call by call.
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Models flow over 7 days: claude to claude-opus-5.5 to the Claude subscription; opencode, copilot and pi to several models, all answered by GitHub Copilot; side calls dashed.](images/ui-models-flow.png)](images/ui-models-flow.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![Models flow over 7 days: claude, pi, copilot, opencode and coding's background services, to models grouped by vendor (Anthropic opened, OpenAI folded), to the Claude subscription and GitHub Copilot; the offload endpoint dashed, with no calls in the window.](images/ui-models-flow.png)](images/ui-models-flow.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
 <figcaption>A week on one machine. No decision in the middle: every model here is one the agent chose; glass measures, it does not route.</figcaption>
 </figure>
@@ -428,7 +428,7 @@ Judge the answer too: fewer tokens don't automatically mean a better result.
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Sessions table listing runs from Copilot CLI, Claude Code, pi and OpenCode, with model, calls, tokens and a Context button on each row.](images/ui-sessions.png)](images/ui-sessions.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![Sessions table listing runs from Claude Code, pi and OpenCode, live ones marked, with project, model, calls, tokens and a Context button on each row.](images/ui-sessions.png)](images/ui-sessions.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
 <figcaption>One row per measured run. The sample rows show the UI, not an agent ranking.</figcaption>
 </figure>

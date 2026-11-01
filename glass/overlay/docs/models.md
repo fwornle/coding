@@ -10,7 +10,7 @@ agent's own loop rather than side requests.
     Open `glass ui` → **Models**. One row per agent, model, account and kind for the chosen
     time window (24 h, 7 days, 30 days, all), with sessions, calls and tokens:
 
-    ![Models tab: OpenCode and Claude Code over 24 hours, with OpenCode's title calls marked as side calls](images/ui-models.png)
+    ![Model mix over 24 hours on a machine that also runs coding: coding's background services by name, next to Claude Code's main calls to the Claude subscription](images/ui-models.png)
 
     | Column | Meaning |
     |---|---|
@@ -27,7 +27,7 @@ agent's own loop rather than side requests.
     chose, to the account that answered. Edge thickness is tokens; dashed edges are side
     calls. Hover a node to isolate its paths.
 
-    ![Flow over 7 days: claude to claude-opus-5.5 to the Claude subscription; opencode, copilot and pi to several models, all answered by GitHub Copilot; side calls dashed](images/ui-models-flow.png)
+    ![Models flow over 7 days: claude, pi, copilot, opencode and coding's background services, to models grouped by vendor (Anthropic opened, OpenAI folded), to the Claude subscription and GitHub Copilot; the offload endpoint dashed, with no calls in the window](images/ui-models-flow.png)
 
     By default there is no decision in the middle: every edge is a choice the agent made,
     and glass forwarded the call to the host the agent addressed. With
@@ -37,7 +37,7 @@ agent's own loop rather than side requests.
     For **one session**, open **Sessions** and select its row: the same columns appear in a
     Models card above the session's timeline, with its calls one by one.
 
-    ![Models card of an OpenCode session](images/ui-session-models.png)
+    ![Models card of an OpenCode session: two models answered by GitHub Copilot, and one side call answered by the offload endpoint](images/ui-session-models.png)
 
     Unless [offload](offload.md) is on, every model on this card is one the agent chose, and
     every call went to the agent's own provider. **Next:** what filled the main calls —

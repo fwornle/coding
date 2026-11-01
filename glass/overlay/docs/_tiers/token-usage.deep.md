@@ -24,7 +24,7 @@ cheaply.
 - **By Provider** — the account that was billed: `gh-copilot` (GitHub Copilot),
   `claude-code-max` (Claude subscription), `openai`, `anthropic`.
 - **By Provider / Model** — tokens per model. Agents make side calls you never see:
-  OpenCode, for instance, asks a small model (`gpt-5-mini` above) for a session title.
+  OpenCode, for instance, asks a small model for a session title.
 
 ## Tokens, € or $
 

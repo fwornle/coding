@@ -16,7 +16,7 @@ Anything you can vary between two `glass <agent>` runs:
 2. **Run each variant** through glass, one after the other.
 3. **Compare in Sessions** — one row per run:
 
-    ![Sessions, four agents on one task](images/ui-sessions.png)
+    ![Sessions, four agents on one task](images/ui-sessions-one-task.png)
 
     Above, four rows ran the same task: Claude Code (10:02) used 2 calls and 116K tokens,
     OpenCode (10:03) 4 calls and 88K, pi (10:03) 2 calls and 6.8K, copilot (19:09) 2
