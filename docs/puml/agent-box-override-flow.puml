@@ -1,0 +1,44 @@
+@startuml agent-box-override-flow
+!include _standard-style.puml
+
+title Overriding a rule from inside the agent box
+
+actor "You" as user
+participant "Agent\n(in the box)" as agent
+participant "Constraint hook\n(in the box)" as hook
+participant "coding-guard\n(host :3035)" as guard
+participant "Approval page\n(host browser)" as page
+participant "Authenticator\nTouch ID · phone · key" as authn
+
+agent -> hook : tool call (e.g. Write)
+hook -> hook : rule matches → block
+hook -> guard : POST /requests\n{rule, session, file, excerpt, reason}
+guard --> hook : pending + approval link
+hook --> agent : blocked: "approve at\nhttp://localhost:3035/approve/<id>"
+agent --> user : shows the link
+
+user -> page : opens the link
+page -> guard : request details
+user -> page : picks scope\n(this call · N minutes · session)
+page -> guard : POST /approve/<id>/options {scope}
+guard --> page : challenge bound to <id> + scope
+page -> authn : navigator.credentials.get
+authn -> user : fingerprint / face / PIN
+authn --> page : signed assertion
+page -> guard : POST /approve/<id>/verify
+guard -> guard : verify assertion\nsign grant (Ed25519)\nappend audit
+guard --> page : approved until …
+
+agent -> hook : retries the tool call
+hook -> guard : GET /grants?session=…
+guard --> hook : signed grant
+hook -> hook : verify with public key\n(rule, session, file, expiry)
+hook --> agent : allowed
+
+note over guard
+  Password or a one-time recovery code
+  can stand in for the authenticator
+  (5 wrong tries → 15 min lockout).
+end note
+
+@enduml

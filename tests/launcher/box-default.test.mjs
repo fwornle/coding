@@ -9,7 +9,8 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,8 +26,11 @@ function decisionBlock() {
   return SOURCE.slice(start, end + 'export CODING_BOX_SOURCE'.length);
 }
 
-function decide({ agent, env = {}, source = '' }) {
-  const script = `AGENT=${agent}; CODING_BOX_SOURCE=${source}\n${decisionBlock()}\necho "$CODING_BOX $CODING_BOX_SOURCE"`;
+function decide({ agent, env = {}, source = '', constraints = true }) {
+  // SCRIPT_DIR points at a stub coding-features that answers for `constraints`.
+  const stubDir = mkdtempSync(join(tmpdir(), 'box-default-'));
+  writeFileSync(join(stubDir, 'coding-features'), `process.exit(${constraints ? 0 : 1});\n`);
+  const script = `SCRIPT_DIR=${stubDir}; AGENT=${agent}; CODING_BOX_SOURCE=${source}\n${decisionBlock()}\necho "$CODING_BOX $CODING_BOX_SOURCE"`;
   const clean = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('CODING_BOX')));
   return execFileSync('bash', ['-c', script], { env: { ...clean, ...env }, encoding: 'utf8' }).trim();
 }
@@ -34,6 +38,10 @@ function decide({ agent, env = {}, source = '' }) {
 describe('box mode default', () => {
   test('claude → box, by default', () => {
     assert.equal(decide({ agent: 'claude' }), 'true default');
+  });
+
+  test('with the constraints feature off (harness tier, no Docker) claude stays on the host', () => {
+    assert.equal(decide({ agent: 'claude', constraints: false }), 'false default');
   });
 
   test('other agents stay opt-in', () => {

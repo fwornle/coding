@@ -316,11 +316,16 @@ fi
 # Box mode. Claude runs in the agent box unless told otherwise (--no-box, or
 # CODING_BOX=false in the environment); the other agents stay opt-in (--box)
 # until their own guard and session stores are wired into the box
-# (.planning/guardrail-hardening.md, Phase 1 item 5).
+# (.planning/guardrail-hardening.md, Phase 1 item 5). The box is how the
+# `constraints` feature is enforced, so with that feature off (the Docker-free
+# `harness` tier) the default is the host.
+box_default_feature() {
+  node "$SCRIPT_DIR/coding-features" enabled constraints >/dev/null 2>&1
+}
 if [ -z "${CODING_BOX_SOURCE:-}" ]; then
   if [ -n "${CODING_BOX:-}" ]; then
     CODING_BOX_SOURCE=env
-  elif [ "$AGENT" = "claude" ]; then
+  elif [ "$AGENT" = "claude" ] && box_default_feature; then
     export CODING_BOX=true
     CODING_BOX_SOURCE=default
   else

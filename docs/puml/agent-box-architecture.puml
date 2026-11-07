@@ -1,0 +1,47 @@
+@startuml agent-box-architecture
+!include _standard-style.puml
+
+title Agent box: the agent runs inside, its guard and your approval live outside
+
+top to bottom direction
+
+package "Your authenticators" as authn {
+  component "Touch ID /\nWindows Hello" as touch <<external>>
+  component "Phone passkey\n(QR code)" as phone <<external>>
+  component "Security key\n(YubiKey)" as yubikey <<external>>
+}
+
+package "Host (your user)" as host {
+  component "Approval page\nin your browser" as page <<api>>
+  component "coding-guard daemon\nlocalhost:3035" as guard <<core>>
+  database "~/.coding/guard\nsigning key · token\nfactors · audit log" as guardhome <<storage>>
+  component "Docker daemon" as docker <<infra>>
+  component "coding launcher\n(tmux, status line)" as launcher <<cli>>
+}
+
+package "Agent box (container, uid = you, no_new_privs)" as box {
+  component "Agent CLI\nclaude · copilot · opencode · pi" as agent <<agent>>
+  component "Constraint hook\n/opt/coding-guard\n(root-owned, policy-pinned)" as hook <<core>>
+  database "Workspace\n(rw mount)" as workspace <<storage>>
+  database "Guard public key\n/etc/coding-guard (ro)" as pubkey <<storage>>
+}
+
+touch --> page
+phone --> page
+yubikey --> page
+page --> guard : approve\nwith a factor
+guard --> guardhome : signs grants,\nappends audit
+guard --> docker : fixed argv only
+launcher --> agent : docker run
+agent --> hook : every tool call
+agent --> workspace : edits
+hook ..> guard : override request
+agent ..> guard : coding svc <verb>
+guardhome ..> pubkey : public half only
+
+note bottom of box
+  No Docker socket, no sudo, no host home.
+  The agent can ask for an override, never approve one.
+end note
+
+@enduml

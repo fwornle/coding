@@ -1,11 +1,11 @@
 # Core Systems
 
-Six systems run behind every session. This is what each one is for and how they feed each
+These systems run behind every session. This is what each one is for and how they feed each
 other.
 
 === "⚡ Quick (~3 min)"
 
-    ## The seven systems at a glance
+    ## The systems at a glance
 
     | System | Does | You interact with it via |
     |--------|------|--------------------------|
@@ -14,6 +14,7 @@ other.
     | **Observational Memory** | Captures observations across all four agents, consolidated into digests and insights | The knowledge base |
     | **OKB** | Cross-repo root-cause analyses and runbooks | Its own viewer |
     | **Constraints** | Blocks a violating tool call before it executes | The dashboard at `:3030` |
+    | **Agent Box** | Runs the agent in a container under a guard it cannot edit; you approve overrides with a factor | `coding box`, `coding guard`, `coding --no-box` |
     | **Health Monitoring** | Supervises services and restarts what dies | `coding --health`, `:3032` |
     | **Status Line** | Live health, cost and logging state | Your tmux bar |
 

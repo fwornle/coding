@@ -110,6 +110,7 @@ nav:
     - Live Session Logging: core-systems/lsl.md
     - Ontology: core-systems/ontology.md
     - Constraints: core-systems/constraints.md
+    - Agent Box & Overrides: core-systems/agent-box.md
     - Observational Memory: core-systems/observational-memory.md
   - Architecture:
     - Overview: architecture/index.md

@@ -10,21 +10,37 @@
  *   GET  /public-key                   PEM (also mounted ro into the box)
  *   POST /requests                     an agent asks for an override  → pending
  *   GET  /requests[?status=]           list;  GET /requests/:id  one
- *   POST /requests/:id/approve   [A]   { scope: call|minutes|session, minutes }
- *   POST /requests/:id/deny      [A]
+ *   GET  /approve/:id                  approval page (opened in the host browser)
+ *   POST /approve/:id/options          { scope, minutes } → WebAuthn challenge
+ *   POST /approve/:id/verify           { ceremony, response }       → grant
+ *   POST /approve/:id/password         { scope, minutes, password } → grant
+ *   POST /approve/:id/recovery         { scope, minutes, code }     → grant
+ *   POST /requests/:id/deny            anyone may say no
+ *   GET  /enroll                 [A#]  factor page (token in the URL fragment)
+ *   GET  /factors                      what is enrolled (no secrets)
+ *   POST /manage/options|verify|password   prove a factor → management ticket
+ *   POST /enroll/options|verify  [A+T] add an authenticator (Touch ID, phone, key)
+ *   POST /factors/password       [A+T] set the password
+ *   POST /factors/:id/remove     [A+T] drop an authenticator
+ *   POST /factors/recovery       [A+T] new recovery codes
  *   GET  /grants?session=              live signed grants for a box session
  *   POST /grants/:id/consume           spend a one-call grant
  *   POST /svc                          { verb, args, session } — lib/guard/svc.mjs
  *   GET  /audit                  [A]   tail + chain check
  *   POST /note                   [A]   record a host-side event (e.g. --no-box)
  *
- * [A] = needs `Authorization: Bearer <approver.token>`. The token file is 0600
- * in ~/.coding/guard, which is mounted nowhere, so a boxed agent can request
- * but never approve. Interactive approval (WebAuthn, password) replaces the
- * CLI-held token in Phase 1 item 3; approver routes refuse any browser Origin
- * until then.
+ * Approving needs one of the user's FACTORS (lib/guard/factors.mjs): a WebAuthn
+ * authenticator — Touch ID / Windows Hello, a phone passkey via QR, a FIDO2 key
+ * — or the password, or a one-time recovery code. The agent can request, never
+ * approve: it holds no authenticator, and password / recovery attempts lock
+ * out after 5 failures.
  *
- * Plan: .planning/guardrail-hardening.md (Phase 1, item 2).
+ * [A] = needs `Authorization: Bearer <approver.token>` (0600 in ~/.coding/guard,
+ * mounted nowhere). [T] = and, once any factor exists, a management ticket from
+ * proving one — so neither the token alone nor a stolen session can add a
+ * factor of its own. The very first factor needs only the token.
+ *
+ * Plan: .planning/guardrail-hardening.md (Phase 1, items 2 and 3).
  */
 
 import { execFile } from 'node:child_process';
@@ -35,12 +51,25 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
 import { guardPaths, ensureGuardHome, guardPort } from '../lib/guard/home.mjs';
-import { signGrant, SCOPES } from '../lib/guard/grants.mjs';
+import { signGrant, SCOPES, expiryFor } from '../lib/guard/grants.mjs';
+import { FactorStore } from '../lib/guard/factors.mjs';
+import { Ceremonies } from '../lib/guard/ceremonies.mjs';
 import { appendAudit, readAudit, verifyAudit } from '../lib/guard/audit.mjs';
 import { svcPlan, parsePrograms, SvcError, SERVICES_CONTAINER } from '../lib/guard/svc.mjs';
 import { listenLocal, isAllowedHost } from '../lib/network/local-only.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const UI_DIR = path.join(REPO, 'lib', 'guard', 'ui');
+
+/** Static files the pages load — a fixed map, nothing else is served from disk. */
+const ASSETS = {
+  '/assets/guard-ui.js': [path.join(UI_DIR, 'guard-ui.js'), 'text/javascript'],
+  '/assets/guard.css': [path.join(UI_DIR, 'guard.css'), 'text/css'],
+  '/assets/webauthn.js': [path.join(REPO, 'node_modules', '@simplewebauthn', 'browser', 'dist', 'bundle', 'index.umd.min.js'), 'text/javascript'],
+};
+const PAGES = { approve: path.join(UI_DIR, 'approve.html'), enroll: path.join(UI_DIR, 'enroll.html') };
+/** No inline script, no framing, nothing from elsewhere: request text is agent-written. */
+const CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
 const MAX_BODY = 64 * 1024;
 const MAX_PENDING = 100;
@@ -75,8 +104,14 @@ function dockerRunner(argv, { timeout = 60_000 } = {}) {
  * The request handler, with every side effect injected so tests can drive it
  * against a temp guard home and a fake docker.
  */
-export function createGuard({ paths = guardPaths(), runDocker = dockerRunner, now = () => Date.now(), codingRepo = REPO } = {}) {
+export function createGuard({
+  paths = guardPaths(), runDocker = dockerRunner, now = () => Date.now(), codingRepo = REPO, port = guardPort(),
+} = {}) {
   const keys = ensureGuardHome(paths);
+  const pageOrigin = `http://localhost:${port}`;
+  const ownOrigins = new Set([pageOrigin, `http://127.0.0.1:${port}`, `http://[::1]:${port}`]);
+  const factors = new FactorStore(paths.dir, { now });
+  const ceremonies = new Ceremonies(factors, { origins: [pageOrigin], now });
   const fingerprint = createHash('sha256').update(keys.publicPem).digest('hex').slice(0, 16);
   const tokenBuf = Buffer.from(keys.token);
   let state = { requests: {}, grants: {} };
@@ -97,13 +132,68 @@ export function createGuard({ paths = guardPaths(), runDocker = dockerRunner, no
     for (const [id, r] of Object.entries(state.requests)) if (t - r.created > REQUEST_TTL_MS) delete state.requests[id];
   };
 
-  function authorize(req) {
-    if (req.headers.origin) throw new HttpError(403, 'approver routes do not accept browser requests');
+  /** Approver token. `page`: the guard's own pages may send it (enrolment). */
+  function authorize(req, { page = false } = {}) {
+    if (req.headers.origin && !(page && ownOrigins.has(req.headers.origin))) {
+      throw new HttpError(403, 'this route does not accept browser requests');
+    }
     const m = /^Bearer (.+)$/.exec(req.headers.authorization || '');
     const given = Buffer.from(m ? m[1].trim() : '');
     if (given.length !== tokenBuf.length || !timingSafeEqual(given, tokenBuf)) {
       throw new HttpError(401, 'approver token required (only the host user has it: coding guard approve …)');
     }
+  }
+
+  /** Token, plus — once anything is enrolled — a ticket from proving a factor. */
+  function authorizeManage(req, body) {
+    authorize(req, { page: true });
+    if (factors.hasFactors() && !ceremonies.checkTicket(body.ticket)) {
+      throw new HttpError(401, 'prove an enrolled factor first (management ticket missing or expired)');
+    }
+  }
+
+  function pendingRequest(id) {
+    const r = state.requests[id];
+    if (!r) throw new HttpError(404, 'no such request');
+    if (r.status !== 'pending') throw new HttpError(409, `request is already ${r.status}`);
+    return r;
+  }
+
+  function checkScope(body) {
+    const scope = body.scope || 'call';
+    if (!SCOPES.includes(scope)) throw new HttpError(400, `scope must be one of: ${SCOPES.join(', ')}`);
+    try {
+      expiryFor(scope, { minutes: body.minutes });
+    } catch (err) {
+      throw new HttpError(400, err.message);
+    }
+    return { scope, minutes: scope === 'minutes' ? Number(body.minutes) : undefined };
+  }
+
+  /** The one place a grant is made — after a factor has been proven. */
+  function approve(r, { scope, minutes }, via) {
+    const grant = signGrant(r, { scope, minutes, privatePem: keys.privatePem, now: now() });
+    state.grants[grant.payload.id] = grant;
+    Object.assign(r, { status: 'approved', decided: now(), grant: grant.payload.id, via });
+    save();
+    audit({ event: 'request.approved', request: r.id, rule: r.rule, session: r.session, scope, grant: grant.payload.id, exp: grant.payload.exp, via });
+    return { request: r, grant };
+  }
+
+  /** Password / recovery code: guessable, so locked out after repeated failures. */
+  function secretFactor(kind, value, context) {
+    let ok;
+    try {
+      ok = kind === 'password' ? factors.checkPassword(value) : factors.useRecoveryCode(value);
+    } catch (err) {
+      audit({ event: 'factor.locked', kind, ...context });
+      throw new HttpError(429, err.message);
+    }
+    if (!ok) {
+      audit({ event: 'factor.failed', kind, ...context });
+      throw new HttpError(401, `wrong ${kind === 'password' ? 'password' : 'recovery code'}`);
+    }
+    if (kind === 'recovery') audit({ event: 'factor.recovery-used', left: factors.summary().recoveryLeft, ...context });
   }
 
   function newRequest(body, source = 'agent') {
@@ -117,7 +207,8 @@ export function createGuard({ paths = guardPaths(), runDocker = dockerRunner, no
       if (typeof body[key] !== 'string' || !body[key].trim()) throw new HttpError(400, `${key} required`);
     }
     recent.push(t);
-    const r = { id: randomBytes(6).toString('hex'), status: 'pending', created: t, source };
+    const id = randomBytes(6).toString('hex');
+    const r = { id, status: 'pending', created: t, source, approve: `${pageOrigin}/approve/${id}` };
     for (const [key, max] of Object.entries(FIELD_LIMITS)) r[key] = clip(body[key], max);
     state.requests[r.id] = r;
     save();
@@ -153,7 +244,7 @@ export function createGuard({ paths = guardPaths(), runDocker = dockerRunner, no
       const grant = liveGrants(session).find((g) => g.payload.rule === rule);
       if (!grant) {
         const r = newRequest({ rule, session, agent: body.agent, tool: 'svc', reason: body.reason ?? `coding svc ${verb}` });
-        throw new HttpError(403, `'${verb}' needs your approval: coding guard approve ${r.id}`, { request: r });
+        throw new HttpError(403, `'${verb}' needs your approval: ${r.approve}`, { request: r });
       }
       if (grant.payload.scope === 'call') grant.consumed = now();
       save();
@@ -188,29 +279,115 @@ export function createGuard({ paths = guardPaths(), runDocker = dockerRunner, no
       if (parts.length === 2 && m === 'GET') {
         return { request: r, grant: r.grant ? state.grants[r.grant] ?? null : null };
       }
-      if (parts.length === 3 && m === 'POST' && (parts[2] === 'approve' || parts[2] === 'deny')) {
-        authorize(req);
-        if (r.status !== 'pending') throw new HttpError(409, `request is already ${r.status}`);
-        if (parts[2] === 'deny') {
-          r.status = 'denied';
-          r.decided = now();
-          save();
-          audit({ event: 'request.denied', request: r.id, rule: r.rule, session: r.session });
-          return { request: r };
-        }
-        const scope = body.scope || 'call';
-        if (!SCOPES.includes(scope)) throw new HttpError(400, `scope must be one of: ${SCOPES.join(', ')}`);
-        let grant;
+      if (parts.length === 3 && m === 'POST' && parts[2] === 'deny') {
+        const pending = pendingRequest(r.id);
+        pending.status = 'denied';
+        pending.decided = now();
+        save();
+        audit({ event: 'request.denied', request: r.id, rule: r.rule, session: r.session });
+        return { request: pending };
+      }
+    }
+
+    if (parts[0] === 'approve' && parts.length === 3 && m === 'POST') {
+      const r = pendingRequest(parts[1]);
+      const ctx = { request: r.id, rule: r.rule };
+      if (parts[2] === 'options') {
+        const scope = checkScope(body);
         try {
-          grant = signGrant(r, { scope, minutes: body.minutes, privatePem: keys.privatePem, now: now() });
+          return await ceremonies.authOptions({ kind: 'approve', request: r.id, ...scope });
         } catch (err) {
           throw new HttpError(400, err.message);
         }
-        state.grants[grant.payload.id] = grant;
-        Object.assign(r, { status: 'approved', decided: now(), grant: grant.payload.id });
-        save();
-        audit({ event: 'request.approved', request: r.id, rule: r.rule, session: r.session, scope, grant: grant.payload.id, exp: grant.payload.exp });
-        return { request: r, grant };
+      }
+      if (parts[2] === 'verify') {
+        let proof;
+        try {
+          proof = await ceremonies.authVerify(body.ceremony, body.response);
+        } catch (err) {
+          audit({ event: 'factor.failed', kind: 'webauthn', ...ctx, error: clip(err.message, 200) });
+          throw new HttpError(401, err.message);
+        }
+        if (proof.purpose.kind !== 'approve' || proof.purpose.request !== r.id) {
+          throw new HttpError(400, 'that proof was issued for something else');
+        }
+        return approve(r, proof.purpose, `webauthn:${proof.credential.slice(0, 12)}`);
+      }
+      if (parts[2] === 'password' || parts[2] === 'recovery') {
+        if (parts[2] === 'password' && !factors.data.password) throw new HttpError(400, 'no password set');
+        const scope = checkScope(body);
+        secretFactor(parts[2], parts[2] === 'password' ? body.password : body.code, ctx);
+        return approve(r, scope, parts[2]);
+      }
+    }
+
+    if (m === 'GET' && url.pathname === '/factors') return { factors: factors.summary() };
+
+    if (parts[0] === 'manage' && parts.length === 2 && m === 'POST') {
+      if (parts[1] === 'options') {
+        try {
+          return await ceremonies.authOptions({ kind: 'manage' });
+        } catch (err) {
+          throw new HttpError(400, err.message);
+        }
+      }
+      if (parts[1] === 'verify') {
+        let proof;
+        try {
+          proof = await ceremonies.authVerify(body.ceremony, body.response);
+        } catch (err) {
+          audit({ event: 'factor.failed', kind: 'webauthn', purpose: 'manage', error: clip(err.message, 200) });
+          throw new HttpError(401, err.message);
+        }
+        if (proof.purpose.kind !== 'manage') throw new HttpError(400, 'that proof was issued for something else');
+        return { ticket: ceremonies.issueTicket() };
+      }
+      if (parts[1] === 'password' || parts[1] === 'recovery') {
+        secretFactor(parts[1], parts[1] === 'password' ? body.password : body.code, { purpose: 'manage' });
+        return { ticket: ceremonies.issueTicket() };
+      }
+    }
+
+    if (parts[0] === 'enroll' && parts.length === 2 && m === 'POST') {
+      authorizeManage(req, body);
+      if (parts[1] === 'options') {
+        return ceremonies.enrollOptions({ kind: body.kind, label: clip(body.label, 60) });
+      }
+      if (parts[1] === 'verify') {
+        const first = !factors.hasFactors();
+        let cred;
+        try {
+          cred = await ceremonies.enrollVerify(body.ceremony, body.response);
+        } catch (err) {
+          throw new HttpError(400, err.message);
+        }
+        audit({ event: 'factor.enrolled', kind: cred.kind, label: cred.label, credential: cred.id.slice(0, 12) });
+        return { credential: { id: cred.id, kind: cred.kind, label: cred.label }, recoveryCodes: first ? firstRecovery() : undefined };
+      }
+    }
+
+    if (parts[0] === 'factors' && m === 'POST') {
+      authorizeManage(req, body);
+      if (parts[1] === 'password' && parts.length === 2) {
+        const first = !factors.hasFactors();
+        try {
+          factors.setPassword(body.password);
+        } catch (err) {
+          throw new HttpError(400, err.message);
+        }
+        audit({ event: 'factor.enrolled', kind: 'password' });
+        return { password: true, recoveryCodes: first ? firstRecovery() : undefined };
+      }
+      if (parts[1] === 'recovery' && parts.length === 2) {
+        audit({ event: 'factor.recovery-regenerated' });
+        return { recoveryCodes: factors.newRecoveryCodes() };
+      }
+      if (parts.length === 3 && parts[2] === 'remove') {
+        const remaining = factors.data.credentials.length - 1 + (factors.data.password ? 1 : 0);
+        if (remaining < 1) throw new HttpError(409, 'refusing to remove the last factor — enrol another first');
+        if (!factors.removeCredential(parts[1])) throw new HttpError(404, 'no such authenticator');
+        audit({ event: 'factor.removed', credential: parts[1].slice(0, 12) });
+        return { factors: factors.summary() };
       }
     }
 
@@ -250,6 +427,36 @@ export function createGuard({ paths = guardPaths(), runDocker = dockerRunner, no
     throw new HttpError(404, 'not found');
   }
 
+  /** Recovery codes come with the FIRST factor, unless a set already exists. */
+  function firstRecovery() {
+    if (factors.summary().recoveryLeft > 0) return undefined;
+    audit({ event: 'factor.recovery-regenerated' });
+    return factors.newRecoveryCodes();
+  }
+
+  /** Pages and their assets. Returns true when it answered. */
+  function servePage(req, res, url) {
+    if (req.method !== 'GET') return false;
+    let file;
+    let type = 'text/html; charset=utf-8';
+    if (ASSETS[url.pathname]) [file, type] = ASSETS[url.pathname];
+    else if (/^\/approve\/[0-9a-f]{12}$/.test(url.pathname)) file = PAGES.approve;
+    else if (url.pathname === '/enroll' || url.pathname === '/') file = PAGES.enroll;
+    else return false;
+    // WebAuthn needs a domain: 127.0.0.1 / [::1] page loads move to localhost.
+    if (type.startsWith('text/html') && !/^localhost(:|$)/.test(req.headers.host || '')) {
+      res.writeHead(302, { location: `${pageOrigin}${url.pathname}${url.search}` });
+      res.end();
+      return true;
+    }
+    res.writeHead(200, {
+      'content-type': type, 'cache-control': 'no-store', 'content-security-policy': CSP,
+      'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer',
+    });
+    res.end(fs.readFileSync(file));
+    return true;
+  }
+
   async function handler(req, res) {
     const send = (status, obj) => {
       res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' });
@@ -257,7 +464,11 @@ export function createGuard({ paths = guardPaths(), runDocker = dockerRunner, no
     };
     try {
       if (!isAllowedHost(req.headers.host)) throw new HttpError(403, 'forbidden host');
-      if (req.headers.origin && req.method !== 'GET') throw new HttpError(403, 'forbidden origin');
+      if (req.headers.origin && req.method !== 'GET' && !ownOrigins.has(req.headers.origin)) {
+        throw new HttpError(403, 'forbidden origin');
+      }
+      const pageUrl = new URL(req.url, 'http://guard.local');
+      if (servePage(req, res, pageUrl)) return;
       let raw = '';
       for await (const chunk of req) {
         raw += chunk;
@@ -277,12 +488,12 @@ export function createGuard({ paths = guardPaths(), runDocker = dockerRunner, no
     }
   }
 
-  return { handler, fingerprint, audit };
+  return { handler, fingerprint, audit, factors, ceremonies, pageOrigin };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = guardPort();
-  const guard = createGuard();
+  const guard = createGuard({ port });
   const server = listenLocal(guard.handler, port, (addrs) => {
     guard.audit({ event: 'daemon.start', pid: process.pid, port, fingerprint: guard.fingerprint });
     process.stdout.write(`coding-guard listening on ${addrs.join(', ')}:${port} (key ${guard.fingerprint})\n`);

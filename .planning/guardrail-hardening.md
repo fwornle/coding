@@ -287,7 +287,8 @@ request path (proxy repo); team scope fails closed with a route test.
 | 0.5 proxy repo | todo (external) | needs PR on bmw.ghe.com |
 | Phase 1 item 1 (agent box) | done — DEFAULT for claude since item 2 | see "Phase 1 item 1 results" |
 | Phase 1 item 2 (host guard daemon) | done — LaunchAgent install left to the user | see "Phase 1 item 2 results" |
-| Phase 1 items 3–6 | todo | WebAuthn, hook verifies grants, per-agent guards, red-team |
+| Phase 1 item 3 (WebAuthn approval) | done — enrolment on this Mac needs the user | see "Phase 1 item 3 results" |
+| Phase 1 items 4–6 | todo | hook verifies grants, per-agent guards, red-team |
 | Phase 2–3 | todo | |
 
 ## Phase 0 results (2026-11-07)
@@ -463,6 +464,56 @@ Audit chain intact. Launcher dry-run: `coding` → box=true (default),
 - Nothing consumes grants yet — item 4 makes the in-box hook ask for them
   instead of reading `OVERRIDE_CONSTRAINT` from the transcript.
 
+## Phase 1 item 3 results (2026-11-07)
+
+**What exists**
+- `lib/guard/factors.mjs` — `~/.coding/guard/factors.json` (0600): WebAuthn
+  credentials (public keys only), argon2id password (Node 25 built-in
+  `crypto.argon2Sync`, 64 MiB / 3 passes, ≥12 chars), ten argon2id one-time
+  recovery codes (issued with the FIRST factor), lockout 5 failures → 15 min
+  for password + recovery (authenticators are not guessable, stay usable).
+- `lib/guard/ceremonies.mjs` — `@simplewebauthn/server` 14.1 (docs via ctx7):
+  rpID `localhost`, origin `http://localhost:3035`, attestation none,
+  userVerification REQUIRED; ceremonies single-use, 2 min, and the purpose
+  (request id + scope, or "manage") is fixed when the challenge is issued.
+  `preferredAuthenticatorType` → hints: platform / hybrid (QR) / security-key.
+- Daemon: token approval REMOVED. Approve = `/approve/:id/options|verify`
+  (WebAuthn), `/approve/:id/password`, `/approve/:id/recovery`. Enrol =
+  approver token for the first factor; afterwards token + a management ticket
+  from proving a factor (5 min). Never remove the last factor. Deny needs no
+  auth. Pages `/approve/<id>`, `/enroll` (token in the URL FRAGMENT, stripped
+  by the page) + fixed asset map, CSP `script-src 'self'`, `frame-ancestors
+  'none'`; agent-written fields rendered with textContent; 127.0.0.1 page
+  loads redirect to localhost (WebAuthn refuses IP origins); own-origin POSTs
+  allowed, foreign Origins refused, `/audit` + `/note` still refuse any Origin.
+- CLI: `coding guard approve <id>` opens the page; `enroll`, `factors`.
+- `install.sh` step `setup_guard_factors` (after the daemons; interactive
+  only; skips when already enrolled) + manifest row for `~/.coding/guard/`.
+- Box default now also requires the `constraints` feature: the Docker-free
+  `harness` tier stays on the host instead of failing on a missing image.
+- Docs (MkDocs): `docs-content/core-systems/agent-box.md` (nav: Core Systems →
+  Agent Box & Overrides), diagrams `docs/puml/agent-box-architecture.puml`,
+  `agent-box-override-flow.puml`; Constraints page (box, overrides, exit 2,
+  fail-closed), Core Systems overview row, installation step 6. Strict build OK.
+
+**Verified** — `tests/guard/` 47/47 incl. real `@simplewebauthn/server`
+verification against a software authenticator
+(`tests/guard/helpers/soft-authenticator.mjs`): enrol, approve, unenrolled
+key 401, UV missing 401, proof moved to another request 400 then replay 401,
+foreign origin 401, password, recovery once, lockout, token-only enrol of a
+2nd factor 401. Browser (gsd-browser, scratch guard home): enrol page strips
+the token, loads SimpleWebAuthnBrowser, sets a password, shows 10 codes;
+approval page escapes `<img onerror>` / `<script>` from the agent's reason
+and excerpt, approves with the password at scope "15 minutes" → signed grant,
+audit `via: password`. NOT verifiable here: a real Touch ID / phone / YubiKey
+ceremony (gsd-browser has no virtual authenticator) — the user's enrolment is
+that test.
+
+**Open**
+- LaunchAgent still not installed (classifier refused again):
+  `scripts/install-launchd-daemons.sh guard`, then `coding guard enroll`.
+- Item 4: hook fetches + verifies grants, transcript override off in the box.
+
 ## Session log
 
 - **2026-11-07** — audit; plan written; Phase 0 implemented (0.1, 0.3, 0.4;
@@ -473,3 +524,6 @@ Audit chain intact. Launcher dry-run: `coding` → box=true (default),
 - **2026-11-07 (evening)** — Phase 1 item 2: host guard daemon (signed grants,
   audit chain, `coding svc` broker, units) built and verified against a real
   box; box mode made the default for claude with an audited `--no-box`.
+- **2026-11-07 (late)** — Phase 1 item 3: WebAuthn / password / recovery
+  approval with enrolment UI and install step; box default tied to the
+  constraints feature; MkDocs page + two diagrams.
