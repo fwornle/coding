@@ -22,14 +22,15 @@
  * deletes them from config; coordinator must not process them in any plan ordering.
  *
  * Pattern source: scripts/observations-api-server.mjs (single-owner HTTP gateway).
- * Bind: 0.0.0.0 (Linux Docker host-gateway requires this; loopback enforcement is at the
- * network layer per RESEARCH §3 — same reason obs-api binds 0.0.0.0).
+ * Bind: loopback (IPv4 + IPv6) plus docker0 on native Linux, via lib/network/local-only.mjs.
+ * Containers reach it through host.docker.internal, which Docker Desktop forwards to the
+ * host's loopback and native Linux Docker resolves to docker0.
  *
  * @module scripts/health-coordinator
  */
 
 import express from 'express';
-import cors from 'cors';
+import { localOnly, listenLocal } from '../lib/network/local-only.mjs';
 import path from 'node:path';
 import fs from 'node:fs';
 import { spawnSync, spawn, execFile, execSync } from 'node:child_process';
@@ -4382,7 +4383,8 @@ async function forceTick() {
 // HTTP server
 // ============================================
 const app = express();
-app.use(cors());
+// Host + Origin allow-lists instead of wildcard CORS (lib/network/local-only.mjs).
+app.use(localOnly());
 app.use(express.json({ limit: '1mb' }));
 
 app.get('/health', (_req, res) => {
@@ -4643,12 +4645,12 @@ app.post('/health/remediate', async (req, res) => {
 // and clears the run-owned active-measurement.json span (OQ3) so the D-02
 // 409 slot frees even after a hard SIGKILL.
 //
-// V4 origin gate: accept the container (host-gateway, a NON-loopback private
-// IP) AND host-side loopback callers; reject arbitrary EXTERNAL callers. Do
-// NOT reuse the /test/* LOOPBACK_IPS gate — it would 403 the container proxy
-// (85-PATTERNS V4 note). The coordinator port is not published beyond
-// localhost / the Docker-desktop loopback, so a private-range origin is the
-// container proxy, never a public caller.
+// V4 origin gate: accept the container (host-gateway) AND host-side loopback
+// callers; reject everything else. Do NOT reuse the /test/* LOOPBACK_IPS gate —
+// it would 403 the container proxy on native Linux (85-PATTERNS V4 note).
+// Docker Desktop delivers container traffic from loopback; native Linux Docker
+// delivers it from a bridge address in 172.16/12. 10/8 and 192.168/16 were
+// accepted too, which on a home or office LAN meant any machine on it.
 
 /**
  * True when the request originates from the host (loopback) OR a container on
@@ -4663,11 +4665,7 @@ function isExperimentOriginAllowed(req) {
   const ip = raw.replace(/^::ffff:/, '');
   // Host-side loopback.
   if (ip === '127.0.0.1' || ip === '::1') return true;
-  // RFC1918 / Docker private ranges (host-gateway origin): 10/8, 172.16–31/12,
-  // 192.168/16. A container reaching the coordinator via host-gateway presents
-  // one of these; an external caller cannot (port not published beyond localhost).
-  if (/^10\./.test(ip)) return true;
-  if (/^192\.168\./.test(ip)) return true;
+  // Docker bridge networks (docker0 and compose networks): 172.16–31/12.
   const m = /^172\.(\d{1,3})\./.exec(ip);
   if (m) {
     const second = Number(m[1]);
@@ -5060,13 +5058,13 @@ app.post('/test/reset', (req, res) => {
   return res.json({ ok: true, active: [] });
 });
 
-// RESEARCH §3: bind 0.0.0.0 (not 127.0.0.1) so Linux Docker containers reaching
-// via host-gateway can connect — same reason obs-api binds 0.0.0.0. Localhost
-// scoping is enforced at the network layer (Docker Desktop loopback / firewall),
-// not at the listen address.
-const server = app.listen(PORT, '0.0.0.0', () => {
-  log(`listening on http://0.0.0.0:${PORT}`);
-  process.stderr.write(`[HealthCoordinator] listening on http://0.0.0.0:${PORT}\n`);
+// Loopback + docker0 (lib/network/local-only.mjs). Binding 0.0.0.0 exposed the
+// unauthenticated /features, /teams and /health/remediate endpoints to the LAN:
+// the "network layer" this used to rely on (Docker Desktop loopback, firewall)
+// does not apply to a host process.
+const server = listenLocal(app, PORT, (addrs) => {
+  log(`listening on ${addrs.join(', ')} port ${PORT}`);
+  process.stderr.write(`[HealthCoordinator] listening on ${addrs.join(', ')} port ${PORT}\n`);
   startTickLoop();
   startNetworkWatch();
   startLearningCommitLoop();

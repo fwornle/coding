@@ -15,10 +15,32 @@
       "severity": "critical"
     },
     {
+      "id": "env_vars_generic",
+      "name": "Environment Variables (generic names)",
+      "description": "KEY=value where the name ends in API_KEY, SECRET, TOKEN, PASSWORD, ACCESS_KEY or PRIVATE_KEY and the value has 8+ characters",
+      "pattern": "\\b([A-Z0-9_]*(?:API_KEY|SECRET|SECRET_KEY|TOKEN|PASSWORD|PASSWD|ACCESS_KEY|PRIVATE_KEY))\\s*=\\s*[\\\"']?([^\\\"'\\s\\n]{8,})[\\\"']?",
+      "flags": "g",
+      "replacementType": "env_var",
+      "replacement": "$1=<SECRET_REDACTED>",
+      "enabled": true,
+      "severity": "critical"
+    },
+    {
+      "id": "json_secret_fields",
+      "name": "JSON Secret Fields (generic names)",
+      "description": "JSON string values of 8+ characters under keys ending in apiKey, secret, token, password, accessKey or privateKey",
+      "pattern": "\\\"([A-Za-z0-9_]*(?:api[_-]?key|secret|token|password|passwd|access[_-]?key|private[_-]?key))\\\"\\s*:\\s*\\\"([^\\\"]{8,})\\\"",
+      "flags": "gi",
+      "replacementType": "json_key",
+      "replacement": "\"$1\": \"<SECRET_REDACTED>\"",
+      "enabled": true,
+      "severity": "critical"
+    },
+    {
       "id": "json_api_keys",
       "name": "JSON API Keys",
       "description": "API keys in JSON format",
-      "pattern": "\"(apiKey|API_KEY|ANTHROPIC_API_KEY|OPENAI_API_KEY|XAI_API_KEY|GROK_API_KEY|api_key|anthropicApiKey|openaiApiKey|xaiApiKey|grokApiKey)\":\\s*\"(sk-[a-zA-Z0-9-_]{20,}|xai-[a-zA-Z0-9-_]{20,}|[a-zA-Z0-9-_]{32,})\"",
+      "pattern": "\"(apiKey|API_KEY|ANTHROPIC_API_KEY|OPENAI_API_KEY|XAI_API_KEY|GROK_API_KEY|api_key|anthropicApiKey|openaiApiKey|xaiApiKey|grokApiKey)\":\\s*\"([^\"]{8,})\"",
       "flags": "gi",
       "replacementType": "json_key",
       "replacement": "\"$1\": \"<SECRET_REDACTED>\"",
@@ -88,6 +110,50 @@
       "flags": "g",
       "replacementType": "generic",
       "replacement": "<SECRET_REDACTED>",
+      "enabled": true,
+      "severity": "critical"
+    },
+    {
+      "id": "pem_private_keys",
+      "name": "PEM Private Keys",
+      "description": "PEM-encoded private key blocks (RSA, EC, OPENSSH, PKCS#8)",
+      "pattern": "-----BEGIN [A-Z ]*PRIVATE KEY-----[\\s\\S]*?-----END [A-Z ]*PRIVATE KEY-----",
+      "flags": "g",
+      "replacementType": "generic",
+      "replacement": "<PRIVATE_KEY_REDACTED>",
+      "enabled": true,
+      "severity": "critical"
+    },
+    {
+      "id": "slack_tokens",
+      "name": "Slack Tokens",
+      "description": "Slack bot/user/app tokens (xoxb-, xoxp-, xoxa-, xoxs-, xoxr-, xoxo-)",
+      "pattern": "\\bxox[abposr]-[A-Za-z0-9-]{10,}",
+      "flags": "g",
+      "replacementType": "generic",
+      "replacement": "<SLACK_TOKEN_REDACTED>",
+      "enabled": true,
+      "severity": "critical"
+    },
+    {
+      "id": "slack_webhooks",
+      "name": "Slack Webhook URLs",
+      "description": "Incoming webhook URLs carry their own credential",
+      "pattern": "https://hooks\\.slack\\.com/services/[A-Za-z0-9/_-]+",
+      "flags": "g",
+      "replacementType": "generic",
+      "replacement": "<SLACK_WEBHOOK_REDACTED>",
+      "enabled": true,
+      "severity": "critical"
+    },
+    {
+      "id": "google_api_keys",
+      "name": "Google API Keys",
+      "description": "Google Cloud / Firebase API keys (AIza…)",
+      "pattern": "\\bAIza[0-9A-Za-z_-]{35}\\b",
+      "flags": "g",
+      "replacementType": "generic",
+      "replacement": "<GOOGLE_API_KEY_REDACTED>",
       "enabled": true,
       "severity": "critical"
     },
@@ -202,21 +268,10 @@
       "severity": "critical"
     },
     {
-      "id": "generic_api_keys",
-      "name": "Generic API Keys",
-      "description": "Common API key formats with dashes/underscores",
-      "pattern": "\\b[a-zA-Z0-9]{32,}[-_][a-zA-Z0-9]{8,}",
-      "flags": "gi",
-      "replacementType": "generic",
-      "replacement": "<SECRET_REDACTED>",
-      "enabled": true,
-      "severity": "high"
-    },
-    {
       "id": "bearer_tokens",
       "name": "Bearer Tokens",
       "description": "Authorization Bearer tokens",
-      "pattern": "Bearer\\s+[a-zA-Z0-9\\-._~+\\/]{20,}",
+      "pattern": "Bearer\\s+[a-zA-Z0-9\\-._~+\\/]{8,}",
       "flags": "gi",
       "replacementType": "bearer_token",
       "replacement": "Bearer <TOKEN_REDACTED>",
@@ -233,6 +288,17 @@
       "replacement": "<JWT_REDACTED>",
       "enabled": true,
       "severity": "critical"
+    },
+    {
+      "id": "generic_api_keys",
+      "name": "Generic API Keys",
+      "description": "Common API key formats with dashes/underscores Runs after the specific token patterns (bearer, JWT) so it cannot split them.",
+      "pattern": "\\b[a-zA-Z0-9]{32,}[-_][a-zA-Z0-9]{8,}",
+      "flags": "gi",
+      "replacementType": "generic",
+      "replacement": "<SECRET_REDACTED>",
+      "enabled": true,
+      "severity": "high"
     },
     {
       "id": "mongodb_urls",

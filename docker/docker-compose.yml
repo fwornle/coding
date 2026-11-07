@@ -86,14 +86,18 @@ services:
       # In-container readers (dashboard, constraint-monitor) reach the host
       # coordinator via host.docker.internal (extra_hosts wires this on Linux).
       - HEALTH_COORDINATOR_URL=http://host.docker.internal:3034
+    # Every port is published on 127.0.0.1 only. None of these services
+    # authenticates; a bare "3032:3032" listens on every interface of the host
+    # (LAN included). Browsers resolving localhost to ::1 are refused at once
+    # and fall back to 127.0.0.1.
     ports:
-      - "3848:3848"     # Semantic Analysis SSE
-      - "3849:3849"     # Constraint Monitor SSE
-      - "3851:3851"     # Graphify HTTP MCP (/mcp)
-      - "3030:3030"     # Constraint Dashboard (Next.js)
-      - "3031:3031"     # Constraint Dashboard API
-      - "3032:3032"     # Health Dashboard HTTP
-      - "3033:3033"     # Health Dashboard WebSocket
+      - "127.0.0.1:3848:3848"     # Semantic Analysis SSE
+      - "127.0.0.1:3849:3849"     # Constraint Monitor SSE
+      - "127.0.0.1:3851:3851"     # Graphify HTTP MCP (/mcp)
+      - "127.0.0.1:3030:3030"     # Constraint Dashboard (Next.js)
+      - "127.0.0.1:3031:3031"     # Constraint Dashboard API
+      - "127.0.0.1:3032:3032"     # Health Dashboard HTTP
+      - "127.0.0.1:3033:3033"     # Health Dashboard WebSocket
     volumes:
       # Persistent data.
       #
@@ -317,8 +321,8 @@ services:
     container_name: coding-qdrant
     restart: unless-stopped
     ports:
-      - "6333:6333"     # HTTP API
-      - "6334:6334"     # gRPC API
+      - "127.0.0.1:6333:6333"     # HTTP API
+      - "127.0.0.1:6334:6334"     # gRPC API
     volumes:
       - qdrant-data:/qdrant/storage
     environment:
@@ -338,7 +342,7 @@ services:
     container_name: coding-redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis-data:/data
     command: redis-server --appendonly yes

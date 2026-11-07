@@ -165,6 +165,27 @@ jobs:
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: npm run test:node
 
+      # The constraint guard's own suites, incl. the adversarial hook suite that
+      # pins every closed bypass (.planning/guardrail-hardening.md). The
+      # submodule is PUBLIC, so it is checked out on its own here while the
+      # private integrations/* stay off. The tests read the canonical rules from
+      # THIS repo (config/constraints/), so they run against the superproject's
+      # rules at the pinned submodule SHA — the pairing that ships.
+      - name: Install constraint-monitor
+        id: constraints-setup
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          git submodule update --init integrations/constraint-monitor
+          cd integrations/constraint-monitor
+          npm ci --no-audit --no-fund
+
+      - name: constraint-monitor (engine + adversarial hook suite)
+        if: ${{ !cancelled() && steps.constraints-setup.outcome == 'success' }}
+        run: |
+          cd integrations/constraint-monitor
+          npm test
+
       # The unified-viewer's ~1000 vitest tests ran NOWHERE until 2026-09-25, and
       # nothing said so. Three things had to line up: it is a self-contained
       # package (own package.json, own lock, not a workspace) so root `npm ci`

@@ -5237,31 +5237,12 @@ create_project_local_settings() {
     ],
     "deny": [],
     "ask": []
-  },
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node CODING_REPO_PLACEHOLDER/integrations/constraint-monitor/src/hooks/pre-prompt-hook-wrapper.js"
-          }
-        ]
-      }
-    ],
-    "PreToolUse": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node CODING_REPO_PLACEHOLDER/integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js"
-          }
-        ]
-      }
-    ]
   }
 }
 EOF
+    # NOTE: hooks are NOT set here. The constraint hook is registered by
+    # scripts/build-claude-runtime-config.mjs (feature-gated); a second copy
+    # here ran the guard twice per tool call and ignored `constraints off`.
     # NOTE: statusLine is NOT set here — tmux provides the status bar for all
     # coding sessions. See tmux-session-wrapper.sh and status-line-fast.cjs.
 

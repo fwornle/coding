@@ -24,7 +24,7 @@
  */
 
 import express from 'express';
-import cors from 'cors';
+import { localOnly, listenLocal } from '../lib/network/local-only.mjs';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -966,7 +966,8 @@ function runRollUp(options = {}) {
 }
 
 const app = express();
-app.use(cors());
+// Host + Origin allow-lists instead of wildcard CORS (lib/network/local-only.mjs).
+app.use(localOnly());
 app.use(express.json({ limit: '1mb' }));
 
 // The built knowledge viewer at /viewer/ (bin/vkb) — see lib/viewer/mount.mjs.
@@ -3786,8 +3787,8 @@ app.get('/api/coding/observations/stream', (req, res) => {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   // Allow the unified-viewer dev server (any localhost origin) to consume
-  // this stream — the global cors() middleware already sets the wildcard
-  // Access-Control-Allow-Origin for plain GET, but SSE clients sometimes
+  // this stream — the global localOnly() middleware already sets
+  // Access-Control-Allow-Origin for loopback origins, but SSE clients sometimes
   // require a flushed-headers signal before they treat the connection as
   // "open" (Chrome's EventSource impl).
   res.flushHeaders();
@@ -4296,22 +4297,20 @@ const _embedIndex = _autostart
   ? createIndexScheduler({ script: path.join(REPO_ROOT, 'dist', 'embedding', 'backfill.js') })
   : null;
 const server = _autostart
-  // '::' not '0.0.0.0'. Node binds an unspecified IPv6 address dual-stack by
-  // default (ipv6Only=false), so this accepts BOTH families on the same
-  // interfaces '0.0.0.0' already covered — no new exposure, one family more.
+  // Loopback only, BOTH families (lib/network/local-only.mjs), plus docker0 on
+  // native Linux. Binding every interface ('::') published the unauthenticated
+  // knowledge store to the LAN. Containers still reach it: Docker Desktop
+  // forwards host.docker.internal to the host's loopback.
   //
-  // Why it matters: browsers resolve `localhost` to ::1 first. Bound to
-  // 0.0.0.0 only, nothing answered there, so every browser request to
+  // Both families matter: browsers resolve `localhost` to ::1 first. Bound to
+  // IPv4 only, nothing answered there, so every browser request to
   // http://localhost:12436 hung while curl (which falls back to IPv4 fast)
   // and http://127.0.0.1:12436 both worked. The unified viewer's default
   // endpoint is `http://localhost:12436` (system-endpoints.ts), so its graph
   // queries never completed and it sat on "Loading coding graph… · Showing 0
-  // of 0 nodes" forever, with no console error and no failed request to see —
-  // the requests were never issued. The health API on :3033 was already
-  // dual-stack, which is why that one worked from the same page and made the
-  // failure look like an obs-api outage rather than an address-family gap.
-  ? app.listen(PORT, '::', () => {
-      process.stderr.write(`[obs-api] listening on http://[::]:${PORT} (dual-stack; km-core data root: ${path.dirname(KG_DB_PATH)})\n`);
+  // of 0 nodes" forever, with no console error and no failed request to see.
+  ? listenLocal(app, PORT, (addrs) => {
+      process.stderr.write(`[obs-api] listening on ${addrs.join(', ')} port ${PORT} (km-core data root: ${path.dirname(KG_DB_PATH)})\n`);
       // So `coding sync` reloads THIS data home's obs-api, not whatever owns the port.
       recordEndpoint({ port: PORT });
       // Warm the writer first (opens DB rw + FTS triggers + WAL), then warm
