@@ -285,7 +285,8 @@ request path (proxy repo); team scope fails closed with a route test.
 | 0.3 redaction fail-closed | done | LSL security harness deferred |
 | 0.4 network | done for host services; containers need recreate | |
 | 0.5 proxy repo | todo (external) | needs PR on bmw.ghe.com |
-| Phase 1 (container + WebAuthn) | designed | work items 1–6 |
+| Phase 1 item 1 (agent box) | done — opt-in `--box` | see "Phase 1 item 1 results" |
+| Phase 1 items 2–6 | todo | daemon, WebAuthn, signed grants, per-agent guards, red-team |
 | Phase 2–3 | todo | |
 
 ## Phase 0 results (2026-11-07)
@@ -345,7 +346,61 @@ PUT 403, rebinding Host 403, container + dashboard proxy 200, dashboard renders.
 - Environment trap: `grep` in agent shells is a shell function that can miss
   matches silently; use `/usr/bin/grep` for audits.
 
+## Phase 1 item 1 results (2026-11-07)
+
+**What exists**
+- `docker/agent-box/` — image (`node:22-bookworm-slim` + claude, copilot,
+  opencode, pi), root-owned guard at `/opt/coding-guard`, Claude managed
+  policy at `/etc/claude-code/managed-settings.json` (`allowManagedHooksOnly`,
+  PreToolUse hook with `CONSTRAINT_CONFIG_PATH` pinned to the baked rules),
+  entrypoint that drops to the host uid/gid with `no_new_privs` and refuses root.
+- `scripts/agent-box.mjs` — `build` (stages ONLY committed content: the
+  superproject's pinned constraint-monitor SHA via `git archive`, the committed
+  rules blob, the committed box files; labels the image with a guard digest),
+  `status` (0 current / 2 stale / 1 missing), `run <agent>`; `boxRunArgs` is
+  pure and pinned by `tests/agents/agent-box.test.mjs`.
+- `coding box build|status`; `coding --<agent> --box` swaps only the final
+  command — tmux, status line and every host service are unchanged. A stale
+  image warns; the launcher never rebuilds by itself (an agent could otherwise
+  edit the guard source in the mounted repo and have it baked in).
+- Mounts: workspace rw at the SAME path (Claude transcript folders keep their
+  names, so host session logging works); coding repo ro when it is not the
+  workspace; `~/.claude/projects`; a `coding-box-home` volume; pi agent dir
+  and CA bundle when set. Routing env (`ROUTING_ENV_VARS`) passed with
+  localhost → host.docker.internal.
+
+**Verified in a real box (macOS, Docker Desktop)**: uid 502 / NoNewPrivs=1;
+all four CLIs run; guard dir, hook and policy not writable or removable; no
+sudo, no Docker socket; workspace writes owned by the host user; proxy reachable
+(200); the guard's suites pass INSIDE the box as the agent user (48 pass,
+5 todo). `disableAllHooks` in user/project settings cannot disable managed
+hooks (Claude Code docs).
+
+**Found and fixed on the way**
+- constraint-monitor's `package-lock.json` was out of sync with `package.json`
+  (since b2c1934): every `npm ci` failed — the image build and the CI step
+  added in Phase 0. Lock regenerated (submodule 9081743).
+- `tests/experiments/injection-env.test.mjs` bound a stub on 127.0.0.1:3033 —
+  the live dashboard port — and only passed because Docker held `*:3033`.
+  It now uses a free port via `CODING_RETRIEVAL_PORT`.
+
+**Not yet (follow-ups, mostly items 2–5)**
+- Each agent logs in ONCE inside the box (Linux has no macOS Keychain); the
+  login persists in the `coding-box-home` volume. Not exercised here — needs
+  an interactive session.
+- In the box: no MCP servers, no knowledge-injection / LSL tool hooks (only the
+  managed guard hook loads). LSL still works from transcripts for claude;
+  copilot / opencode / pi session stores are not mounted yet.
+- Egress is not locked to the proxy yet (default bridge network).
+- copilot / opencode / pi run in the box but without their own guard (item 5).
+- Box mode is opt-in (`--box`); default-on once items 2–5 land.
+- glass is untouched: none of the new/changed files is in `glass/manifest.yaml`;
+  re-verified (extract both targets, extracted suite 114/114, extract tests 22/22).
+
 ## Session log
 
 - **2026-11-07** — audit; plan written; Phase 0 implemented (0.1, 0.3, 0.4;
   0.2 partial). Full `npm test` green: jest 1294/1294, node 2229 pass / 0 fail.
+- **2026-11-07 (later)** — user decisions: container boundary, WebAuthn bypass,
+  test-fixture whitelist. Phase 0 completed, committed (82ebde86). Phase 1 item 1
+  (agent box, opt-in `--box`) built and verified; glass re-verified unchanged.

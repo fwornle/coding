@@ -1,0 +1,17 @@
+{
+  "allowManagedHooksOnly": true,
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CONSTRAINT_CONFIG_PATH=/opt/coding-guard/config/constraints/constraint-monitor.yaml node /opt/coding-guard/integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
