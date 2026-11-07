@@ -69,8 +69,10 @@ function runHook(input, env = {}) {
       },
     });
     let stderr = '';
+    let stdout = '';
     child.stderr.on('data', (d) => { stderr += d; });
-    child.on('close', (code) => resolve({ code, stderr }));
+    child.stdout.on('data', (d) => { stdout += d; });
+    child.on('close', (code) => resolve({ code, stderr, stdout }));
     child.stdin.end(JSON.stringify(input));
   });
 }
@@ -291,5 +293,57 @@ describe('a broken guard', () => {
     const req = (await pending()).find((x) => x.rule === 'guard-error');
     await approve(req.id, { scope: 'minutes', minutes: 5 });
     assert.equal((await runHook(write, broken)).code, 0);
+  });
+});
+
+describe('the other agents (Phase 1 item 5): native calls, same rules, same grants', () => {
+  const content = 'Fixed in 2026 by the team.\n';
+  // As each agent's guard plugin sends them (docker/agent-box/agents/).
+  const calls = {
+    copilot: { tool_name: 'Write', tool_input: { path: '/w/copilot.md', file_text: content } },
+    opencode: { agent: 'opencode', tool_name: 'write', tool_input: { filePath: '/w/opencode.md', content } },
+    pi: { agent: 'pi', tool_name: 'write', tool_input: { path: 'pi.md', content }, cwd: '/w' },
+  };
+
+  /** What the agent is shown: copilot reads a JSON deny on stdout (it hides an exit-2 hook's stderr). */
+  const shown = (agent, r) => {
+    if (agent !== 'copilot') {
+      assert.equal(r.code, 2, r.stderr);
+      return r.stderr;
+    }
+    assert.equal(r.code, 0, r.stderr);
+    const out = JSON.parse(r.stdout); // exactly one JSON document — copilot allows on anything else
+    assert.equal(out.hookSpecificOutput.permissionDecision, 'deny');
+    return out.hookSpecificOutput.permissionDecisionReason;
+  };
+
+  for (const [agent, call] of Object.entries(calls)) {
+    test(`${agent}: blocked, and the request names the agent and the absolute file`, async () => {
+      const r = await runHook({ session_id: 'box', ...call }, { CODING_GUARD_AGENT: agent });
+      const message = shown(agent, r);
+      const req = (await pending()).find((x) => x.agent === agent);
+      assert.ok(req, r.stderr);
+      assert.equal(req.rule, RULE);
+      assert.equal(req.file, `/w/${agent}.md`);
+      assert.ok(message.includes(req.approve), message);
+    });
+  }
+
+  test('copilot: a broken guard is a JSON deny too, never an exit copilot reads as allow', async () => {
+    const r = await runHook({ tool_name: 'Write', tool_input: { path: '/w/x.md', file_text: 'x' } },
+      { CODING_GUARD_AGENT: 'copilot', CONSTRAINT_CONFIG_PATH: path.join(TMP, 'missing.yaml') });
+    assert.match(shown('copilot', r), /fail-closed/);
+  });
+
+  test('pi: an approved grant lets the same native call through', async () => {
+    const req = (await pending()).find((x) => x.agent === 'pi');
+    await approve(req.id, { scope: 'minutes', minutes: 5 });
+    assert.equal((await runHook({ session_id: 'box', ...calls.pi }, { CODING_GUARD_AGENT: 'pi' })).code, 0);
+  });
+
+  test('copilot: a clean edit passes', async () => {
+    const r = await runHook({ tool_name: 'Edit', tool_input: { path: '/w/ok.md', old_str: 'a', new_str: 'Plain prose.' } }, { CODING_GUARD_AGENT: 'copilot' });
+    assert.equal(r.code, 0, r.stderr);
+    assert.equal(r.stdout, '', 'allow = empty stdout');
   });
 });

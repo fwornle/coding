@@ -9,6 +9,7 @@
 #   guard/config/constraints/…yaml          the committed rules
 #   guard/lib/guard/grants.mjs              verifies the host guard's signed grants
 #   managed-settings.json, entrypoint.sh    from docker/agent-box/
+#   agents/                                 the other agents' guard plugins
 # Only committed content is ever baked in, and only when the user builds: an
 # agent that edits the guard in the mounted repo changes nothing in the box.
 #
@@ -47,6 +48,15 @@ RUN cd /opt/coding-guard/integrations/constraint-monitor \
  && chmod -R u=rwX,go=rX /opt/coding-guard \
  && mkdir -p /opt/coding-guard/integrations/constraint-monitor/logs \
  && chmod 1777 /opt/coding-guard/integrations/constraint-monitor/logs
+
+# The other agents' guard plugins, next to the guard they call. copilot loads
+# its plugin through --plugin-dir and pi its extension through -e (both fixed
+# by the launcher); opencode through its managed config, which user and
+# project config cannot override.
+COPY agents/ /opt/coding-guard/agents/
+COPY agents/opencode/opencode.json /etc/opencode/opencode.json
+RUN chown -R root:root /opt/coding-guard/agents /etc/opencode \
+ && chmod -R u=rwX,go=rX /opt/coding-guard/agents /etc/opencode
 
 # Claude Code managed policy: only these hooks load; user/project settings
 # cannot add, remove or replace them.

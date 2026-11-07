@@ -38,6 +38,29 @@ export const BOX_HOME = '/home/agent';
 export const BOX_GUARD_KEYS = '/etc/coding-guard';
 export const AGENT_COMMANDS = { claude: 'claude', copilot: 'copilot', opencode: 'opencode', pi: 'pi' };
 
+/**
+ * How each agent loads its guard (docker/agent-box/agents/), fixed on the
+ * command line the agent cannot change. claude: the managed policy in
+ * /etc/claude-code; opencode: its managed config in /etc/opencode — neither
+ * needs an argument.
+ */
+export const AGENT_GUARD_ARGS = {
+  copilot: ['--plugin-dir', '/opt/coding-guard/agents/copilot'],
+  pi: ['-e', '/opt/coding-guard/agents/pi/guard.js'],
+};
+
+/**
+ * Copilot reads repository settings that can switch every hook off
+ * (`disableAllHooks`, in a folder the user trusted — and trust is stored in
+ * a file the agent can write). The box mounts these directories read-only in
+ * every directory from the workspace down to the cwd (any of them can become
+ * the repository root). `.github` itself is re-mounted read-write so it cannot
+ * be renamed away from under the read-only `.github/copilot`; a top-level
+ * mount point cannot be renamed.
+ */
+export const COPILOT_CONFIG_DIRS = ['.github/copilot', '.claude'];
+const COPILOT_SETTINGS = ['settings.json', 'settings.local.json'];
+
 const GUARD_SUBMODULE = 'integrations/constraint-monitor';
 const RULES = 'config/constraints/constraint-monitor.yaml';
 const BOX_DIR = 'docker/agent-box';
@@ -110,9 +133,9 @@ export function stageContext(dir, src = guardSource(), repo = REPO) {
   fs.mkdirSync(path.dirname(grantsOut), { recursive: true });
   fs.writeFileSync(grantsOut, execFileSync('git', ['cat-file', 'blob', src.grants], { cwd: repo }));
 
-  for (const name of ['Dockerfile', 'managed-settings.json', 'entrypoint.sh']) {
-    fs.writeFileSync(path.join(dir, name), execFileSync('git', ['show', `HEAD:${BOX_DIR}/${name}`], { cwd: repo }));
-  }
+  // The box files as committed: Dockerfile, policy, entrypoint, agents/.
+  const boxTar = execFileSync('git', ['archive', '--format=tar', `${src.box}`], { cwd: repo, maxBuffer: 64 * 1024 * 1024 });
+  execFileSync('tar', ['-x', '-C', dir], { input: boxTar });
 }
 
 /** The digest label of the built image, or null when there is no image. */
@@ -137,6 +160,7 @@ export function boxRunArgs({
 
   const workspace = env.TARGET_PROJECT_DIR || cwd;
   const argv = ['run', '--rm', '-i'];
+  const protectedDirs = agent === 'copilot' ? configRoots(workspace, cwd) : [];
   if (tty) argv.push('-t');
   // The hostname IS the guard session: grants are bound to it, and a non-root
   // process cannot change it (an env var could be set by a nested agent).
@@ -154,6 +178,10 @@ export function boxRunArgs({
     if (!mounts.has(target)) mounts.set(target, [host, mode]);
   };
   mount(workspace, 'rw');
+  for (const dir of protectedDirs) {
+    mount(path.join(dir, '.github'), 'rw');
+    for (const sub of COPILOT_CONFIG_DIRS) mount(path.join(dir, sub), 'ro');
+  }
   const insideWorkspace = (p) => path.relative(workspace, p) === '' || !path.relative(workspace, p).startsWith('..');
   if (!insideWorkspace(codingRepo)) mount(codingRepo, 'ro'); // opencode plugins, pi extensions
 
@@ -187,8 +215,44 @@ export function boxRunArgs({
   const publicDir = guardPaths(guardDir).publicDir;
   if (exists(publicDir)) argv.push('-v', `${publicDir}:${BOX_GUARD_KEYS}:ro`);
 
-  argv.push('-w', boxPath(cwd, platform), image, command, ...args);
+  argv.push('-w', boxPath(cwd, platform), image, command, ...(AGENT_GUARD_ARGS[agent] ?? []), ...args);
   return argv;
+}
+
+/** The workspace and every directory below it down to `cwd`. */
+export function configRoots(workspace, cwd) {
+  const rel = path.relative(workspace, cwd);
+  if (rel.startsWith('..') || path.isAbsolute(rel)) return [workspace];
+  const roots = [workspace];
+  let dir = workspace;
+  for (const part of rel.split(path.sep).filter(Boolean)) {
+    dir = path.join(dir, part);
+    roots.push(dir);
+  }
+  return roots;
+}
+
+/**
+ * Before a copilot box starts: refuse when a repository settings file already
+ * disables hooks (the guard would never run), and create the directories the
+ * read-only mounts need — empty directories, which git does not track.
+ */
+export function prepareCopilotConfig(workspace, cwd, fsImpl = fs) {
+  const roots = configRoots(workspace, cwd);
+  for (const dir of roots) {
+    for (const sub of COPILOT_CONFIG_DIRS) {
+      for (const name of COPILOT_SETTINGS) {
+        const file = path.join(dir, sub, name);
+        let text;
+        try { text = fsImpl.readFileSync(file, 'utf8'); } catch { continue; }
+        if (/"disable(All)?Hooks"\s*:\s*true|"disabledHooks"\s*:\s*\[\s*"/.test(text)) {
+          throw new Error(`${file} disables Copilot hooks, so the guard would not run. Remove that setting, or run copilot outside the box (--no-box).`);
+        }
+      }
+      fsImpl.mkdirSync(path.join(dir, sub), { recursive: true });
+    }
+  }
+  return roots;
 }
 
 function build() {
@@ -234,6 +298,14 @@ function run(agent, args) {
   const current = guardSource().digest;
   if (built !== current) {
     process.stderr.write(`agent-box: WARNING the box runs guard ${built}; the committed guard is ${current}. Run: coding box build\n`);
+  }
+  if (agent === 'copilot') {
+    try {
+      prepareCopilotConfig(process.env.TARGET_PROJECT_DIR || process.cwd(), process.cwd());
+    } catch (err) {
+      process.stderr.write(`agent-box: ${err.message}\n`);
+      return 1;
+    }
   }
   const argv = boxRunArgs({
     agent, args,

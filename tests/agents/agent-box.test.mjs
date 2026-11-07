@@ -10,7 +10,12 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
-import { boxRunArgs, boxPath, toBoxUrl, guardSource, IMAGE, HOME_VOLUME, BOX_HOME, BOX_GUARD_KEYS } from '../../scripts/agent-box.mjs';
+import os from 'node:os';
+import path from 'node:path';
+import {
+  boxRunArgs, boxPath, toBoxUrl, guardSource, configRoots, prepareCopilotConfig,
+  IMAGE, HOME_VOLUME, BOX_HOME, BOX_GUARD_KEYS,
+} from '../../scripts/agent-box.mjs';
 
 const base = {
   agent: 'claude', cwd: '/Users/u/proj', codingRepo: '/Users/u/coding', home: '/Users/u',
@@ -143,5 +148,59 @@ describe('the in-box guard (Phase 1 item 4)', () => {
 
   test('the grant verifier is part of what the image digest covers', () => {
     assert.match(guardSource().grants, /^[0-9a-f]{40}$/);
+  });
+});
+
+describe('per-agent guards (Phase 1 item 5)', () => {
+  const read = (rel) => JSON.parse(fs.readFileSync(new URL(`../../docker/agent-box/${rel}`, import.meta.url), 'utf8'));
+  const tail = (agent) => { const a = boxRunArgs({ ...base, agent }); return a.slice(a.indexOf(IMAGE) + 1); };
+
+  test('each agent starts with its guard fixed on the command line (claude/opencode: managed config)', () => {
+    assert.deepStrictEqual(tail('claude'), ['claude']);
+    assert.deepStrictEqual(tail('opencode'), ['opencode']);
+    assert.deepStrictEqual(tail('copilot'), ['copilot', '--plugin-dir', '/opt/coding-guard/agents/copilot']);
+    assert.deepStrictEqual(tail('pi'), ['pi', '-e', '/opt/coding-guard/agents/pi/guard.js']);
+  });
+
+  test('user args come after the guard, so they cannot replace it', () => {
+    const a = boxRunArgs({ ...base, agent: 'pi', args: ['-ne'] });
+    assert.deepStrictEqual(a.slice(-4), ['pi', '-e', '/opt/coding-guard/agents/pi/guard.js', '-ne']);
+  });
+
+  test('copilot hook and opencode managed config call the box hook with the agent fixed inline', () => {
+    const cmd = read('agents/copilot/hooks/hooks.json').hooks.PreToolUse[0].hooks[0].command;
+    assert.match(cmd, /^CODING_GUARD_MODE=box CODING_GUARD_KEYS=\/etc\/coding-guard CODING_GUARD_AGENT=copilot /);
+    assert.deepStrictEqual(read('agents/opencode/opencode.json').plugin, ['file:///opt/coding-guard/agents/opencode/guard.js']);
+    const helper = fs.readFileSync(new URL('../../docker/agent-box/agents/guard-hook.mjs', import.meta.url), 'utf8');
+    assert.match(helper, /\.\.\.process\.env, \.\.\.FIXED_ENV, CODING_GUARD_AGENT: agent/, 'fixed values override inherited env');
+  });
+
+  test('copilot: repo settings dirs are read-only, .github pinned, in every dir down to the cwd', () => {
+    const a = boxRunArgs({ ...base, agent: 'copilot', cwd: '/Users/u/proj/sub', env: { TARGET_PROJECT_DIR: '/Users/u/proj' } });
+    const v = volumes(a);
+    for (const d of ['/Users/u/proj', '/Users/u/proj/sub']) {
+      assert.ok(v.includes(`${d}/.github:${d}/.github`));
+      assert.ok(v.includes(`${d}/.github/copilot:${d}/.github/copilot:ro`));
+      assert.ok(v.includes(`${d}/.claude:${d}/.claude:ro`));
+    }
+    assert.ok(!volumes(boxRunArgs(base)).some((x) => x.includes('.github')), 'other agents keep them writable');
+  });
+
+  test('configRoots: the workspace, then each level to the cwd; a cwd outside is ignored', () => {
+    assert.deepStrictEqual(configRoots('/w', '/w/a/b'), ['/w', '/w/a', '/w/a/b']);
+    assert.deepStrictEqual(configRoots('/w', '/elsewhere'), ['/w']);
+  });
+
+  test('copilot refuses to start when a repo settings file disables hooks; creates missing dirs otherwise', () => {
+    const ws = fs.mkdtempSync(path.join(os.tmpdir(), 'copilot-cfg-'));
+    try {
+      prepareCopilotConfig(ws, ws);
+      assert.ok(fs.statSync(path.join(ws, '.github', 'copilot')).isDirectory());
+      assert.ok(fs.statSync(path.join(ws, '.claude')).isDirectory());
+      fs.writeFileSync(path.join(ws, '.claude', 'settings.local.json'), '{ "disableAllHooks": true }');
+      assert.throws(() => prepareCopilotConfig(ws, ws), /disables Copilot hooks/);
+    } finally {
+      fs.rmSync(ws, { recursive: true, force: true });
+    }
   });
 });
