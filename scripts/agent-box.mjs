@@ -219,6 +219,27 @@ export function boxRunArgs({
   return argv;
 }
 
+/**
+ * Provider config an agent needs inside the box, as files to place in the
+ * box home — generated COPIES with loopback URLs pointed at the host, never
+ * mounts: `~/.pi/agent` mounted writable would let the box plant an extension
+ * the HOST pi then loads. Returns [{ path (relative to the box home), content }];
+ * a source that does not exist is skipped.
+ */
+export function boxAgentConfig(agent, { home = os.homedir(), readFile = (f) => fs.readFileSync(f, 'utf8') } = {}) {
+  const sources = {
+    opencode: ['.config/opencode/opencode.json'],
+    pi: ['.pi/agent/models.json', '.pi/agent/settings.json'],
+  }[agent] ?? [];
+  const files = [];
+  for (const rel of sources) {
+    let text;
+    try { text = readFile(path.join(home, rel)); } catch { continue; }
+    files.push({ path: rel, content: toBoxUrl(text) });
+  }
+  return files;
+}
+
 /** The workspace and every directory below it down to `cwd`. */
 export function configRoots(workspace, cwd) {
   const rel = path.relative(workspace, cwd);
@@ -321,11 +342,14 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   let code;
   if (cmd === 'build') code = build();
   else if (cmd === 'status') code = status();
+  else if (cmd === 'redteam') {
+    code = spawnSync(process.execPath, [path.join(REPO, 'scripts', 'redteam-box.mjs'), ...rest], { stdio: 'inherit' }).status ?? 1;
+  }
   else if (cmd === 'run') {
     const [agent, ...more] = rest;
     code = run(agent, more[0] === '--' ? more.slice(1) : more);
   } else {
-    process.stderr.write('usage: agent-box.mjs build | status | run <claude|copilot|opencode|pi> [-- args…]\n');
+    process.stderr.write('usage: agent-box.mjs build | status | redteam [options] | run <claude|copilot|opencode|pi> [-- args…]\n');
     code = 64;
   }
   process.exit(code);

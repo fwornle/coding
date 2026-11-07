@@ -136,6 +136,7 @@ OPTIONS:
 
 SUBCOMMANDS:
   box build|status   Build / check the agent box image (bakes in the COMMITTED guard)
+  box redteam        Run agents against bypass scenarios inside the box (verdict per cell)
   guard status|pending|approve|deny|audit
                      Override requests from the box and the guard's audit log
   svc <verb> ...     Fixed Docker verbs for agents in the box (status, logs, restart, graphify, up, rebuild)
