@@ -293,3 +293,36 @@ describe('a broken guard', () => {
     assert.equal((await runHook(write, broken)).code, 0);
   });
 });
+
+describe('the other agents (Phase 1 item 5): native calls, same rules, same grants', () => {
+  const content = 'Fixed in 2026 by the team.\n';
+  // As each agent's guard plugin sends them (docker/agent-box/agents/).
+  const calls = {
+    copilot: { tool_name: 'Write', tool_input: { path: '/w/copilot.md', file_text: content } },
+    opencode: { agent: 'opencode', tool_name: 'write', tool_input: { filePath: '/w/opencode.md', content } },
+    pi: { agent: 'pi', tool_name: 'write', tool_input: { path: 'pi.md', content }, cwd: '/w' },
+  };
+
+  for (const [agent, call] of Object.entries(calls)) {
+    test(`${agent}: blocked, and the request names the agent and the absolute file`, async () => {
+      const r = await runHook({ session_id: 'box', ...call }, { CODING_GUARD_AGENT: agent });
+      assert.equal(r.code, 2, r.stderr);
+      const req = (await pending()).find((x) => x.agent === agent);
+      assert.ok(req, r.stderr);
+      assert.equal(req.rule, RULE);
+      assert.equal(req.file, `/w/${agent}.md`);
+      assert.ok(r.stderr.includes(req.approve));
+    });
+  }
+
+  test('pi: an approved grant lets the same native call through', async () => {
+    const req = (await pending()).find((x) => x.agent === 'pi');
+    await approve(req.id, { scope: 'minutes', minutes: 5 });
+    assert.equal((await runHook({ session_id: 'box', ...calls.pi }, { CODING_GUARD_AGENT: 'pi' })).code, 0);
+  });
+
+  test('copilot: a clean edit passes', async () => {
+    const r = await runHook({ tool_name: 'Edit', tool_input: { path: '/w/ok.md', old_str: 'a', new_str: 'Plain prose.' } }, { CODING_GUARD_AGENT: 'copilot' });
+    assert.equal(r.code, 0, r.stderr);
+  });
+});

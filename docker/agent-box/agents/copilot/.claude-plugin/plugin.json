@@ -1,0 +1,5 @@
+{
+  "name": "coding-guard",
+  "version": "1.0.0",
+  "description": "Constraint guard for the coding agent box (root-owned; loaded with --plugin-dir)"
+}

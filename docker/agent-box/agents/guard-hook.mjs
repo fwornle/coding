@@ -1,0 +1,60 @@
+/**
+ * Runs the constraint hook for an agent's guard plugin (opencode, pi) — the
+ * same hook Claude Code runs from /etc/claude-code/managed-settings.json.
+ *
+ * Box mode, the key dir, the rules and the agent name are fixed HERE, in
+ * root-owned code, and override anything inherited: the agent controls the
+ * environment of whatever it starts, so nothing that decides "allowed" may
+ * come from there.
+ *
+ * Fail-closed: anything but a clean exit 0 blocks the call.
+ * Plan: coding/.planning/guardrail-hardening.md (Phase 1, item 5).
+ */
+
+import { spawn } from 'node:child_process';
+
+const NODE = '/usr/local/bin/node';
+const HOOK = '/opt/coding-guard/integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js';
+const FIXED_ENV = {
+  CODING_GUARD_MODE: 'box',
+  CODING_GUARD_KEYS: '/etc/coding-guard',
+  CONSTRAINT_CONFIG_PATH: '/opt/coding-guard/config/constraints/constraint-monitor.yaml',
+};
+const TIMEOUT_MS = 30_000;
+
+/**
+ * @param {string} agent  'opencode' | 'pi'
+ * @param {{ tool_name: string, tool_input: object, session_id?: string, cwd?: string }} call
+ * @returns {Promise<{ allow: boolean, message: string }>}
+ */
+export function checkCall(agent, call) {
+  return new Promise((resolve) => {
+    let stderr = '';
+    let settled = false;
+    const done = (allow, message) => {
+      if (!settled) { settled = true; resolve({ allow, message }); }
+    };
+    let child;
+    try {
+      child = spawn(NODE, [HOOK], {
+        env: { ...process.env, ...FIXED_ENV, CODING_GUARD_AGENT: agent },
+        stdio: ['pipe', 'ignore', 'pipe'],
+      });
+    } catch (err) {
+      done(false, `🔴 Constraint guard could not start (${err.message}) — blocked (fail-closed).`);
+      return;
+    }
+    const timer = setTimeout(() => {
+      child.kill('SIGKILL');
+      done(false, '🔴 Constraint guard timed out — blocked (fail-closed).');
+    }, TIMEOUT_MS);
+    child.stderr.on('data', (d) => { stderr += d; });
+    child.on('error', (err) => done(false, `🔴 Constraint guard failed (${err.message}) — blocked (fail-closed).`));
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (code === 0) done(true, '');
+      else done(false, stderr.trim() || `🔴 Constraint guard exited ${code} — blocked (fail-closed).`);
+    });
+    child.stdin.end(JSON.stringify({ agent, ...call }));
+  });
+}
