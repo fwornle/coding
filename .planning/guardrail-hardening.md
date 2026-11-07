@@ -285,8 +285,9 @@ request path (proxy repo); team scope fails closed with a route test.
 | 0.3 redaction fail-closed | done | LSL security harness deferred |
 | 0.4 network | done for host services; containers need recreate | |
 | 0.5 proxy repo | todo (external) | needs PR on bmw.ghe.com |
-| Phase 1 item 1 (agent box) | done — opt-in `--box` | see "Phase 1 item 1 results" |
-| Phase 1 items 2–6 | todo | daemon, WebAuthn, signed grants, per-agent guards, red-team |
+| Phase 1 item 1 (agent box) | done — DEFAULT for claude since item 2 | see "Phase 1 item 1 results" |
+| Phase 1 item 2 (host guard daemon) | done — LaunchAgent install left to the user | see "Phase 1 item 2 results" |
+| Phase 1 items 3–6 | todo | WebAuthn, hook verifies grants, per-agent guards, red-team |
 | Phase 2–3 | todo | |
 
 ## Phase 0 results (2026-11-07)
@@ -393,9 +394,74 @@ hooks (Claude Code docs).
   copilot / opencode / pi session stores are not mounted yet.
 - Egress is not locked to the proxy yet (default bridge network).
 - copilot / opencode / pi run in the box but without their own guard (item 5).
-- Box mode is opt-in (`--box`); default-on once items 2–5 land.
+- Box mode was opt-in (`--box`); since item 2 it is the DEFAULT for claude
+  (user's request, 2026-11-07), opt-in for the other agents until item 5.
 - glass is untouched: none of the new/changed files is in `glass/manifest.yaml`;
   re-verified (extract both targets, extracted suite 114/114, extract tests 22/22).
+
+## Phase 1 item 2 results (2026-11-07)
+
+**What exists**
+- `lib/guard/home.mjs` — `~/.coding/guard/` (0700; `CODING_GUARD_HOME`
+  overrides): Ed25519 `signing-key.pem` + `approver.token` (0600), `audit.jsonl`,
+  `state.json`, and `public/guard-public.pem` — the only part the box sees.
+  NOT under the data home: that is mounted rw into coding-services, whose code
+  the agent can edit and restart. The public key is re-derived from the
+  private one at every start.
+- `lib/guard/grants.mjs` — `signGrant` / `verifyGrant` / `grantCovers`;
+  canonical JSON, scopes `call` (10 min, one use) / `minutes` (1–240) /
+  `session` (12 h), bound to rule + box session (+ file when named).
+  node:crypto only, so the in-box hook can import it unchanged (item 4).
+- `lib/guard/audit.mjs` — hash-chained JSONL; `verifyAudit` names the first
+  edited / deleted / reordered line.
+- `lib/guard/svc.mjs` — the broker vocabulary: `status`, `logs <container|
+  program> [n]`, `restart <program>` (must be a live supervisor program),
+  `graphify query|path|explain|update|diagnose|cluster-only …`; `up` and
+  `rebuild` are GATED (they act on the agent-writable compose file and
+  Dockerfile) and need a signed grant for `svc:<verb>`. Every argv is built
+  here; nothing goes through a shell.
+- `scripts/coding-guard-daemon.mjs` on :3035 (loopback + docker0 via
+  `listenLocal`, Host allow-list, no browser writes; approver routes refuse
+  any Origin until item 3 has a real UI). Requests rate-limited (30/min,
+  100 pending), fields clipped.
+- `scripts/coding-guard.mjs` = `coding guard status|pending|approve <id>
+  [--call|--minutes N|--session]|deny|audit|note` and `coding svc <verb>`.
+  Approving needs the token file, so it only works from a host shell.
+- Units `launchd/com.coding.guard.plist`, `systemd/guard.service`; DAEMONS
+  `guard: 'constraints'`; features.md row; install manifest rows;
+  `CODING_GUARD_PORT=3035` in `.env.ports`. Windows: no host daemons are
+  installed there yet (only the ctx sweeper) — the guard follows the others.
+- Box: `CODING_GUARD_URL=http://host.docker.internal:3035`,
+  `CODING_GUARD_SESSION=<container name>`, guard `public/` dir mounted ro at
+  `/etc/coding-guard`; `boxRunArgs` THROWS when any mount would contain the
+  guard home (workspace = `$HOME`, `~/.coding`, …). `bin/graphify` inside the
+  box (`CODING_BOX=1`) goes through `coding svc graphify`.
+- Launcher: claude runs in the box by default; `--no-box` / `CODING_BOX=false`
+  run it on the host and write `host.box.bypass` (agent, via flag|env,
+  project) into the audit log. Other agents: `--box` opt-in. The launcher
+  warns when the daemon is unreachable but still starts the box.
+
+**Verified** — tests: `tests/guard/` 30/30 (grants, audit chain, svc
+vocabulary, daemon over real HTTP with a fake docker), `tests/agents/agent-box`
+17/17, `tests/launcher/box-default` 6/6, feature drift guards 90/90.
+Live (daemon in the foreground with a scratch guard home, real box, real
+docker): from inside the box health OK, public key readable and its dir not
+writable, guard home invisible, request 201, approve without / with a guessed
+token 401, `svc run -v /:/h` 400, `svc rebuild` 403 + approval request, no
+docker socket. Approved from the host CLI → the box verified the grant with
+the mounted public key; a tampered copy failed; another session not covered.
+`graphify query` through the broker exit 0, `graphify install` refused.
+Audit chain intact. Launcher dry-run: `coding` → box=true (default),
+`--no-box` → false (flag), `--copilot` → false (default).
+
+**Open**
+- The LaunchAgent is NOT installed on this Mac (the session's permission
+  classifier refused a persistence change): run
+  `scripts/install-launchd-daemons.sh guard`.
+- Approval is the host CLI holding the token; item 3 replaces it with
+  WebAuthn / password in a host browser page.
+- Nothing consumes grants yet — item 4 makes the in-box hook ask for them
+  instead of reading `OVERRIDE_CONSTRAINT` from the transcript.
 
 ## Session log
 
@@ -404,3 +470,6 @@ hooks (Claude Code docs).
 - **2026-11-07 (later)** — user decisions: container boundary, WebAuthn bypass,
   test-fixture whitelist. Phase 0 completed, committed (82ebde86). Phase 1 item 1
   (agent box, opt-in `--box`) built and verified; glass re-verified unchanged.
+- **2026-11-07 (evening)** — Phase 1 item 2: host guard daemon (signed grants,
+  audit chain, `coding svc` broker, units) built and verified against a real
+  box; box mode made the default for claude with an audited `--no-box`.

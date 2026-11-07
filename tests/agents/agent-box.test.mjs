@@ -9,7 +9,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { boxRunArgs, boxPath, toBoxUrl, IMAGE, HOME_VOLUME, BOX_HOME } from '../../scripts/agent-box.mjs';
+import { boxRunArgs, boxPath, toBoxUrl, IMAGE, HOME_VOLUME, BOX_HOME, BOX_GUARD_KEYS } from '../../scripts/agent-box.mjs';
 
 const base = {
   agent: 'claude', cwd: '/Users/u/proj', codingRepo: '/Users/u/coding', home: '/Users/u',
@@ -34,9 +34,10 @@ describe('boxRunArgs — boundary', () => {
     assert.strictEqual(envs(argv).CODING_BOX_GID, '20');
   });
 
-  test('host mounts: workspace rw, coding repo ro, transcripts, the home volume — nothing else', () => {
+  test('host mounts: workspace rw, coding repo ro, transcripts, the home volume, guard PUBLIC key — nothing else', () => {
     assert.deepStrictEqual(volumes(argv).sort(), [
       `${HOME_VOLUME}:${BOX_HOME}`,
+      `/Users/u/.coding/guard/public:${BOX_GUARD_KEYS}:ro`,
       `/Users/u/.claude/projects:${BOX_HOME}/.claude/projects`,
       '/Users/u/coding:/Users/u/coding:ro',
       '/Users/u/proj:/Users/u/proj',
@@ -46,12 +47,27 @@ describe('boxRunArgs — boundary', () => {
   test('the coding repo is the workspace itself → mounted once, writable', () => {
     const v = volumes(boxRunArgs({ ...base, cwd: '/Users/u/coding' }));
     assert.ok(v.includes('/Users/u/coding:/Users/u/coding'));
-    assert.ok(!v.some((m) => m.endsWith(':ro')));
+    assert.ok(!v.some((m) => m.endsWith(':ro') && !m.includes(BOX_GUARD_KEYS)));
   });
 
   test('image, then the agent command and its args, in the workspace', () => {
     const tail = boxRunArgs({ ...base, args: ['--resume'] }).slice(-5);
     assert.deepStrictEqual(tail, ['-w', '/Users/u/proj', IMAGE, 'claude', '--resume']);
+  });
+
+  test('a workspace that contains the guard keys is refused', () => {
+    assert.throws(() => boxRunArgs({ ...base, cwd: '/Users/u' }), /guard's keys/);
+    assert.throws(() => boxRunArgs({ ...base, cwd: '/Users/u/.coding' }), /guard's keys/);
+    assert.throws(() => boxRunArgs({ ...base, env: { PI_CODING_AGENT_DIR: '/Users/u/.coding/guard' } }), /guard's keys/);
+  });
+
+  test('the guard key dir is never mounted beyond its public part', () => {
+    assert.ok(!volumes(argv).some((v) => /\.coding\/guard(:|\/(?!public:))/.test(v)));
+  });
+
+  test('the box knows where the host guard is and which session it is', () => {
+    assert.strictEqual(envs(argv).CODING_GUARD_URL, 'http://host.docker.internal:3035');
+    assert.strictEqual(envs(argv).CODING_GUARD_SESSION, 'coding-box-claude-1');
   });
 
   test('unknown agent is refused', () => {

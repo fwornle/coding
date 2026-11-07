@@ -27,12 +27,15 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { ROUTING_ENV_VARS } from '../lib/agents/proxy-routing.mjs';
+import { guardHome, guardPaths, guardPort, exposesGuardHome } from '../lib/guard/home.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 export const IMAGE = 'coding-agent-box:latest';
 export const HOME_VOLUME = 'coding-box-home';
 export const BOX_HOME = '/home/agent';
+/** The guard's PUBLIC key directory inside the box (verifies grants, Phase 1 item 4). */
+export const BOX_GUARD_KEYS = '/etc/coding-guard';
 export const AGENT_COMMANDS = { claude: 'claude', copilot: 'copilot', opencode: 'opencode', pi: 'pi' };
 
 const GUARD_SUBMODULE = 'integrations/constraint-monitor';
@@ -119,6 +122,7 @@ export function boxRunArgs({
   agent, args = [], env = process.env, cwd = process.cwd(), codingRepo = REPO,
   home = os.homedir(), platform = process.platform, uid, gid, tty = false,
   image = IMAGE, name = `coding-box-${agent}-${process.pid}`, exists = fs.existsSync,
+  guardDir = guardHome(env, home), guardPortNum = guardPort(env),
 }) {
   const command = AGENT_COMMANDS[agent];
   if (!command) throw new Error(`unknown agent '${agent}' (one of: ${Object.keys(AGENT_COMMANDS).join(', ')})`);
@@ -132,6 +136,10 @@ export function boxRunArgs({
 
   const mounts = new Map(); // box path → [host path, mode]
   const mount = (host, mode = 'rw') => {
+    // The guard's signing key and approver token must never be visible in the box.
+    if (exposesGuardHome(host, guardDir)) {
+      throw new Error(`refusing to mount ${host}: it contains the guard's keys (${guardDir})`);
+    }
     const target = boxPath(host, platform);
     if (!mounts.has(target)) mounts.set(target, [host, mode]);
   };
@@ -157,11 +165,17 @@ export function boxRunArgs({
     argv.push('-e', `${key}=${boxed}`);
   }
 
+  // Host guard (scripts/coding-guard-daemon.mjs): where to ask, and who is asking.
+  argv.push('-e', `CODING_GUARD_URL=http://host.docker.internal:${guardPortNum}`, '-e', `CODING_GUARD_SESSION=${name}`);
+
   argv.push('-v', `${HOME_VOLUME}:${BOX_HOME}`);
   // Claude transcripts on the host's disk, where session logging reads them.
   const projects = path.join(home, '.claude', 'projects');
   argv.push('-v', `${projects}:${BOX_HOME}/.claude/projects`);
   for (const [target, [host, mode]] of mounts) argv.push('-v', `${host}:${target}${mode === 'ro' ? ':ro' : ''}`);
+  // The directory, not the file: single-file bind mounts go stale on VirtioFS.
+  const publicDir = guardPaths(guardDir).publicDir;
+  if (exists(publicDir)) argv.push('-v', `${publicDir}:${BOX_GUARD_KEYS}:ro`);
 
   argv.push('-w', boxPath(cwd, platform), image, command, ...args);
   return argv;
