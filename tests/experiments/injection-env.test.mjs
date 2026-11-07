@@ -8,7 +8,7 @@
 //
 // Strategy: spawn the real hook (src/hooks/knowledge-injection-hook.js) as a child process
 // exactly the way Claude Code does (JSON on stdin), pointed at a LOCAL stub retrieval server
-// bound on the hook's default port (3033). The stub records whether it was hit. We assert:
+// on a free port (CODING_RETRIEVAL_PORT). The stub records whether it was hit. We assert:
 //   (a) CODING_KNOWLEDGE_INJECTION=0  → server NOT hit, stdout has NO additionalContext.
 //   (b) env unset                     → server hit, stdout carries the injected markdown.
 // Difference between (a) and (b) is ONLY the env var → the guard is per-process, not global.
@@ -21,7 +21,10 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const HOOK_PATH = path.resolve(__dirname, '..', '..', 'src', 'hooks', 'knowledge-injection-hook.js');
-const STUB_PORT = 3033; // the hook's callRetrieval default port
+// A free port, handed to the hook via CODING_RETRIEVAL_PORT. The hook's default (3033) is
+// the live dashboard API's port: the stub used to bind 127.0.0.1:3033 next to Docker's *:3033
+// and broke once the dashboard was published on 127.0.0.1 only.
+let stubPort;
 
 let server;
 let hitCount = 0;
@@ -41,7 +44,7 @@ before(async () => {
   });
   await new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(STUB_PORT, '127.0.0.1', resolve);
+    server.listen(0, '127.0.0.1', () => { stubPort = server.address().port; resolve(); });
   });
 });
 
@@ -57,7 +60,7 @@ function runHook(extraEnv) {
   return new Promise((resolve) => {
     // Merge, then DELETE any key whose override value is undefined so the "unset" case truly
     // unsets it (a plain spread of {KEY: undefined} would leave the parent's value in place).
-    const env = { ...process.env, ...extraEnv };
+    const env = { ...process.env, CODING_RETRIEVAL_PORT: String(stubPort), ...extraEnv };
     for (const [k, v] of Object.entries(extraEnv)) {
       if (v === undefined) delete env[k];
     }

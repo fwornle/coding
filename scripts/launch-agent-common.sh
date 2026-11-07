@@ -664,6 +664,7 @@ launch_agent() {
     _agent_log "DRY-RUN: All startup logic completed successfully"
     _agent_log "DRY-RUN: Would launch in tmux: $AGENT_COMMAND"
     _agent_log "DRY-RUN: Agent=$AGENT_NAME, Docker=$DOCKER_MODE, Platform=$PLATFORM"
+    _agent_log "DRY-RUN: Agent box=${CODING_BOX:-false}"
     _agent_log "DRY-RUN: Features=${CODING_FEATURES:-none} (docker needed: $CODING_NEEDS_DOCKER)"
     _agent_log "DRY-RUN: Project=$TARGET_PROJECT_DIR"
     _agent_log "DRY-RUN: Network: CN=$INSIDE_CN, Proxy=$PROXY_WORKING, Required=$PROXY_REQUIRED"
@@ -754,8 +755,23 @@ launch_agent() {
   cd "$TARGET_PROJECT_DIR"
   _agent_log "Changed working directory to: $(pwd)"
 
-  # 19. Launch via tmux session wrapper
-  _agent_log "Launching ${AGENT_DISPLAY_NAME}..."
+  # 19. Launch via tmux session wrapper. In box mode (`--box`) only the command
+  #     changes: tmux, the status line and every host service stay as they are,
+  #     and the agent itself runs in the coding agent box (scripts/agent-box.mjs),
+  #     under the guard baked into the image.
   source "$SCRIPT_DIR/tmux-session-wrapper.sh"
-  tmux_session_wrapper "$AGENT_COMMAND" "${AGENT_COMMAND_ARGS[@]}" "$@"
+  if [ "${CODING_BOX:-}" = "true" ]; then
+    # status: 0 up to date, 2 stale (warn, still run), 1 no image (stop).
+    local box_status=0
+    node "$CODING_REPO/scripts/agent-box.mjs" status >&2 || box_status=$?
+    if [ "$box_status" = "1" ]; then
+      _agent_log "❌ No agent box image. Build it first: coding box build"
+      exit 1
+    fi
+    _agent_log "📦 Launching ${AGENT_DISPLAY_NAME} in the agent box..."
+    tmux_session_wrapper node "$CODING_REPO/scripts/agent-box.mjs" run "$AGENT_NAME" -- "${AGENT_COMMAND_ARGS[@]}" "$@"
+  else
+    _agent_log "Launching ${AGENT_DISPLAY_NAME}..."
+    tmux_session_wrapper "$AGENT_COMMAND" "${AGENT_COMMAND_ARGS[@]}" "$@"
+  fi
 }
