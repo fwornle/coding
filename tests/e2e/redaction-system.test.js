@@ -19,6 +19,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { fileURLToPath } from 'url';
 import ConfigurableRedactor from '../../src/live-logging/ConfigurableRedactor.js';
 
@@ -57,7 +58,7 @@ class RedactionSystemTest {
       'allPatternRedactionTests',
       'performanceAndAccuracyTests',
       'configurationErrorHandling',
-      'secureDefaultFallback',
+      'failClosedWithoutInitialization',
       'enhancedTranscriptMonitorIntegration'
     ];
 
@@ -472,7 +473,10 @@ class RedactionSystemTest {
               expectedRedacted: '<SECRET_REDACTED>'
             },
             {
-              input: 'some-key-12345678-abcdefgh',
+              // 32+ alphanumerics, separator, 8+ — the generic_api_keys shape. A short
+              // hyphenated slug like some-key-12345678-abcdefgh is deliberately NOT a
+              // secret: redacting slugs mangles file and branch names in observations.
+              input: 'a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6-abcdefgh',
               shouldMatch: true,
               expectedRedacted: '<SECRET_REDACTED>'
             }
@@ -497,7 +501,9 @@ class RedactionSystemTest {
           category: 'JWT Tokens',
           tests: [
             {
-              input: '<SECRET-REDACTED>',
+              // The public sample token from jwt.io (an earlier redaction pass had
+              // replaced this fixture with its own placeholder).
+              input: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c',
               shouldMatch: true,
               expectedRedacted: '<JWT_REDACTED>'
             }
@@ -529,12 +535,12 @@ class RedactionSystemTest {
             {
               input: 'https://user:pass@api.example.com/data',
               shouldMatch: true,
-              expectedRedacted: 'http://<URL_WITH_CREDENTIALS_REDACTED>'
+              expectedRedacted: 'https://<CONNECTION_STRING_REDACTED>'
             },
             {
               input: 'http://admin:secret@internal.company.com/admin',
               shouldMatch: true,
-              expectedRedacted: 'http://<URL_WITH_CREDENTIALS_REDACTED>'
+              expectedRedacted: 'http://<CONNECTION_STRING_REDACTED>'
             }
           ]
         },
@@ -746,151 +752,66 @@ class RedactionSystemTest {
     }
   }
 
+  /**
+   * A missing or corrupt config must make initialize() THROW. The caller
+   * (ObservationWriter) then refuses to store anything. Falling back to
+   * built-in defaults would silently drop the custom patterns (user ids,
+   * company names) while everything looks fine.
+   */
   async configurationErrorHandling() {
     const startTime = Date.now();
-    
+    const corruptedConfigPath = path.join(os.tmpdir(), `corrupted-config-${Date.now()}.json`);
+
     try {
-      // Test with non-existent configuration file
-      const nonExistentPath = '/tmp/non-existent-config.json';
-      const redactor1 = new ConfigurableRedactor({
-        debug: this.options.verbose,
-        configPath: nonExistentPath
-      });
-      
-      const initResult1 = await redactor1.initialize();
-      
-      // Should still initialize (creates default config)
-      if (!redactor1.isInitialized) {
-        return {
-          success: false,
-          error: 'Redactor failed to handle non-existent config file',
-          duration: Date.now() - startTime
-        };
+      const outcomes = {};
+      for (const [label, configPath] of [
+        ['nonExistentConfig', path.join(os.tmpdir(), `non-existent-config-${Date.now()}.json`)],
+        ['corruptedConfig', corruptedConfigPath],
+      ]) {
+        if (label === 'corruptedConfig') fs.writeFileSync(configPath, '{ invalid json content');
+        const redactor = new ConfigurableRedactor({ debug: this.options.verbose, configPath });
+        try {
+          await redactor.initialize();
+          outcomes[label] = 'initialized';
+        } catch {
+          outcomes[label] = 'refused';
+        }
+        if (redactor.isInitialized) outcomes[label] = 'initialized';
       }
-      
-      // Test with corrupted JSON file
-      const corruptedConfigPath = path.join('/tmp', `corrupted-config-${Date.now()}.json`);
-      fs.writeFileSync(corruptedConfigPath, '{ invalid json content');
-      
-      const redactor2 = new ConfigurableRedactor({
-        debug: this.options.verbose,
-        configPath: corruptedConfigPath
-      });
-      
-      const initResult2 = await redactor2.initialize();
-      
-      // Should fall back to secure defaults
-      if (!redactor2.isInitialized) {
-        return {
-          success: false,
-          error: 'Redactor failed to handle corrupted config file',
-          duration: Date.now() - startTime
-        };
-      }
-      
-      // Test redaction still works with fallbacks
-      const testText = 'API_KEY=sk-1234567890abcdef';
-      const redacted1 = redactor1.redact(testText);
-      const redacted2 = redactor2.redact(testText);
-      
-      if (redacted1 === testText || redacted2 === testText) {
-        return {
-          success: false,
-          error: 'Redaction not working with error fallbacks',
-          duration: Date.now() - startTime
-        };
-      }
-      
-      // Cleanup
-      if (fs.existsSync(corruptedConfigPath)) {
-        fs.unlinkSync(corruptedConfigPath);
-      }
-      
+
+      const success = Object.values(outcomes).every((o) => o === 'refused');
       return {
-        success: true,
-        details: {
-          nonExistentConfigHandled: initResult1,
-          corruptedConfigHandled: initResult2,
-          redactionStillWorking: redacted1 !== testText && redacted2 !== testText
-        },
+        success,
+        ...(success ? {} : { error: `a broken config must make initialize() throw: ${JSON.stringify(outcomes)}` }),
+        details: outcomes,
         duration: Date.now() - startTime
       };
-      
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        duration: Date.now() - startTime
-      };
+      return { success: false, error: error.message, duration: Date.now() - startTime };
+    } finally {
+      if (fs.existsSync(corruptedConfigPath)) fs.unlinkSync(corruptedConfigPath);
     }
   }
 
-  async secureDefaultFallback() {
+  /**
+   * redact() on an uninitialized redactor must THROW, never return its input:
+   * returned input is indistinguishable from "nothing to redact".
+   */
+  async failClosedWithoutInitialization() {
     const startTime = Date.now();
-    
+    const redactor = new ConfigurableRedactor({ debug: this.options.verbose });
+    let outcome;
     try {
-      // Create redactor without initialization to test secure defaults
-      const redactor = new ConfigurableRedactor({ debug: this.options.verbose });
-      
-      // Test redaction without initialization (should use secure defaults)
-      const criticalTestData = [
-        'sk-1234567890abcdefghijklmnop',
-        'xai-abcdef1234567890',
-        'API_KEY=sk-test123',
-        'PASSWORD=secret123',
-        'test@example.com'
-      ];
-      
-      const fallbackResults = [];
-      
-      for (const testData of criticalTestData) {
-        const redacted = redactor.redact(testData);
-        fallbackResults.push({
-          original: testData,
-          redacted,
-          wasRedacted: redacted !== testData
-        });
-      }
-      
-      const allCriticalDataRedacted = fallbackResults.every(r => r.wasRedacted);
-      
-      if (!allCriticalDataRedacted) {
-        const unredacted = fallbackResults.filter(r => !r.wasRedacted);
-        return {
-          success: false,
-          error: `Secure defaults failed to redact: ${unredacted.map(r => r.original).join(', ')}`,
-          duration: Date.now() - startTime
-        };
-      }
-      
-      // Test that secure defaults have reasonable coverage
-      const stats = redactor.getStats();
-      
-      if (stats.patternsActive === 0) {
-        return {
-          success: false,
-          error: 'Secure defaults loaded no patterns',
-          duration: Date.now() - startTime
-        };
-      }
-      
-      return {
-        success: true,
-        details: {
-          secureDefaultPatternsActive: stats.patternsActive,
-          allCriticalDataRedacted,
-          fallbackResults
-        },
-        duration: Date.now() - startTime
-      };
-      
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        duration: Date.now() - startTime
-      };
+      const out = redactor.redact('PASSWORD=hunter2hunter2');
+      outcome = out === 'PASSWORD=hunter2hunter2' ? 'returned input unchanged' : 'returned redacted text';
+    } catch {
+      outcome = 'refused';
     }
+    return {
+      success: outcome === 'refused',
+      ...(outcome === 'refused' ? {} : { error: `uninitialized redact() ${outcome}` }),
+      duration: Date.now() - startTime
+    };
   }
 
   async enhancedTranscriptMonitorIntegration() {

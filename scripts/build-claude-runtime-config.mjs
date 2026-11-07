@@ -67,7 +67,9 @@ function allCodingHooks(repoPath) {
   const postTool = `node ${repoPath}/scripts/tool-interaction-hook-wrapper.js`;
   const prompt = `node ${repoPath}/scripts/health-prompt-hook.js`;
   return {
-    PreToolUse: { feature: 'constraints', entries: [{ matcher: '*', hooks: [{ type: 'command', command: preTool }] }] },
+    // Explicit timeout: Claude Code proceeds when a hook times out, so the guard
+    // must answer well inside it (it does no network I/O; typical < 1 s).
+    PreToolUse: { feature: 'constraints', entries: [{ matcher: '*', hooks: [{ type: 'command', command: preTool, timeout: 30 }] }] },
     PostToolUse: { feature: 'lsl', entries: [{ matcher: '*', hooks: [{ type: 'command', command: postTool }] }] },
     UserPromptSubmit: { feature: 'health', entries: [{ hooks: [{ type: 'command', command: prompt, timeout: 5 }] }] },
   };

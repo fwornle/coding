@@ -347,8 +347,12 @@ export class ObservationWriter {
       await this._redactor.initialize();
       process.stderr.write(`[ObservationWriter] Redactor initialized (${this._redactor.compiledPatterns?.length || 0} patterns)\n`);
     } catch (err) {
-      process.stderr.write(`[ObservationWriter] Redactor init failed (observations will be stored unredacted): ${err.message}\n`);
+      // Fail closed: without a redactor every write is refused (see _redact),
+      // never stored raw. A secret that reaches an observation is copied into
+      // digests, insights, Qdrant and the git-shared KB export.
+      process.stderr.write(`[ObservationWriter] Redactor init failed — observation writes will be REFUSED until it initializes: ${err.message}\n`);
       this._redactor = null;
+      this._redactorError = err;
     }
 
     // Phase 44 Plan 13: km-core is the canonical write+read target. When the
@@ -751,17 +755,36 @@ export class ObservationWriter {
 
   /**
    * Redact PII/secrets from text using the same rules as the LSL system.
-   * Falls back to identity if redactor is not initialized.
+   * FAILS CLOSED: throws when the redactor is missing or fails, so the
+   * observation is not written. Returning the raw text here used to store
+   * secrets whenever redaction broke — silently, since the output looks the
+   * same as text that simply had nothing to redact.
    * @param {string} text
    * @returns {string}
    */
   _redact(text) {
-    if (!text || !this._redactor) return text;
+    if (!text) return text;
+    if (!this._redactor) {
+      const cause = this._redactorError ? `: ${this._redactorError.message}` : ' (init() not called)';
+      throw new Error(`[ObservationWriter] redaction unavailable, refusing to store unredacted text${cause}`);
+    }
     try {
       return this._redactor.redact(text);
-    } catch {
-      return text;
+    } catch (err) {
+      throw new Error(`[ObservationWriter] redaction failed, refusing to store unredacted text: ${err.message}`);
     }
+  }
+
+  /**
+   * Redact a structured value by redacting its JSON form. A replacement that
+   * breaks the JSON (a pattern spanning a quote) throws — the write is refused
+   * rather than the value stored raw.
+   * @param {unknown} value
+   * @returns {unknown}
+   */
+  _redactJson(value) {
+    if (value === undefined || value === null) return value;
+    return JSON.parse(this._redact(JSON.stringify(value)));
   }
 
   /**
@@ -1597,7 +1620,8 @@ export class ObservationWriter {
     const redactedSummary = this._redact(summary);
     const redactedMessages = messages.map(m => ({
       ...m,
-      content: typeof m.content === 'string' ? this._redact(m.content) : m.content,
+      // Block arrays (text/tool_use/tool_result) were stored unredacted.
+      content: typeof m.content === 'string' ? this._redact(m.content) : this._redactJson(m.content),
     }));
 
     const id = crypto.randomUUID();

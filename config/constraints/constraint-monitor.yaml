@@ -40,6 +40,7 @@ constraints:
   tool_filter:
   - Edit
   - Write
+  - MultiEdit
   suggestion: 'Replace with: Logger.log(''info'', ''category'', message)'
   whitelist:
   - '**/.claude/plans/*.md'
@@ -48,6 +49,9 @@ constraints:
   # break every bash caller. The existing scripts/experiments-*.mjs CLIs already work
   # this way. The rule keeps full force everywhere else (lib/, integrations/, services).
   - '**/scripts/*.mjs'
+  # The constraint monitor's own tests must contain violations as fixtures
+  # (user decision 2026-11-07). Write/Edit only; Bash has no file path.
+  - '**/integrations/constraint-monitor/test/**'
 - id: no-var-declarations
   group: code_quality
   pattern: \bvar\s+
@@ -62,6 +66,10 @@ constraints:
   severity: error
   enabled: true
   suggestion: Add proper error handling or at minimum log the error
+  # The constraint monitor's own tests must contain violations as fixtures
+  # (user decision 2026-11-07). Write/Edit only; Bash has no file path.
+  whitelist:
+  - '**/integrations/constraint-monitor/test/**'
 - id: proper-function-naming
   group: code_quality
   pattern: function\s+[a-z]
@@ -71,11 +79,16 @@ constraints:
   suggestion: 'Use descriptive verb-based names: getUserData(), processResults()'
 - id: no-hardcoded-secrets
   group: security
-  pattern: (api[_-]?key|password|secret|token)\s*[=:]\s*['"][^'"]{8,}['"]
+  # Case-insensitive: `apiKey`, `API_KEY`, `Token` are the common spellings.
+  pattern: (?i)(api[_-]?key|access[_-]?key|private[_-]?key|password|passwd|secret|token)\s*[=:]\s*['"][^'"]{8,}['"]
   message: Potential hardcoded secret detected
   severity: critical
   enabled: true
   suggestion: Use environment variables or secure key management
+  # The constraint monitor's own tests must contain violations as fixtures
+  # (user decision 2026-11-07). Write/Edit only; Bash has no file path.
+  whitelist:
+  - '**/integrations/constraint-monitor/test/**'
 - id: no-eval-usage
   group: security
   pattern: \beval\s*\(
@@ -83,6 +96,10 @@ constraints:
   severity: critical
   enabled: true
   suggestion: Avoid eval() - use safer alternatives for dynamic code execution
+  # The constraint monitor's own tests must contain violations as fixtures
+  # (user decision 2026-11-07). Write/Edit only; Bash has no file path.
+  whitelist:
+  - '**/integrations/constraint-monitor/test/**'
 - id: no-parallel-files
   group: architecture
   pattern: (v[2-9]|enhanced|improved|better|new|advanced|pro|simplified|simple|basic|lite|fixed|patched|updated|revised|modified|temp|temporary|backup|copy|duplicate|clone|alt|alternative|variant|final|draft|experimental|old)[
@@ -105,9 +122,17 @@ constraints:
   severity: error
   enabled: true
   suggestion: Use debugging tools and verification commands to identify root causes
+  # The constraint monitor's own tests must contain violations as fixtures
+  # (user decision 2026-11-07). Write/Edit only; Bash has no file path.
+  whitelist:
+  - '**/integrations/constraint-monitor/test/**'
 - id: no-evolutionary-names
   group: architecture
-  pattern: (?:class|function|const|let|var)\s+\w*(?<![a-z])(?:V[2-9]|Enhanced|Improved|Better|New|Advanced|Pro|Simplified|Simple|Basic|Lite|Fixed|Patched|Updated|Revised|Modified|Temp|Temporary|Backup|Copy|Duplicate|Clone|Alt|Alternative|Variant|Final|Draft|Experimental)(?![a-z])
+  # Two word classes. Unambiguous version markers match as a camelCase suffix
+  # (UserServiceV2, processDataEnhanced). Words that are also ordinary
+  # vocabulary (isNew, hasCopy, getFinal, maxTemp) only match when they start
+  # the name or follow a non-lowercase character.
+  pattern: (?:class|function|const|let|var)\s+\w*(?:(?:V[2-9]|Enhanced|Improved|Better|Advanced|Simplified|Lite|Patched|Revised|Temporary|Duplicate|Alternative|Experimental)(?![a-z])|(?<![a-z])(?:New|Pro|Simple|Basic|Fixed|Updated|Modified|Temp|Backup|Copy|Clone|Alt|Variant|Final|Draft)(?![a-z]))
   message: Evolutionary naming detected - refactor original instead. (Whitelisted
     files are exempt from this rule)
   severity: error
@@ -116,6 +141,9 @@ constraints:
   whitelist:
   - scripts/enhanced-transcript-monitor.js
   - scripts/enhanced-*.js
+  # The constraint monitor's own tests must contain violations as fixtures
+  # (user decision 2026-11-07). Write/Edit only; Bash has no file path.
+  - '**/integrations/constraint-monitor/test/**'
 - id: no-backup-files
   group: architecture
   pattern: \.(backup|bak|old|orig|tmp)(-\d{8}(-\d{6})?)?$
@@ -146,6 +174,13 @@ constraints:
   message: PlantUML files must include the standard styling file
   severity: error
   enabled: true
+  # A rule about PlantUML FILES: without this scope it fired on any Bash
+  # command or document that merely mentions the start tag.
+  tool_filter:
+  - Edit
+  - Write
+  - MultiEdit
+  file_pattern: \.puml$
   suggestion: Add '!include _standard-style.puml' after @startuml and before content
   whitelist:
   - '**/*.yaml'
@@ -203,6 +238,13 @@ constraints:
   severity: critical
   enabled: true
   applies_to: content
+  # Diagram names live in .puml files; unscoped, the rule fired on any edit
+  # or command that mentions the start tag (including this rules file).
+  tool_filter:
+  - Edit
+  - Write
+  - MultiEdit
+  file_pattern: \.puml$
   suggestion: Change @startuml My Diagram Name to @startuml my-diagram-name (must
     match filename without .puml extension)
 - id: image-reference-pattern
@@ -291,17 +333,26 @@ constraints:
   - '**/.planning/**/*.md'
 - id: documentation-style-skill-required
   group: documentation
-  pattern: (?:```(?:plantuml|puml|mermaid)|@startuml|flowchart|sequenceDiagram)
+  pattern: (?:```(?:plantuml|puml|mermaid)|@startuml)
   message: 'CRITICAL: Creating diagrams requires documentation-style skill. You MUST
     invoke Skill tool with skill=''documentation-style'' BEFORE creating diagram files'
   severity: error
   enabled: true
-  applies_to: file_path
+  # The pattern matches diagram CONTENT. As `applies_to: file_path` it was
+  # tested against the path and could never fire.
+  applies_to: content
+  tool_filter:
+  - Edit
+  - Write
+  - MultiEdit
   suggestion: 'STOP: Invoke the documentation-style skill first: Use Skill tool with
     parameter skill=''documentation-style'' to load proper workflow and standards'
   whitelist:
   - .constraint-monitor.yaml
   - config/constraints/constraint-monitor.yaml
+  # The constraint monitor's own tests must contain violations as fixtures
+  # (user decision 2026-11-07). Write/Edit only; Bash has no file path.
+  - '**/integrations/constraint-monitor/test/**'
 - id: plantuml-modification-requires-skill
   group: plantuml
   pattern: '@startuml|!include.*\.puml'
