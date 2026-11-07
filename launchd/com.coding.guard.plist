@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  com.coding.guard — the host guard daemon on :3035 (feature: constraints).
+
+  The half of the agent-box guard that lives OUTSIDE the box: it holds the
+  grant signing key and the approver token in ~/.coding/guard (mounted
+  nowhere), answers override requests from the box, runs the fixed `coding svc`
+  Docker verbs, and keeps the hash-chained audit log.
+  KeepAlive with a 30s throttle so a crash-looping daemon cannot spin.
+  Plan: .planning/guardrail-hardening.md (Phase 1, item 2).
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.coding.guard</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/sh</string>
+        <string>-c</string>
+        <string>exec node "$@"</string>
+        <string>node</string>
+        <string>__CODING_REPO__/scripts/coding-guard-daemon.mjs</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__CODING_REPO__</string>
+    <key>KeepAlive</key>
+    <true/>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>ThrottleInterval</key>
+    <integer>30</integer>
+    <key>StandardOutPath</key>
+    <string>__CODING_REPO__/.logs/guard.log</string>
+    <key>StandardErrorPath</key>
+    <string>__CODING_REPO__/.logs/guard.log</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/usr/sbin:/bin:/sbin</string>
+        <key>CODING_GUARD_PORT</key>
+        <string>3035</string>
+    </dict>
+</dict>
+</plist>

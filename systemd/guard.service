@@ -1,0 +1,19 @@
+# coding: host guard daemon on :3035 (feature: constraints)
+# Linux twin of launchd/com.coding.guard.plist, which carries the reasoning
+# behind each setting. tests/features/systemd-units.test.mjs keeps the two equal.
+[Unit]
+Description=coding: host guard daemon on :3035 (feature: constraints)
+
+[Service]
+Type=simple
+WorkingDirectory=__CODING_REPO__
+Environment=PATH=__NODE_DIR__:/usr/local/bin:/usr/bin:/bin
+Environment=CODING_GUARD_PORT=3035
+ExecStart=/bin/sh -c 'exec node "$$@"' node "__CODING_REPO__/scripts/coding-guard-daemon.mjs"
+Restart=always
+RestartSec=30
+StandardOutput=append:__CODING_REPO__/.logs/guard.log
+StandardError=append:__CODING_REPO__/.logs/guard.log
+
+[Install]
+WantedBy=default.target

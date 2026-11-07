@@ -172,12 +172,14 @@ system|~/Library/LaunchAgents/com.coding.{obs-api,digest-refs-sweeper}.plist|cre
 system|~/Library/LaunchAgents/com.coding.prompt-classifier.plist|create+load|yes|the prompt-complexity judge the proxy asks (macOS) [feature:llm-proxy]
 system|~/Library/LaunchAgents/com.coding.{measurement-reconciler,context-turns-sweeper}.plist|create+load|yes|binds live sessions to measurements, and prunes captured context turns (macOS) [feature:performance]
 system|~/Library/LaunchAgents/com.coding.health-coordinator.plist|create+load|yes|the health coordinator: re-spawns dead session loggers, serves the features API (macOS) [feature:health]
+system|~/Library/LaunchAgents/com.coding.guard.plist|create+load|yes|the host guard: signs override grants for the agent box, runs its fixed Docker verbs, keeps the audit log in ~/.coding/guard (macOS) [feature:constraints]
 system|~/.config/systemd/user/llm-cli-proxy.service|create+enable|yes|OPT-IN: starts the LLM proxy at login (Linux) [feature:llm-proxy]
 system|~/.config/systemd/user/{lsl-lock-sweeper,sub-agent-*}.{service,timer}|create+enable|yes|session-logging daemons: capture sub-agent transcripts, clear stale git locks in the history checkout (Linux/WSL, systemd user units) [feature:lsl]
 system|~/.config/systemd/user/{obs-api,digest-refs-sweeper}.{service,timer}|create+enable|yes|the observations API every agent writes through, and its reference sweeper (Linux/WSL, systemd user units) [feature:observations]
 system|~/.config/systemd/user/prompt-classifier.service|create+enable|yes|the prompt-complexity judge the proxy asks (Linux/WSL, systemd user unit) [feature:llm-proxy]
 system|~/.config/systemd/user/{measurement-reconciler,context-turns-sweeper}.{service,timer}|create+enable|yes|binds live sessions to measurements, and prunes captured context turns (Linux/WSL, systemd user units) [feature:performance]
 system|~/.config/systemd/user/health-coordinator.service|create+enable|yes|the health coordinator: re-spawns dead session loggers, serves the features API (Linux/WSL, systemd user unit) [feature:health]
+system|~/.config/systemd/user/guard.service|create+enable|yes|the host guard: signs override grants for the agent box, runs its fixed Docker verbs, keeps the audit log in ~/.coding/guard (Linux/WSL, systemd user unit) [feature:constraints]
 system|Scheduled Task \coding\claude-ctx-sweeper|create|yes|Windows only: hourly cleanup of stale status-line temp files, because nothing else ever reclaims %TEMP% (elsewhere this runs at agent launch and changes nothing)
 MANIFEST
 }

@@ -23,6 +23,13 @@ fi
 require_feature codegraph
 
 
+
+# Inside the agent box there is no Docker socket: the host guard daemon runs the
+# read/update graphify verbs for us (lib/guard/svc.mjs) and refuses the rest.
+if [ "${CODING_BOX:-}" = "1" ]; then
+    exec node "$CODING_REPO/scripts/coding-guard.mjs" svc graphify "$@"
+fi
+
 CONTAINER="${GRAPHIFY_CONTAINER:-coding-services}"
 
 if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "${CONTAINER}"; then

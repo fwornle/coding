@@ -76,6 +76,7 @@ Platform service manager: launchd (macOS), systemd `--user` (Linux), Scheduled T
 | `com.coding.measurement-reconciler` | `scripts/measurement-reconciler.mjs` | `performance` |
 | `com.coding.context-turns-sweeper` | `scripts/context-turns-sweeper-job.sh` | `performance` |
 | `com.coding.health-coordinator` | `scripts/health-coordinator.js` | `health` |
+| `com.coding.guard` | `scripts/coding-guard-daemon.mjs` | `constraints` |
 
 **How they get installed.** Every label above has a template in `launchd/` (macOS) and
 in `systemd/` (Linux, WSL): `<id>.service`, plus `<id>.timer` for an interval job (the

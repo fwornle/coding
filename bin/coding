@@ -130,7 +130,15 @@ OPTIONS:
   --project DIR      Set target project directory (default: current dir)
   --verbose          Enable verbose logging
   --dry-run          Run startup logic but stop before launching agent
+  --box              Run the agent in the agent box (default for claude)
+  --no-box           Run the agent directly on the host (recorded in the guard audit log)
   --help             Show this help
+
+SUBCOMMANDS:
+  box build|status   Build / check the agent box image (bakes in the COMMITTED guard)
+  guard status|pending|approve|deny|audit
+                     Override requests from the box and the guard's audit log
+  svc <verb> ...     Fixed Docker verbs for agents in the box (status, logs, restart, graphify, up, rebuild)
 
 EXAMPLES:
   coding-agent --lsl-status           # Show LSL system status
@@ -176,6 +184,15 @@ fi
 if [[ "${1:-}" == "box" ]]; then
   shift
   exec node "$SCRIPT_DIR/../scripts/agent-box.mjs" "$@"
+fi
+# `coding guard …` — override requests, approvals and the audit log of the host
+# guard daemon; `coding svc …` — the fixed Docker verbs it runs for the box.
+if [[ "${1:-}" == "guard" ]]; then
+  shift
+  exec node "$SCRIPT_DIR/../scripts/coding-guard.mjs" "$@"
+fi
+if [[ "${1:-}" == "svc" ]]; then
+  exec node "$SCRIPT_DIR/../scripts/coding-guard.mjs" "$@"
 fi
 # `coding job-classes …` — a team's shared job-class taxonomy (lib/job-classes/cli.mjs).
 if [[ "${1:-}" == "job-classes" ]]; then
@@ -232,6 +249,14 @@ while [[ $# -gt 0 ]]; do
     --box)
       # Run the agent inside the coding agent box (docker/agent-box/).
       export CODING_BOX=true
+      CODING_BOX_SOURCE=flag
+      shift
+      ;;
+    --no-box)
+      # Escape hatch: run the agent directly on the host, outside the box.
+      # Recorded in the guard's audit log at launch (launch-agent-common.sh).
+      export CODING_BOX=false
+      CODING_BOX_SOURCE=flag
       shift
       ;;
     --lsl-status)
@@ -287,6 +312,23 @@ else
   
   log "Detected agent: $AGENT"
 fi
+
+# Box mode. Claude runs in the agent box unless told otherwise (--no-box, or
+# CODING_BOX=false in the environment); the other agents stay opt-in (--box)
+# until their own guard and session stores are wired into the box
+# (.planning/guardrail-hardening.md, Phase 1 item 5).
+if [ -z "${CODING_BOX_SOURCE:-}" ]; then
+  if [ -n "${CODING_BOX:-}" ]; then
+    CODING_BOX_SOURCE=env
+  elif [ "$AGENT" = "claude" ]; then
+    export CODING_BOX=true
+    CODING_BOX_SOURCE=default
+  else
+    export CODING_BOX=false
+    CODING_BOX_SOURCE=default
+  fi
+fi
+export CODING_BOX_SOURCE
 
 # Resolve the repo path early (needed for config lookup)
 CODING_REPO_PATH="$(cd "$SCRIPT_DIR/.." && pwd)"
