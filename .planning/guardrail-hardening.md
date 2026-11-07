@@ -288,7 +288,8 @@ request path (proxy repo); team scope fails closed with a route test.
 | Phase 1 item 1 (agent box) | done — DEFAULT for claude since item 2 | see "Phase 1 item 1 results" |
 | Phase 1 item 2 (host guard daemon) | done — LaunchAgent install left to the user | see "Phase 1 item 2 results" |
 | Phase 1 item 3 (WebAuthn approval) | done — enrolment on this Mac needs the user | see "Phase 1 item 3 results" |
-| Phase 1 items 4–6 | todo | hook verifies grants, per-agent guards, red-team |
+| Phase 1 item 4 (hook verifies grants) | done | see "Phase 1 item 4 results" |
+| Phase 1 items 5–6 | todo | per-agent guards, red-team |
 | Phase 2–3 | todo | |
 
 ## Phase 0 results (2026-11-07)
@@ -514,6 +515,56 @@ that test.
   `scripts/install-launchd-daemons.sh guard`, then `coding guard enroll`.
 - Item 4: hook fetches + verifies grants, transcript override off in the box.
 
+## Phase 1 item 4 results (2026-11-07)
+
+**What exists**
+- `integrations/constraint-monitor/src/hooks/box-grants.js` — box mode
+  (`CODING_GUARD_MODE=box`): the transcript override is OFF (including the
+  `guard-error` escape). A blocked call fetches `GET /grants?session=`,
+  verifies each with the mounted public key (`lib/guard/grants.mjs`, imported
+  from `../../../../lib/guard/`, staged into the image at the same relative
+  place), matches rule + session + file + expiry, spends a one-call grant via
+  `/grants/:id/consume` (non-call grants are preferred so a 15-min approval
+  doesn't burn a one-call one); otherwise it files `POST /requests` and the
+  block message carries the approval link. Guard unreachable / keys missing
+  ⇒ blocked, "no override is possible right now". A broken guard asks for a
+  `guard-error` grant. An escaped rejection in the wrapper now blocks (Node
+  exits 1 on an unhandled rejection, which Claude Code treats as allow).
+- Trusted inputs only: `CODING_GUARD_MODE` / `CODING_GUARD_KEYS` set INLINE
+  in the managed hook command (a nested `claude` started by the agent can
+  carry any env, but an inline assignment wins); guard URL from
+  `public/guard.json` (written by the daemon) in the ro mount, NOT from
+  `CODING_GUARD_URL` — a fake guard could otherwise replay a spent grant;
+  session = container hostname (`docker run --hostname <name>`).
+- Daemon: writes `public/guard.json`; a pending request for the same rule +
+  session + file is reused, so a retrying agent files one request.
+- Image: `lib/guard/grants.mjs` staged from HEAD, part of the guard digest.
+
+**Verified** — `tests/guard/box-hook.test.mjs` 16/16 (real hook wrapper vs
+real `createGuard`): block files one request with the link, typed transcript
+override ignored, call / minutes / file binding, other session, denied,
+forged-key grant from a fake guard, edited payload, env URL ignored, guard
+down, no keys, broken guard + `guard-error` grant. Submodule suite 51 pass /
+5 todo (3 box cases added). Full `npm test`: jest 1297/1297, node 2321 pass
+/ 0 fail / 4 skipped. Live, real image + scratch guard on :3036: the managed
+command run in the box with an agent env of `CODING_GUARD_MODE=host`, own
+keys dir and a fake URL → still box mode, request filed (session =
+`coding-box-claude-live4`); after a one-call password approval the next run
+exit 0, the one after exit 2 with a fresh request; `/etc/coding-guard` is
+read-only, `hostname` needs root; audit chain intact.
+
+**Residual (not item 4)**
+- Skill activations still come from the transcript in the box; a forged
+  `Skill` entry satisfies the skill-required (documentation-style) rules.
+  Low impact; result-based checks (Phase 2) are the real fix.
+- `/svc` gated verbs take `session` from the request body: a box could name
+  another box's session and use its `svc:<verb>` grant. Bind to the caller
+  (e.g. per-box token in the ro mount) in item 5.
+- `NODE_OPTIONS` etc. still reach the hook from a nested agent's env; the
+  hook's own decision inputs are inline, but preload code would run inside
+  it. Next hardening: `env -i` in the managed command (needs a check of
+  what claude passes to hooks).
+
 ## Session log
 
 - **2026-11-07** — audit; plan written; Phase 0 implemented (0.1, 0.3, 0.4;
@@ -527,3 +578,5 @@ that test.
 - **2026-11-07 (late)** — Phase 1 item 3: WebAuthn / password / recovery
   approval with enrolment UI and install step; box default tied to the
   constraints feature; MkDocs page + two diagrams.
+- **2026-11-07 (night)** — Phase 1 item 4: in-box hook honours only signed
+  grants, files the request itself; verified against a real box.
