@@ -289,7 +289,8 @@ request path (proxy repo); team scope fails closed with a route test.
 | Phase 1 item 2 (host guard daemon) | done — LaunchAgent install left to the user | see "Phase 1 item 2 results" |
 | Phase 1 item 3 (WebAuthn approval) | done — enrolment on this Mac needs the user | see "Phase 1 item 3 results" |
 | Phase 1 item 4 (hook verifies grants) | done | see "Phase 1 item 4 results" |
-| Phase 1 items 5–6 | todo | per-agent guards, red-team |
+| Phase 1 item 5 (per-agent guards) | done — other agents still opt-in `--box` | see "Phase 1 item 5 results" |
+| Phase 1 item 6 | todo | red-team cells on the box |
 | Phase 2–3 | todo | |
 
 ## Phase 0 results (2026-11-07)
@@ -565,6 +566,74 @@ read-only, `hostname` needs root; audit chain intact.
   it. Next hardening: `env -i` in the managed command (needs a check of
   what claude passes to hooks).
 
+## Phase 1 item 5 results (2026-11-07)
+
+**Investigation (CLIs in the box: copilot 1.0.107, opencode 1.19.5, pi 1.5.0;
+each run through the proxy with a logging hook, not from docs alone)**
+- opencode: managed config `/etc/opencode/` (docs: highest precedence).
+  Verified: project `"plugin": []`, `OPENCODE_CONFIG_CONTENT` and
+  `OPENCODE_DISABLE_DEFAULT_PLUGINS` keep the managed plugin; it runs AFTER
+  project plugins (sees final args). Only `OPENCODE_TEST_MANAGED_CONFIG_DIR`
+  moves it — not in the box's env allowlist.
+- pi: `-e <path>` always loads (also with `-ne`); its handler runs before
+  discovered extensions. Shapes: `bash{command}`, `write{path,content}`,
+  `edit{path,edits[{oldText,newText}]}`, paths relative.
+- copilot: no local managed layer (managed settings = GitHub org / MDM).
+  Hooks fire from `--plugin-dir` (legacy plugin.json inline/`hooks.json`,
+  and Claude-format `.claude-plugin` + `hooks/hooks.json`, which gets a
+  Claude-shaped payload: `Write{path,file_text}`, `Edit{path,old_str,new_str}`).
+  `disableAllHooks` in REPOSITORY settings (`.github/copilot/settings*.json`,
+  `.claude/settings*.json`) silences plugin hooks too, but only in a trusted
+  folder — and trust is in `~/.copilot/config.json`, agent-writable. User
+  `disableAllHooks` / `enabledPlugins:false` do not stop the plugin. Settings
+  planted mid-session did not stop hooks in that session (read at start).
+  Copilot hides an exit-2 hook's stderr; it shows a JSON deny reason (exit 0),
+  and it ALLOWS when stdout is not exactly the JSON.
+- A ro mount of `.github/copilot` alone is NOT enough: renaming its parent
+  `.github` works and a new settings file can be planted (tested). Pinning
+  `.github` with its own rw mount makes it a mount point (EBUSY).
+
+**What exists**
+- `integrations/constraint-monitor/src/hooks/agent-adapters.js` — native
+  calls → Claude shape; the wrapper takes the agent from `CODING_GUARD_AGENT`
+  (inline in each plugin) and records it on requests. For copilot `block()`
+  writes a JSON deny to fd 1 and every other stdout write goes to stderr.
+- `docker/agent-box/agents/`: `copilot/` (Claude-format plugin),
+  `opencode/guard.js` + `opencode.json` (→ `/etc/opencode/`), `pi/guard.js`,
+  `guard-hook.mjs` (runs the hook with box mode / keys / rules / agent fixed,
+  fail-closed). Image copies them root-owned; `stageContext` now archives the
+  whole committed `docker/agent-box` tree.
+- `scripts/agent-box.mjs`: `AGENT_GUARD_ARGS` (copilot `--plugin-dir`, pi
+  `-e`, before user args); copilot boxes mount `.github` rw (pin),
+  `.github/copilot` + `.claude` ro in every dir from workspace to cwd
+  (`configRoots`); `prepareCopilotConfig` refuses a repo that disables hooks
+  and creates missing dirs (empty, git-invisible).
+
+**Verified** — tests: adapters 11 (submodule, now 62 pass / 5 todo),
+`tests/guard/box-hook.test.mjs` 22/22 (per-agent native payloads vs real
+daemon, copilot JSON deny incl. broken guard, empty stdout on allow),
+`tests/agents/agent-box` 26/26. Full `npm test`: jest 1297/1297, node 2333
+pass / 0 fail / 4 skipped. LIVE, real image + real `boxRunArgs` + scratch
+guard (:3036), each agent asked to write a blocked line: copilot, opencode
+and pi all blocked, each quoted the rule and the approval link, requests
+filed with the right agent / box session / absolute file; after a one-call
+password approval each wrote the file. In a copilot box: writing either
+settings dir, renaming `.github` / `.github/copilot`, deleting `.claude`, and
+editing any guard file — all refused. Claude hook re-checked on the new image.
+
+**Open**
+- Other agents stay opt-in (`--box`): opencode/pi provider config
+  (`~/.config/opencode`, `~/.pi/agent`) is host-only and not in the box —
+  mounting `~/.pi/agent` rw would let the box plant a HOST extension, so it
+  needs a generated, read-only copy; copilot needs a box login or BYOK.
+- Agent-written in-process code (opencode project/global plugins, pi
+  discovered extensions, copilot extensions) can mutate a call around the
+  check — same class as Bash running an agent-written script → Phase 2.
+- Carried from item 4, NOT done here: `/svc` session binding (per-box token),
+  `env -i` for the hook command.
+- Enforcement in the proxy (plan's fallback) not needed: every agent has a
+  root-owned load path.
+
 ## Session log
 
 - **2026-11-07** — audit; plan written; Phase 0 implemented (0.1, 0.3, 0.4;
@@ -580,3 +649,6 @@ read-only, `hostname` needs root; audit chain intact.
   constraints feature; MkDocs page + two diagrams.
 - **2026-11-07 (night)** — Phase 1 item 4: in-box hook honours only signed
   grants, files the request itself; verified against a real box.
+- **2026-11-07 (night, later)** — Phase 1 item 5: copilot / opencode / pi
+  load the guard from root-owned places; copilot repo-settings bypass found
+  and closed; verified live for all three agents.

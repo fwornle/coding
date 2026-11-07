@@ -17,9 +17,8 @@ in between:
 - The agent runs as your user id with `no_new_privs`. There is no `sudo` and no
   Docker socket.
 - The constraint hook and its rules are baked into the image under
-  `/opt/coding-guard`, owned by root. Claude's managed policy
-  (`/etc/claude-code/managed-settings.json`) pins the hook, and `disableAllHooks`
-  in user or project settings cannot switch it off.
+  `/opt/coding-guard`, owned by root. Every agent loads it from a place its
+  user or project settings cannot remove (see [Each agent's guard](#each-agents-guard)).
 - Only the workspace is mounted read-write. The rest of `$HOME` is not
   mounted, apart from Claude's transcript folder.
 - It works the same on macOS, Linux, WSL and Windows, because inside the box it
@@ -31,7 +30,7 @@ in between:
 |---------|---------------------|
 | `coding` / `coding --claude` | in the box: the default when the `constraints` feature is on |
 | `coding --no-box` | on the host; this is **recorded in the guard audit log** |
-| `coding --copilot --box` (also `--opencode`, `--pi`) | in the box, opt-in for now |
+| `coding --copilot --box` (also `--opencode`, `--pi`) | in the box, opt-in (see below) |
 | `CODING_BOX=false coding` | on the host (same as `--no-box`, also recorded) |
 
 Only the final command changes: tmux, the status line and all host services
@@ -50,6 +49,45 @@ coding box status     # current / stale / missing
 The image contains only what is committed. If an agent edits the guard inside
 the mounted repo, nothing reaches the box. When the image is older than the
 committed guard, the launcher warns, but it never rebuilds on its own.
+
+## Each agent's guard
+
+All four agents run the same constraint hook with the same rules, and an
+override is the same signed grant for all of them. What differs is how each
+CLI is made to load the hook so that the agent cannot unload it:
+
+| Agent | Loaded from | Why the agent cannot remove it |
+|-------|-------------|--------------------------------|
+| Claude Code | `/etc/claude-code/managed-settings.json` | managed policy with `allowManagedHooksOnly`; `disableAllHooks` in user or project settings does not touch managed hooks |
+| Copilot CLI | plugin in `/opt/coding-guard/agents/copilot`, passed with `--plugin-dir` | the command line is fixed by the launcher. See the note on repository settings below |
+| opencode | plugin listed in `/etc/opencode/opencode.json` | opencode's managed config wins over user, project and inline config; a `"plugin": []` elsewhere does not drop it, and it runs after every other plugin |
+| pi | extension `/opt/coding-guard/agents/pi/guard.js`, passed with `-e` | an explicit `-e` extension always loads, even with `--no-extensions` |
+
+The hook maps each CLI's own tool calls (`write`/`edit`/`bash`, `path` or
+`filePath`, pi's relative paths) onto the names the rules use, so a rule means
+the same thing whichever agent wrote the file. Override requests name the
+agent.
+
+**Copilot and repository settings.** In a folder marked trusted, Copilot
+reads `.github/copilot/settings*.json` and `.claude/settings*.json` from the
+repository, and `disableAllHooks` there switches off every hook, plugins
+included. The agent can mark a folder trusted, because trust is stored in a
+file it can write. So in a Copilot box:
+
+- `.github/copilot` and `.claude` are mounted **read-only**, in the workspace
+  and in every directory down to where you started. `.github` itself is
+  mounted again, writable, so that it cannot be renamed away from under the
+  read-only part.
+- If one of those files already disables hooks, the box refuses to start and
+  names the file.
+- The launcher creates the two directories if they are missing (empty
+  directories, which git ignores).
+
+A Copilot agent therefore cannot edit those two directories inside the box.
+
+**Copilot shows the reason.** Copilot hides the error text of a hook that
+exits with code 2. For Copilot the hook answers with a JSON "deny" and the
+reason instead, so the agent sees the rule and the approval link.
 
 ## The host guard
 
@@ -182,8 +220,15 @@ chain, and `audit` names the first broken line.
 - No MCP servers, and no knowledge-injection or session-logging hooks inside the
   box. Claude's session logs still work, because its transcripts are written to
   your normal folder.
-- Copilot, opencode and pi run in the box only with `--box`, and without their
-  own constraint check.
+- Copilot, opencode and pi run in the box only with `--box`. opencode and pi
+  also need their provider configuration in the box (`~/.config/opencode`,
+  `~/.pi/agent` live on the host and are not mounted), and Copilot needs a
+  login in the box unless it is routed through the proxy.
+- Plugins or extensions the agent writes itself (an opencode project plugin,
+  a pi extension in its agent directory, a Copilot extension) run inside the
+  agent's own process and could change a call after it was checked. That is
+  the same kind of gap as a Bash command running a script the agent wrote;
+  checking results instead of wording (Phase 2) is the fix for both.
 - Network traffic from the box is not yet forced through the proxy.
 
 ## Key files
@@ -191,6 +236,8 @@ chain, and `audit` names the first broken line.
 | File | Role |
 |------|------|
 | `docker/agent-box/` | image, entrypoint, Claude managed policy |
+| `docker/agent-box/agents/` | the Copilot plugin, opencode plugin + managed config, pi extension |
+| `integrations/constraint-monitor/src/hooks/agent-adapters.js` | maps each agent's tool calls onto the rules' tool names |
 | `scripts/agent-box.mjs` | `coding box build\|status`, the `docker run` arguments |
 | `scripts/coding-guard-daemon.mjs` | the host guard on :3035 |
 | `scripts/coding-guard.mjs` | `coding guard …`, `coding svc …` |
