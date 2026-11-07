@@ -5,17 +5,21 @@
  *
  *   coding guard status                   daemon up? key fingerprint, pending count
  *   coding guard pending [--all]          override requests
- *   coding guard approve <id> [--call | --minutes N | --session]
+ *   coding guard approve <id>             open the approval page in your browser
  *   coding guard deny <id>
+ *   coding guard enroll                   enrol / manage factors (Touch ID, phone, key, password)
+ *   coding guard factors                  what is enrolled
  *   coding guard audit [--limit N]        tail + hash-chain check
  *   coding guard note <event> [k=v …]     record a host event (launcher uses it)
  *   coding svc <verb> [args…]             status | logs | restart | graphify | up | rebuild
  *
- * approve / deny / audit / note need the approver token, which only exists on
- * the host (~/.coding/guard/approver.token). Inside the agent box they fail by
- * design; `svc` and requests work from both sides.
+ * Approving needs one of your factors, proven in the host browser — never a
+ * token, so nothing that only has a shell can approve. enroll / audit / note
+ * need the approver token, which only exists on the host
+ * (~/.coding/guard/approver.token); inside the agent box they fail by design.
  */
 
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -51,12 +55,23 @@ async function call(method, route, { body, auth = false, timeout = 30_000 } = {}
   return { status: res.status, data };
 }
 
-/** `--minutes 30` / `--session` / `--call` → { scope, minutes } */
-export function parseScope(args) {
-  if (args.includes('--session')) return { scope: 'session' };
-  const i = args.indexOf('--minutes');
-  if (i !== -1) return { scope: 'minutes', minutes: Number(args[i + 1]) };
-  return { scope: 'call' };
+/** The guard's pages live on localhost (WebAuthn refuses IP addresses). */
+export function pageUrl(route, env = process.env) {
+  return `http://localhost:${guardPort(env)}${route}`;
+}
+
+/** Open a URL in the user's browser; true when a browser was launched. */
+function openBrowser(url) {
+  if (process.env.CODING_BOX === '1') return false; // no browser in the box
+  const [cmd, args] = process.platform === 'darwin' ? ['open', [url]]
+    : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]]
+      : ['xdg-open', [url]];
+  try {
+    spawn(cmd, args, { stdio: 'ignore', detached: true }).unref();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function fmtRequest(r) {
@@ -90,15 +105,35 @@ async function main(argv) {
       for (const r of data.requests) out(fmtRequest(r));
       return 0;
     }
-    case 'approve':
+    case 'approve': {
+      const id = args[0];
+      if (!id) { err('usage: coding guard approve <id>'); return 64; }
+      const url = pageUrl(`/approve/${encodeURIComponent(id)}`);
+      out(openBrowser(url) ? `opened ${url} — approve there with Touch ID, your phone, a key or your password` : `open in your browser: ${url}`);
+      return 0;
+    }
     case 'deny': {
       const id = args[0];
-      if (!id) { err(`usage: coding guard ${cmd} <id>`); return 64; }
-      const body = cmd === 'approve' ? parseScope(args.slice(1)) : {};
-      const { status, data } = await call('POST', `/requests/${encodeURIComponent(id)}/${cmd}`, { body, auth: true });
+      if (!id) { err('usage: coding guard deny <id>'); return 64; }
+      const { status, data } = await call('POST', `/requests/${encodeURIComponent(id)}/deny`);
       if (status !== 200) { err(`coding guard: ${data.error || status}`); return 1; }
-      if (cmd === 'deny') out(`denied ${id}`);
-      else out(`approved ${id}: ${data.grant.payload.rule} for ${data.grant.payload.session}, ${data.grant.payload.scope}, until ${new Date(data.grant.payload.exp).toISOString()}`);
+      out(`denied ${id}`);
+      return 0;
+    }
+    case 'enroll': {
+      // The token rides in the URL fragment: the browser keeps it, no server log sees it.
+      const url = pageUrl(`/enroll#t=${token()}`);
+      if (!openBrowser(url)) { out(`open in your browser: ${url}`); return 0; }
+      out(`opened the factor page at ${pageUrl('/enroll')} — enrol Touch ID, your phone (QR), a security key and/or a password`);
+      return 0;
+    }
+    case 'factors': {
+      const { data } = await call('GET', '/factors');
+      const f = data.factors;
+      if (!f.credentials.length && !f.password) out('nothing enrolled — run: coding guard enroll');
+      for (const c of f.credentials) out(`${c.kind.padEnd(13)} ${c.label}  (added ${new Date(c.created).toISOString().slice(0, 10)})`);
+      if (f.password) out('password');
+      out(`${f.recoveryLeft} unused recovery code(s)${f.locked ? ' — password/recovery LOCKED (too many failures)' : ''}`);
       return 0;
     }
     case 'audit': {
@@ -157,7 +192,7 @@ async function main(argv) {
       return data.code;
     }
     default:
-      err('usage: coding guard <status|pending|approve|deny|audit|note> …   |   coding svc <verb> …');
+      err('usage: coding guard <status|pending|approve|deny|enroll|factors|audit|note> …   |   coding svc <verb> …');
       return 64;
   }
 }

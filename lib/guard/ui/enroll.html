@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guard Factors</title>
+  <link rel="stylesheet" href="/assets/guard.css">
+  <script src="/assets/webauthn.js" defer></script>
+  <script src="/assets/guard-ui.js" defer></script>
+</head>
+<body data-page="enroll">
+  <main>
+    <header>
+      <p class="eyebrow">coding guard</p>
+      <h1>Your override factors</h1>
+      <p class="muted">Agents in the box cannot bypass a rule without one of these. Enrol several so losing one device does not lock you out.</p>
+    </header>
+
+    <p id="no-token" class="warn" hidden>Open this page with <code>coding guard enroll</code> from a host terminal — it carries the setup token.</p>
+
+    <section class="card" id="unlock" hidden>
+      <h2>Unlock</h2>
+      <p class="muted">Prove an enrolled factor before changing them.</p>
+      <div class="actions"><button id="btn-unlock-passkey" class="primary">Unlock with Touch ID, phone or key</button></div>
+      <form id="form-unlock-password" class="inline">
+        <label for="unlock-password">or password</label>
+        <div class="row"><input type="password" id="unlock-password" autocomplete="current-password" required><button type="submit">Unlock</button></div>
+      </form>
+      <details>
+        <summary>Use a recovery code</summary>
+        <form id="form-unlock-recovery" class="inline">
+          <div class="row"><input type="text" id="unlock-recovery" placeholder="xxxx-xxxx-xxxx-xxxx" autocomplete="off" required><button type="submit">Unlock</button></div>
+        </form>
+      </details>
+    </section>
+
+    <section class="card" id="manage" hidden>
+      <h2>Enrolled</h2>
+      <ul id="factor-list" class="factors"></ul>
+
+      <h2>Add an authenticator</h2>
+      <div class="grid">
+        <button class="tile" data-kind="platform"><strong>This computer</strong><span>Touch ID · Windows Hello</span></button>
+        <button class="tile" data-kind="hybrid"><strong>Phone</strong><span>scan a QR code, then face or fingerprint</span></button>
+        <button class="tile" data-kind="security-key"><strong>Security key</strong><span>YubiKey or other FIDO2 key</span></button>
+      </div>
+
+      <h2>Password</h2>
+      <form id="form-set-password" class="inline">
+        <label for="new-password">At least 12 characters. Typed here, never in an agent's terminal.</label>
+        <div class="row">
+          <input type="password" id="new-password" autocomplete="new-password" minlength="12" required placeholder="new password">
+          <input type="password" id="new-password-2" autocomplete="new-password" minlength="12" required placeholder="repeat">
+          <button type="submit" id="btn-set-password">Set password</button>
+        </div>
+      </form>
+
+      <h2>Recovery codes</h2>
+      <p class="muted" id="recovery-left"></p>
+      <div class="actions"><button id="btn-regenerate">Make a new set</button></div>
+    </section>
+
+    <section class="card" id="codes" hidden>
+      <h2>Save these recovery codes now</h2>
+      <p class="muted">Each works once, in place of any factor. They are shown only this time.</p>
+      <ol id="code-list" class="codes"></ol>
+    </section>
+
+    <p id="status" role="status" aria-live="polite"></p>
+  </main>
+</body>
+</html>

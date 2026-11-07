@@ -114,6 +114,13 @@ Prerequisites, the install itself, and what it puts on your machine.
     5. **Machine scope** — the name of this machine's runtime home `~/.coding/data/<scope>/`
        (caches only; what is shared lives in each repo, see
        [Per-Repo Tenancy](../architecture/tenancy.md)).
+    6. **Override factors** (tiers with `constraints`) — opens a browser page to enrol how you
+       approve an agent's rule bypass: Touch ID / Windows Hello, your phone (QR code), a security
+       key, a password. Several are allowed; save the recovery codes it shows. Later:
+       `coding guard enroll`. See [Agent Box & Overrides](../core-systems/agent-box.md).
+
+    With `constraints` on, `coding` runs Claude in the [agent box](../core-systems/agent-box.md):
+    build its image once with `coding box build`, and log the agent in once inside the box.
 
     Unattended: `./install.sh --yes --features=learning` (default tier `harness`). A re-run asks
     again with your current tier as the default, so changing tier is just re-running it.

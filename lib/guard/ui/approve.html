@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Approve Override</title>
+  <link rel="stylesheet" href="/assets/guard.css">
+  <script src="/assets/webauthn.js" defer></script>
+  <script src="/assets/guard-ui.js" defer></script>
+</head>
+<body data-page="approve">
+  <main>
+    <header>
+      <p class="eyebrow">coding guard</p>
+      <h1>An agent asks to bypass a rule</h1>
+      <p class="muted">Approve only if you expected this. The agent wrote the reason and excerpt below — read them as a claim, not a fact.</p>
+    </header>
+
+    <section class="card" id="request">
+      <dl>
+        <dt>Rule</dt><dd><code id="r-rule">…</code></dd>
+        <dt>Agent</dt><dd id="r-agent">…</dd>
+        <dt>Session</dt><dd><code id="r-session">…</code></dd>
+        <dt>File</dt><dd><code id="r-file">—</code></dd>
+        <dt>Reason</dt><dd id="r-reason">—</dd>
+        <dt>Asked</dt><dd id="r-created">…</dd>
+      </dl>
+      <pre id="r-excerpt" hidden></pre>
+    </section>
+
+    <section class="card" id="decide">
+      <h2>Allow it for</h2>
+      <div class="scopes" role="radiogroup" aria-label="Scope">
+        <label><input type="radio" name="scope" value="call" checked> this one call</label>
+        <label><input type="radio" name="scope" value="minutes"> the next <input type="number" id="minutes" min="1" max="240" value="15"> minutes</label>
+        <label><input type="radio" name="scope" value="session"> this whole session (12 h max)</label>
+      </div>
+
+      <div class="actions">
+        <button id="btn-passkey" class="primary" hidden>Approve with Touch ID, phone or security key</button>
+        <button id="btn-deny" class="danger">Deny</button>
+      </div>
+
+      <form id="form-password" class="inline" hidden>
+        <label for="password">or with your guard password</label>
+        <div class="row">
+          <input type="password" id="password" autocomplete="current-password" required>
+          <button type="submit">Approve</button>
+        </div>
+      </form>
+
+      <details id="recovery">
+        <summary>Lost your authenticator? Use a recovery code</summary>
+        <form id="form-recovery" class="inline">
+          <div class="row">
+            <input type="text" id="recovery-code" placeholder="xxxx-xxxx-xxxx-xxxx" autocomplete="off" required>
+            <button type="submit">Approve</button>
+          </div>
+        </form>
+      </details>
+
+      <p id="no-factors" class="warn" hidden>No factor is enrolled, so nothing can approve this. Run <code>coding guard enroll</code> in a host terminal.</p>
+    </section>
+
+    <p id="status" role="status" aria-live="polite"></p>
+  </main>
+</body>
+</html>

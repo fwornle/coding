@@ -172,6 +172,7 @@ system|~/Library/LaunchAgents/com.coding.{obs-api,digest-refs-sweeper}.plist|cre
 system|~/Library/LaunchAgents/com.coding.prompt-classifier.plist|create+load|yes|the prompt-complexity judge the proxy asks (macOS) [feature:llm-proxy]
 system|~/Library/LaunchAgents/com.coding.{measurement-reconciler,context-turns-sweeper}.plist|create+load|yes|binds live sessions to measurements, and prunes captured context turns (macOS) [feature:performance]
 system|~/Library/LaunchAgents/com.coding.health-coordinator.plist|create+load|yes|the health coordinator: re-spawns dead session loggers, serves the features API (macOS) [feature:health]
+home|~/.coding/guard/|create|yes|the guard's signing key, approver token, enrolled override factors (public keys / argon2id hashes only) and audit log; mounted into no container [feature:constraints]
 system|~/Library/LaunchAgents/com.coding.guard.plist|create+load|yes|the host guard: signs override grants for the agent box, runs its fixed Docker verbs, keeps the audit log in ~/.coding/guard (macOS) [feature:constraints]
 system|~/.config/systemd/user/llm-cli-proxy.service|create+enable|yes|OPT-IN: starts the LLM proxy at login (Linux) [feature:llm-proxy]
 system|~/.config/systemd/user/{lsl-lock-sweeper,sub-agent-*}.{service,timer}|create+enable|yes|session-logging daemons: capture sub-agent transcripts, clear stale git locks in the history checkout (Linux/WSL, systemd user units) [feature:lsl]
@@ -3216,6 +3217,47 @@ create_llm_proxy_launchd() {
 # an interval job). WSL without systemd gets none, and is told how to enable it —
 # decided over a launcher-run supervisor, which would be a third service manager
 # to keep alive, while systemd is the default for every WSL distribution since 2023.
+# ─────────────────────────────────────────────────────────────────────────────
+# Override factors for the agent box (feature: constraints).
+#
+# An agent in the box cannot bypass a rule unless the user approves in the host
+# browser with an enrolled factor: Touch ID / Windows Hello, a phone passkey (QR
+# code), a FIDO2 security key, or a password — several allowed, recovery codes
+# on the first. Enrolment needs a browser and a person, so an unattended run
+# only says how to do it later. Plan: .planning/guardrail-hardening.md, item 3.
+# ─────────────────────────────────────────────────────────────────────────────
+setup_guard_factors() {
+    if ! feature_on constraints; then
+        return 0
+    fi
+    local guard="$CODING_REPO/scripts/coding-guard.mjs"
+    if ! node "$guard" status >/dev/null 2>&1; then
+        warning "Guard daemon not running — enrol override factors later with: coding guard enroll"
+        return 0
+    fi
+    if node "$guard" factors 2>/dev/null | grep -qv '^nothing enrolled'; then
+        info "Override factors already enrolled ($(node "$guard" factors | tail -1)) — manage them with: coding guard enroll"
+        return 0
+    fi
+    if [[ "$NON_INTERACTIVE" == "true" ]]; then
+        info "No override factors enrolled yet — run: coding guard enroll"
+        return 0
+    fi
+    echo ""
+    info "Agents in the box need YOUR approval to bypass a rule. Choose how you prove it's you:"
+    info "  - this computer (Touch ID / Windows Hello)   - your phone (scan a QR code)"
+    info "  - a security key (YubiKey)                    - a password"
+    local reply
+    read_or_default reply "y" "Open the enrolment page in your browser now? [Y/n] "
+    if [[ "$reply" =~ ^[Nn] ]]; then
+        info "Skipped — enrol later with: coding guard enroll"
+        return 0
+    fi
+    node "$guard" enroll
+    read_or_default reply "" "Press Enter when you have enrolled your factors (and saved the recovery codes)... "
+    node "$guard" factors || true
+}
+
 install_feature_daemons() {
     local tpl_dir tpl_fmt installer
     case "$PLATFORM" in
@@ -4818,6 +4860,7 @@ main() {
     # host-embeddings verdict is only true once nothing else will run npm.
     run_step verify_host_embeddings
     run_step install_feature_daemons  # after every npm step: the daemons run from node_modules
+    run_step setup_guard_factors      # after the daemons: enrolment talks to the guard daemon
     run_step install_okb_snapshot_guard
     run_step install_constraint_monitor_hooks
     verify_installation

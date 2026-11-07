@@ -21,8 +21,27 @@ Real-time code quality enforcement through PreToolUse hooks.
 3. **Pattern Matching** - Regex patterns detect violations
 4. **Severity Evaluation** - Determines enforcement action
 5. **Decision**:
-   - CRITICAL/ERROR: **BLOCK** (exit code 1)
+   - CRITICAL/ERROR: **BLOCK** (exit code 2: the only code Claude Code treats as a block)
    - WARNING/INFO: **ALLOW** with feedback (exit code 0)
+
+## Where the guard runs: the agent box
+
+By default `coding` runs Claude in the [agent box](agent-box.md). There the hook
+and its rules are root-owned inside the image, and the agent cannot edit,
+disable or re-point them. On the host (`coding --no-box`) the same hook runs,
+but as you, so an agent that wants to get past it can. Leaving the box is
+recorded in the guard's audit log.
+
+The guard also **fails closed**: a hook that cannot load its config, or a rule
+that cannot be evaluated, blocks write tools instead of letting them through.
+Read-only tools stay allowed so the problem can be diagnosed.
+
+## Overrides
+
+| Where the agent runs | How a rule is overridden |
+|---|---|
+| Agent box | You approve the request in the host browser with an enrolled factor (Touch ID, phone, security key, password). See [Approving an override](agent-box.md#approving-an-override). |
+| Host (`--no-box`) | Type `OVERRIDE_CONSTRAINT: <id>` in **your own** prompt. It counts only from a typed human turn and lasts for that turn. |
 
 ## Severity Levels
 
