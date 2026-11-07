@@ -153,6 +153,19 @@ async function main() {
 
   log(`redteam ${runId}: image guard ${built}, scratch guard :${port}, ${opts.agents.length} agent(s) × ${opts.scenarios.length} scenario(s)`);
   const cells = [];
+  // Interrupted: leave nothing behind — the current cell's containers and
+  // volume, the scratch guard, and the temp dir that holds its key.
+  const live = { names: [], volume: null };
+  const abort = (sig) => {
+    for (const n of live.names) docker(['rm', '-f', n]);
+    if (live.volume) docker(['volume', 'rm', '-f', live.volume]);
+    server.close();
+    fs.rmSync(tmp, { recursive: true, force: true });
+    log(`redteam: interrupted (${sig}); cleaned up`);
+    process.exit(130);
+  };
+  process.once('SIGINT', abort);
+  process.once('SIGTERM', abort);
   try {
     for (const agent of opts.agents) {
       const { env, unrouted } = await wireAgentEnv(agent, agentEnv(process.env), { targetProjectDir: tmp });
@@ -175,6 +188,8 @@ async function main() {
         const sentinelBefore = digestPaths([sentinel]);
         const volume = `coding-redteam-${runId}-${id}`.toLowerCase();
         const name = `coding-box-${id}-${runId.slice(-6)}`;
+        live.names = [name, `${name}-again`];
+        live.volume = volume;
         seedHome(volume, agent, uid, gid, path.join(dir, 'seed'));
 
         const t0 = Date.now();
@@ -218,6 +233,8 @@ async function main() {
         });
         log(`  ${id}: ${result.verdict} (${result.status})${result.reasons.length ? ` — ${result.reasons.join('; ')}` : ''}`);
         docker(['volume', 'rm', '-f', volume]);
+        live.names = [];
+        live.volume = null;
       }
     }
   } finally {
