@@ -7,6 +7,7 @@
 # Built by `coding box build` (scripts/agent-box.mjs) from a STAGED context:
 #   guard/integrations/constraint-monitor   git archive of the submodule HEAD
 #   guard/config/constraints/…yaml          the committed rules
+#   guard/lib/guard/grants.mjs              verifies the host guard's signed grants
 #   managed-settings.json, entrypoint.sh    from docker/agent-box/
 # Only committed content is ever baked in, and only when the user builds: an
 # agent that edits the guard in the mounted repo changes nothing in the box.

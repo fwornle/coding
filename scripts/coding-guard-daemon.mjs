@@ -9,6 +9,8 @@
  *   GET  /health                       liveness + public key fingerprint
  *   GET  /public-key                   PEM (also mounted ro into the box)
  *   POST /requests                     an agent asks for an override  → pending
+ *                                      (the same rule + session + file still
+ *                                      pending → that request, not a new one)
  *   GET  /requests[?status=]           list;  GET /requests/:id  one
  *   GET  /approve/:id                  approval page (opened in the host browser)
  *   POST /approve/:id/options          { scope, minutes } → WebAuthn challenge
@@ -50,7 +52,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 
-import { guardPaths, ensureGuardHome, guardPort } from '../lib/guard/home.mjs';
+import { guardPaths, ensureGuardHome, guardPort, writeGuardEndpoint } from '../lib/guard/home.mjs';
 import { signGrant, SCOPES, expiryFor } from '../lib/guard/grants.mjs';
 import { FactorStore } from '../lib/guard/factors.mjs';
 import { Ceremonies } from '../lib/guard/ceremonies.mjs';
@@ -108,6 +110,7 @@ export function createGuard({
   paths = guardPaths(), runDocker = dockerRunner, now = () => Date.now(), codingRepo = REPO, port = guardPort(),
 } = {}) {
   const keys = ensureGuardHome(paths);
+  writeGuardEndpoint(paths, port);
   const pageOrigin = `http://localhost:${port}`;
   const ownOrigins = new Set([pageOrigin, `http://127.0.0.1:${port}`, `http://[::1]:${port}`]);
   const factors = new FactorStore(paths.dir, { now });
@@ -197,6 +200,11 @@ export function createGuard({
   }
 
   function newRequest(body, source = 'agent') {
+    // A blocked agent retries; one decision per rule + session + file is enough.
+    const file = clip(body.file, FIELD_LIMITS.file);
+    const open = Object.values(state.requests).find((r) => r.status === 'pending'
+      && r.rule === clip(body.rule, FIELD_LIMITS.rule) && r.session === clip(body.session, FIELD_LIMITS.session) && r.file === file);
+    if (open) return open;
     const t = now();
     while (recent.length && t - recent[0] > 60_000) recent.shift();
     const pending = Object.values(state.requests).filter((r) => r.status === 'pending').length;

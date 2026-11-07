@@ -175,8 +175,8 @@ describe('approving', () => {
   });
 
   test('a proof cannot be moved to another request, or replayed', async () => {
-    const a = await newRequest();
-    const b = await newRequest();
+    const a = await newRequest({ file: '/w/a1.js' });
+    const b = await newRequest({ file: '/w/b1.js' });
     const { data } = await api('POST', `/approve/${a.id}/options`, { body: { scope: 'session' } });
     const response = key.assert(data.options);
     assert.equal((await api('POST', `/approve/${b.id}/verify`, { body: { ceremony: data.ceremony, response } })).status, 400);
@@ -222,6 +222,17 @@ describe('approving', () => {
     assert.equal((await api('POST', `/grants/${grant.payload.id}/consume`, { body: { session: SESSION } })).status, 200);
     const live = (await api('GET', `/grants?session=${SESSION}`)).data.grants;
     assert.ok(!live.some((g) => g.payload.id === grant.payload.id));
+  });
+
+  test('a retried block reuses the open request instead of filing another', async () => {
+    const a = await newRequest({ file: '/w/retry.js', excerpt: 'first try' });
+    const b = await newRequest({ file: '/w/retry.js', excerpt: 'second try' });
+    const other = await newRequest({ file: '/w/other.js' });
+    assert.equal(b.id, a.id);
+    assert.equal(b.excerpt, 'first try');
+    assert.notEqual(other.id, a.id);
+    await api('POST', `/requests/${a.id}/deny`);
+    assert.notEqual((await newRequest({ file: '/w/retry.js' })).id, a.id, 'once decided, a new block asks again');
   });
 
   test('requests need a rule and a session; oversize fields are clipped', async () => {
@@ -310,8 +321,9 @@ describe('pages and exposure', () => {
     assert.equal(fs.statSync(paths.dir).mode & 0o777, 0o700);
     assert.equal(fs.statSync(paths.signingKey).mode & 0o777, 0o600);
     assert.equal(fs.statSync(paths.token).mode & 0o777, 0o600);
-    assert.deepEqual(fs.readdirSync(paths.publicDir), ['guard-public.pem']);
+    assert.deepEqual(fs.readdirSync(paths.publicDir).sort(), ['guard-public.pem', 'guard.json']);
     assert.match(fs.readFileSync(paths.publicKey, 'utf8'), /BEGIN PUBLIC KEY/);
+    assert.deepEqual(JSON.parse(fs.readFileSync(paths.endpoint, 'utf8')), { url: `http://host.docker.internal:${new URL(origin).port}` });
   });
 });
 

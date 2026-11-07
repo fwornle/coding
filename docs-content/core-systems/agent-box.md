@@ -120,13 +120,37 @@ named) the file. The box can verify a grant with the public key but can never
 create one. The challenge is fixed to that request and scope when it is issued,
 so a proof given for "this one call" cannot be turned into "this whole session".
 
-!!! warning "Grants are not consumed by the hook yet"
-    The guard daemon, the factors and the approval page are in place. Making
-    the constraint hook **inside** the box fetch and verify grants is the next
-    step (Phase 1 item 4 of `.planning/guardrail-hardening.md`). Until it lands, a
-    blocked call in the box still shows the `OVERRIDE_CONSTRAINT` message of the
-    hook. Item 4 switches that transcript-based override off in box mode,
-    because the agent can write to the transcript.
+### What the agent sees
+
+Inside the box, a blocked tool call files the request itself and tells the
+agent where to send you:
+
+```text
+🔐 Only the user can override this, on the host. Override requested:
+   no-incremental-documentation: http://localhost:3035/approve/3f9c0a1b2d4e
+Tell the user which rule blocked you, why you need the exception, and give them the link.
+```
+
+The agent relays the link and the reason. After you approve, it repeats the
+same call; the hook fetches the grant, checks the signature with the public key
+and lets the call through. Retrying before you decide doesn't pile up requests:
+the same rule, session and file share one pending request.
+
+In the box, **only a signed grant overrides a rule**:
+
+- `OVERRIDE_CONSTRAINT: <id>` in a prompt does nothing there. The agent can
+  write to its own transcript and can type into its own terminal, so a prompt
+  is no proof that you wrote it.
+- The hook takes the guard's address and public key from the read-only
+  `/etc/coding-guard`, and the session from the container's hostname, not from
+  environment variables the agent could set.
+- If the guard is unreachable or the keys are missing, the call stays blocked.
+- If the constraint guard itself breaks, write tools are blocked and the hook
+  asks for a `guard-error` grant; approving it lets calls through for the scope
+  you pick.
+
+On the host (`coding --no-box`) the typed `OVERRIDE_CONSTRAINT` still works,
+because there is no boundary for a grant to protect.
 
 ## Docker access from the box: `coding svc`
 
