@@ -33,7 +33,17 @@ agent -> hook : retries the tool call
 hook -> guard : GET /grants?session=…
 guard --> hook : signed grant
 hook -> hook : verify with public key\n(rule, session, file, expiry)
+opt one-call grant
+  hook -> guard : POST /grants/<id>/consume
+  guard --> hook : spent (a second use is refused)
+end
 hook --> agent : allowed
+
+note over hook
+  In the box the transcript grants nothing:
+  OVERRIDE_CONSTRAINT in a prompt is ignored.
+  Guard unreachable or keys missing → blocked.
+end note
 
 note over guard
   Password or a one-time recovery code

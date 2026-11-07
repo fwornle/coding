@@ -41,6 +41,8 @@ export const AGENT_COMMANDS = { claude: 'claude', copilot: 'copilot', opencode: 
 const GUARD_SUBMODULE = 'integrations/constraint-monitor';
 const RULES = 'config/constraints/constraint-monitor.yaml';
 const BOX_DIR = 'docker/agent-box';
+/** The grant verifier the in-box hook imports (node:crypto only). */
+const GRANTS_LIB = 'lib/guard/grants.mjs';
 
 /** Env passed into the box besides the routing set: terminal, locale, egress proxy. */
 const EXTRA_ENV = ['TERM', 'COLORTERM', 'LANG', 'LC_ALL', 'TASK_ID', 'NODE_EXTRA_CA_CERTS',
@@ -73,20 +75,21 @@ export function toBoxUrl(value) {
 
 /**
  * Identity of the guard a build would bake in: the constraint-monitor SHA the
- * superproject pins, the committed rules blob, and the committed box files.
- * Working-tree edits never count.
+ * superproject pins, the committed rules blob, the committed box files and the
+ * committed grant verifier. Working-tree edits never count.
  */
 export function guardSource(repo = REPO) {
   const submodule = git(['rev-parse', `HEAD:${GUARD_SUBMODULE}`], repo);
   const rules = git(['rev-parse', `HEAD:${RULES}`], repo);
   const box = git(['rev-parse', `HEAD:${BOX_DIR}`], repo);
-  const digest = createHash('sha256').update(`${submodule}|${rules}|${box}`).digest('hex').slice(0, 16);
-  return { submodule, rules, box, digest };
+  const grants = git(['rev-parse', `HEAD:${GRANTS_LIB}`], repo);
+  const digest = createHash('sha256').update(`${submodule}|${rules}|${box}|${grants}`).digest('hex').slice(0, 16);
+  return { submodule, rules, box, grants, digest };
 }
 
 /** Uncommitted guard changes — they are NOT in the image, so say so. */
 function uncommittedGuardChanges(repo = REPO) {
-  const out = git(['status', '--porcelain', '--', GUARD_SUBMODULE, RULES, BOX_DIR], repo);
+  const out = git(['status', '--porcelain', '--', GUARD_SUBMODULE, RULES, BOX_DIR, GRANTS_LIB], repo);
   return out ? out.split('\n') : [];
 }
 
@@ -101,6 +104,11 @@ export function stageContext(dir, src = guardSource(), repo = REPO) {
   const rulesOut = path.join(dir, 'guard', RULES);
   fs.mkdirSync(path.dirname(rulesOut), { recursive: true });
   fs.writeFileSync(rulesOut, execFileSync('git', ['cat-file', 'blob', src.rules], { cwd: repo }));
+
+  // Same relative place as in the repo: the hook finds it at ../../../../lib/guard.
+  const grantsOut = path.join(dir, 'guard', GRANTS_LIB);
+  fs.mkdirSync(path.dirname(grantsOut), { recursive: true });
+  fs.writeFileSync(grantsOut, execFileSync('git', ['cat-file', 'blob', src.grants], { cwd: repo }));
 
   for (const name of ['Dockerfile', 'managed-settings.json', 'entrypoint.sh']) {
     fs.writeFileSync(path.join(dir, name), execFileSync('git', ['show', `HEAD:${BOX_DIR}/${name}`], { cwd: repo }));
@@ -130,7 +138,9 @@ export function boxRunArgs({
   const workspace = env.TARGET_PROJECT_DIR || cwd;
   const argv = ['run', '--rm', '-i'];
   if (tty) argv.push('-t');
-  argv.push('--name', name, '--label', 'coding.box=1', '--label', `coding.box.agent=${agent}`);
+  // The hostname IS the guard session: grants are bound to it, and a non-root
+  // process cannot change it (an env var could be set by a nested agent).
+  argv.push('--name', name, '--hostname', name, '--label', 'coding.box=1', '--label', `coding.box.agent=${agent}`);
   argv.push('-e', `CODING_BOX_UID=${uid ?? 1000}`, '-e', `CODING_BOX_GID=${gid ?? 1000}`, '-e', 'CODING_BOX=1');
   if (platform === 'linux') argv.push('--add-host', 'host.docker.internal:host-gateway');
 

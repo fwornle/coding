@@ -9,7 +9,8 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { boxRunArgs, boxPath, toBoxUrl, IMAGE, HOME_VOLUME, BOX_HOME, BOX_GUARD_KEYS } from '../../scripts/agent-box.mjs';
+import fs from 'node:fs';
+import { boxRunArgs, boxPath, toBoxUrl, guardSource, IMAGE, HOME_VOLUME, BOX_HOME, BOX_GUARD_KEYS } from '../../scripts/agent-box.mjs';
 
 const base = {
   agent: 'claude', cwd: '/Users/u/proj', codingRepo: '/Users/u/coding', home: '/Users/u',
@@ -70,6 +71,10 @@ describe('boxRunArgs — boundary', () => {
     assert.strictEqual(envs(argv).CODING_GUARD_SESSION, 'coding-box-claude-1');
   });
 
+  test('the hostname is the session: grants are bound to what the agent cannot change', () => {
+    assert.strictEqual(argv[argv.indexOf('--hostname') + 1], 'coding-box-claude-1');
+  });
+
   test('unknown agent is refused', () => {
     assert.throws(() => boxRunArgs({ ...base, agent: 'bash' }), /unknown agent/);
   });
@@ -121,5 +126,22 @@ describe('path and URL mapping', () => {
   test('loopback hosts become host.docker.internal; others untouched', () => {
     assert.strictEqual(toBoxUrl('http://[::1]:3034/x'), 'http://host.docker.internal:3034/x');
     assert.strictEqual(toBoxUrl('https://api.example.com'), 'https://api.example.com');
+  });
+});
+
+describe('the in-box guard (Phase 1 item 4)', () => {
+  const policy = JSON.parse(fs.readFileSync(new URL('../../docker/agent-box/managed-settings.json', import.meta.url), 'utf8'));
+  const command = policy.hooks.PreToolUse[0].hooks[0].command;
+
+  test('box mode and the key dir are set INLINE in the managed command, not inherited from the agent', () => {
+    const inline = Object.fromEntries([...command.matchAll(/(?:^|\s)([A-Z_]+)=(\S+)/g)].map((m) => [m[1], m[2]]));
+    assert.strictEqual(inline.CODING_GUARD_MODE, 'box');
+    assert.strictEqual(inline.CODING_GUARD_KEYS, BOX_GUARD_KEYS);
+    assert.match(inline.CONSTRAINT_CONFIG_PATH, /^\/opt\/coding-guard\//);
+    assert.strictEqual(policy.allowManagedHooksOnly, true);
+  });
+
+  test('the grant verifier is part of what the image digest covers', () => {
+    assert.match(guardSource().grants, /^[0-9a-f]{40}$/);
   });
 });
