@@ -194,6 +194,10 @@ integrations/mcp-server-browserbase/
 .data/exports/
 .data/entity-embeddings.json
 .data/kgbench/
+# Red-team runs (scripts/redteam-box.mjs): one machine's verdicts plus each
+# agent's last 2 KB of output. Local evidence, not source; the summary lives
+# in docs-content/core-systems/agent-box.md.
+.data/redteam/
 .data/experiments/
 .data/insight-consolidation-plan.md
 .data/knowledge-audit-report.md
