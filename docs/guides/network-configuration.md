@@ -57,10 +57,9 @@ The startup script runs a **one-time** DNS-based check before the coordinator is
 ```bash
 # DNS-based — works without proxy (no chicken-and-egg)
 dig +short muc.proxy-pac.bmwgroup.net +timeout=2
-dig +short cc-github.bmwgroup.net +timeout=2
 ```
 
-If either resolves to a corporate IP → `INSIDE_CN=true`. This replaced the previous `curl https://cc-github.bmwgroup.net` approach, which required the proxy to already be configured (circular dependency on CN).
+If it resolves to a corporate IP → `INSIDE_CN=true`. A DNS lookup needs no proxy, so this check cannot depend on the proxy it is about to configure.
 
 Once the coordinator is running, the launcher defers to `GET http://localhost:3034/health/state` for all subsequent network state.
 
@@ -215,7 +214,7 @@ coding --claude --dry-run
 
 Output includes:
 ```
-[OpenCode] 🏢 Inside Corporate Network (cc-github.bmwgroup.net reachable)
+[OpenCode] 🏢 Inside Corporate Network (PAC DNS resolves to 10.x.x.x)
 [OpenCode] Proxy active: http://127.0.0.1:3128/
 [OpenCode] ✅ External access working (via proxy)
 [OpenCode] DRY-RUN: Network: CN=true, Proxy=true, Required=true

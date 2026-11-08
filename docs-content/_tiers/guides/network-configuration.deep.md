@@ -90,10 +90,9 @@ The launcher runs a **one-time** DNS-based check, so it works before the coordin
 ```bash
 # DNS-based — works without proxy (no chicken-and-egg)
 dig +short +timeout=2 +tries=1 muc.proxy-pac.bmwgroup.net
-dig +short +timeout=2 +tries=1 cc-github.bmwgroup.net
 ```
 
-If either resolves to an IP → `INSIDE_CN=true`; otherwise it asks the coordinator. Then it pins
+If it resolves to an IP → `INSIDE_CN=true`; otherwise it asks the coordinator. Then it pins
 the session's proxy environment (next section) and checks that the agent's API is reachable.
 
 ![Network Detection Flow](../images/network-detection-flow.png)

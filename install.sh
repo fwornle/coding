@@ -323,10 +323,7 @@ confirm_system_change() {
 # straight out of .gitmodules. The eight MEMORY_VISUALIZER_*/SEMANTIC_ANALYSIS_*
 # {CN,PUBLIC}_{SSH,HTTPS} variables that used to live here were dead code --
 # declared, never referenced by anything in this script -- and the CN mirrors
-# they named (cc-github.bmwgroup.net/frankwoernle/...) are retired.
-#
-# Note that cc-github.bmwgroup.net still appears in scripts/detect-network.sh:
-# that is a DNS probe used as a corporate-network sentinel, unrelated to git.
+# they named are retired.
 
 # Platform detection
 PLATFORM=""
