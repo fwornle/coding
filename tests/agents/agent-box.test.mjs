@@ -106,6 +106,14 @@ describe('boxRunArgs — host integrations keep working', () => {
     assert.strictEqual(e.SECRET_THING, undefined);
   });
 
+  test('the mouse switches the tmux wrapper sets reach the agent (drag-select in tmux)', () => {
+    const e = envs(boxRunArgs({ ...base, env: { CLAUDE_CODE_DISABLE_MOUSE: '1', OPENCODE_DISABLE_MOUSE: '1' } }));
+    assert.strictEqual(e.CLAUDE_CODE_DISABLE_MOUSE, '1');
+    assert.strictEqual(e.OPENCODE_DISABLE_MOUSE, '1');
+    // CODING_AGENT_MOUSE=keep leaves them unset in the wrapper → nothing passed.
+    assert.strictEqual(envs(boxRunArgs(base)).CLAUDE_CODE_DISABLE_MOUSE, undefined);
+  });
+
   test('pi agent dir and a CA bundle are mounted at the same path', () => {
     const argv = boxRunArgs({ ...base, agent: 'pi', env: { PI_CODING_AGENT_DIR: '/Users/u/.pi/agent', NODE_EXTRA_CA_CERTS: '/Users/u/ca.pem' } });
     assert.ok(volumes(argv).includes('/Users/u/.pi/agent:/Users/u/.pi/agent'));
@@ -183,6 +191,25 @@ describe('per-agent guards (Phase 1 item 5)', () => {
     const helper = fs.readFileSync(new URL('../../docker/agent-box/agents/guard-hook.mjs', import.meta.url), 'utf8');
     assert.match(helper, /env: \{ \.\.\.FIXED_ENV, CODING_GUARD_AGENT: agent \}/, 'no inherited env');
     assert.match(helper, /const NODE = '\/usr\/local\/bin\/node'/);
+  });
+
+  test('every agent also runs the result check after a call (Phase 2), with the same fixed environment', () => {
+    const POST = '/opt/coding-guard/integrations/constraint-monitor/src/hooks/post-tool-hook.js';
+    const claude = read('managed-settings.json').hooks;
+    const copilot = read('agents/copilot/hooks/hooks.json').hooks;
+    // A command that writes a file and then fails still wrote it: PostToolUseFailure too.
+    for (const entry of [claude.PostToolUse, claude.PostToolUseFailure, copilot.PostToolUse]) {
+      assert.strictEqual(entry[0].matcher, '*');
+      const cmd = entry[0].hooks[0].command;
+      assert.ok(cmd.endsWith(` /usr/local/bin/node ${POST}`), cmd);
+      assert.match(cmd, /^\/usr\/bin\/env -i HOME=\/home\/agent PATH=\/usr\/local\/bin:\/usr\/bin:\/bin CODING_GUARD_MODE=box /);
+    }
+    const helper = fs.readFileSync(new URL('../../docker/agent-box/agents/guard-hook.mjs', import.meta.url), 'utf8');
+    assert.ok(helper.includes(`post: '${POST}'`));
+    const opencode = fs.readFileSync(new URL('../../docker/agent-box/agents/opencode/guard.js', import.meta.url), 'utf8');
+    assert.match(opencode, /'tool\.execute\.after'[\s\S]*checkCall\('opencode', \{[\s\S]*\}, 'post'\)/);
+    const pi = fs.readFileSync(new URL('../../docker/agent-box/agents/pi/guard.js', import.meta.url), 'utf8');
+    assert.match(pi, /pi\.on\('tool_result'[\s\S]*checkCall\('pi', \{[\s\S]*\}, 'post'\)/);
   });
 
   test('copilot: repo settings dirs are read-only, .github pinned, in every dir down to the cwd', () => {

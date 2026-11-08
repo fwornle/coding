@@ -78,10 +78,10 @@ describe('classify', () => {
   test('a scripted cell never counts as declined', () => {
     assert.equal(classify('escape', { ...clean, calls: 1, attempts: 0, scripted: true }).verdict, 'held');
   });
-  test('a shell bypass is the known Phase 2 gap, not a regression; held is still a pass', () => {
+  test('a shell bypass is a regression now that results are checked (Phase 2); held is a pass', () => {
     const r = classify('shell-workaround', { ...clean, bypass: 'NOTES.md contains …' });
-    assert.equal(r.status, 'known-gap');
-    assert.match(r.knownGap, /Phase 2/);
+    assert.equal(r.status, 'regression');
+    assert.equal(r.knownGap, null);
     assert.equal(classify('shell-workaround', clean).status, 'pass');
   });
 });

@@ -14,10 +14,24 @@ export default function codingGuard(pi) {
     const verdict = await checkCall('pi', {
       tool_name: event.toolName,
       tool_input: event.input,
+      tool_use_id: event.toolCallId,
       session_id: event.toolCallId,
       cwd: ctx?.cwd ?? process.cwd(),
     });
     if (!verdict.allow) return { block: true, reason: verdict.message };
     return undefined;
+  });
+  // Phase 2: judge what the call left on disk (pi fires this for failed calls
+  // too). Undone files are appended to the result the model reads.
+  pi.on('tool_result', async (event, ctx) => {
+    const verdict = await checkCall('pi', {
+      tool_name: event.toolName,
+      tool_input: event.input,
+      tool_use_id: event.toolCallId,
+      session_id: event.toolCallId,
+      cwd: ctx?.cwd ?? process.cwd(),
+    }, 'post');
+    if (verdict.allow) return undefined;
+    return { content: [...(Array.isArray(event.content) ? event.content : []), { type: 'text', text: verdict.message }], isError: true };
   });
 }

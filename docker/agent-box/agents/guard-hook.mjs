@@ -14,7 +14,11 @@
 import { spawn } from 'node:child_process';
 
 const NODE = '/usr/local/bin/node';
-const HOOK = '/opt/coding-guard/integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js';
+const HOOKS = {
+  pre: '/opt/coding-guard/integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js',
+  // Phase 2: judge what the call left on disk, undo violating files.
+  post: '/opt/coding-guard/integrations/constraint-monitor/src/hooks/post-tool-hook.js',
+};
 const FIXED_ENV = {
   HOME: '/home/agent',
   PATH: '/usr/local/bin:/usr/bin:/bin',
@@ -26,10 +30,11 @@ const TIMEOUT_MS = 30_000;
 
 /**
  * @param {string} agent  'opencode' | 'pi'
- * @param {{ tool_name: string, tool_input: object, session_id?: string, cwd?: string }} call
- * @returns {Promise<{ allow: boolean, message: string }>}
+ * @param {{ tool_name: string, tool_input: object, tool_use_id?: string, session_id?: string, cwd?: string }} call
+ * @param {'pre'|'post'} phase  pre: may the call run? post: what did it leave?
+ * @returns {Promise<{ allow: boolean, message: string }>}  post: allow=false means files were undone
  */
-export function checkCall(agent, call) {
+export function checkCall(agent, call, phase = 'pre') {
   return new Promise((resolve) => {
     let stderr = '';
     let settled = false;
@@ -38,7 +43,7 @@ export function checkCall(agent, call) {
     };
     let child;
     try {
-      child = spawn(NODE, [HOOK], {
+      child = spawn(NODE, [HOOKS[phase]], {
         env: { ...FIXED_ENV, CODING_GUARD_AGENT: agent },
         stdio: ['pipe', 'ignore', 'pipe'],
       });

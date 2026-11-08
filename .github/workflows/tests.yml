@@ -186,6 +186,28 @@ jobs:
           cd integrations/constraint-monitor
           npm test
 
+      # The constraint rules as a gate on what this push CHANGES (guardrail
+      # hardening Phase 2): the same check the agent box runs on the files a
+      # tool call leaves, here off-machine, where `--no-verify` and anything an
+      # agent does in the box cannot reach. Only matches the push ADDED count.
+      # History: commits only (--filter=tree:0, a few MB instead of the ~450MB
+      # pack); git fetches the two trees and the changed blobs on demand. The
+      # commits are needed for the `Constraint-Override:` trailers in the range.
+      - name: constraint gate (rules on the files this push changed)
+        if: ${{ !cancelled() && steps.constraints-setup.outcome == 'success' }}
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --filter=tree:0 --unshallow origin "$HEAD_SHA"
+          if [ -z "${BASE:-}" ] || [[ "$BASE" =~ ^0+$ ]]; then
+            BASE=$(git rev-parse "$HEAD_SHA~1")   # new branch / manual run: the last commit
+          elif ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            git fetch --no-tags --filter=tree:0 origin "$BASE"   # force push: old tip not an ancestor
+          fi
+          node scripts/guard-check-diff.mjs "$BASE" "$HEAD_SHA"
+
       # The unified-viewer's ~1000 vitest tests ran NOWHERE until 2026-09-25, and
       # nothing said so. Three things had to line up: it is a self-contained
       # package (own package.json, own lock, not a workspace) so root `npm ci`
