@@ -48,6 +48,12 @@ jobs:
     timeout-minutes: 30
     env:
       CI: 'true'
+      # onnxruntime-node (via fastembed, in the root, km-core and proxy installs)
+      # downloads its CUDA build from GitHub's release CDN on EVERY Linux x64
+      # install; a 504 there failed "Build km-core" (tests #486). The CPU
+      # binaries the suites use ship inside the package. `skip` is the
+      # script's own switch for this.
+      ONNXRUNTIME_NODE_INSTALL_CUDA: skip
 
     steps:
       - uses: actions/checkout@v4
