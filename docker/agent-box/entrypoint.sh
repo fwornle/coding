@@ -23,6 +23,13 @@ esac
 home=/home/agent
 mkdir -p "$home"
 chown "$uid:$gid" "$home"
+# Docker creates the missing parents of a nested mount as root: ~/.claude when
+# it mounts the host's ~/.claude/projects into the home volume. Left that way,
+# the agent cannot write ~/.claude/.credentials.json and /login fails. Only the
+# directory itself — never the mount below it.
+for dir in "$home/.claude"; do
+  if [ -d "$dir" ] && ! mountpoint -q "$dir"; then chown "$uid:$gid" "$dir"; fi
+done
 # Tools that look the user up (git, ssh, npm) need a passwd/group entry.
 if ! getent group "$gid" >/dev/null; then echo "agent:x:$gid:" >> /etc/group; fi
 if ! getent passwd "$uid" >/dev/null; then echo "agent:x:$uid:$gid:agent:$home:/bin/bash" >> /etc/passwd; fi
