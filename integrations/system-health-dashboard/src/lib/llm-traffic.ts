@@ -13,8 +13,9 @@
  *   - is the proxy answering, and when did it last? (newest timestamp)
  *   - which accounts carry the load, how many calls and how fast? (provider,
  *     latency_ms — generation included, so shown as information, never graded)
- *   - are calls landing on their FIRST-choice provider? (attempt_trail.skipped:
- *     the providers the route tried before the one that answered, and why)
+ *   - which configured providers can the proxy not use? (attempt_trail.skipped:
+ *     every unusable provider in the call's chain, and why — NOT a fallback
+ *     record: it includes providers behind the one that answered)
  */
 
 export interface TrafficCall {
@@ -175,29 +176,26 @@ export function buildTrafficView(calls: TrafficCall[], now: number, limit: numbe
       skippedBy.set(s.provider, reasons)
     }
   }
-  if (fellBack === 0) {
-    items.push({
-      name: 'Routing',
-      status: 'operational',
-      description: 'every call reached its first-choice provider',
-      tooltip: 'No call in this sample had to skip a provider its route lists first.',
-    })
-  } else {
-    const skipped = [...skippedBy].map(([prov, reasons]) => {
+  // attempt_trail.skipped lists EVERY provider in the call's chain the proxy
+  // could not use — wherever it sits, also BEHIND the one that answered — so
+  // it does not mean the call fell back. Say what it does mean: these
+  // providers are configured but unavailable, and routes pass over them.
+  if (fellBack > 0) {
+    const names = [...skippedBy].map(([prov, reasons]) => {
       const top = [...reasons].sort((a, b) => b[1] - a[1])[0][0]
-      return `${providerLabel(prov)} ${top}`
+      return `${providerLabel(prov)} (${top})`
     })
     items.push({
-      name: 'Fallbacks',
-      status: 'warning',
-      description: `${fellBack} of ${dated.length} calls skipped their first choice — ${skipped.join('; ')}`,
+      name: 'Unavailable',
+      status: 'reference',
+      description: `${names.join(', ')} — passed over in ${fellBack} of ${dated.length} calls`,
       tooltip: [
-        'A route lists providers in order of preference; these calls were answered by a later one because the earlier ones were skipped.',
+        'Providers listed in these calls\' routes that the proxy could not use. They were passed over — not necessarily before the provider that answered: the proxy records every unusable provider in the chain.',
         ...[...skippedBy].map(([prov, reasons]) =>
           `${providerLabel(prov)} (${prov}): ${[...reasons].map(([r, n]) => `${r} ×${n}`).join(', ')}`),
-        'Usually a missing key or blocked egress for that provider on this machine. If that is intended, removing it from the proxy route clears this row.',
+        'Usually no key or no egress for that provider on this machine; the proxy\'s /health lists which backends are available.',
       ].join('\n'),
-      badgeLabel: `${Math.round((fellBack / dated.length) * 100)}%`,
+      badgeLabel: 'skipped',
     })
   }
 
