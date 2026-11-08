@@ -40,9 +40,16 @@ RUN npm install -g --no-audit --no-fund \
 # The guard: root-owned, not writable by the agent user. The hook finds its
 # rules through CONSTRAINT_CONFIG_PATH set in the managed hook command, so a
 # CODING_REPO pointing at the (writable) workspace never reaches them.
+#
+# --ignore-scripts: the hooks load no native module (better-sqlite3 binds its
+# addon only when a database is opened, which the hook never does; sharp and
+# onnxruntime come with @xenova/transformers, which it never imports). Their
+# install scripts only download prebuilt binaries — through the egress proxy,
+# where a 504 on GitHub's release CDN failed the whole build — and running no
+# dependency's install script in the guard's own image is the safer default.
 COPY guard/ /opt/coding-guard/
 RUN cd /opt/coding-guard/integrations/constraint-monitor \
- && npm ci --omit=dev --no-audit --no-fund \
+ && npm ci --omit=dev --ignore-scripts --no-audit --no-fund \
  && npm cache clean --force \
  && chown -R root:root /opt/coding-guard \
  && chmod -R u=rwX,go=rX /opt/coding-guard \
