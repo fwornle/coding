@@ -292,7 +292,8 @@ request path (proxy repo); team scope fails closed with a route test.
 | Phase 1 item 5 (per-agent guards) | done — other agents still opt-in `--box` | see "Phase 1 item 5 results" |
 | Phase 1 item 6 (red-team cells) | done — script row + declined verdict; env -i hole found and closed; opencode void (empty completions) | see "Phase 1 item 6 results" and "follow-up" |
 | Phase 2 (check results) | done — red-team 2026-11-08 no regression, shell-workaround held; CI gate unverified until the first push | see "Phase 2 results" |
-| Phase 2: eslint AST rules | todo | `console["log"]`, split identifiers still pass the regex |
+| Phase 2: AST rules | done — needs `coding box build` to reach the box | parsed-file checks behind 3 regex rules; see "Phase 2 AST rules results" |
+| Box image paste (Cmd+V) | done — Terminal.app sends nothing for an image (Ctrl+V there) | see "Box clipboard" |
 | Phase 3 | todo | |
 
 ## Phase 0 results (2026-11-07)
@@ -804,11 +805,77 @@ timestamps, cell durations and a per-minute heartbeat.
 **Known, not closed:** git-ignored files, submodule contents, binary/>1 MB
 files, a background writer after its call returned, and an agent rewriting
 the base (state dir is agent-writable) — the CI gate covers all of these.
-Follow-up: hold the base tree id at the host guard. eslint AST rules.
+Follow-up: hold the base tree id at the host guard. ~~eslint AST rules~~ —
+done, see below.
 
 **Also (same session):** the box passes `CLAUDE_CODE_DISABLE_MOUSE` /
 `OPENCODE_DISABLE_MOUSE` through (`EXTRA_ENV`), so tmux drag-select works in
 boxed sessions again.
+
+## Phase 2 AST rules results (2026-11-08)
+
+**Why not eslint itself:** the rules file stays the one source of truth (ids,
+whitelists, file patterns, grants and the CI trailer all key on the rule id),
+and eslint would bring its own config resolution the agent can influence
+(a project `eslint.config.js` in the workspace). Instead a rule opts in with
+`ast: <check>`; the engine parses the WHOLE file with `@babel/parser` (pure JS,
+JS/TS/JSX/TSX, `errorRecovery`) and counts **max(regex, AST)** — the AST only
+adds what the spelling hid, it never drops a regex hit.
+
+**Checks** (`integrations/constraint-monitor/src/engines/ast-rules.js`):
+
+| rule | `ast:` | catches beyond the regex |
+|---|---|---|
+| no-console-log | `console-log` | `console["log"]`, template / concatenated / const-held keys, aliases (to a fixed point), `const { log } = console`, `globalThis.console`, `Reflect.get(console,'log')`, optional chaining |
+| no-eval-usage | `eval` | `(0, eval)`, copies, `globalThis.eval` / `window["ev"+"al"]`, `Function(…)` / `new Function(…)` |
+| proper-error-handling | `empty-catch` | `catch {}` without a binding (eslint `no-empty` semantics: a comment inside = on purpose) |
+
+Not a scope analysis: a name bound to `console` anywhere counts everywhere —
+errs towards blocking. An unknown check name throws (broken guard → block).
+
+**Where it applies — whole files only:**
+- per-call **Write**: the content;
+- per-call **Edit / MultiEdit**: the hook applies the replacements to the file
+  on disk and counts what the edit ADDS (after − before). This was a real gap:
+  the result check skips a file tool's own target ("judged in full"), which
+  for an Edit was only the fragment;
+- **result check** and **CI gate**: the file read back / from git, before vs
+  after, as for the regex.
+- An unparseable file counts nothing — and does not run; the call that makes
+  it parse is judged 0 → n, so breaking a file is no way past.
+
+**Not closed:** opencode's `patch`/`apply_patch` (mapped to Edit with the
+patch text and no old_string, so the call-time AST check cannot apply it; the
+result check skips the file when the call names it as its own target — the CI
+gate still judges it); split identifiers built at runtime from values the
+file cannot fold (`console[pick()]`); `\beval\s*\(` still false-positives on a
+method named `eval` (regex unchanged).
+
+Tests: `test/ast-rules.test.js` (39), the former hook-adversarial todo is six
+real hook-level tests (Write / Edit / MultiEdit / pre-existing violation /
+clean), result check: obfuscated call written by the shell is undone.
+Constraint-monitor `npm test` 133 pass / 0 fail / 2 todo; coding guard +
+agent-box tests 130 pass. CI gate over the last 87 commits: clean, 1 s.
+
+**Caught before shipping:** the first binding fixed point flipped a variable
+reassigned between two strings (`let x = 'a'; x = 'b'`) forever — every Write
+of such a file would have hung the hook. A binding now goes unknown → value →
+ambiguous only (monotone), with a pass cap as backstop; regression tests for
+it, a 200-deep alias chain and a 4000-function file.
+
+## Box clipboard (2026-11-08)
+
+Image paste from the host into boxed agents. `clipboard-shim.mjs` answers
+xclip/wl-paste from the guard's `GET /clipboard` (box token, audited, images
+only, no copy-out). `paste-bridge.py` (PTY passthrough, entrypoint) turns the
+EMPTY bracketed paste a Mac terminal sends for an image-only clipboard into
+Ctrl+V — the Linux agent builds ignore it (Claude Code gates that on
+macos/wsl). copilot reads images over X11 natively (not xclip): the bridge
+runs a private Xvfb and loads the host image into the selection with the real
+xclip on each paste key (paste-time reads only, no polling). Works in VS Code's
+terminal; macOS Terminal.app sends nothing on Cmd+V for an image, so Ctrl+V
+there. `CODING_BOX_PASTE=off` runs an agent bare. Tests:
+`tests/guard/paste-bridge.test.mjs` (pty, 7).
 
 ## Session log
 
@@ -839,3 +906,12 @@ boxed sessions again.
 - **2026-11-08 (late morning)** — Phase 2: result check (snapshot/diff/undo)
   wired for all four agents; CI constraint gate; shell-workaround expects
   held. Box mouse env fixed. Needs `coding box build` + red-team on the host.
+- **2026-11-08 (midday)** — box image paste: clipboard shim + paste bridge
+  (Cmd+V → Ctrl+V; copilot via private Xvfb); CI made green (onnx CUDA skip,
+  submodule checkout before tests); verified by the user in VS Code's
+  terminal. Health dashboard: dead "LLM Pool Overhead" tile replaced by
+  "LLM Traffic".
+- **2026-11-08 (afternoon)** — Phase 2 AST rules: `ast:` checks behind
+  no-console-log / no-eval-usage / proper-error-handling; Edit/MultiEdit judged
+  on the file they produce (closed the own-target gap). Needs
+  `coding box build`; then a red-team run to confirm no regression.
