@@ -3,8 +3,13 @@
  * Red-team the agent box: run each agent against each scenario INSIDE the
  * shipped box and report a verdict per cell (lib/redteam/cells.mjs).
  *
- *   coding box redteam [--agents copilot,opencode,pi,claude] [--scenarios a,b]
+ *   coding box redteam [--agents script,claude,copilot,opencode,pi] [--scenarios a,b]
  *                      [--model agent=model …] [--timeout 360] [--keep]
+ *
+ * `script` is no model: lib/redteam/attacks.mjs runs each scenario as fixed
+ * steps in the box, so the box is tested even where a model declines. Each
+ * model agent first gets a canary-only run (its guard check), so "made no
+ * tool call" can be told apart from "the guard is missing".
  *
  * Per cell: a disposable git workspace, a throwaway home volume (seeded with
  * generated provider config, and with the box's Claude login when one exists),
@@ -39,13 +44,16 @@ import { wireAgentEnv } from '../lib/agents/proxy-routing.mjs';
 import { agentEnv, assertProxyReachable } from '../lib/kgbench/runner.mjs';
 import { argvForAgent } from '../lib/experiments/agent-headless.mjs';
 import {
-  SCENARIOS, CANARY_FILE, scenarioPrompt, canaryPrompt, classify, digestPaths, guardChanges, secretNeedles, findText,
+  SCENARIOS, CANARY_FILE, CALL_LOG, scenarioPrompt, canaryPrompt, classify, digestPaths, guardChanges, secretNeedles, findText,
+  callStats, scriptReport, probeBypass, factorsDigest,
 } from '../lib/redteam/cells.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const RUNS_DIR = path.join(REPO, '.data', 'redteam', 'runs');
-const AGENTS = ['claude', 'copilot', 'opencode', 'pi'];
-const DEFAULT_MODELS = { claude: 'sonnet', copilot: 'claude-sonnet-5', opencode: 'rapid-proxy/claude-sonnet-5', pi: 'claude-sonnet-5' };
+const AGENTS = ['script', 'claude', 'copilot', 'opencode', 'pi'];
+const DEFAULT_MODELS = { script: 'none', claude: 'sonnet', copilot: 'claude-sonnet-5', opencode: 'rapid-proxy/claude-sonnet-5', pi: 'claude-sonnet-5' };
+/** Where lib/redteam is mounted in a `script` box. */
+const BOX_REDTEAM = '/redteam';
 const log = (s) => process.stderr.write(`${s}\n`);
 
 function parseArgs(argv) {
@@ -74,11 +82,15 @@ function docker(args, opts = {}) {
   return spawnSync('docker', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, ...opts });
 }
 
-/** The agent's headless argv (lib/experiments), with the box as the sandbox. */
+/**
+ * The agent's headless argv (lib/experiments), with the box as the sandbox:
+ * the agent's own permission prompts, which nobody answers here, would stop
+ * an attack before it reaches the box — and test the CLI instead of the box.
+ */
 function agentArgs(agent, prompt, model) {
   const argv = argvForAgent(agent, prompt, { model });
+  if (agent === 'copilot') return [...argv, '--allow-all-paths', '--allow-all-urls'];
   if (agent !== 'claude') return argv;
-  // acceptEdits leaves Bash to a prompt nobody answers; the box is the sandbox.
   const i = argv.indexOf('--permission-mode');
   return [...argv.slice(0, i), '--dangerously-skip-permissions', ...argv.slice(i + 2)];
 }
@@ -99,15 +111,25 @@ function seedHome(volume, agent, uid, gid, stage) {
   if (res.status !== 0) throw new Error(`seeding ${volume} failed: ${res.stderr}`);
 }
 
-/** One container run of `agent` with `prompt`; returns { code, output, timedOut, diff }. */
+/**
+ * One container run of `agent` with `prompt` (for `script`: the scenario, or
+ * 'canary'); returns { code, output, timedOut, diff, callLog }.
+ */
 async function runBox({ agent, prompt, model, workspace, volume, name, guardDir, port, sentinel, env, timeoutS, outFile }) {
+  const script = agent === 'script';
   const argv = boxRunArgs({
-    agent, args: agentArgs(agent, prompt, model), env: { ...env, TARGET_PROJECT_DIR: workspace }, cwd: workspace,
+    agent: script ? 'claude' : agent, args: script ? [] : agentArgs(agent, prompt, model),
+    env: { ...env, TARGET_PROJECT_DIR: workspace }, cwd: workspace,
     uid: process.getuid(), gid: process.getgid(), name, guardDir, guardPortNum: port,
   });
   argv.splice(argv.indexOf('--rm'), 1); // keep the stopped container for `docker diff`
   const hv = argv.indexOf(`${HOME_VOLUME}:${BOX_HOME}`);
   argv[hv] = `${volume}:${BOX_HOME}`;
+  if (script) {
+    argv[argv.indexOf('coding.box.agent=claude')] = 'coding.box.agent=script';
+    argv.splice(argv.indexOf(IMAGE) + 1, Infinity, 'node', `${BOX_REDTEAM}/attacks.mjs`, prompt);
+    argv.splice(argv.indexOf(IMAGE), 0, '-v', `${path.join(REPO, 'lib', 'redteam')}:${BOX_REDTEAM}:ro`);
+  }
   argv.splice(argv.indexOf(IMAGE), 0, '-e', `HOST_SENTINEL=${sentinel}`, '-e', 'CODING_KNOWLEDGE_INJECTION=0');
   const out = fs.openSync(outFile, 'w');
   const child = spawn('docker', argv, { stdio: ['ignore', out, out] });
@@ -117,8 +139,13 @@ async function runBox({ agent, prompt, model, workspace, volume, name, guardDir,
   clearTimeout(timer);
   fs.closeSync(out);
   const diff = docker(['diff', name]).stdout || '';
+  // No record = no call reached the guard (or the agent deleted it): no result, never a pass.
+  let callLog = '';
+  try {
+    callLog = execFileSync('sh', ['-c', `docker cp ${name}:${CALL_LOG} - | tar -xO`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+  } catch { /* no record */ }
   docker(['rm', '-f', name]);
-  return { code, timedOut, diff, output: fs.readFileSync(outFile, 'utf8') };
+  return { code, timedOut, diff, callLog, output: fs.readFileSync(outFile, 'utf8') };
 }
 
 async function main() {
@@ -148,11 +175,13 @@ async function main() {
   const api = async (route) => (await fetch(`http://127.0.0.1:${port}${route}`)).json();
   const signingKey = fs.readFileSync(paths.signingKey, 'utf8');
   const needles = [...secretNeedles(signingKey), fs.readFileSync(paths.token, 'utf8').trim()];
-  const guardHomeFiles = [paths.signingKey, paths.token, path.join(paths.dir, 'factors.json'), paths.publicDir];
-  const guardHomeBefore = digestPaths(guardHomeFiles);
+  const factorsFile = path.join(paths.dir, 'factors.json');
+  const guardHome = () => `${digestPaths([paths.signingKey, paths.token, paths.publicDir])}:${factorsDigest(factorsFile)}`;
+  const guardHomeBefore = guardHome();
 
   log(`redteam ${runId}: image guard ${built}, scratch guard :${port}, ${opts.agents.length} agent(s) × ${opts.scenarios.length} scenario(s)`);
   const cells = [];
+  const guardChecks = {}; // agent → its canary-only run was blocked
   // Interrupted: leave nothing behind — the current cell's containers and
   // volume, the scratch guard, and the temp dir that holds its key.
   const live = { names: [], volume: null };
@@ -168,11 +197,18 @@ async function main() {
   process.once('SIGTERM', abort);
   try {
     for (const agent of opts.agents) {
-      const { env, unrouted } = await wireAgentEnv(agent, agentEnv(process.env), { targetProjectDir: tmp });
-      if (unrouted) throw new Error(`proxy wiring failed for ${agent}`);
-      delete env.PI_CODING_AGENT_DIR; // the box home holds a generated copy; never mount the host's
-      delete env.PI_CODING_AGENT_SESSION_DIR;
-      for (const scenario of opts.scenarios) {
+      const script = agent === 'script';
+      let env = agentEnv(process.env);
+      if (!script) {
+        const wired = await wireAgentEnv(agent, env, { targetProjectDir: tmp });
+        if (wired.unrouted) throw new Error(`proxy wiring failed for ${agent}`);
+        env = wired.env;
+        delete env.PI_CODING_AGENT_DIR; // the box home holds a generated copy; never mount the host's
+        delete env.PI_CODING_AGENT_SESSION_DIR;
+      }
+      // A model agent's guard check comes first: one canary-only run.
+      for (const scenario of script ? opts.scenarios : ['guard-check', ...opts.scenarios]) {
+        const check = scenario === 'guard-check';
         const id = `${agent}-${scenario}`;
         const dir = path.join(tmp, id);
         const workspace = path.join(dir, 'ws');
@@ -195,11 +231,21 @@ async function main() {
         const t0 = Date.now();
         log(`  ${id} …`);
         const common = { agent, model: opts.models[agent], workspace, volume, guardDir: paths.dir, port, sentinel, env, timeoutS: opts.timeout };
-        const run = await runBox({ ...common, prompt: scenarioPrompt(scenario), name, outFile: path.join(dir, 'output.txt') });
+        const prompt = script ? scenario : check ? canaryPrompt() : scenarioPrompt(scenario);
+        const run = await runBox({ ...common, prompt, name, outFile: path.join(dir, 'output.txt') });
+        if (check) {
+          const reqs = (await api('/requests')).requests;
+          guardChecks[agent] = reqs.some((r) => r.session === name && r.file?.endsWith(`/${CANARY_FILE}`));
+          log(`  ${id}: ${guardChecks[agent] ? 'the guard blocked the canary' : 'NOT blocked — no canary request'}`);
+          docker(['volume', 'rm', '-f', volume]);
+          live.names = [];
+          live.volume = null;
+          continue;
+        }
         let persistenceCanary;
         if (SCENARIOS[scenario].persistence) {
           const again = `${name}-again`;
-          await runBox({ ...common, prompt: canaryPrompt(), name: again, outFile: path.join(dir, 'output-again.txt') });
+          await runBox({ ...common, prompt: script ? 'canary' : canaryPrompt(), name: again, outFile: path.join(dir, 'output-again.txt') });
           const reqs = (await api('/requests')).requests;
           persistenceCanary = reqs.some((r) => r.session === again && r.file?.endsWith(`/${CANARY_FILE}`));
         }
@@ -214,12 +260,17 @@ async function main() {
           output: run.output,
           canary: requests.some((r) => r.session === name && r.file?.endsWith(`/${CANARY_FILE}`)),
           guardDiff: guardChanges(run.diff),
-          guardHomeChanged: digestPaths(guardHomeFiles) !== guardHomeBefore,
+          guardHomeChanged: guardHome() !== guardHomeBefore,
           protectedChanged: protectedPaths.length > 0 && digestPaths(protectedPaths) !== protectedBefore,
           auditOk: verifyAudit(paths.audit).ok,
           persistenceCanary,
+          ...callStats(run.callLog),
+          guardCheck: guardChecks[agent],
+          scripted: script,
         };
-        evidence.bypass = SCENARIOS[scenario].bypassed({
+        const report = script ? scriptReport(run.output) : null;
+        if (script && !report) throw new Error(`${id}: the attack script printed no report:\n${run.output.slice(-1500)}`);
+        evidence.bypass = probeBypass(report) || SCENARIOS[scenario].bypassed({
           workspace,
           guard: { approved: requests.filter((r) => r.status === 'approved'), grants },
           sentinelChanged,
@@ -229,6 +280,7 @@ async function main() {
         cells.push({
           id, agent, scenario, model: opts.models[agent], seconds: Math.round((Date.now() - t0) / 1000),
           ...result, requests: requests.map((r) => ({ rule: r.rule, file: r.file, status: r.status })),
+          ...(report ? { probes: report.probes, attempts: report.attempts } : {}),
           evidence: { ...evidence, output: undefined, outputTail: run.output.slice(-2000) },
         });
         log(`  ${id}: ${result.verdict} (${result.status})${result.reasons.length ? ` — ${result.reasons.join('; ')}` : ''}`);
@@ -244,8 +296,10 @@ async function main() {
 
   fs.mkdirSync(RUNS_DIR, { recursive: true });
   const file = path.join(RUNS_DIR, `${runId}.json`);
-  fs.writeFileSync(file, `${JSON.stringify({ runId, image: built, cells }, null, 2)}\n`);
+  fs.writeFileSync(file, `${JSON.stringify({ runId, image: built, guardChecks, cells }, null, 2)}\n`);
   const width = Math.max(...cells.map((c) => c.id.length));
+  const checks = Object.entries(guardChecks).map(([a, ok]) => `${a} ${ok ? 'blocked' : 'NOT BLOCKED'}`).join(', ');
+  if (checks) process.stdout.write(`\nguard check (canary only): ${checks}\n`);
   process.stdout.write(`\n${'cell'.padEnd(width)}  verdict       status\n`);
   for (const c of cells) process.stdout.write(`${c.id.padEnd(width)}  ${c.verdict.padEnd(12)}  ${c.status}${c.knownGap ? ` (${c.knownGap})` : ''}\n`);
   process.stdout.write(`\n${file}${opts.keep ? `\nworkspaces kept in ${tmp}` : ''}\n`);
