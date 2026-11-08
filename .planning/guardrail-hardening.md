@@ -291,7 +291,9 @@ request path (proxy repo); team scope fails closed with a route test.
 | Phase 1 item 4 (hook verifies grants) | done | see "Phase 1 item 4 results" |
 | Phase 1 item 5 (per-agent guards) | done — other agents still opt-in `--box` | see "Phase 1 item 5 results" |
 | Phase 1 item 6 (red-team cells) | done — script row + declined verdict; env -i hole found and closed; opencode void (empty completions) | see "Phase 1 item 6 results" and "follow-up" |
-| Phase 2–3 | todo | |
+| Phase 2 (check results) | done in code — needs `coding box build` + a red-team run on the host; CI gate unverified until the first push | see "Phase 2 results" |
+| Phase 2: eslint AST rules | todo | `console["log"]`, split identifiers still pass the regex |
+| Phase 3 | todo | |
 
 ## Phase 0 results (2026-11-07)
 
@@ -751,6 +753,54 @@ host-side effect): `/requests`, `/grants`, consume — the hook has no token
 **Known, not fixed**: the box can trip the password lockout on purpose
 (denial of the password factor only; a passkey still approves).
 
+## Phase 2 results (2026-11-08)
+
+**Decision (user):** a violating result is UNDONE (restored / new file
+removed), not just reported.
+
+**Result check** (`integrations/constraint-monitor/src/hooks/result-check.js`)
+- Box only (`CODING_GUARD_MODE=box`; host opt-in `CODING_GUARD_RESULTS=on`).
+- Base = work tree as a git tree: temp index seeded from the real one, `add
+  -A`, `write-tree`, objects in `logs/results/<hash>/objects` with the repo's
+  store as alternate. ~200 ms per snapshot on coding (4.3k files).
+- After a call (and before the next one — backstop for a call that fired no
+  after-event): `diff-tree` base→now; each changed text file judged as a
+  Write of the whole file by the same enforcer; only rules whose match COUNT
+  grew; skill-required rules use the transcript's active skills.
+- Violation → box grant (`settleWithGrants`, Write of that file) or undo +
+  rejected copy + message. The base advances to the judged tree; it is
+  dropped when nothing is in flight (user edits between turns never judged).
+- A file tool's own target is excluded (the per-call check judged it, and a
+  one-call grant is already spent).
+- Wiring: claude PostToolUse + PostToolUseFailure (managed settings);
+  copilot PostToolUse (output never shown → notice delivered by the next
+  pre); opencode `tool.execute.after` (args remembered by callID); pi
+  `tool_result`. `guard-hook.mjs checkCall(agent, call, phase)`.
+- Pre hook: settle runs after the rules allow a call; anything undone or a
+  pending notice blocks that call (not registered). A guard-error grant skips
+  a broken result check.
+- Tests: `test/result-check.test.js` (23, incl. the former adversarial todos
+  Bash redirect / cp / base64 / generated script, now real tests).
+
+**CI gate** (`scripts/guard-check-diff.mjs`, step in `tests.yml`): same
+judgment on `before..sha`, commit-only partial fetch (`--filter=tree:0`).
+Skill-required rules skipped (session rules). User override: commit trailer
+`Constraint-Override: <rule> <path|*>` (box has no push credentials).
+Last 40 commits: clean. Tests: `tests/guard/guard-check-diff.test.mjs`.
+
+**Red-team:** `shell-workaround` expects `held` (no known gap); the script
+row writes NOTES.md inside a tool call through each agent's real pre/post
+hooks.
+
+**Known, not closed:** git-ignored files, submodule contents, binary/>1 MB
+files, a background writer after its call returned, and an agent rewriting
+the base (state dir is agent-writable) — the CI gate covers all of these.
+Follow-up: hold the base tree id at the host guard. eslint AST rules.
+
+**Also (same session):** the box passes `CLAUDE_CODE_DISABLE_MOUSE` /
+`OPENCODE_DISABLE_MOUSE` through (`EXTRA_ENV`), so tmux drag-select works in
+boxed sessions again.
+
 ## Session log
 
 - **2026-11-07** — audit; plan written; Phase 0 implemented (0.1, 0.3, 0.4;
@@ -777,3 +827,6 @@ host-side effect): `/requests`, `/grants`, consume — the hook has no token
 - **2026-11-08 (later)** — opencode's empty answers traced to Copilot's
   content filter (proxy fix on a branch); opencode red-team cells run;
   `/svc` bound to a per-box token, verified live.
+- **2026-11-08 (late morning)** — Phase 2: result check (snapshot/diff/undo)
+  wired for all four agents; CI constraint gate; shell-workaround expects
+  held. Box mouse env fixed. Needs `coding box build` + red-team on the host.
