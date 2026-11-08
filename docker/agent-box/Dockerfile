@@ -65,6 +65,17 @@ COPY agents/opencode/opencode.json /etc/opencode/opencode.json
 RUN chown -R root:root /opt/coding-guard/agents /etc/opencode \
  && chmod -R u=rwX,go=rX /opt/coding-guard/agents /etc/opencode
 
+# Image paste from the HOST clipboard: the agents are Linux builds and read
+# images with xclip / wl-paste, which a container cannot serve. These stand-ins
+# ask the host guard for the image at paste time (clipboard/clipboard-shim.mjs).
+COPY clipboard/clipboard-shim.mjs /opt/coding-box/clipboard-shim.mjs
+RUN for tool in xclip wl-paste; do \
+      printf '#!/bin/sh\nexec node /opt/coding-box/clipboard-shim.mjs %s "$@"\n' "$tool" > "/usr/local/bin/$tool"; \
+    done \
+ && chown -R root:root /opt/coding-box /usr/local/bin/xclip /usr/local/bin/wl-paste \
+ && chmod 0755 /opt/coding-box /usr/local/bin/xclip /usr/local/bin/wl-paste \
+ && chmod 0644 /opt/coding-box/clipboard-shim.mjs
+
 # Claude Code managed policy: only these hooks load; user/project settings
 # cannot add, remove or replace them.
 COPY managed-settings.json /etc/claude-code/managed-settings.json
