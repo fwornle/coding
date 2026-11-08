@@ -39,9 +39,11 @@ interface HealthStatusCardProps {
    * missing. Greying says "you turned this off" and keeps the layout stable.
    */
   disabledReason?: string
+  /** One muted line under the rows, inside the card (e.g. what the numbers are based on). */
+  footer?: string
 }
 
-export default function HealthStatusCard({ title, icon, items, onClick, clickable, disabledReason }: HealthStatusCardProps) {
+export default function HealthStatusCard({ title, icon, items, onClick, clickable, disabledReason, footer }: HealthStatusCardProps) {
   const isDisabled = Boolean(disabledReason)
   const handleCardClick = () => {
     // A disabled tile is inert: its modal would open onto a service that is not
@@ -165,6 +167,9 @@ export default function HealthStatusCard({ title, icon, items, onClick, clickabl
             </div>
           ))}
         </div>
+        {footer && (
+          <div className="text-[11px] text-muted-foreground mt-4 pt-2 border-t">{footer}</div>
+        )}
         {clickable && (
           <div className="text-xs text-muted-foreground text-center mt-4 pt-2 border-t">Click to expand</div>
         )}

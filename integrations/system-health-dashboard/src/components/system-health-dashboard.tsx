@@ -25,7 +25,7 @@ import {
   Terminal
 } from 'lucide-react'
 import HealthStatusCard from './health-status-card'
-import LlmLatencyTile from './llm-latency-tile'
+import LlmTrafficTile from './llm-traffic-tile'
 import ViolationsTable from './violations-table'
 import SystemChecksTable from './system-checks-table'
 import UKBWorkflowModal from './ukb-workflow-modal'
@@ -612,10 +612,9 @@ export default function SystemHealthDashboard() {
           items={getProxyHealthItems()}
           disabledReason={featureOff('llm-proxy')}
         />
-        {/* Phase 66-02: headline per-model median latency tile (D-01 glanceable
-            surface). Owns its own fetch of the same-origin /api/token-usage/summary
-            proxy; sonnet/opus get green ≤3s / red-toward-14s, haiku plain (D-04). */}
-        <LlmLatencyTile />
+        {/* Who answers LLM calls, how fast, and whether they reach their
+            first-choice provider (src/lib/llm-traffic.ts). */}
+        <LlmTrafficTile disabledReason={featureOff('llm-proxy')} />
       </div>
 
       {/* Service Detail — expandable per-port and per-supervisord-process status */}

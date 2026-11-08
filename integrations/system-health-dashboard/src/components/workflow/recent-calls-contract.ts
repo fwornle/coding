@@ -3,7 +3,7 @@
  * dashboard is allowed to unwrap it.
  *
  * rapid-llm-proxy answers `{ data: RecentCall[], scope }`. Every other reader in
- * this repo says `body?.data || []` (llm-latency-tile, token-usage.tsx,
+ * this repo says `body?.data || []` (llm-traffic-tile, token-usage.tsx,
  * health-coordinator). One reader instead said `json.calls ?? json ?? []`, and
  * `calls` has never been a key the proxy emits — so the `?? json` arm handed the
  * WHOLE RESPONSE OBJECT to a consumer that called `.filter` on it. That is not a
