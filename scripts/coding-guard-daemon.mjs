@@ -27,7 +27,9 @@
  *   POST /factors/recovery       [A+T] new recovery codes
  *   GET  /grants?session=              live signed grants for a box session
  *   POST /grants/:id/consume           spend a one-call grant
- *   POST /svc                          { verb, args, session } — lib/guard/svc.mjs
+ *   POST /boxes                  [A]   { session } → { token }: register a box at launch
+ *   POST /boxes/release          [A]   { session } — the box exited
+ *   POST /svc                    [B]   { verb, args } — lib/guard/svc.mjs
  *   GET  /audit                  [A]   tail + chain check
  *   POST /note                   [A]   record a host-side event (e.g. --no-box)
  *
@@ -37,6 +39,9 @@
  * approve: it holds no authenticator, and password / recovery attempts lock
  * out after 5 failures.
  *
+ * [B] = the session is the one the box's token was registered for
+ *       (`x-coding-box-token`, set by the launcher) — never a session the
+ *       request names; a host caller with [A] may name one.
  * [A] = needs `Authorization: Bearer <approver.token>` (0600 in ~/.coding/guard,
  * mounted nowhere). [T] = and, once any factor exists, a management ticket from
  * proving one — so neither the token alone nor a stolen session can add a
@@ -77,6 +82,8 @@ const MAX_BODY = 64 * 1024;
 const MAX_PENDING = 100;
 const MAX_NEW_PER_MINUTE = 30;
 const REQUEST_TTL_MS = 24 * 60 * 60 * 1000;
+/** A box token outlives any session; the launcher releases it on exit, this catches a crash. */
+const BOX_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 const FIELD_LIMITS = { rule: 200, session: 200, agent: 40, tool: 80, file: 1000, excerpt: 4000, reason: 2000 };
 
 class HttpError extends Error {
@@ -117,7 +124,7 @@ export function createGuard({
   const ceremonies = new Ceremonies(factors, { origins: [pageOrigin], now });
   const fingerprint = createHash('sha256').update(keys.publicPem).digest('hex').slice(0, 16);
   const tokenBuf = Buffer.from(keys.token);
-  let state = { requests: {}, grants: {} };
+  let state = { requests: {}, grants: {}, boxes: {} };
   try {
     state = { ...state, ...JSON.parse(fs.readFileSync(paths.state, 'utf8')) };
   } catch { /* first start, or unreadable: start empty — grants are re-requestable */ }
@@ -133,7 +140,9 @@ export function createGuard({
     const t = now();
     for (const [id, g] of Object.entries(state.grants)) if (g.payload.exp <= t || g.consumed) delete state.grants[id];
     for (const [id, r] of Object.entries(state.requests)) if (t - r.created > REQUEST_TTL_MS) delete state.requests[id];
+    for (const [h, b] of Object.entries(state.boxes)) if (t - b.created > BOX_TTL_MS) delete state.boxes[h];
   };
+  const tokenHash = (tok) => createHash('sha256').update(String(tok)).digest('hex');
 
   /** Approver token. `page`: the guard's own pages may send it (enrolment). */
   function authorize(req, { page = false } = {}) {
@@ -145,6 +154,31 @@ export function createGuard({
     if (given.length !== tokenBuf.length || !timingSafeEqual(given, tokenBuf)) {
       throw new HttpError(401, 'approver token required (only the host user has it: coding guard approve …)');
     }
+  }
+
+  const isApprover = (req) => {
+    try { authorize(req); return true; } catch { return false; }
+  };
+
+  /**
+   * The session a `/svc` call acts for. From a box: the session its launcher
+   * registered with the box's token — a box that could name a session could
+   * spend another box's `svc:<verb>` grant. From the host (approver token): the
+   * session it names, else its own.
+   */
+  function svcSession(req, body) {
+    const tok = req.headers['x-coding-box-token'];
+    if (tok) {
+      const box = state.boxes[tokenHash(tok)];
+      if (!box) throw new HttpError(401, 'unknown box token (the box was not registered, or has exited)');
+      if (body.session && body.session !== box.session) {
+        audit({ event: 'svc.refused', verb: clip(body.verb, 40), session: box.session, error: `named another session: ${clip(body.session, 80)}` });
+        throw new HttpError(403, 'a box acts only for its own session');
+      }
+      return box.session;
+    }
+    if (isApprover(req)) return typeof body.session === 'string' && body.session ? body.session : 'host';
+    throw new HttpError(401, 'box token required (set by the box launcher as CODING_GUARD_BOX_TOKEN)');
   }
 
   /** Token, plus — once anything is enrolled — a ticket from proving a factor. */
@@ -229,9 +263,8 @@ export function createGuard({
     return Object.values(state.grants).filter((g) => g.payload.session === session);
   }
 
-  async function runSvc(body) {
-    const { verb, args = [], session } = body;
-    if (typeof session !== 'string' || !session) throw new HttpError(400, 'session required');
+  async function runSvc(body, session) {
+    const { verb, args = [] } = body;
     let programs = [];
     if (verb === 'logs' || verb === 'restart') {
       const res = await runDocker(['exec', SERVICES_CONTAINER, 'supervisorctl', 'status']);
@@ -417,7 +450,26 @@ export function createGuard({
       }
     }
 
-    if (m === 'POST' && url.pathname === '/svc') return runSvc(body);
+    if (parts[0] === 'boxes' && m === 'POST') {
+      authorize(req);
+      const session = body.session;
+      if (typeof session !== 'string' || !/^[A-Za-z0-9_.-]{1,120}$/.test(session)) throw new HttpError(400, 'session required');
+      if (parts.length === 1) {
+        const tok = randomBytes(32).toString('base64url');
+        state.boxes[tokenHash(tok)] = { session, created: now() };
+        save();
+        audit({ event: 'box.registered', session });
+        return { token: tok };
+      }
+      if (parts.length === 2 && parts[1] === 'release') {
+        let released = 0;
+        for (const [h, b] of Object.entries(state.boxes)) if (b.session === session) { delete state.boxes[h]; released++; }
+        save();
+        audit({ event: 'box.released', session, released });
+        return { released };
+      }
+    }
+    if (m === 'POST' && url.pathname === '/svc') return runSvc(body, svcSession(req, body));
 
     if (m === 'GET' && url.pathname === '/audit') {
       authorize(req);

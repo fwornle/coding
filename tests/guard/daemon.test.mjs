@@ -243,9 +243,14 @@ describe('approving', () => {
 });
 
 describe('svc broker', () => {
+  const register = async (session) => (await api('POST', '/boxes', { body: { session }, auth: token })).data.token;
+  const svc = (boxToken, body) => api('POST', '/svc', { body, headers: boxToken ? { 'x-coding-box-token': boxToken } : {} });
+  let box;
+  before(async () => { box = await register(SESSION); });
+
   test('ungated verbs run the fixed argv', async () => {
     dockerCalls.length = 0;
-    const { status, data } = await api('POST', '/svc', { body: { verb: 'restart', args: ['graphify'], session: SESSION } });
+    const { status, data } = await svc(box, { verb: 'restart', args: ['graphify'] });
     assert.equal(status, 200);
     assert.deepEqual(dockerCalls.at(-1), ['exec', 'coding-services', 'supervisorctl', 'restart', 'backend-services:graphify']);
     assert.equal(data.code, 0);
@@ -253,24 +258,51 @@ describe('svc broker', () => {
 
   test('outside the vocabulary → 400, docker never called', async () => {
     dockerCalls.length = 0;
-    assert.equal((await api('POST', '/svc', { body: { verb: 'run', args: ['-v', '/:/h', 'alpine'], session: SESSION } })).status, 400);
+    assert.equal((await svc(box, { verb: 'run', args: ['-v', '/:/h', 'alpine'] })).status, 400);
     assert.equal(dockerCalls.length, 0);
   });
 
   test('a gated verb asks first, runs after approval, and a one-call grant runs it once', async () => {
     dockerCalls.length = 0;
-    const first = await api('POST', '/svc', { body: { verb: 'rebuild', session: SESSION } });
+    const first = await svc(box, { verb: 'rebuild', session: SESSION });
     assert.equal(first.status, 403);
     assert.equal(first.data.request.rule, 'svc:rebuild');
+    assert.equal(first.data.request.session, SESSION, 'the session comes from the box token');
     assert.match(first.data.error, /\/approve\/[0-9a-f]{12}$/);
     assert.equal(dockerCalls.length, 0);
 
     assert.equal((await approveWith(key, first.data.request.id, { scope: 'call' })).status, 200);
-    const second = await api('POST', '/svc', { body: { verb: 'rebuild', session: SESSION } });
+    const second = await svc(box, { verb: 'rebuild' });
     assert.equal(second.status, 200);
     assert.deepEqual(dockerCalls, [[...COMPOSE, 'build', 'coding-services'], [...COMPOSE, 'up', '-d', 'coding-services']]);
 
-    assert.equal((await api('POST', '/svc', { body: { verb: 'rebuild', session: SESSION } })).status, 403);
+    assert.equal((await svc(box, { verb: 'rebuild' })).status, 403);
+  });
+
+  test('a box cannot act for another box: no token, a foreign session, an unknown or released token', async () => {
+    dockerCalls.length = 0;
+    const other = await register('coding-box-pi-7');
+    // Box A holds a session grant for rebuild; box B must not be able to spend it.
+    const ask = await svc(box, { verb: 'rebuild' });
+    assert.equal((await approveWith(key, ask.data.request.id, { scope: 'session' })).status, 200);
+    dockerCalls.length = 0;
+    assert.equal((await svc(other, { verb: 'rebuild', session: SESSION })).status, 403, 'naming box A from box B');
+    const own = await svc(other, { verb: 'rebuild' });
+    assert.equal(own.status, 403, 'box B has no grant of its own');
+    assert.equal(own.data.request.session, 'coding-box-pi-7');
+    assert.equal((await svc(null, { verb: 'rebuild', session: SESSION })).status, 401, 'no box token');
+    assert.equal((await svc('forged', { verb: 'status', session: SESSION })).status, 401, 'unknown box token');
+    assert.equal(dockerCalls.length, 0, 'docker never ran');
+
+    assert.equal((await api('POST', '/boxes/release', { body: { session: 'coding-box-pi-7' }, auth: token })).data.released, 1);
+    assert.equal((await svc(other, { verb: 'status' })).status, 401, 'a released box token is dead');
+  });
+
+  test('registering needs the approver token; the host may name a session', async () => {
+    assert.equal((await api('POST', '/boxes', { body: { session: 'coding-box-x-1' } })).status, 401);
+    assert.equal((await api('POST', '/boxes', { body: { session: 'bad session!' }, auth: token })).status, 400);
+    const host = await api('POST', '/svc', { body: { verb: 'restart', args: ['graphify'], session: SESSION }, auth: token });
+    assert.equal(host.status, 200);
   });
 });
 

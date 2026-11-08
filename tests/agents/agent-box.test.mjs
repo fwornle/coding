@@ -9,6 +9,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
+import { randomBytes } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -74,6 +75,12 @@ describe('boxRunArgs — boundary', () => {
   test('the box knows where the host guard is and which session it is', () => {
     assert.strictEqual(envs(argv).CODING_GUARD_URL, 'http://host.docker.internal:3035');
     assert.strictEqual(envs(argv).CODING_GUARD_SESSION, 'coding-box-claude-1');
+  });
+
+  test('the box token binds `coding svc` to this box, and is only passed when the guard issued one', () => {
+    assert.ok(!('CODING_GUARD_BOX_TOKEN' in envs(argv)));
+    const issued = randomBytes(16).toString('hex');
+    assert.strictEqual(envs(boxRunArgs({ ...base, boxToken: issued })).CODING_GUARD_BOX_TOKEN, issued);
   });
 
   test('the hostname is the session: grants are bound to what the agent cannot change', () => {

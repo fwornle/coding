@@ -27,7 +27,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { ROUTING_ENV_VARS } from '../lib/agents/proxy-routing.mjs';
-import { guardHome, guardPaths, guardPort, exposesGuardHome } from '../lib/guard/home.mjs';
+import { guardHome, guardPaths, guardPort, exposesGuardHome, readToken } from '../lib/guard/home.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -153,7 +153,7 @@ export function boxRunArgs({
   agent, args = [], env = process.env, cwd = process.cwd(), codingRepo = REPO,
   home = os.homedir(), platform = process.platform, uid, gid, tty = false,
   image = IMAGE, name = `coding-box-${agent}-${process.pid}`, exists = fs.existsSync,
-  guardDir = guardHome(env, home), guardPortNum = guardPort(env),
+  guardDir = guardHome(env, home), guardPortNum = guardPort(env), boxToken = null,
 }) {
   const command = AGENT_COMMANDS[agent];
   if (!command) throw new Error(`unknown agent '${agent}' (one of: ${Object.keys(AGENT_COMMANDS).join(', ')})`);
@@ -205,6 +205,8 @@ export function boxRunArgs({
 
   // Host guard (scripts/coding-guard-daemon.mjs): where to ask, and who is asking.
   argv.push('-e', `CODING_GUARD_URL=http://host.docker.internal:${guardPortNum}`, '-e', `CODING_GUARD_SESSION=${name}`);
+  // Binds `coding svc` to THIS box's session (registerBox); the agent may read it — it is only this box's.
+  if (boxToken) argv.push('-e', `CODING_GUARD_BOX_TOKEN=${boxToken}`);
 
   argv.push('-v', `${HOME_VOLUME}:${BOX_HOME}`);
   // Claude transcripts on the host's disk, where session logging reads them.
@@ -310,7 +312,27 @@ function status() {
   return built === current ? 0 : 2;
 }
 
-function run(agent, args) {
+/**
+ * Register a box with the host guard (approver token, host-only) and get the
+ * token that binds its `coding svc` calls to `session`; release it on exit.
+ * No guard running → null, and the box starts without `coding svc`.
+ */
+export async function registerBox(session, { env = process.env, release = false } = {}) {
+  try {
+    const res = await fetch(`http://127.0.0.1:${guardPort(env)}/boxes${release ? '/release' : ''}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${readToken(guardPaths(guardHome(env)))}` },
+      body: JSON.stringify({ session }),
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return null;
+    return release ? true : (await res.json()).token ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function run(agent, args) {
   const built = imageDigest();
   if (!built) {
     process.stderr.write(`agent-box: no ${IMAGE} image — run: coding box build\n`);
@@ -328,12 +350,16 @@ function run(agent, args) {
       return 1;
     }
   }
+  const name = `coding-box-${agent}-${process.pid}`;
+  const boxToken = await registerBox(name);
+  if (!boxToken) process.stderr.write('agent-box: the host guard did not register this box — `coding svc` will be refused inside it\n');
   const argv = boxRunArgs({
-    agent, args,
+    agent, args, name, boxToken,
     uid: process.getuid?.(), gid: process.getgid?.(),
     tty: Boolean(process.stdin.isTTY),
   });
   const res = spawnSync('docker', argv, { stdio: 'inherit' });
+  if (boxToken) await registerBox(name, { release: true });
   return res.status ?? 1;
 }
 
@@ -347,7 +373,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   }
   else if (cmd === 'run') {
     const [agent, ...more] = rest;
-    code = run(agent, more[0] === '--' ? more.slice(1) : more);
+    code = await run(agent, more[0] === '--' ? more.slice(1) : more);
   } else {
     process.stderr.write('usage: agent-box.mjs build | status | redteam [options] | run <claude|copilot|opencode|pi> [-- args…]\n');
     code = 64;
