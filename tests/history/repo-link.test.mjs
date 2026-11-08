@@ -334,7 +334,7 @@ describe('remote state', () => {
   test('URL parsing', () => {
     assert.equal(link.urlHost('https://bmw.ghe.com/me/x-history.git'), 'bmw.ghe.com');
     assert.equal(link.urlSlug('https://bmw.ghe.com/me/x-history.git'), 'me/x-history');
-    assert.equal(link.urlHost('git@cc-github.bmwgroup.net:me/x.git'), 'cc-github.bmwgroup.net');
-    assert.equal(link.urlSlug('git@cc-github.bmwgroup.net:me/x.git'), 'me/x');
+    assert.equal(link.urlHost('git@git.example.com:me/x.git'), 'git.example.com');
+    assert.equal(link.urlSlug('git@git.example.com:me/x.git'), 'me/x');
   });
 });

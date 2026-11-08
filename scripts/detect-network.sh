@@ -88,26 +88,17 @@ detect_corporate_network() {
     PROXY_REQUIRED=true
     log "🏢 Inside Corporate Network (PAC DNS resolves to $pac_ip)"
   else
-    # 2. Fallback: DNS resolve of corporate GitHub
-    local gh_ip
-    gh_ip=$(dig +short +timeout=2 +tries=1 cc-github.bmwgroup.net 2>/dev/null | head -1)
-    if [ -n "$gh_ip" ] && [[ "$gh_ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    # 2. Fallback: Check health coordinator if running
+    local coord_location
+    coord_location=$(curl -s --connect-timeout 1 http://localhost:3034/health/state 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['network']['location'])" 2>/dev/null || true)
+    if [ "$coord_location" = "corporate" ]; then
       INSIDE_CN=true
       PROXY_REQUIRED=true
-      log "🏢 Inside Corporate Network (cc-github DNS resolves to $gh_ip)"
+      log "🏢 Inside Corporate Network (health coordinator confirms)"
     else
-      # 3. Fallback: Check health coordinator if running
-      local coord_location
-      coord_location=$(curl -s --connect-timeout 1 http://localhost:3034/health/state 2>/dev/null | python3 -c "import sys,json; print(json.load(sys.stdin)['network']['location'])" 2>/dev/null || true)
-      if [ "$coord_location" = "corporate" ]; then
-        INSIDE_CN=true
-        PROXY_REQUIRED=true
-        log "🏢 Inside Corporate Network (health coordinator confirms)"
-      else
-        INSIDE_CN=false
-        PROXY_REQUIRED=false
-        log "🌐 Outside Corporate Network"
-      fi
+      INSIDE_CN=false
+      PROXY_REQUIRED=false
+      log "🌐 Outside Corporate Network"
     fi
   fi
 

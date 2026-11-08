@@ -25,8 +25,8 @@ common -> common: resolve project · load .env files · resolve features
 == Network (detect_network_and_configure_proxy) ==
 common -> network: detect_corporate_network()
 activate network
-network -> network: dig PAC host / cc-github\n(DNS — needs no proxy)
-opt neither resolves
+network -> network: dig PAC host\n(DNS — needs no proxy)
+opt it does not resolve
   network -> coord: GET /health/state → network.location
 end
 network -> network: INSIDE_CN, PROXY_REQUIRED
