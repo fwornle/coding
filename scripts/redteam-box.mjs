@@ -54,7 +54,16 @@ const AGENTS = ['script', 'claude', 'copilot', 'opencode', 'pi'];
 const DEFAULT_MODELS = { script: 'none', claude: 'sonnet', copilot: 'claude-sonnet-5', opencode: 'rapid-proxy/claude-sonnet-5', pi: 'claude-sonnet-5' };
 /** Where lib/redteam is mounted in a `script` box. */
 const BOX_REDTEAM = '/redteam';
-const log = (s) => process.stderr.write(`${s}\n`);
+/** Every line carries the wall-clock time, so a stalled cell shows as a gap. */
+const clock = () => new Date().toTimeString().slice(0, 8);
+const log = (s) => process.stderr.write(`${clock()} ${s}\n`);
+/** 75 → "1m15s". */
+export const duration = (ms) => {
+  const t = Math.round(ms / 1000);
+  return t >= 60 ? `${Math.floor(t / 60)}m${String(t % 60).padStart(2, '0')}s` : `${t}s`;
+};
+/** How often a running box says it is still running. */
+const HEARTBEAT_MS = 60_000;
 
 /** The canary text on disk in the workspace: a guarded write that went through. */
 function canaryOnDisk(workspace) {
@@ -149,8 +158,15 @@ async function runBox({ agent, prompt, model, workspace, volume, name, guardDir,
   const child = spawn('docker', argv, { stdio: ['ignore', out, out] });
   let timedOut = false;
   const timer = setTimeout(() => { timedOut = true; docker(['kill', name]); }, timeoutS * 1000);
+  // A long cell is not a stalled one: say so every minute, against the limit.
+  const started = Date.now();
+  const heartbeat = setInterval(() => {
+    log(`    ${name}: still running, ${duration(Date.now() - started)} of the ${duration(timeoutS * 1000)} limit`);
+  }, HEARTBEAT_MS);
   const code = await new Promise((r) => child.on('close', r));
   clearTimeout(timer);
+  clearInterval(heartbeat);
+  if (timedOut) log(`    ${name}: stopped at the ${duration(timeoutS * 1000)} limit`);
   fs.closeSync(out);
   const diff = docker(['diff', name]).stdout || '';
   // No record = no call reached the guard (or the agent deleted it): no result, never a pass.
@@ -314,7 +330,7 @@ async function main() {
           ...(report ? { probes: report.probes, attempts: report.attempts } : {}),
           evidence: { ...evidence, output: undefined, outputTail: run.output.slice(-2000) },
         });
-        log(`  ${id}: ${result.verdict} (${result.status})${result.reasons.length ? ` — ${result.reasons.join('; ')}` : ''}`);
+        log(`  ${id}: ${result.verdict} (${result.status}) [${duration(Date.now() - t0)}]${result.reasons.length ? ` — ${result.reasons.join('; ')}` : ''}`);
         docker(['volume', 'rm', '-f', volume]);
         live.names = [];
         live.volume = null;
