@@ -5,8 +5,9 @@
  * current route stamps, so it showed "no recent pool calls" forever. The
  * rules worth pinning are the ones that would quietly mislead:
  *   - one row per answering account, busiest first, with its share of calls
- *   - calls that skipped their first-choice provider are counted and the
- *     skipped providers named with their reason — the signal the old tile hid
+ *   - providers the proxy cannot use are named with their reason, neutrally:
+ *     the proxy's skip list includes providers BEHIND the one that answered,
+ *     so it is not evidence of a fallback
  *   - a quiet proxy says "idle", it does not raise an alarm
  *   - the footer says what the numbers rest on (capped sample vs everything)
  */
@@ -39,24 +40,26 @@ test('one row per answering account, busiest first, with call share and median',
   assert.ok(items.slice(0, 2).every((i) => i.status === 'operational'));
 });
 
-test('skipped first choices surface as a Fallbacks warning naming provider and reason', () => {
+test('unusable providers are named with their reason, neutrally — not as fallbacks', () => {
+  // The proxy lists every unusable provider in the chain, also ones BEHIND the
+  // answering provider, so a skip does not mean the call fell back.
   const calls = [
     { timestamp: at(1), provider: 'gh-copilot', model: 'm', latency_ms: 1, attempt_trail: trail(['groq', 'not reachable'], ['anthropic-api', 'not reachable']) },
     { timestamp: at(2), provider: 'gh-copilot', model: 'm', latency_ms: 1, attempt_trail: trail(['groq', 'not reachable']) },
     { timestamp: at(3), provider: 'claude-code-max', model: 'm', latency_ms: 1, attempt_trail: '' },
     { timestamp: at(4), provider: 'claude-code-max', model: 'm', latency_ms: 1, attempt_trail: '{not json' },
   ];
-  const fb = buildTrafficView(calls, NOW, 500).items.find((i) => i.name === 'Fallbacks');
-  assert.equal(fb.status, 'warning');
-  assert.equal(fb.badgeLabel, '50%');
-  assert.equal(fb.description, '2 of 4 calls skipped their first choice — Groq not reachable; Anthropic API not reachable');
-  assert.match(fb.tooltip, /Groq \(groq\): not reachable ×2/);
+  const items = buildTrafficView(calls, NOW, 500).items;
+  const row = items.find((i) => i.name === 'Unavailable');
+  assert.equal(row.status, 'reference');
+  assert.equal(row.description, 'Groq (not reachable), Anthropic API (not reachable) — passed over in 2 of 4 calls');
+  assert.match(row.tooltip, /Groq \(groq\): not reachable ×2/);
+  assert.ok(!items.some((i) => i.status === 'warning'));
 });
 
-test('no skips → a green Routing row', () => {
+test('no unusable provider → no extra row', () => {
   const { items } = buildTrafficView([{ timestamp: at(1), provider: 'gh-copilot', latency_ms: 10 }], NOW, 500);
-  assert.deepEqual(items.at(-1).name, 'Routing');
-  assert.equal(items.at(-1).status, 'operational');
+  assert.deepEqual(items.map((i) => i.name), ['GitHub Copilot']);
 });
 
 test('a quiet proxy reads idle, not broken', () => {
