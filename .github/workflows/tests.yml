@@ -77,8 +77,11 @@ jobs:
           git -C lib/km-core fetch -q --depth 1 origin "$SHA"
           git -C lib/km-core checkout -q FETCH_HEAD
 
+      # sharp's install script downloads libvips from GitHub's release CDN, and
+      # a 504 there failed the whole install (tests #484/#485). Nothing the
+      # suites run loads sharp; every other install script still runs.
       - name: Install root dependencies
-        run: npm ci --no-audit --no-fund
+        run: node scripts/ci/npm-ci-skip.mjs --skip sharp -- --no-audit --no-fund
 
       # Recreate the hand-made link `npm ci` knows nothing about. Without it every
       # km-core import fails, which is also how this breaks on a dev machine when
@@ -178,7 +181,7 @@ jobs:
           set -euo pipefail
           git submodule update --init integrations/constraint-monitor
           cd integrations/constraint-monitor
-          npm ci --no-audit --no-fund
+          node ../../scripts/ci/npm-ci-skip.mjs --skip sharp -- --no-audit --no-fund
 
       - name: constraint-monitor (engine + adversarial hook suite)
         if: ${{ !cancelled() && steps.constraints-setup.outcome == 'success' }}
