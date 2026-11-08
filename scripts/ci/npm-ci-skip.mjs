@@ -10,7 +10,8 @@
  * whole `npm ci` fails — in CI (tests #484/#485, 2026-11-08) and in the agent
  * box build the same morning. Nothing the suites run loads sharp, so its
  * binary is not needed; the other native modules (better-sqlite3,
- * classic-level, onnxruntime-node) are, and still get their scripts.
+ * classic-level, onnxruntime-node) are, and still get their scripts (onnxruntime's CUDA download is
+ * switched off separately: ONNXRUNTIME_NODE_INSTALL_CUDA=skip in tests.yml).
  *
  * npm has no per-package ignore-scripts, hence: install with --ignore-scripts,
  * then `npm rebuild` the packages that declare install scripts (which runs
