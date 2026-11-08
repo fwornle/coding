@@ -30,6 +30,10 @@
  *   POST /boxes                  [A]   { session } → { token }: register a box at launch
  *   POST /boxes/release          [A]   { session } — the box exited
  *   POST /svc                    [B]   { verb, args } — lib/guard/svc.mjs
+ *   GET  /clipboard[?peek=1]     [B]   the host clipboard's IMAGE, as PNG
+ *                                      (box xclip/wl-paste stand-in; never text;
+ *                                      every read audited; CODING_GUARD_CLIPBOARD=off
+ *                                      turns it off) — lib/guard/clipboard.mjs
  *   GET  /audit                  [A]   tail + chain check
  *   POST /note                   [A]   record a host-side event (e.g. --no-box)
  *
@@ -63,6 +67,7 @@ import { FactorStore } from '../lib/guard/factors.mjs';
 import { Ceremonies } from '../lib/guard/ceremonies.mjs';
 import { appendAudit, readAudit, verifyAudit } from '../lib/guard/audit.mjs';
 import { svcPlan, parsePrograms, SvcError, SERVICES_CONTAINER } from '../lib/guard/svc.mjs';
+import { peekClipboardImage, readClipboardImage } from '../lib/guard/clipboard.mjs';
 import { listenLocal, isAllowedHost } from '../lib/network/local-only.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -115,6 +120,8 @@ function dockerRunner(argv, { timeout = 60_000 } = {}) {
  */
 export function createGuard({
   paths = guardPaths(), runDocker = dockerRunner, now = () => Date.now(), codingRepo = REPO, port = guardPort(),
+  clipboard = { peek: peekClipboardImage, read: readClipboardImage },
+  clipboardEnabled = () => process.env.CODING_GUARD_CLIPBOARD !== 'off',
 } = {}) {
   const keys = ensureGuardHome(paths);
   writeGuardEndpoint(paths, port);
@@ -301,6 +308,27 @@ export function createGuard({
     return { verb, code, results };
   }
 
+  /**
+   * The box's image paste (docker/agent-box/clipboard/clipboard-shim.mjs).
+   * Box token only — the agent can call this, so it serves images and never
+   * text, and audits every read so an uninvited one is visible.
+   */
+  async function readClipboard(req, url) {
+    if (req.headers.origin) throw new HttpError(403, 'this route does not accept browser requests');
+    const session = svcSession(req, {});
+    if (!clipboardEnabled()) throw new HttpError(403, 'the clipboard bridge is off on this host (CODING_GUARD_CLIPBOARD=off)');
+    if (url.searchParams.get('peek') === '1') return { image: (await clipboard.peek()) ? 'image/png' : null };
+    let png;
+    try {
+      png = await clipboard.read();
+    } catch (err) {
+      audit({ event: 'clipboard.refused', session, error: clip(err.message, 200) });
+      throw new HttpError(413, err.message);
+    }
+    audit({ event: 'clipboard.read', session, bytes: png?.length ?? 0 });
+    return png ? { image: 'image/png', data: png.toString('base64') } : { image: null };
+  }
+
   async function route(req, url, body) {
     const parts = url.pathname.split('/').filter(Boolean);
     const m = req.method;
@@ -470,6 +498,7 @@ export function createGuard({
       }
     }
     if (m === 'POST' && url.pathname === '/svc') return runSvc(body, svcSession(req, body));
+    if (m === 'GET' && url.pathname === '/clipboard') return readClipboard(req, url);
 
     if (m === 'GET' && url.pathname === '/audit') {
       authorize(req);

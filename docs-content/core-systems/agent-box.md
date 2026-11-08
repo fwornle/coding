@@ -277,6 +277,28 @@ without a token, with another box's session, or after the box has exited is
 refused, and the refusal is in the audit log. If the guard is not running at
 launch, the box still starts, without `coding svc`.
 
+## Pasting images from the host clipboard
+
+Inside the box the agents are Linux programs. To paste an image (Ctrl+V in
+Claude Code) they run `xclip` or `wl-paste`, and a container has no display
+and no access to your Mac's or PC's clipboard. The box has stand-ins for both
+tools. When the agent pastes, the stand-in asks the host guard for the image,
+and the guard reads your clipboard at that moment and hands it over as PNG.
+Nothing is copied into the box ahead of time.
+
+- **Images only.** Text never goes through this bridge: text paste already
+  works through the terminal, and the clipboard is where passwords pass
+  through. Copying from the box to your clipboard (`xclip -i`) is not
+  supported either.
+- **It needs the box token**, like `coding svc`, so only a registered box can
+  ask, and a browser page cannot.
+- **The agent can ask too, not only your Ctrl+V.** Every read is in the audit
+  log (`clipboard.read`, with the box and the size), so a read you did not
+  cause shows up there. To turn the bridge off, set
+  `CODING_GUARD_CLIPBOARD=off` for the guard daemon and restart it.
+- Hosts: macOS (`osascript`), Linux (`wl-paste` on Wayland, else `xclip`),
+  Windows (PowerShell).
+
 ## Red-team test
 
 ```bash
@@ -432,6 +454,7 @@ chain, and `audit` names the first broken line.
 | `scripts/redteam-box.mjs`, `lib/redteam/cells.mjs` | `coding box redteam`: scenarios, evidence, verdicts |
 | `lib/redteam/attacks.mjs` | the `script` row: fixed attack steps and probes, run inside the box |
 | `scripts/coding-guard-daemon.mjs` | the host guard on :3035 |
+| `lib/guard/clipboard.mjs`, `docker/agent-box/clipboard/clipboard-shim.mjs` | image paste: host clipboard reader, box `xclip`/`wl-paste` stand-in |
 | `scripts/coding-guard.mjs` | `coding guard …`, `coding svc …` |
 | `lib/guard/` | keys, grants, factors, WebAuthn ceremonies, audit chain, svc vocabulary, pages |
 | `launchd/com.coding.guard.plist`, `systemd/guard.service` | service units |
