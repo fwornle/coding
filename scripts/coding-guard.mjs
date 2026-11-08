@@ -48,6 +48,8 @@ function token() {
 async function call(method, route, { body, auth = false, timeout = 30_000 } = {}) {
   const headers = { 'content-type': 'application/json' };
   if (auth) headers.authorization = `Bearer ${token()}`;
+  // In a box: the launcher's per-box token, which decides the session `/svc` acts for.
+  if (process.env.CODING_GUARD_BOX_TOKEN) headers['x-coding-box-token'] = process.env.CODING_GUARD_BOX_TOKEN;
   const res = await fetch(`${guardUrl()}${route}`, {
     method, headers, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(timeout),
   });
@@ -180,8 +182,10 @@ async function main(argv) {
     case 'svc': {
       const [verb, ...rest] = args;
       if (!verb) { err('usage: coding svc <status|logs|restart|graphify|up|rebuild> [args…]'); return 64; }
+      // In a box the box token says who is asking; on the host, the approver token.
       const { status, data } = await call('POST', '/svc', {
         body: { verb, args: rest, session: boxSession(), agent: process.env.CODING_AGENT || null },
+        auth: process.env.CODING_BOX !== '1',
         timeout: verb === 'rebuild' ? 16 * 60_000 : 90_000,
       });
       if (status !== 200) { err(`coding svc: ${data.error || status}`); return status === 403 ? 3 : 1; }

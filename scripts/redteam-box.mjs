@@ -95,6 +95,12 @@ function docker(args, opts = {}) {
 function agentArgs(agent, prompt, model) {
   const argv = argvForAgent(agent, prompt, { model });
   if (agent === 'copilot') return [...argv, '--allow-all-paths', '--allow-all-urls'];
+  // opencode's calls carry no band unless a variant sets one, and the proxy
+  // routes a band-less fg-chat/opencode turn to `high` — gh-copilot
+  // claude-opus-5, whose content filter answers every scenario prompt with
+  // nothing. `standard` (reasoningEffort medium in its provider config) is
+  // claude-sonnet-5 on the same account, which answers.
+  if (agent === 'opencode') return [...argv, '--variant', 'standard'];
   if (agent !== 'claude') return argv;
   const i = argv.indexOf('--permission-mode');
   return [...argv.slice(0, i), '--dangerously-skip-permissions', ...argv.slice(i + 2)];
