@@ -130,6 +130,24 @@ jobs:
           (cd "$dir" && npm ci --no-audit --no-fund && npm run build)
           test -f "$dir/dist/token-usage.js" || { echo "proxy build did not emit dist/token-usage.js"; exit 1; }
 
+      # The constraint guard's own suites, incl. the adversarial hook suite that
+      # pins every closed bypass (.planning/guardrail-hardening.md). The
+      # submodule is PUBLIC, so it is checked out on its own here while the
+      # private integrations/* stay off. The tests read the canonical rules from
+      # THIS repo (config/constraints/), so they run against the superproject's
+      # rules at the pinned submodule SHA — the pairing that ships.
+      # A SETUP step, before the gate: node:test drives the real hook from here
+      # too (tests/guard/box-hook, guard-check-diff), so it must exist before
+      # node:test runs — run after it, those suites failed on an empty
+      # submodule directory (tests #487, 25 failures).
+      - name: Install constraint-monitor
+        id: constraints-setup
+        run: |
+          set -euo pipefail
+          git submodule update --init integrations/constraint-monitor
+          cd integrations/constraint-monitor
+          node ../../scripts/ci/npm-ci-skip.mjs --skip sharp -- --no-audit --no-fund
+
       # The LAST setup step, and the gate the test steps hang off. Every setup
       # step above is unconditional, so if any one of them fails the rest are
       # skipped and this one's outcome is 'skipped' — never 'success'. That makes
@@ -173,21 +191,6 @@ jobs:
       - name: node:test
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: npm run test:node
-
-      # The constraint guard's own suites, incl. the adversarial hook suite that
-      # pins every closed bypass (.planning/guardrail-hardening.md). The
-      # submodule is PUBLIC, so it is checked out on its own here while the
-      # private integrations/* stay off. The tests read the canonical rules from
-      # THIS repo (config/constraints/), so they run against the superproject's
-      # rules at the pinned submodule SHA — the pairing that ships.
-      - name: Install constraint-monitor
-        id: constraints-setup
-        if: ${{ !cancelled() }}
-        run: |
-          set -euo pipefail
-          git submodule update --init integrations/constraint-monitor
-          cd integrations/constraint-monitor
-          node ../../scripts/ci/npm-ci-skip.mjs --skip sharp -- --no-audit --no-fund
 
       - name: constraint-monitor (engine + adversarial hook suite)
         if: ${{ !cancelled() && steps.constraints-setup.outcome == 'success' }}
