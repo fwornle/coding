@@ -33,6 +33,9 @@ constraints:
 - id: no-console-log
   group: code_quality
   pattern: console\.log
+  # Also counted in the parsed file (Write / result check / CI gate):
+  # computed, aliased and destructured forms the pattern cannot spell.
+  ast: console-log
   message: Use Logger.log() instead of console.log for better log management
   severity: error
   enabled: true
@@ -62,6 +65,9 @@ constraints:
 - id: proper-error-handling
   group: code_quality
   pattern: catch\s*\([^)]*\)\s*\{\s*\}
+  # Also counted in the parsed file (Write / result check / CI gate):
+  # `catch {}` without a binding, which the pattern needs parentheses for.
+  ast: empty-catch
   message: Empty catch blocks should be avoided
   severity: error
   enabled: true
@@ -92,6 +98,9 @@ constraints:
 - id: no-eval-usage
   group: security
   pattern: \beval\s*\(
+  # Also counted in the parsed file (Write / result check / CI gate):
+  # globalThis/window lookups, copies into another name, the Function constructor.
+  ast: eval
   message: eval() usage detected - security risk
   severity: critical
   enabled: true
