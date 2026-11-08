@@ -167,12 +167,15 @@ describe('per-agent guards (Phase 1 item 5)', () => {
     assert.deepStrictEqual(a.slice(-4), ['pi', '-e', '/opt/coding-guard/agents/pi/guard.js', '-ne']);
   });
 
-  test('copilot hook and opencode managed config call the box hook with the agent fixed inline', () => {
-    const cmd = read('agents/copilot/hooks/hooks.json').hooks.PreToolUse[0].hooks[0].command;
-    assert.match(cmd, /^CODING_GUARD_MODE=box CODING_GUARD_KEYS=\/etc\/coding-guard CODING_GUARD_AGENT=copilot /);
+  test('every hook entry point starts the hook with a fixed environment and an absolute node', () => {
+    // Nothing inherited: a nested agent's NODE_OPTIONS or PATH must not reach the hook.
+    const fixed = (agent) => new RegExp(`^/usr/bin/env -i HOME=/home/agent PATH=/usr/local/bin:/usr/bin:/bin CODING_GUARD_MODE=box CODING_GUARD_KEYS=/etc/coding-guard CODING_GUARD_AGENT=${agent} CONSTRAINT_CONFIG_PATH=\\S+ /usr/local/bin/node /opt/coding-guard/`);
+    assert.match(read('agents/copilot/hooks/hooks.json').hooks.PreToolUse[0].hooks[0].command, fixed('copilot'));
+    assert.match(read('managed-settings.json').hooks.PreToolUse[0].hooks[0].command, fixed('claude'));
     assert.deepStrictEqual(read('agents/opencode/opencode.json').plugin, ['file:///opt/coding-guard/agents/opencode/guard.js']);
     const helper = fs.readFileSync(new URL('../../docker/agent-box/agents/guard-hook.mjs', import.meta.url), 'utf8');
-    assert.match(helper, /\.\.\.process\.env, \.\.\.FIXED_ENV, CODING_GUARD_AGENT: agent/, 'fixed values override inherited env');
+    assert.match(helper, /env: \{ \.\.\.FIXED_ENV, CODING_GUARD_AGENT: agent \}/, 'no inherited env');
+    assert.match(helper, /const NODE = '\/usr\/local\/bin\/node'/);
   });
 
   test('copilot: repo settings dirs are read-only, .github pinned, in every dir down to the cwd', () => {

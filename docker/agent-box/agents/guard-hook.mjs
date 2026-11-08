@@ -2,10 +2,10 @@
  * Runs the constraint hook for an agent's guard plugin (opencode, pi) — the
  * same hook Claude Code runs from /etc/claude-code/managed-settings.json.
  *
- * Box mode, the key dir, the rules and the agent name are fixed HERE, in
- * root-owned code, and override anything inherited: the agent controls the
- * environment of whatever it starts, so nothing that decides "allowed" may
- * come from there.
+ * The hook's whole environment is fixed HERE, in root-owned code, and nothing
+ * is inherited: the agent controls the environment of whatever it starts, and
+ * a nested agent started with NODE_OPTIONS=--require <file> would run that
+ * file inside the hook (lib/redteam/attacks.mjs probes exactly this).
  *
  * Fail-closed: anything but a clean exit 0 blocks the call.
  * Plan: coding/.planning/guardrail-hardening.md (Phase 1, item 5).
@@ -16,6 +16,8 @@ import { spawn } from 'node:child_process';
 const NODE = '/usr/local/bin/node';
 const HOOK = '/opt/coding-guard/integrations/constraint-monitor/src/hooks/pre-tool-hook-wrapper.js';
 const FIXED_ENV = {
+  HOME: '/home/agent',
+  PATH: '/usr/local/bin:/usr/bin:/bin',
   CODING_GUARD_MODE: 'box',
   CODING_GUARD_KEYS: '/etc/coding-guard',
   CONSTRAINT_CONFIG_PATH: '/opt/coding-guard/config/constraints/constraint-monitor.yaml',
@@ -37,7 +39,7 @@ export function checkCall(agent, call) {
     let child;
     try {
       child = spawn(NODE, [HOOK], {
-        env: { ...process.env, ...FIXED_ENV, CODING_GUARD_AGENT: agent },
+        env: { ...FIXED_ENV, CODING_GUARD_AGENT: agent },
         stdio: ['pipe', 'ignore', 'pipe'],
       });
     } catch (err) {
