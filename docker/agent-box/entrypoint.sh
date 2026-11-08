@@ -35,4 +35,17 @@ if ! getent group "$gid" >/dev/null; then echo "agent:x:$gid:" >> /etc/group; fi
 if ! getent passwd "$uid" >/dev/null; then echo "agent:x:$uid:$gid:agent:$home:/bin/bash" >> /etc/passwd; fi
 
 export HOME="$home"
-exec setpriv --reuid="$uid" --regid="$gid" --clear-groups --no-new-privs -- "$@"
+# Cmd+V image paste (clipboard/paste-bridge.py): the agents' Linux builds ignore
+# the empty bracketed paste a Mac terminal sends for an image-only clipboard;
+# the bridge turns it into their Ctrl+V. copilot also gets a private X display,
+# because it reads images over X11 rather than through xclip.
+# CODING_BOX_PASTE=off runs the agent bare.
+bridge=""
+if [ "${CODING_BOX_PASTE:-on}" != off ] && [ $# -gt 0 ]; then
+  case "$(basename "$1")" in
+    claude|pi) bridge="/opt/coding-box/paste-bridge --" ;;
+    copilot) bridge="/opt/coding-box/paste-bridge --x11 --" ;;
+  esac
+fi
+# shellcheck disable=SC2086 # $bridge is deliberately word-split (empty or a fixed argv prefix)
+exec setpriv --reuid="$uid" --regid="$gid" --clear-groups --no-new-privs -- $bridge "$@"
