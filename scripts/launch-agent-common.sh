@@ -776,7 +776,7 @@ launch_agent() {
   else
     # Outside the box the agent runs as you, with write access to its own guard.
     # Where the box is the default, choosing the host is recorded.
-    if [ "$AGENT_NAME" = "claude" ]; then
+    if [ "${CODING_BOX_DEFAULT:-}" = "true" ]; then
       node "$CODING_REPO/scripts/coding-guard.mjs" note box.bypass \
         "agent=$AGENT_NAME" "via=${CODING_BOX_SOURCE:-unknown}" "project=$TARGET_PROJECT_DIR" >/dev/null 2>&1 || true
       _agent_log "⚠️  Running ${AGENT_DISPLAY_NAME} OUTSIDE the agent box (recorded in the guard audit log)"

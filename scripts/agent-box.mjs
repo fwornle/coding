@@ -78,8 +78,23 @@ const EXTRA_ENV = ['TERM', 'COLORTERM', 'LANG', 'LC_ALL', 'TASK_ID', 'NODE_EXTRA
   'HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY', 'https_proxy', 'http_proxy', 'no_proxy',
   'CLAUDE_CODE_DISABLE_MOUSE', 'OPENCODE_DISABLE_MOUSE'];
 
-/** Routing vars that name a host directory the agent must see at the same path. */
-const PATH_ENV = ['PI_CODING_AGENT_DIR', 'PI_CODING_AGENT_SESSION_DIR'];
+/**
+ * Routing vars that name a host directory the agent must see at the same path.
+ * PI_CODING_AGENT_DIR is deliberately NOT one: pi loads extensions from it, so
+ * a writable mount would let the box plant code the HOST pi runs, and its
+ * models.json names loopback URLs the box cannot reach. The box gets a staged
+ * copy instead (stageBoxPiDir), at BOX_PI_DIR.
+ */
+const PATH_ENV = ['PI_CODING_AGENT_SESSION_DIR'];
+/** Where the staged pi config dir appears inside the box. */
+export const BOX_PI_DIR = `${BOX_HOME}/.pi/agent`;
+/**
+ * Copilot's session store, relative to the home. Mounted from the host so
+ * session logging (lib/lsl/adapters/copilot-events.mjs) sees boxed sessions —
+ * the same reason the Claude transcripts are mounted. Session data only:
+ * copilot loads no code from it.
+ */
+export const COPILOT_SESSIONS = path.join('.copilot', 'session-state');
 
 function git(args, cwd = REPO) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
@@ -161,6 +176,7 @@ export function boxRunArgs({
   home = os.homedir(), platform = process.platform, uid, gid, tty = false,
   image = IMAGE, name = `coding-box-${agent}-${process.pid}`, exists = fs.existsSync,
   guardDir = guardHome(env, home), guardPortNum = guardPort(env), boxToken = null,
+  piAgentDir = null,
 }) {
   const command = AGENT_COMMANDS[agent];
   if (!command) throw new Error(`unknown agent '${agent}' (one of: ${Object.keys(AGENT_COMMANDS).join(', ')})`);
@@ -195,6 +211,7 @@ export function boxRunArgs({
   for (const key of [...ROUTING_ENV_VARS, ...EXTRA_ENV]) {
     const value = env[key];
     if (value === undefined || value === '') continue;
+    if (key === 'PI_CODING_AGENT_DIR') continue; // never the host's: see PATH_ENV, set below from the staged copy
     let boxed = value;
     if (/^no_proxy$/i.test(key)) {
       boxed = `${value},host.docker.internal`;
@@ -219,6 +236,15 @@ export function boxRunArgs({
   // Claude transcripts on the host's disk, where session logging reads them.
   const projects = path.join(home, '.claude', 'projects');
   argv.push('-v', `${projects}:${BOX_HOME}/.claude/projects`);
+  if (agent === 'copilot') {
+    argv.push('-v', `${path.join(home, COPILOT_SESSIONS)}:${BOX_HOME}/${COPILOT_SESSIONS.split(path.sep).join('/')}`);
+  }
+  if (agent === 'pi' && piAgentDir) {
+    if (exposesGuardHome(piAgentDir, guardDir)) {
+      throw new Error(`refusing to mount ${piAgentDir}: it contains the guard's keys (${guardDir})`);
+    }
+    argv.push('-v', `${piAgentDir}:${BOX_PI_DIR}`, '-e', `PI_CODING_AGENT_DIR=${BOX_PI_DIR}`);
+  }
   for (const [target, [host, mode]] of mounts) argv.push('-v', `${host}:${target}${mode === 'ro' ? ':ro' : ''}`);
   // The directory, not the file: single-file bind mounts go stale on VirtioFS.
   const publicDir = guardPaths(guardDir).publicDir;
@@ -247,6 +273,37 @@ export function boxAgentConfig(agent, { home = os.homedir(), readFile = (f) => f
     files.push({ path: rel, content: toBoxUrl(text) });
   }
   return files;
+}
+
+/** The top-level files of pi's config dir a box session gets (never auth.json / models-store.json). */
+export const PI_STAGED = ['models.json', 'settings.json', 'APPEND_SYSTEM.md'];
+
+/**
+ * pi's config dir for one box session: a COPY of the launch's dir (the
+ * provider config agent_pre_launch just wrote, and the extensions pi.sh
+ * installed) in `stageDir`, with loopback URLs pointed at the host. The box
+ * may write to the copy; the host never loads it. Credentials (auth.json,
+ * models-store.json) and old sessions stay behind. Returns the files copied.
+ */
+export function stageBoxPiDir(srcDir, stageDir, fsImpl = fs) {
+  const copied = [];
+  fsImpl.mkdirSync(stageDir, { recursive: true });
+  for (const name of PI_STAGED) {
+    let text;
+    try { text = fsImpl.readFileSync(path.join(srcDir, name), 'utf8'); } catch { continue; }
+    fsImpl.writeFileSync(path.join(stageDir, name), name.endsWith('.json') ? toBoxUrl(text) : text);
+    copied.push(name);
+  }
+  const extSrc = path.join(srcDir, 'extensions');
+  let entries = [];
+  try { entries = fsImpl.readdirSync(extSrc, { withFileTypes: true }); } catch { /* no extensions */ }
+  for (const e of entries) {
+    if (!e.isFile()) continue; // pi loads extensions/*.ts; a subdirectory is not copied
+    fsImpl.mkdirSync(path.join(stageDir, 'extensions'), { recursive: true });
+    fsImpl.copyFileSync(path.join(extSrc, e.name), path.join(stageDir, 'extensions', e.name));
+    copied.push(path.join('extensions', e.name));
+  }
+  return copied;
 }
 
 /** The workspace and every directory below it down to `cwd`. */
@@ -357,17 +414,33 @@ async function run(agent, args) {
       return 1;
     }
   }
+  if (agent === 'copilot') {
+    // Created here, as the user: docker would create a missing source as root.
+    fs.mkdirSync(path.join(os.homedir(), COPILOT_SESSIONS), { recursive: true });
+  }
+  let piAgentDir = null;
+  if (agent === 'pi') {
+    piAgentDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coding-box-pi-'));
+    const src = process.env.PI_CODING_AGENT_DIR || path.join(os.homedir(), '.pi', 'agent');
+    if (!stageBoxPiDir(src, piAgentDir).includes('models.json')) {
+      process.stderr.write(`agent-box: no pi provider config in ${src} — pi in the box will have no model\n`);
+    }
+  }
   const name = `coding-box-${agent}-${process.pid}`;
   const boxToken = await registerBox(name);
   if (!boxToken) process.stderr.write('agent-box: the host guard did not register this box — `coding svc` will be refused inside it\n');
-  const argv = boxRunArgs({
-    agent, args, name, boxToken,
-    uid: process.getuid?.(), gid: process.getgid?.(),
-    tty: Boolean(process.stdin.isTTY),
-  });
-  const res = spawnSync('docker', argv, { stdio: 'inherit' });
-  if (boxToken) await registerBox(name, { release: true });
-  return res.status ?? 1;
+  try {
+    const argv = boxRunArgs({
+      agent, args, name, boxToken, piAgentDir,
+      uid: process.getuid?.(), gid: process.getgid?.(),
+      tty: Boolean(process.stdin.isTTY),
+    });
+    const res = spawnSync('docker', argv, { stdio: 'inherit' });
+    return res.status ?? 1;
+  } finally {
+    if (boxToken) await registerBox(name, { release: true });
+    if (piAgentDir) fs.rmSync(piAgentDir, { recursive: true, force: true });
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

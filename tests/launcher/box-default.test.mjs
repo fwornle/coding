@@ -1,7 +1,8 @@
 /**
- * bin/coding: Claude runs in the agent box by default; `--no-box` (or
- * CODING_BOX=false) is the escape hatch, and launch-agent-common.sh records it.
- * The other agents stay opt-in until their guard is wired into the box.
+ * bin/coding: claude, copilot and pi run in the agent box by default; `--no-box`
+ * (or CODING_BOX=false) is the escape hatch, and launch-agent-common.sh records
+ * it. opencode stays opt-in (its SQLite session store cannot be shared with the
+ * box, so a boxed session would be invisible to session logging).
  *
  * The decision block is sliced out of bin/coding and evaluated in bash, so the
  * test runs the launcher's own lines rather than a restatement of them.
@@ -26,26 +27,35 @@ function decisionBlock() {
   return SOURCE.slice(start, end + 'export CODING_BOX_SOURCE'.length);
 }
 
-function decide({ agent, env = {}, source = '', constraints = true }) {
+function decide({ agent, env = {}, source = '', constraints = true, showDefault = false }) {
   // SCRIPT_DIR points at a stub coding-features that answers for `constraints`.
   const stubDir = mkdtempSync(join(tmpdir(), 'box-default-'));
   writeFileSync(join(stubDir, 'coding-features'), `process.exit(${constraints ? 0 : 1});\n`);
-  const script = `SCRIPT_DIR=${stubDir}; AGENT=${agent}; CODING_BOX_SOURCE=${source}\n${decisionBlock()}\necho "$CODING_BOX $CODING_BOX_SOURCE"`;
+  const script = `SCRIPT_DIR=${stubDir}; AGENT=${agent}; CODING_BOX_SOURCE=${source}\n${decisionBlock()}\necho "$CODING_BOX $CODING_BOX_SOURCE${showDefault ? ' $CODING_BOX_DEFAULT' : ''}"`;
   const clean = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('CODING_BOX')));
   return execFileSync('bash', ['-c', script], { env: { ...clean, ...env }, encoding: 'utf8' }).trim();
 }
 
 describe('box mode default', () => {
-  test('claude → box, by default', () => {
-    assert.equal(decide({ agent: 'claude' }), 'true default');
+  test('claude, copilot and pi → box, by default', () => {
+    for (const agent of ['claude', 'copilot', 'pi']) assert.equal(decide({ agent }), 'true default', agent);
   });
 
-  test('with the constraints feature off (harness tier, no Docker) claude stays on the host', () => {
-    assert.equal(decide({ agent: 'claude', constraints: false }), 'false default');
+  test('with the constraints feature off (harness tier, no Docker) every agent stays on the host', () => {
+    for (const agent of ['claude', 'copilot', 'pi']) {
+      assert.equal(decide({ agent, constraints: false }), 'false default', agent);
+    }
   });
 
-  test('other agents stay opt-in', () => {
-    for (const agent of ['copilot', 'opencode', 'pi']) assert.equal(decide({ agent }), 'false default', agent);
+  test('opencode stays opt-in (its session store cannot be shared with the box)', () => {
+    assert.equal(decide({ agent: 'opencode' }), 'false default');
+    assert.equal(decide({ agent: 'opencode', env: { CODING_BOX: 'true' }, source: 'flag' }), 'true flag');
+  });
+
+  test('CODING_BOX_DEFAULT says what the default was, even when a flag overrides it', () => {
+    assert.equal(decide({ agent: 'copilot', env: { CODING_BOX: 'false' }, source: 'flag', showDefault: true }), 'false flag true');
+    assert.equal(decide({ agent: 'opencode', showDefault: true }), 'false default false');
+    assert.equal(decide({ agent: 'pi', constraints: false, showDefault: true }), 'false default false');
   });
 
   test('a flag wins over the default (--no-box / --box set CODING_BOX + source=flag)', () => {
@@ -61,8 +71,8 @@ describe('box mode default', () => {
     assert.match(SOURCE, /--no-box\)\n[\s\S]*?export CODING_BOX=false/);
   });
 
-  test('leaving the box for claude is recorded in the guard audit log', () => {
+  test('leaving the box where it is the default is recorded in the guard audit log', () => {
     const outside = LAUNCH.slice(LAUNCH.indexOf('Outside the box the agent runs as you'));
-    assert.match(outside, /coding-guard\.mjs" note box\.bypass/);
+    assert.match(outside, /CODING_BOX_DEFAULT:-\}" = "true"[\s\S]*?coding-guard\.mjs" note box\.bypass/);
   });
 });

@@ -28,9 +28,9 @@ in between:
 
 | Command | Where the agent runs |
 |---------|---------------------|
-| `coding` / `coding --claude` | in the box: the default when the `constraints` feature is on |
-| `coding --no-box` | on the host; this is **recorded in the guard audit log** |
-| `coding --copilot --box` (also `--opencode`, `--pi`) | in the box, opt-in (see below) |
+| `coding` / `coding --claude`, `coding --copilot`, `coding --pi` | in the box: the default when the `constraints` feature is on |
+| `coding --no-box` (with any of those) | on the host; this is **recorded in the guard audit log** |
+| `coding --opencode --box` | in the box, opt-in (see below) |
 | `CODING_BOX=false coding` | on the host (same as `--no-box`, also recorded) |
 
 Only the final command changes: tmux, the status line and all host services
@@ -424,12 +424,21 @@ chain, and `audit` names the first broken line.
 ## What is not in the box yet
 
 - No MCP servers, and no knowledge-injection or session-logging hooks inside the
-  box. Claude's session logs still work, because its transcripts are written to
-  your normal folder.
-- Copilot, opencode and pi run in the box only with `--box`. opencode and pi
-  also need their provider configuration in the box (`~/.config/opencode`,
-  `~/.pi/agent` live on the host and are not mounted), and Copilot needs a
-  login in the box unless it is routed through the proxy.
+  box. Session logs still work for claude, Copilot and pi, because their
+  session files land on your disk: Claude's transcript folder and Copilot's
+  `~/.copilot/session-state` are mounted, and pi already writes its sessions
+  into the project (`.observations/pi-sessions`).
+- pi gets a **copy** of its config directory for each box session (provider
+  config with `localhost` pointed at the host, plus the extensions the launcher
+  installed; no credentials, no old sessions). The host directory is never
+  mounted, because pi loads extensions from it: a writable mount would let the
+  box plant code that the host pi then runs.
+- opencode runs in the box only with `--box`. Its session store is a SQLite
+  database in WAL mode, which a Linux box must not share with the macOS host
+  over the VM file share, so a boxed opencode session is not in the session
+  logs.
+- Copilot needs a login in the box unless it is routed through the proxy
+  (the launcher does that whenever the proxy is healthy).
 - Plugins or extensions the agent writes itself (an opencode project plugin,
   a pi extension in its agent directory, a Copilot extension) run inside the
   agent's own process and could change a call after it was checked. For the
