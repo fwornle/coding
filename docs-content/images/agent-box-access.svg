@@ -1,0 +1,186 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 1300" width="1320" height="1300" font-family="Inter, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
+<title id="t">What an agent can reach: on the host versus in the agent box</title>
+<desc id="d">Every path an agent can read or write. The host agent (grey) reaches all of them. The agent in the box: Your project (the workspace): read-write, same path; The coding repo, when you work elsewhere: read-only; Session transcripts: read-write → session logs; Agent settings and logins: its own, not yours; The rest of your home folder: not visible; The guard: hooks, rules, hook settings: root-owned, read-only; Guard keys and audit log: public key only; Docker socket: no socket; coding containers: via coding svc; Host processes and daemons: not visible; MCP servers, knowledge injection: not loaded; LLM proxy  :12435: every model call; Guard daemon  :3035: can ask, never approve; Other host services: reachable: not locked yet; Internet: open: not limited yet; Your terminal: keys, screen, paste; Overriding a rule: only grants you sign; Pushing to GitHub: no keys: commits stay local.</desc>
+<rect x="0" y="0" width="1320" height="1300" rx="18" fill="#ffffff"/>
+<text x="330" y="180" font-size="12" font-weight="700" fill="#5f6b7a">F I L E S   A N D   F O L D E R S</text>
+<text x="330" y="574" font-size="12" font-weight="700" fill="#5f6b7a">C O N T A I N E R S   A N D   P R O C E S S E S</text>
+<text x="330" y="812" font-size="12" font-weight="700" fill="#5f6b7a">N E T W O R K</text>
+<text x="330" y="1050" font-size="12" font-weight="700" fill="#5f6b7a">Y O U   A N D   Y O U R   A C C O U N T S</text>
+<text x="30" y="44" font-size="26" font-weight="700" fill="#1b2430">What an agent can reach</text>
+<text x="30" y="72" font-size="15" fill="#5f6b7a">Grey: an agent on the host reaches everything you can. Colour: what the same agent reaches from inside the agent box.</text>
+<line x1="30" y1="104" x2="64" y2="104" stroke="#b9bec5" stroke-width="3"/><text x="72" y="109" font-size="13" fill="#8a929c">host agent: everything</text>
+<line x1="240" y1="104" x2="274" y2="104" stroke="#2e7d32" stroke-width="3" />
+<text x="282" y="109" font-size="13" fill="#3a4450">read-write</text>
+<line x1="384" y1="104" x2="418" y2="104" stroke="#1565c0" stroke-width="3" />
+<text x="426" y="109" font-size="13" fill="#3a4450">read-only</text>
+<line x1="520.4" y1="104" x2="554.4" y2="104" stroke="#00838f" stroke-width="3" />
+<text x="562.4" y="109" font-size="13" fill="#3a4450">box's own copy</text>
+<line x1="694.8" y1="104" x2="728.8" y2="104" stroke="#6a1b9a" stroke-width="3" stroke-dasharray="7 5"/>
+<text x="736.8" y="109" font-size="13" fill="#3a4450">through the guard: you approve</text>
+<line x1="990.8" y1="104" x2="1024.8" y2="104" stroke="#e65100" stroke-width="3" stroke-dasharray="3 4"/>
+<text x="1032.8" y="109" font-size="13" fill="#3a4450">reachable: not locked yet</text>
+<line x1="30" y1="130" x2="48" y2="130" stroke="#c62828" stroke-width="3"/><g stroke="#c62828" stroke-width="3.2" stroke-linecap="round"><line x1="50" y1="123" x2="64" y2="137"/><line x1="50" y1="137" x2="64" y2="123"/></g>
+<text x="72" y="135" font-size="13" fill="#3a4450">blocked / not visible</text>
+<path d="M 240 685 C 290 685, 280 213, 330 213" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
+<path d="M 240 685 C 290 685, 280 265, 330 265" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
+<path d="M 240 685 C 290 685, 280 317, 330 317" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
+<path d="M 240 685 C 290 685, 280 369, 330 369" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
+<path d="M 240 685 C 290 685, 280 421, 330 421" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
+<path d="M 240 685 C 290 685, 280 473, 330 473" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
+<path d="M 240 685 C 290 685, 280 525, 330 525" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
+<path d="M 240 685 C 290 685, 280 607, 330 607" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
+<path d="M 240 685 C 290 685, 280 659, 330 659" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
+<path d="M 240 685 C 290 685, 280 711, 330 711" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
+<path d="M 240 685 C 290 685, 280 763, 330 763" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
+<path d="M 240 685 C 290 685, 280 845, 330 845" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
+<path d="M 240 685 C 290 685, 280 897, 330 897" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
+<path d="M 240 685 C 290 685, 280 949, 330 949" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
+<path d="M 240 685 C 290 685, 280 1001, 330 1001" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
+<path d="M 240 685 C 290 685, 280 1083, 330 1083" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
+<path d="M 240 685 C 290 685, 280 1135, 330 1135" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
+<path d="M 240 685 C 290 685, 280 1187, 330 1187" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
+<rect x="30" y="630" width="210" height="110" rx="14" fill="#f2f3f5" stroke="#c9cdd2" stroke-width="2"/>
+<text x="135" y="671" text-anchor="middle" font-size="17" font-weight="700" fill="#8a929c">Agent on the host</text>
+<text x="135" y="695" text-anchor="middle" font-size="12.5" fill="#9aa1aa">runs as you</text>
+<text x="135" y="713" text-anchor="middle" font-size="12.5" fill="#9aa1aa">--no-box, or opencode</text>
+<rect x="1010" y="154" width="286" height="1062" rx="16" fill="#eef4fc" stroke="#1565c0" stroke-width="3"/>
+<text x="1153" y="182" text-anchor="middle" font-size="15" font-weight="700" fill="#1565c0">agent box</text>
+<text x="1153" y="202" text-anchor="middle" font-size="12" fill="#3a4f6b">Linux container · your uid, not root</text>
+<text x="1153" y="218" text-anchor="middle" font-size="12" fill="#3a4f6b">no_new_privs · no Docker socket</text>
+<rect x="330" y="190" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
+<rect x="924" y="190" width="6" height="46" rx="3" fill="#2e7d32"/>
+<text x="344" y="210" font-size="14.5" font-weight="700" fill="#1b2430">Your project (the workspace)</text>
+<text x="914" y="210" text-anchor="end" font-size="13.5" font-weight="700" fill="#2e7d32">read-write, same path</text>
+<text x="344" y="228" font-size="12" fill="#7a838d">what you launched in; the agent works here in both cases</text>
+<line x1="930" y1="213" x2="1010" y2="213" stroke="#2e7d32" stroke-width="2.6" />
+<path d="M 1010 213 C 1050 213, 1040 685, 1080 685" fill="none" stroke="#2e7d32" stroke-width="2"  opacity="0.85"/>
+<rect x="330" y="242" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
+<rect x="924" y="242" width="6" height="46" rx="3" fill="#1565c0"/>
+<text x="344" y="262" font-size="14.5" font-weight="700" fill="#1b2430">The coding repo, when you work elsewhere</text>
+<text x="914" y="262" text-anchor="end" font-size="13.5" font-weight="700" fill="#1565c0">read-only</text>
+<text x="344" y="280" font-size="12" fill="#7a838d">tools, plugins and extensions the agent runs</text>
+<line x1="930" y1="265" x2="1010" y2="265" stroke="#1565c0" stroke-width="2.6" />
+<path d="M 1010 265 C 1050 265, 1040 685, 1080 685" fill="none" stroke="#1565c0" stroke-width="2"  opacity="0.85"/>
+<rect x="330" y="294" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
+<rect x="924" y="294" width="6" height="46" rx="3" fill="#2e7d32"/>
+<text x="344" y="314" font-size="14.5" font-weight="700" fill="#1b2430">Session transcripts</text>
+<text x="914" y="314" text-anchor="end" font-size="13.5" font-weight="700" fill="#2e7d32">read-write → session logs</text>
+<text x="344" y="332" font-size="12" fill="#7a838d">~/.claude/projects, ~/.copilot/session-state; pi writes into the project</text>
+<line x1="930" y1="317" x2="1010" y2="317" stroke="#2e7d32" stroke-width="2.6" />
+<path d="M 1010 317 C 1050 317, 1040 685, 1080 685" fill="none" stroke="#2e7d32" stroke-width="2"  opacity="0.85"/>
+<rect x="330" y="346" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
+<rect x="924" y="346" width="6" height="46" rx="3" fill="#00838f"/>
+<text x="344" y="366" font-size="14.5" font-weight="700" fill="#1b2430">Agent settings and logins</text>
+<text x="914" y="366" text-anchor="end" font-size="13.5" font-weight="700" fill="#00838f">its own, not yours</text>
+<text x="344" y="384" font-size="12" fill="#7a838d">host: ~/.claude, ~/.copilot, Keychain · box: own login in a volume; pi gets a copy</text>
+<line x1="930" y1="369" x2="1010" y2="369" stroke="#00838f" stroke-width="2.6" />
+<path d="M 1010 369 C 1050 369, 1040 685, 1080 685" fill="none" stroke="#00838f" stroke-width="2"  opacity="0.85"/>
+<rect x="330" y="398" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
+<rect x="924" y="398" width="6" height="46" rx="3" fill="#c62828"/>
+<text x="344" y="418" font-size="14.5" font-weight="700" fill="#1b2430">The rest of your home folder</text>
+<text x="914" y="418" text-anchor="end" font-size="13.5" font-weight="700" fill="#c62828">not visible</text>
+<text x="344" y="436" font-size="12" fill="#7a838d">other repos, ~/.ssh, cloud credentials, ~/.coding data, shell config</text>
+<line x1="930" y1="421" x2="960" y2="421" stroke="#c62828" stroke-width="2.6"/>
+<g stroke="#c62828" stroke-width="3.2" stroke-linecap="round"><line x1="965" y1="414" x2="979" y2="428"/><line x1="965" y1="428" x2="979" y2="414"/></g>
+<rect x="330" y="450" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
+<rect x="924" y="450" width="6" height="46" rx="3" fill="#1565c0"/>
+<text x="344" y="470" font-size="14.5" font-weight="700" fill="#1b2430">The guard: hooks, rules, hook settings</text>
+<text x="914" y="470" text-anchor="end" font-size="13.5" font-weight="700" fill="#1565c0">root-owned, read-only</text>
+<text x="344" y="488" font-size="12" fill="#7a838d">on the host the agent can edit them, or switch its hooks off</text>
+<line x1="930" y1="473" x2="1010" y2="473" stroke="#1565c0" stroke-width="2.6" />
+<path d="M 1010 473 C 1050 473, 1040 685, 1080 685" fill="none" stroke="#1565c0" stroke-width="2"  opacity="0.85"/>
+<rect x="330" y="502" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
+<rect x="924" y="502" width="6" height="46" rx="3" fill="#c62828"/>
+<text x="344" y="522" font-size="14.5" font-weight="700" fill="#1b2430">Guard keys and audit log</text>
+<text x="914" y="522" text-anchor="end" font-size="13.5" font-weight="700" fill="#c62828">public key only</text>
+<text x="344" y="540" font-size="12" fill="#7a838d">~/.coding/guard: signing key, approver token, hash-chained audit</text>
+<line x1="930" y1="525" x2="960" y2="525" stroke="#c62828" stroke-width="2.6"/>
+<g stroke="#c62828" stroke-width="3.2" stroke-linecap="round"><line x1="965" y1="518" x2="979" y2="532"/><line x1="965" y1="532" x2="979" y2="518"/></g>
+<rect x="330" y="584" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
+<rect x="924" y="584" width="6" height="46" rx="3" fill="#c62828"/>
+<text x="344" y="604" font-size="14.5" font-weight="700" fill="#1b2430">Docker socket</text>
+<text x="914" y="604" text-anchor="end" font-size="13.5" font-weight="700" fill="#c62828">no socket</text>
+<text x="344" y="622" font-size="12" fill="#7a838d">host: start, stop, rebuild any container, mount any folder</text>
+<line x1="930" y1="607" x2="960" y2="607" stroke="#c62828" stroke-width="2.6"/>
+<g stroke="#c62828" stroke-width="3.2" stroke-linecap="round"><line x1="965" y1="600" x2="979" y2="614"/><line x1="965" y1="614" x2="979" y2="600"/></g>
+<rect x="330" y="636" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
+<rect x="924" y="636" width="6" height="46" rx="3" fill="#6a1b9a"/>
+<text x="344" y="656" font-size="14.5" font-weight="700" fill="#1b2430">coding containers</text>
+<text x="914" y="656" text-anchor="end" font-size="13.5" font-weight="700" fill="#6a1b9a">via coding svc</text>
+<text x="344" y="674" font-size="12" fill="#7a838d">box: status, logs, restart, graphify; up / rebuild need your approval</text>
+<line x1="930" y1="659" x2="1010" y2="659" stroke="#6a1b9a" stroke-width="2.6" stroke-dasharray="7 5"/>
+<g><rect x="961" y="650" width="18" height="18" transform="rotate(45 970 659)" fill="#ffffff" stroke="#6a1b9a" stroke-width="2.4"/><circle cx="970" cy="659" r="3" fill="#6a1b9a"/></g>
+<path d="M 1010 659 C 1050 659, 1040 685, 1080 685" fill="none" stroke="#6a1b9a" stroke-width="2" stroke-dasharray="7 5" opacity="0.85"/>
+<rect x="330" y="688" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
+<rect x="924" y="688" width="6" height="46" rx="3" fill="#c62828"/>
+<text x="344" y="708" font-size="14.5" font-weight="700" fill="#1b2430">Host processes and daemons</text>
+<text x="914" y="708" text-anchor="end" font-size="13.5" font-weight="700" fill="#c62828">not visible</text>
+<text x="344" y="726" font-size="12" fill="#7a838d">host: kill, launchctl / systemctl, restart services</text>
+<line x1="930" y1="711" x2="960" y2="711" stroke="#c62828" stroke-width="2.6"/>
+<g stroke="#c62828" stroke-width="3.2" stroke-linecap="round"><line x1="965" y1="704" x2="979" y2="718"/><line x1="965" y1="718" x2="979" y2="704"/></g>
+<rect x="330" y="740" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
+<rect x="924" y="740" width="6" height="46" rx="3" fill="#c62828"/>
+<text x="344" y="760" font-size="14.5" font-weight="700" fill="#1b2430">MCP servers, knowledge injection</text>
+<text x="914" y="760" text-anchor="end" font-size="13.5" font-weight="700" fill="#c62828">not loaded</text>
+<text x="344" y="778" font-size="12" fill="#7a838d">loaded for the host agent only</text>
+<line x1="930" y1="763" x2="960" y2="763" stroke="#c62828" stroke-width="2.6"/>
+<g stroke="#c62828" stroke-width="3.2" stroke-linecap="round"><line x1="965" y1="756" x2="979" y2="770"/><line x1="965" y1="770" x2="979" y2="756"/></g>
+<rect x="330" y="822" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
+<rect x="924" y="822" width="6" height="46" rx="3" fill="#2e7d32"/>
+<text x="344" y="842" font-size="14.5" font-weight="700" fill="#1b2430">LLM proxy  :12435</text>
+<text x="914" y="842" text-anchor="end" font-size="13.5" font-weight="700" fill="#2e7d32">every model call</text>
+<text x="344" y="860" font-size="12" fill="#7a838d">routed, metered and logged in both cases</text>
+<line x1="930" y1="845" x2="1010" y2="845" stroke="#2e7d32" stroke-width="2.6" />
+<path d="M 1010 845 C 1050 845, 1040 685, 1080 685" fill="none" stroke="#2e7d32" stroke-width="2"  opacity="0.85"/>
+<rect x="330" y="874" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
+<rect x="924" y="874" width="6" height="46" rx="3" fill="#6a1b9a"/>
+<text x="344" y="894" font-size="14.5" font-weight="700" fill="#1b2430">Guard daemon  :3035</text>
+<text x="914" y="894" text-anchor="end" font-size="13.5" font-weight="700" fill="#6a1b9a">can ask, never approve</text>
+<text x="344" y="912" font-size="12" fill="#7a838d">override requests and coding svc; approving needs your factor</text>
+<line x1="930" y1="897" x2="1010" y2="897" stroke="#6a1b9a" stroke-width="2.6" stroke-dasharray="7 5"/>
+<g><rect x="961" y="888" width="18" height="18" transform="rotate(45 970 897)" fill="#ffffff" stroke="#6a1b9a" stroke-width="2.4"/><circle cx="970" cy="897" r="3" fill="#6a1b9a"/></g>
+<path d="M 1010 897 C 1050 897, 1040 685, 1080 685" fill="none" stroke="#6a1b9a" stroke-width="2" stroke-dasharray="7 5" opacity="0.85"/>
+<rect x="330" y="926" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
+<rect x="924" y="926" width="6" height="46" rx="3" fill="#e65100"/>
+<text x="344" y="946" font-size="14.5" font-weight="700" fill="#1b2430">Other host services</text>
+<text x="914" y="946" text-anchor="end" font-size="13.5" font-weight="700" fill="#e65100">reachable: not locked yet</text>
+<text x="344" y="964" font-size="12" fill="#7a838d">obs-api :12436, coordinator :3034, dashboard :3032, Qdrant :6333 …</text>
+<line x1="930" y1="949" x2="1010" y2="949" stroke="#e65100" stroke-width="2.6" stroke-dasharray="3 4"/>
+<path d="M 1010 949 C 1050 949, 1040 685, 1080 685" fill="none" stroke="#e65100" stroke-width="2" stroke-dasharray="3 4" opacity="0.85"/>
+<rect x="330" y="978" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
+<rect x="924" y="978" width="6" height="46" rx="3" fill="#e65100"/>
+<text x="344" y="998" font-size="14.5" font-weight="700" fill="#1b2430">Internet</text>
+<text x="914" y="998" text-anchor="end" font-size="13.5" font-weight="700" fill="#e65100">open: not limited yet</text>
+<text x="344" y="1016" font-size="12" fill="#7a838d">through the host's web proxy :3128</text>
+<line x1="930" y1="1001" x2="1010" y2="1001" stroke="#e65100" stroke-width="2.6" stroke-dasharray="3 4"/>
+<path d="M 1010 1001 C 1050 1001, 1040 685, 1080 685" fill="none" stroke="#e65100" stroke-width="2" stroke-dasharray="3 4" opacity="0.85"/>
+<rect x="330" y="1060" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
+<rect x="924" y="1060" width="6" height="46" rx="3" fill="#2e7d32"/>
+<text x="344" y="1080" font-size="14.5" font-weight="700" fill="#1b2430">Your terminal</text>
+<text x="914" y="1080" text-anchor="end" font-size="13.5" font-weight="700" fill="#2e7d32">keys, screen, paste</text>
+<text x="344" y="1098" font-size="12" fill="#7a838d">tmux pane; Cmd+V image paste goes through a bridge</text>
+<line x1="930" y1="1083" x2="1010" y2="1083" stroke="#2e7d32" stroke-width="2.6" />
+<path d="M 1010 1083 C 1050 1083, 1040 685, 1080 685" fill="none" stroke="#2e7d32" stroke-width="2"  opacity="0.85"/>
+<rect x="330" y="1112" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
+<rect x="924" y="1112" width="6" height="46" rx="3" fill="#6a1b9a"/>
+<text x="344" y="1132" font-size="14.5" font-weight="700" fill="#1b2430">Overriding a rule</text>
+<text x="914" y="1132" text-anchor="end" font-size="13.5" font-weight="700" fill="#6a1b9a">only grants you sign</text>
+<text x="344" y="1150" font-size="12" fill="#7a838d">host: one line in the transcript, which the agent can type itself</text>
+<line x1="930" y1="1135" x2="1010" y2="1135" stroke="#6a1b9a" stroke-width="2.6" stroke-dasharray="7 5"/>
+<g><rect x="961" y="1126" width="18" height="18" transform="rotate(45 970 1135)" fill="#ffffff" stroke="#6a1b9a" stroke-width="2.4"/><circle cx="970" cy="1135" r="3" fill="#6a1b9a"/></g>
+<path d="M 1010 1135 C 1050 1135, 1040 685, 1080 685" fill="none" stroke="#6a1b9a" stroke-width="2" stroke-dasharray="7 5" opacity="0.85"/>
+<rect x="330" y="1164" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
+<rect x="924" y="1164" width="6" height="46" rx="3" fill="#c62828"/>
+<text x="344" y="1184" font-size="14.5" font-weight="700" fill="#1b2430">Pushing to GitHub</text>
+<text x="914" y="1184" text-anchor="end" font-size="13.5" font-weight="700" fill="#c62828">no keys: commits stay local</text>
+<text x="344" y="1202" font-size="12" fill="#7a838d">host: your SSH keys and gh login</text>
+<line x1="930" y1="1187" x2="960" y2="1187" stroke="#c62828" stroke-width="2.6"/>
+<g stroke="#c62828" stroke-width="3.2" stroke-linecap="round"><line x1="965" y1="1180" x2="979" y2="1194"/><line x1="965" y1="1194" x2="979" y2="1180"/></g>
+<rect x="1080" y="621" width="196" height="128" rx="14" fill="#1565c0"/>
+<text x="1178" y="663" text-anchor="middle" font-size="17" font-weight="700" fill="#ffffff">Agent in the box</text>
+<text x="1178" y="689" text-anchor="middle" font-size="12.5" fill="#dbe8fb">claude · copilot · pi</text>
+<text x="1178" y="707" text-anchor="middle" font-size="12.5" fill="#dbe8fb">by default</text>
+<text x="1178" y="725" text-anchor="middle" font-size="12.5" fill="#dbe8fb">opencode with --box</text>
+<text x="30" y="1244" font-size="13" fill="#5f6b7a">Planned (Phase 3): box network limited to the LLM proxy and the guard; result-check state out of the agent’s reach.</text>
+<text x="30" y="1264" font-size="13" fill="#5f6b7a">Default: claude, copilot and pi run in the box; opencode with --box. --no-box runs on the host and is recorded in the guard audit log.</text>
+</svg>
