@@ -294,6 +294,7 @@ request path (proxy repo); team scope fails closed with a route test.
 | Phase 2 (check results) | done — red-team 2026-11-08 no regression, shell-workaround held; CI gate unverified until the first push | see "Phase 2 results" |
 | Phase 2: AST rules | done — in the box (guard 04b64ed3), red-team 2026-11-08 no regression | parsed-file checks behind 3 regex rules; see "Phase 2 AST rules results" |
 | Box default (copilot, pi) | pi verified live on the host; copilot fix needs `coding box build` | see "Box default" |
+| Result-check lock | fixed (cm 1a84f40), needs box build; state dir agent-writable → Phase 3 | see "Result-check lock" |
 | Box image paste (Cmd+V) | done — Terminal.app sends nothing for an image (Ctrl+V there) | see "Box clipboard" |
 | Phase 3 | todo | |
 
@@ -944,6 +945,32 @@ after cleaning up. Test: `tests/launcher/terminal-reset` (runs the scripts'
 own lines in bash). Where the signal came from was not established (could
 not reproduce Terminal.app + tmux from inside the box).
 
+## Result-check lock (2026-11-09)
+
+Incident: for ~a minute every tool call in a claude box failed closed with
+"result check: state lock busy". A `git stash` running concurrently over
+VirtioFS stalled the hooks' full-tree snapshot (normally ~1.5 s) past the
+harness's 30 s hook timeout; the killed hook never ran its `finally`, so its
+lock (and temp index — four orphans found, 07:07–07:11) outlived it. Waiters
+gave up after 20 s; the lock only aged out at 60 s. Calls whose post-hook
+failed (incl. Agent, TaskStop) stayed "in flight" for 30 min, keeping an old
+base alive.
+
+Fixed in constraint-monitor `1a84f40`: lock holds "<pid> <host>", dead holder
+→ immediate, race-free takeover (rename aside + link back); orphan indexes
+swept; one shared READ_ONLY_TOOLS (now incl. Agent/Task*/Web*/Skill/
+AskUserQuestion/ListAgents/SendMessage) — no snapshots, no in-flight entry.
+Needs `coding box build`.
+
+**OPEN — Phase 3 (security):** the result-check state dir is AGENT-WRITABLE.
+`/opt/coding-guard/integrations/constraint-monitor/logs` is mode 1777 and the
+hooks run as the agent's uid, so `logs/results/<ws>/state.json` is owned by
+the agent. It can (a) set `base` to a tree that already contains its
+violating content, so the next settle sees no added violation — a bypass of
+the result check; (b) plant a lock (self-DoS only). Needs state the agent
+uid cannot write: e.g. keep base/inflight in the host guard daemon (the box
+already talks to it), or a root-owned helper. Add a red-team cell for it.
+
 ## Box clipboard (2026-11-08)
 
 Image paste from the host into boxed agents. `clipboard-shim.mjs` answers
@@ -1005,3 +1032,6 @@ there. `CODING_BOX_PASTE=off` runs an agent bare. Tests:
   test; terminal left raw by the failed launch → tty reset right after attach,
   cleanup once, INT/TERM exit. llm-proxy 502s of 11-08 evening–11-09 morning:
   the laptop had lost internet (fixed by reboot), not an agent action.
+- **2026-11-09 (midday)** — copilot verified live in the box. Result-check
+  lock: dead-holder takeover, orphan sweep, wider read-only list (cm
+  1a84f40). Found: result-check state is agent-writable (Phase 3).
