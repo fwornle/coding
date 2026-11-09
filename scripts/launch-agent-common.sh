@@ -106,6 +106,12 @@ _register_session() {
 
 # Cleanup handler for session termination
 _cleanup_session() {
+  # Once: the INT/TERM handlers below exit, which fires EXIT again.
+  [ -n "${_CODING_CLEANUP_DONE:-}" ] && return 0
+  _CODING_CLEANUP_DONE=1
+  # A signal can arrive while the terminal is still in tmux's raw mode; reset
+  # first, or everything printed below stair-steps (LF without CR).
+  if type _tmux_wrapper_reset_tty &>/dev/null; then _tmux_wrapper_reset_tty; else stty sane </dev/tty 2>/dev/null || true; fi
   _agent_log "Session ending - cleaning up services..."
 
   # Call agent-specific cleanup if defined
@@ -687,7 +693,12 @@ launch_agent() {
   _register_session
 
   # 9. Cleanup trap
-  trap _cleanup_session EXIT INT TERM
+  # INT/TERM clean up AND exit: a handler that returns lets the launcher run on
+  # and keep printing (cleanup, then a fast-exit report) into a terminal that
+  # may already be back at the shell prompt.
+  trap _cleanup_session EXIT
+  trap '_cleanup_session; exit 130' INT
+  trap '_cleanup_session; exit 143' TERM
 
   # 10. Ensure Docker running
   _ensure_docker

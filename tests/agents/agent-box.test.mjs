@@ -300,3 +300,25 @@ describe('stageBoxPiDir', () => {
     }
   });
 });
+
+describe('entrypoint ↔ nested mounts', () => {
+  // Docker creates the missing parents of a nested mount as root. A top-level
+  // home dir created that way is unwritable for the agent: copilot exited at
+  // once on 2026-11-09 because ~/.copilot was root-owned. The entrypoint
+  // chowns each such parent — this pins that list to the mounts.
+  const entry = fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'docker', 'agent-box', 'entrypoint.sh'), 'utf8');
+  const chowned = (/^for dir in (.*); do$/m.exec(entry)?.[1] ?? '').match(/"\$home\/([^"]+)"/g)?.map((s) => s.slice(7, -1)) ?? [];
+
+  test('every nested mount in the box home has its top-level parent chowned', () => {
+    for (const agent of ['claude', 'copilot', 'opencode', 'pi']) {
+      const argv = boxRunArgs({ ...base, agent, piAgentDir: '/tmp/coding-box-pi-x' });
+      for (const v of volumes(argv)) {
+        const target = v.split(':')[1];
+        if (!target.startsWith(`${BOX_HOME}/`)) continue;
+        const rel = target.slice(BOX_HOME.length + 1).split('/');
+        if (rel.length < 2) continue; // a direct child is the mount itself, not a created parent
+        assert.ok(chowned.includes(rel[0]), `${agent}: ${target} needs "$home/${rel[0]}" in the entrypoint chown loop (has: ${chowned.join(', ')})`);
+      }
+    }
+  });
+});
