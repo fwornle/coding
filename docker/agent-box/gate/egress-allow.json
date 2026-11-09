@@ -1,0 +1,9 @@
+{
+  "_comment": "Hosts an agent in the box may reach on port 443 through the gate's CONNECT proxy — its own LOGIN only. Model calls go through the LLM proxy, so no model API host is listed (api.anthropic.com, api.githubcopilot.com, …): listing one would let the agent call models around the proxy. Exact names, no wildcards. Changing this file changes the guard digest: rebuild with `coding box build`. Refused hosts are summarised when a box exits.",
+  "agents": {
+    "claude": ["platform.claude.com", "claude.ai", "claude.com"],
+    "copilot": ["github.com", "api.github.com"],
+    "opencode": [],
+    "pi": []
+  }
+}

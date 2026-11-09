@@ -35,6 +35,7 @@ import { fileURLToPath } from 'node:url';
 
 import {
   boxRunArgs, boxAgentConfig, prepareCopilotConfig, imageDigest, guardSource, IMAGE, HOME_VOLUME, BOX_HOME,
+  boxNetworkMode, startGate, stopGate,
 } from './agent-box.mjs';
 import { createGuard } from './coding-guard-daemon.mjs';
 import { guardPaths } from '../lib/guard/home.mjs';
@@ -138,11 +139,20 @@ function seedHome(volume, agent, uid, gid, stage) {
  */
 async function runBox({ agent, prompt, model, workspace, volume, name, guardDir, port, sentinel, env, timeoutS, outFile }) {
   const script = agent === 'script';
-  const argv = boxRunArgs({
-    agent: script ? 'claude' : agent, args: script ? [] : agentArgs(agent, prompt, model),
-    env: { ...env, TARGET_PROJECT_DIR: workspace }, cwd: workspace,
-    uid: process.getuid(), gid: process.getgid(), name, guardDir, guardPortNum: port,
-  });
+  // The box as it is launched by default: on its locked network, whose gate
+  // forwards the LLM proxy and THIS run's scratch guard, nothing else.
+  const gate = boxNetworkMode(env) === 'locked' ? startGate({ name, agent, env, guardPortNum: port }) : null;
+  let argv;
+  try {
+    argv = boxRunArgs({
+      agent: script ? 'claude' : agent, args: script ? [] : agentArgs(agent, prompt, model),
+      env: { ...env, TARGET_PROJECT_DIR: workspace }, cwd: workspace,
+      uid: process.getuid(), gid: process.getgid(), name, guardDir, guardPortNum: port, gate,
+    });
+  } catch (err) {
+    if (gate) stopGate(gate);
+    throw err;
+  }
   argv.splice(argv.indexOf('--rm'), 1); // keep the stopped container for `docker diff`
   const hv = argv.indexOf(`${HOME_VOLUME}:${BOX_HOME}`);
   argv[hv] = `${volume}:${BOX_HOME}`;
@@ -175,7 +185,8 @@ async function runBox({ agent, prompt, model, workspace, volume, name, guardDir,
     callLog = execFileSync('sh', ['-c', `docker cp ${name}:${CALL_LOG} - | tar -xO`], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
   } catch { /* no record */ }
   docker(['rm', '-f', name]);
-  return { code, timedOut, diff, callLog, output: fs.readFileSync(outFile, 'utf8') };
+  const denied = gate ? stopGate(gate) : [];
+  return { code, timedOut, diff, callLog, denied, output: fs.readFileSync(outFile, 'utf8') };
 }
 
 async function main() {
@@ -314,6 +325,8 @@ async function main() {
           guardCheck: guardChecks[agent],
           scripted: script,
           lockedOut: guard.factors.lockedFor() > 0,
+          // What the locked box network refused (gate log): attempts, not breaches.
+          networkDenied: run.denied,
         };
         const report = script ? scriptReport(run.output) : null;
         evidence.noReport = script && !report;

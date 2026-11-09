@@ -30,7 +30,7 @@ in between:
 Every path an agent can read or write, both ways. **Grey** is an agent on the
 host: it runs as you, so it reaches everything you can. **Colour** is the same
 agent in the box. Each path is allowed, read-only, the box's own copy, gated by
-the guard, not locked yet, or blocked.
+the guard, limited to the agent's own login, or blocked.
 
 [![Every path an agent can read or write: the host agent (grey) reaches all of them; the boxed agent's access per path in colour.](../images/agent-box-access.svg)](../images/agent-box-access.svg){: target="_blank" rel="noopener" title="Open full-size image" }
 
@@ -53,26 +53,47 @@ The same, as a table:
 | ⛔ | Host processes and daemons | not visible | host: kill, launchctl / systemctl, restart services |
 | ⛔ | MCP servers, knowledge injection | not loaded | loaded for the host agent only |
 | | **Network** | | |
-| ✅ | LLM proxy :12435 | every model call | routed, metered and logged in both cases |
+| ✅ | LLM proxy :12435 | every model call | routed, metered and logged; from the box through the network gate |
 | 🔐 | Guard daemon :3035 | can ask, never approve | override requests and coding svc; approving needs your factor |
-| ⚠️ | Other host services | reachable: not locked yet | obs-api :12436, coordinator :3034, dashboard :3032, Qdrant :6333 … |
-| ⚠️ | Internet | open: not limited yet | through the host's web proxy :3128 |
+| ⛔ | Other host services | refused at the gate | obs-api :12436, coordinator :3034, dashboard :3032, Qdrant :6333 … |
+| 🔑 | Internet | login hosts only | e.g. platform.claude.com for claude; every refusal is reported |
 | | **You and your accounts** | | |
 | ✅ | Your terminal | keys, screen, paste | tmux pane; Cmd+V image paste goes through a bridge |
 | 🔐 | Overriding a rule | only grants you sign | host: one line in the transcript, which the agent can type itself |
 | ⛔ | Pushing to GitHub | no keys: commits stay local | host: your SSH keys and gh login |
 
-✅ read-write · 👁️ read-only · 📦 box's own copy · 🔐 through the guard: you approve · ⚠️ reachable: not locked yet · ⛔ blocked / not visible. On the host, the agent has every one of these.
+✅ read-write · 👁️ read-only · 📦 box's own copy · 🔐 through the guard: you approve · 🔑 the agent's own login only · ⛔ blocked / not visible. On the host, the agent has every one of these.
 <!-- agent-box-access:end -->
 
-Two rows are still open (orange): from inside the box the agent can reach the
-**other host services** (obs-api, the health coordinator, the dashboard,
-Qdrant) and the **internet**, through the host's web proxy. The plan is a box
-network whose only exits are the LLM proxy and the guard. Until then, those
-services' own checks (loopback binding, Host and Origin allow-lists) are what
-stands between the box and them. The diagram and this table come from one list
-in `scripts/render-agent-box-access-svg.mjs`. Change it there when a row
-changes, and re-run the script.
+The diagram and this table come from one list in
+`scripts/render-agent-box-access-svg.mjs`. Change it there when a row changes,
+and re-run the script.
+
+## Box network
+
+The box has no route out. It sits alone on its own `--internal` Docker network
+with one other container: its **gate**, started from the same image as `nobody`,
+read-only and without capabilities. Inside the box, `host.docker.internal` is the
+gate, so every URL the launcher hands the agent keeps working. The gate:
+
+- forwards the **LLM proxy** (`:12435`) and the **guard** (`:3035`) to the host,
+  and nothing else. Any other port is refused, including obs-api, the health
+  coordinator, the dashboard, Qdrant and the MCP servers;
+- runs a CONNECT proxy for the agent's **own login** only: an exact list of hosts,
+  port 443, in `docker/agent-box/gate/egress-allow.json` (claude:
+  `platform.claude.com`, `claude.ai`, `claude.com`; copilot: `github.com`,
+  `api.github.com`; pi and opencode: none). No model API is on it, so every
+  model call still goes through the proxy;
+- logs every refusal. When the box exits, the launcher prints what was refused,
+  for example `the box network refused api.anthropic.com:443 ×3`. If a login
+  needs a host that is missing, add it to the list and run `coding box build`.
+
+Each box gets its own network and gate, and both are removed when the box exits.
+A gate left over from a killed launcher is removed by the next launch.
+
+`CODING_BOX_NETWORK=open coding …` puts the box on the default bridge network
+as before, where every host service and the internet are reachable. It says
+so when it starts and records `box.network.open` in the guard audit log.
 
 ## Launching
 
@@ -494,9 +515,9 @@ chain, and `audit` names the first broken line.
   agent's own process and could change a call after it was checked. For the
   files such a call writes, the result check judges what lands on disk;
   anything else the plugin does is not checked.
-- Network traffic from the box is not yet limited to the proxy: the other host
-  services and the internet (through the host's web proxy) are reachable. See
-  [What the box allows](#what-the-box-allows-and-what-it-does-not).
+- MCP servers do not reach the box: their ports are not forwarded by the
+  [box network](#box-network) gate. Graphify is available through
+  `coding svc graphify`.
 - The result check keeps its state where the agent's user can write it, so an
   agent could tamper with what the check compares against. Planned: keep that
   state out of the agent's reach.

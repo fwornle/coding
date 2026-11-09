@@ -1,7 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 1300" width="1320" height="1300" font-family="Inter, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1320 1320" width="1320" height="1320" font-family="Inter, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-labelledby="t d">
 <title id="t">What an agent can reach: on the host versus in the agent box</title>
-<desc id="d">Every path an agent can read or write. The host agent (grey) reaches all of them. The agent in the box: Your project (the workspace): read-write, same path; The coding repo, when you work elsewhere: read-only; Session transcripts: read-write → session logs; Agent settings and logins: its own, not yours; The rest of your home folder: not visible; The guard: hooks, rules, hook settings: root-owned, read-only; Guard keys and audit log: public key only; Docker socket: no socket; coding containers: via coding svc; Host processes and daemons: not visible; MCP servers, knowledge injection: not loaded; LLM proxy  :12435: every model call; Guard daemon  :3035: can ask, never approve; Other host services: reachable: not locked yet; Internet: open: not limited yet; Your terminal: keys, screen, paste; Overriding a rule: only grants you sign; Pushing to GitHub: no keys: commits stay local.</desc>
-<rect x="0" y="0" width="1320" height="1300" rx="18" fill="#ffffff"/>
+<desc id="d">Every path an agent can read or write. The host agent (grey) reaches all of them. The agent in the box: Your project (the workspace): read-write, same path; The coding repo, when you work elsewhere: read-only; Session transcripts: read-write → session logs; Agent settings and logins: its own, not yours; The rest of your home folder: not visible; The guard: hooks, rules, hook settings: root-owned, read-only; Guard keys and audit log: public key only; Docker socket: no socket; coding containers: via coding svc; Host processes and daemons: not visible; MCP servers, knowledge injection: not loaded; LLM proxy  :12435: every model call; Guard daemon  :3035: can ask, never approve; Other host services: refused at the gate; Internet: login hosts only; Your terminal: keys, screen, paste; Overriding a rule: only grants you sign; Pushing to GitHub: no keys: commits stay local.</desc>
+<rect x="0" y="0" width="1320" height="1320" rx="18" fill="#ffffff"/>
 <text x="330" y="180" font-size="12" font-weight="700" fill="#5f6b7a">F I L E S   A N D   F O L D E R S</text>
 <text x="330" y="574" font-size="12" font-weight="700" fill="#5f6b7a">C O N T A I N E R S   A N D   P R O C E S S E S</text>
 <text x="330" y="812" font-size="12" font-weight="700" fill="#5f6b7a">N E T W O R K</text>
@@ -17,8 +17,8 @@
 <text x="562.4" y="109" font-size="13" fill="#3a4450">box's own copy</text>
 <line x1="694.8" y1="104" x2="728.8" y2="104" stroke="#6a1b9a" stroke-width="3" stroke-dasharray="7 5"/>
 <text x="736.8" y="109" font-size="13" fill="#3a4450">through the guard: you approve</text>
-<line x1="990.8" y1="104" x2="1024.8" y2="104" stroke="#e65100" stroke-width="3" stroke-dasharray="3 4"/>
-<text x="1032.8" y="109" font-size="13" fill="#3a4450">reachable: not locked yet</text>
+<line x1="990.8" y1="104" x2="1024.8" y2="104" stroke="#8d6e63" stroke-width="3" stroke-dasharray="9 3 2 3"/>
+<text x="1032.8" y="109" font-size="13" fill="#3a4450">the agent's own login only</text>
 <line x1="30" y1="130" x2="48" y2="130" stroke="#c62828" stroke-width="3"/><g stroke="#c62828" stroke-width="3.2" stroke-linecap="round"><line x1="50" y1="123" x2="64" y2="137"/><line x1="50" y1="137" x2="64" y2="123"/></g>
 <text x="72" y="135" font-size="13" fill="#3a4450">blocked / not visible</text>
 <path d="M 240 685 C 290 685, 280 213, 330 213" fill="none" stroke="#c9cdd2" stroke-width="1.6"/>
@@ -47,6 +47,7 @@
 <text x="1153" y="182" text-anchor="middle" font-size="15" font-weight="700" fill="#1565c0">agent box</text>
 <text x="1153" y="202" text-anchor="middle" font-size="12" fill="#3a4f6b">Linux container · your uid, not root</text>
 <text x="1153" y="218" text-anchor="middle" font-size="12" fill="#3a4f6b">no_new_privs · no Docker socket</text>
+<text x="1153" y="234" text-anchor="middle" font-size="12" fill="#3a4f6b">network: gate only</text>
 <rect x="330" y="190" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
 <rect x="924" y="190" width="6" height="46" rx="3" fill="#2e7d32"/>
 <text x="344" y="210" font-size="14.5" font-weight="700" fill="#1b2430">Your project (the workspace)</text>
@@ -129,7 +130,7 @@
 <rect x="924" y="822" width="6" height="46" rx="3" fill="#2e7d32"/>
 <text x="344" y="842" font-size="14.5" font-weight="700" fill="#1b2430">LLM proxy  :12435</text>
 <text x="914" y="842" text-anchor="end" font-size="13.5" font-weight="700" fill="#2e7d32">every model call</text>
-<text x="344" y="860" font-size="12" fill="#7a838d">routed, metered and logged in both cases</text>
+<text x="344" y="860" font-size="12" fill="#7a838d">routed, metered and logged; from the box through the network gate</text>
 <line x1="930" y1="845" x2="1010" y2="845" stroke="#2e7d32" stroke-width="2.6" />
 <path d="M 1010 845 C 1050 845, 1040 685, 1080 685" fill="none" stroke="#2e7d32" stroke-width="2"  opacity="0.85"/>
 <rect x="330" y="874" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
@@ -141,19 +142,19 @@
 <g><rect x="961" y="888" width="18" height="18" transform="rotate(45 970 897)" fill="#ffffff" stroke="#6a1b9a" stroke-width="2.4"/><circle cx="970" cy="897" r="3" fill="#6a1b9a"/></g>
 <path d="M 1010 897 C 1050 897, 1040 685, 1080 685" fill="none" stroke="#6a1b9a" stroke-width="2" stroke-dasharray="7 5" opacity="0.85"/>
 <rect x="330" y="926" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
-<rect x="924" y="926" width="6" height="46" rx="3" fill="#e65100"/>
+<rect x="924" y="926" width="6" height="46" rx="3" fill="#c62828"/>
 <text x="344" y="946" font-size="14.5" font-weight="700" fill="#1b2430">Other host services</text>
-<text x="914" y="946" text-anchor="end" font-size="13.5" font-weight="700" fill="#e65100">reachable: not locked yet</text>
+<text x="914" y="946" text-anchor="end" font-size="13.5" font-weight="700" fill="#c62828">refused at the gate</text>
 <text x="344" y="964" font-size="12" fill="#7a838d">obs-api :12436, coordinator :3034, dashboard :3032, Qdrant :6333 …</text>
-<line x1="930" y1="949" x2="1010" y2="949" stroke="#e65100" stroke-width="2.6" stroke-dasharray="3 4"/>
-<path d="M 1010 949 C 1050 949, 1040 685, 1080 685" fill="none" stroke="#e65100" stroke-width="2" stroke-dasharray="3 4" opacity="0.85"/>
+<line x1="930" y1="949" x2="960" y2="949" stroke="#c62828" stroke-width="2.6"/>
+<g stroke="#c62828" stroke-width="3.2" stroke-linecap="round"><line x1="965" y1="942" x2="979" y2="956"/><line x1="965" y1="956" x2="979" y2="942"/></g>
 <rect x="330" y="978" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
-<rect x="924" y="978" width="6" height="46" rx="3" fill="#e65100"/>
+<rect x="924" y="978" width="6" height="46" rx="3" fill="#8d6e63"/>
 <text x="344" y="998" font-size="14.5" font-weight="700" fill="#1b2430">Internet</text>
-<text x="914" y="998" text-anchor="end" font-size="13.5" font-weight="700" fill="#e65100">open: not limited yet</text>
-<text x="344" y="1016" font-size="12" fill="#7a838d">through the host's web proxy :3128</text>
-<line x1="930" y1="1001" x2="1010" y2="1001" stroke="#e65100" stroke-width="2.6" stroke-dasharray="3 4"/>
-<path d="M 1010 1001 C 1050 1001, 1040 685, 1080 685" fill="none" stroke="#e65100" stroke-width="2" stroke-dasharray="3 4" opacity="0.85"/>
+<text x="914" y="998" text-anchor="end" font-size="13.5" font-weight="700" fill="#8d6e63">login hosts only</text>
+<text x="344" y="1016" font-size="12" fill="#7a838d">e.g. platform.claude.com for claude; every refusal is reported</text>
+<line x1="930" y1="1001" x2="1010" y2="1001" stroke="#8d6e63" stroke-width="2.6" stroke-dasharray="9 3 2 3"/>
+<path d="M 1010 1001 C 1050 1001, 1040 685, 1080 685" fill="none" stroke="#8d6e63" stroke-width="2" stroke-dasharray="9 3 2 3" opacity="0.85"/>
 <rect x="330" y="1060" width="600" height="46" rx="9" fill="#ffffff" stroke="#d5d9de" stroke-width="1.2"/>
 <rect x="924" y="1060" width="6" height="46" rx="3" fill="#2e7d32"/>
 <text x="344" y="1080" font-size="14.5" font-weight="700" fill="#1b2430">Your terminal</text>
@@ -181,6 +182,7 @@
 <text x="1178" y="689" text-anchor="middle" font-size="12.5" fill="#dbe8fb">claude · copilot · pi</text>
 <text x="1178" y="707" text-anchor="middle" font-size="12.5" fill="#dbe8fb">by default</text>
 <text x="1178" y="725" text-anchor="middle" font-size="12.5" fill="#dbe8fb">opencode with --box</text>
-<text x="30" y="1244" font-size="13" fill="#5f6b7a">Planned (Phase 3): box network limited to the LLM proxy and the guard; result-check state out of the agent’s reach.</text>
-<text x="30" y="1264" font-size="13" fill="#5f6b7a">Default: claude, copilot and pi run in the box; opencode with --box. --no-box runs on the host and is recorded in the guard audit log.</text>
+<text x="30" y="1244" font-size="13" fill="#5f6b7a">Box network: an internal Docker network; its gate forwards the LLM proxy and the guard only. CODING_BOX_NETWORK=open lifts it (recorded).</text>
+<text x="30" y="1264" font-size="13" fill="#5f6b7a">Planned (Phase 3): result-check state out of the agent’s reach.</text>
+<text x="30" y="1284" font-size="13" fill="#5f6b7a">Default: claude, copilot and pi run in the box; opencode with --box. --no-box runs on the host and is recorded in the guard audit log.</text>
 </svg>

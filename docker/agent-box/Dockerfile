@@ -85,6 +85,13 @@ RUN for tool in xclip wl-paste; do \
 
 # Claude Code managed policy: only these hooks load; user/project settings
 # cannot add, remove or replace them.
+# The box network gate (gate/gate.mjs): run as its OWN container, from this
+# image, next to the box on the box's --internal network. Forwards only the
+# LLM proxy and the guard; CONNECTs only to the per-agent login allow-list.
+COPY gate/gate.mjs gate/egress-allow.json /opt/coding-box/gate/
+RUN chown -R root:root /opt/coding-box/gate \
+ && chmod 0755 /opt/coding-box/gate \
+ && chmod 0644 /opt/coding-box/gate/gate.mjs /opt/coding-box/gate/egress-allow.json
 COPY managed-settings.json /etc/claude-code/managed-settings.json
 COPY entrypoint.sh /usr/local/sbin/coding-box-entrypoint
 RUN chmod 0644 /etc/claude-code/managed-settings.json \
