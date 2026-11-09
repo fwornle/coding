@@ -55,7 +55,14 @@ rule exists, because the permission matcher cannot statically resolve the comman
   project-scoped ones only exist in `coding`
 
 If you catch yourself writing a shell one-liner to size or filter these files: stop, use the
-two `ls` forms plus `Read`.
+two `ls` forms plus `Read`. That includes **`grep`, `cut`, `wc`, `for` loops and `python -c`
+over LSL content** — there is no "just this once to skim" exception, and no step below needs
+one. Also never `cd` into the history tree: the working directory persists across calls, so
+every later relative path (including the two `ls` forms) silently breaks.
+
+**Budget: at most ~6 tool calls in total** (2 `ls` + up to 4 `Read`s, plus the same for
+Step 3). If the newest files are trivial (only "retry", API errors, `/sl` itself), that IS the
+finding — report it and walk back by filename with `Read`; do not start forensics.
 
 ### Step 1: Determine Current Project
 
@@ -93,8 +100,13 @@ two `ls` forms plus `Read`.
    - `{"type":"session","parentSession":"…"}` — the previous rotation part. Follow it backwards
      when a session spans several files.
 
-   Skim by grepping for user turns rather than reading every line of a large file:
-   `grep -o '"role":"user".\{0,300\}' <file>`.
+   For a large file, `Read` it with `offset`/`limit` from the **end** (the most recent prompt
+   sets) instead of grepping. Do not grep: lines are JSON with escaped quotes, so a pattern
+   like `"role":"user"` silently misses nested content and returns nothing, which looks
+   exactly like an empty log.
+
+   Error-only prompt sets (`API Error: 502 …`, `Not logged in`) mean the session never did
+   the work — the last *real* prompt before them is the open item; say so in the summary.
 
 4. Judge length from what `Read` returned:
    - **Short** (a few hundred lines, or the content is one aborted/trivial exchange) → also
