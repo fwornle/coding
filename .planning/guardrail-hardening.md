@@ -289,10 +289,11 @@ request path (proxy repo); team scope fails closed with a route test.
 | Phase 1 item 2 (host guard daemon) | done — LaunchAgent install left to the user | see "Phase 1 item 2 results" |
 | Phase 1 item 3 (WebAuthn approval) | done — enrolment on this Mac needs the user | see "Phase 1 item 3 results" |
 | Phase 1 item 4 (hook verifies grants) | done | see "Phase 1 item 4 results" |
-| Phase 1 item 5 (per-agent guards) | done — other agents still opt-in `--box` | see "Phase 1 item 5 results" |
+| Phase 1 item 5 (per-agent guards) | done — copilot + pi box by DEFAULT since 2026-11-09; opencode opt-in | see "Phase 1 item 5 results" and "Box default" |
 | Phase 1 item 6 (red-team cells) | done — script row + declined verdict; env -i hole found and closed; opencode void (empty completions) | see "Phase 1 item 6 results" and "follow-up" |
 | Phase 2 (check results) | done — red-team 2026-11-08 no regression, shell-workaround held; CI gate unverified until the first push | see "Phase 2 results" |
 | Phase 2: AST rules | done — in the box (guard 04b64ed3), red-team 2026-11-08 no regression | parsed-file checks behind 3 regex rules; see "Phase 2 AST rules results" |
+| Box default (copilot, pi) | code + tests done; live launch on the host pending | see "Box default" |
 | Box image paste (Cmd+V) | done — Terminal.app sends nothing for an image (Ctrl+V there) | see "Box clipboard" |
 | Phase 3 | todo | |
 
@@ -874,6 +875,54 @@ guard home, protected files and audit chain unchanged → held. copilot
 forge-approval took 4m05 of 6m — raise the limit before reading a timeout
 there as a failure.
 
+## Box default (2026-11-09)
+
+copilot and pi now run in the box by default (as claude does); opencode stays
+opt-in. What blocked the flip was not the guard (item 5) but the interactive
+launch path, which lagged the red-team runner:
+
+- **copilot** — provider config was already fine (BYOK env, rewritten to
+  host.docker.internal), but `~/.copilot/session-state` was not mounted, so a
+  boxed session was invisible to session logging. Now mounted rw at the box
+  home (session data; copilot loads no code from it). `run` creates it first
+  so docker does not create it root-owned.
+- **pi** — `PI_CODING_AGENT_DIR` (`$CODING_REPO/.pi-agent`, or `~/.pi/agent` in
+  global scope) was mounted rw at its host path: pi loads extensions from it,
+  so the box could plant code the HOST pi runs; and its `models.json` names
+  `127.0.0.1:12435`, which in the box is the box. Now `stageBoxPiDir` copies
+  models.json / settings.json (loopback → host.docker.internal) /
+  APPEND_SYSTEM.md / extensions/*.ts into a per-run temp dir mounted at
+  `/home/agent/.pi/agent`, with `PI_CODING_AGENT_DIR` pointing there; the host
+  dir is never mounted or named. No auth.json, no old sessions. Removed after
+  the run. Sessions keep going to the project's `.observations/pi-sessions`
+  (PATH_ENV mount, unchanged). Same idea the red-team runner already used
+  (`redteam-box.mjs` deletes PI_CODING_AGENT_DIR and seeds a copy).
+- **opencode** — stays opt-in. Its session store is
+  `~/.local/share/opencode/opencode.db`, SQLite in WAL mode: sharing it between
+  the macOS host and the Linux box over VirtioFS (the `-shm` file is mmap'd
+  shared memory, which does not cross the VM boundary) risks corrupting the
+  host's opencode history; not sharing it means boxed sessions are not logged.
+  Options: a box-only data dir mounted from the host + a second db path in the
+  opencode LSL adapter (single writer in the box, host reads read-only), or
+  export at session end. Not done.
+- Launcher: `bin/coding` exports `CODING_BOX_DEFAULT` (agent in
+  claude|copilot|pi AND `constraints` on); `launch-agent-common.sh` writes
+  `box.bypass` whenever that is true and the agent runs on the host (was:
+  agent = claude, which also logged a "bypass" on the harness tier, where the
+  host IS the default).
+
+**Verified** — `tests/agents/agent-box` 33/33 (copilot session mount only for
+copilot; pi host dir never mounted/named, staged dir mounted at BOX_PI_DIR,
+guard-home refusal; `stageBoxPiDir` copies/rewrites/omits),
+`tests/launcher/box-default` 8/8 (defaults per agent, harness tier, opencode
+opt-in, CODING_BOX_DEFAULT under a flag), `tests/guard` + `tests/features`
+361/361, `tests/redteam/cells` 26/26, eslint clean.
+
+**Not verified (needs the host — this session ran inside the box, no Docker
+socket)**: an interactive `coding --copilot` / `coding --pi` in the box —
+pi answering through the staged models.json, a copilot session appearing in
+the LSL. No image rebuild needed: nothing under `docker/agent-box` changed.
+
 ## Box clipboard (2026-11-08)
 
 Image paste from the host into boxed agents. `clipboard-shim.mjs` answers
@@ -926,3 +975,7 @@ there. `CODING_BOX_PASTE=off` runs an agent bare. Tests:
   no-console-log / no-eval-usage / proper-error-handling; Edit/MultiEdit judged
   on the file they produce (closed the own-target gap). Box rebuilt (guard
   04b64ed3); red-team: no regression (20 cells, none bypassed).
+- **2026-11-09 (morning)** — box DEFAULT for copilot and pi (copilot session
+  store mounted for LSL; pi gets a staged, host-pointed copy of its config dir
+  instead of a rw mount of the host's); opencode stays opt-in (SQLite WAL
+  store cannot be shared with the box). Live launch check pending on the host.

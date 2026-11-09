@@ -14,8 +14,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  boxRunArgs, boxPath, toBoxUrl, guardSource, configRoots, prepareCopilotConfig,
-  IMAGE, HOME_VOLUME, BOX_HOME, BOX_GUARD_KEYS,
+  boxRunArgs, boxPath, toBoxUrl, guardSource, configRoots, prepareCopilotConfig, stageBoxPiDir,
+  IMAGE, HOME_VOLUME, BOX_HOME, BOX_GUARD_KEYS, BOX_PI_DIR,
 } from '../../scripts/agent-box.mjs';
 
 const base = {
@@ -65,7 +65,8 @@ describe('boxRunArgs — boundary', () => {
   test('a workspace that contains the guard keys is refused', () => {
     assert.throws(() => boxRunArgs({ ...base, cwd: '/Users/u' }), /guard's keys/);
     assert.throws(() => boxRunArgs({ ...base, cwd: '/Users/u/.coding' }), /guard's keys/);
-    assert.throws(() => boxRunArgs({ ...base, env: { PI_CODING_AGENT_DIR: '/Users/u/.coding/guard' } }), /guard's keys/);
+    assert.throws(() => boxRunArgs({ ...base, env: { PI_CODING_AGENT_SESSION_DIR: '/Users/u/.coding/guard' } }), /guard's keys/);
+    assert.throws(() => boxRunArgs({ ...base, agent: 'pi', piAgentDir: '/Users/u/.coding' }), /guard's keys/);
   });
 
   test('the guard key dir is never mounted beyond its public part', () => {
@@ -114,10 +115,30 @@ describe('boxRunArgs — host integrations keep working', () => {
     assert.strictEqual(envs(boxRunArgs(base)).CLAUDE_CODE_DISABLE_MOUSE, undefined);
   });
 
-  test('pi agent dir and a CA bundle are mounted at the same path', () => {
-    const argv = boxRunArgs({ ...base, agent: 'pi', env: { PI_CODING_AGENT_DIR: '/Users/u/.pi/agent', NODE_EXTRA_CA_CERTS: '/Users/u/ca.pem' } });
-    assert.ok(volumes(argv).includes('/Users/u/.pi/agent:/Users/u/.pi/agent'));
+  test('pi session dir and a CA bundle are mounted at the same path', () => {
+    const argv = boxRunArgs({ ...base, agent: 'pi', env: { PI_CODING_AGENT_SESSION_DIR: '/Users/u/proj/.observations/pi-sessions', NODE_EXTRA_CA_CERTS: '/Users/u/ca.pem' } });
+    assert.ok(volumes(argv).includes('/Users/u/proj/.observations/pi-sessions:/Users/u/proj/.observations/pi-sessions'));
     assert.ok(volumes(argv).includes('/Users/u/ca.pem:/Users/u/ca.pem:ro'));
+  });
+
+  test("pi's HOST config dir is never mounted or named — the box gets the staged copy", () => {
+    const env = { PI_CODING_AGENT_DIR: '/Users/u/coding/.pi-agent' };
+    const bare = boxRunArgs({ ...base, agent: 'pi', env });
+    assert.ok(!volumes(bare).some((v) => v.startsWith('/Users/u/coding/.pi-agent')));
+    assert.strictEqual(envs(bare).PI_CODING_AGENT_DIR, undefined);
+    const staged = boxRunArgs({ ...base, agent: 'pi', env, piAgentDir: '/tmp/coding-box-pi-x' });
+    assert.ok(volumes(staged).includes(`/tmp/coding-box-pi-x:${BOX_PI_DIR}`));
+    assert.strictEqual(envs(staged).PI_CODING_AGENT_DIR, BOX_PI_DIR);
+    // only pi takes it
+    assert.ok(!volumes(boxRunArgs({ ...base, piAgentDir: '/tmp/coding-box-pi-x' })).some((v) => v.includes('coding-box-pi')));
+  });
+
+  test("copilot's session store is mounted from the host (session logging reads it); other agents do not get it", () => {
+    const want = `/Users/u/.copilot/session-state:${BOX_HOME}/.copilot/session-state`;
+    assert.ok(volumes(boxRunArgs({ ...base, agent: 'copilot', cwd: '/Users/u/proj' })).includes(want));
+    for (const agent of ['claude', 'opencode', 'pi']) {
+      assert.ok(!volumes(boxRunArgs({ ...base, agent })).some((v) => v.includes('.copilot')), agent);
+    }
   });
 
   test('TARGET_PROJECT_DIR is the workspace when set', () => {
@@ -238,6 +259,44 @@ describe('per-agent guards (Phase 1 item 5)', () => {
       assert.throws(() => prepareCopilotConfig(ws, ws), /disables Copilot hooks/);
     } finally {
       fs.rmSync(ws, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('stageBoxPiDir', () => {
+  test('copies provider config with loopback pointed at the host, and the extensions; leaves credentials and sessions', () => {
+    const src = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-src-'));
+    const dst = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'pi-dst-')), 'stage');
+    try {
+      fs.writeFileSync(path.join(src, 'models.json'), '{"baseUrl":"http://127.0.0.1:12435/v1"}');
+      fs.writeFileSync(path.join(src, 'settings.json'), '{"defaultProvider":"rapid-proxy-pi"}');
+      fs.writeFileSync(path.join(src, 'APPEND_SYSTEM.md'), 'localhost stays text here');
+      fs.writeFileSync(path.join(src, 'auth.json'), '{"secret":1}');
+      fs.writeFileSync(path.join(src, 'models-store.json'), '{}');
+      fs.mkdirSync(path.join(src, 'extensions', 'nested'), { recursive: true });
+      fs.writeFileSync(path.join(src, 'extensions', 'coding-proxy-headers.ts'), 'export default 1;');
+      fs.mkdirSync(path.join(src, 'sessions'));
+      fs.writeFileSync(path.join(src, 'sessions', 'old.jsonl'), '{}');
+
+      const copied = stageBoxPiDir(src, dst);
+      assert.deepStrictEqual(copied.sort(), ['APPEND_SYSTEM.md', 'extensions/coding-proxy-headers.ts', 'models.json', 'settings.json'].sort());
+      assert.strictEqual(fs.readFileSync(path.join(dst, 'models.json'), 'utf8'), '{"baseUrl":"http://host.docker.internal:12435/v1"}');
+      assert.strictEqual(fs.readFileSync(path.join(dst, 'APPEND_SYSTEM.md'), 'utf8'), 'localhost stays text here');
+      for (const gone of ['auth.json', 'models-store.json', 'sessions', 'extensions/nested']) {
+        assert.ok(!fs.existsSync(path.join(dst, gone)), gone);
+      }
+    } finally {
+      fs.rmSync(src, { recursive: true, force: true });
+      fs.rmSync(path.dirname(dst), { recursive: true, force: true });
+    }
+  });
+
+  test('a missing source dir stages nothing (and does not throw)', () => {
+    const dst = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-dst-'));
+    try {
+      assert.deepStrictEqual(stageBoxPiDir(path.join(dst, 'nope'), path.join(dst, 's')), []);
+    } finally {
+      fs.rmSync(dst, { recursive: true, force: true });
     }
   });
 });
