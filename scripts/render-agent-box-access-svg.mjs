@@ -32,6 +32,7 @@ export const KINDS = {
   ro:     { color: '#1565c0', dash: '',      label: 'read-only' },
   own:    { color: '#00838f', dash: '',      label: "box's own copy" },
   guard:  { color: '#6a1b9a', dash: '7 5',   label: 'through the guard: you approve' },
+  login:  { color: '#8d6e63', dash: '9 3 2 3', label: "the agent's own login only" },
   gap:    { color: '#e65100', dash: '3 4',   label: 'reachable: not locked yet' },
   block:  { color: '#c62828', dash: '',      label: 'blocked / not visible' },
 };
@@ -52,10 +53,10 @@ export const ROWS = [
   ['block', 'Host processes and daemons',            'not visible',              'host: kill, launchctl / systemctl, restart services'],
   ['block', 'MCP servers, knowledge injection',      'not loaded',               'loaded for the host agent only'],
   'Network',
-  ['rw',    'LLM proxy  :12435',                     'every model call',         'routed, metered and logged in both cases'],
+  ['rw',    'LLM proxy  :12435',                     'every model call',         'routed, metered and logged; from the box through the network gate'],
   ['guard', 'Guard daemon  :3035',                   'can ask, never approve',   'override requests and coding svc; approving needs your factor'],
-  ['gap',   'Other host services',                   'reachable: not locked yet', 'obs-api :12436, coordinator :3034, dashboard :3032, Qdrant :6333 …'],
-  ['gap',   'Internet',                              'open: not limited yet',    "through the host's web proxy :3128"],
+  ['block', 'Other host services',                   'refused at the gate',      'obs-api :12436, coordinator :3034, dashboard :3032, Qdrant :6333 …'],
+  ['login', 'Internet',                              'login hosts only',         'e.g. platform.claude.com for claude; every refusal is reported'],
   'You and your accounts',
   ['rw',    'Your terminal',                         'keys, screen, paste',      'tmux pane; Cmd+V image paste goes through a bridge'],
   ['guard', 'Overriding a rule',                     'only grants you sign',     'host: one line in the transcript, which the agent can type itself'],
@@ -63,9 +64,16 @@ export const ROWS = [
 ];
 
 const FOOTNOTE = [
-  'Planned (Phase 3): box network limited to the LLM proxy and the guard; result-check state out of the agent’s reach.',
+  'Box network: an internal Docker network; its gate forwards the LLM proxy and the guard only. CODING_BOX_NETWORK=open lifts it (recorded).',
+  'Planned (Phase 3): result-check state out of the agent’s reach.',
   'Default: claude, copilot and pi run in the box; opencode with --box. --no-box runs on the host and is recorded in the guard audit log.',
 ];
+
+/** The kinds some row uses, in KINDS order — the legend shows only these. */
+function usedKinds() {
+  const used = new Set(ROWS.filter((r) => typeof r !== 'string').map((r) => r[0]));
+  return Object.entries(KINDS).filter(([k]) => used.has(k));
+}
 
 // ---------------------------------------------------------------- layout
 
@@ -108,7 +116,7 @@ export function render() {
   let ly = 104;
   out.push(`<line x1="${lx}" y1="${ly}" x2="${lx + 34}" y2="${ly}" stroke="#b9bec5" stroke-width="3"/><text x="${lx + 42}" y="${ly + 5}" font-size="13" fill="#8a929c">host agent: everything</text>`);
   lx += 210;
-  for (const [k, v] of Object.entries(KINDS)) {
+  for (const [k, v] of usedKinds()) {
     const itemW = 42 + v.label.length * 7.6 + 26;
     if (lx + itemW > W - 20) { lx = 30; ly += 26; }
     if (k === 'block') {
@@ -137,6 +145,7 @@ export function render() {
   out.push(`<text x="${(WALL_X + BOX_R) / 2}" y="${TOP + 22}" text-anchor="middle" font-size="15" font-weight="700" fill="#1565c0">agent box</text>`);
   out.push(`<text x="${(WALL_X + BOX_R) / 2}" y="${TOP + 42}" text-anchor="middle" font-size="12" fill="#3a4f6b">Linux container · your uid, not root</text>`);
   out.push(`<text x="${(WALL_X + BOX_R) / 2}" y="${TOP + 58}" text-anchor="middle" font-size="12" fill="#3a4f6b">no_new_privs · no Docker socket</text>`);
+  out.push(`<text x="${(WALL_X + BOX_R) / 2}" y="${TOP + 74}" text-anchor="middle" font-size="12" fill="#3a4f6b">network: gate only</text>`);
 
   // cards, connectors, inner fan
   for (const { r: [kind, name, verdict, detail], y: ry } of rowsY) {
@@ -183,7 +192,7 @@ function gate(x, y, color) {
   return `<g><rect x="${x - 9}" y="${y - 9}" width="18" height="18" transform="rotate(45 ${x} ${y})" fill="#ffffff" stroke="${color}" stroke-width="2.4"/><circle cx="${x}" cy="${y}" r="3" fill="${color}"/></g>`;
 }
 
-const MARK = { rw: '✅', ro: '👁️', own: '📦', guard: '🔐', gap: '⚠️', block: '⛔' };
+const MARK = { rw: '✅', ro: '👁️', own: '📦', guard: '🔐', login: '🔑', gap: '⚠️', block: '⛔' };
 
 /** The same rows as a Markdown table (docs page, between START and END). */
 export function table() {
@@ -193,7 +202,7 @@ export function table() {
     const [kind, name, verdict, detail] = r;
     lines.push(`| ${MARK[kind]} | ${name.replace(/\s+/g, ' ')} | ${verdict} | ${detail.replace(/\|/g, '\\|')} |`);
   }
-  lines.push('', `${Object.entries(KINDS).map(([k, v]) => `${MARK[k]} ${v.label}`).join(' · ')}. On the host, the agent has every one of these.`);
+  lines.push('', `${usedKinds().map(([k, v]) => `${MARK[k]} ${v.label}`).join(' · ')}. On the host, the agent has every one of these.`);
   return lines.join('\n');
 }
 

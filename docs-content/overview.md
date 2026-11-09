@@ -220,12 +220,13 @@ keys, Docker, every service and its own guard.
 it cannot switch its guard off. A rule is overridden only by a grant you
 approve on the host.
 
-**Not locked yet:** the other host services and the internet (orange).
+Its network reaches the LLM proxy and the guard, plus its own login. Nothing
+else.
 
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Every path an agent can read or write. The host agent, greyed, reaches all of them. The boxed agent: project read-write, coding repo and guard read-only, own settings, transcripts read-write; the rest of home, guard keys, Docker socket, host processes, MCP servers and GitHub keys blocked; coding containers, the guard daemon and overrides only through the guard; LLM proxy allowed; other host services and the internet still reachable.](images/agent-box-access.svg)](images/agent-box-access.svg){: target="_blank" rel="noopener" title="Open full-size image" }
+[![Every path an agent can read or write. The host agent, greyed, reaches all of them. The boxed agent: project read-write, coding repo and guard read-only, own settings, transcripts read-write; the rest of home, guard keys, Docker socket, host processes, MCP servers, other host services and GitHub keys blocked; coding containers, the guard daemon and overrides only through the guard; LLM proxy allowed; internet only for its own login.](images/agent-box-access.svg)](images/agent-box-access.svg){: target="_blank" rel="noopener" title="Open full-size image" }
 
 <figcaption>Every path, both ways: grey for the host, colour for the box.</figcaption>
 </figure>

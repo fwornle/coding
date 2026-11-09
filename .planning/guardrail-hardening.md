@@ -295,6 +295,7 @@ request path (proxy repo); team scope fails closed with a route test.
 | Phase 2: AST rules | done — in the box (guard 04b64ed3), red-team 2026-11-08 no regression | parsed-file checks behind 3 regex rules; see "Phase 2 AST rules results" |
 | Box default (copilot, pi) | pi verified live on the host; copilot fix needs `coding box build` | see "Box default" |
 | Result-check lock | fixed (cm 1a84f40), needs box build; state dir agent-writable → Phase 3 | see "Result-check lock" |
+| Box network locked (proxy + guard) | code + tests done; needs `coding box build` + live check on the host | see "Box network" |
 | Box image paste (Cmd+V) | done — Terminal.app sends nothing for an image (Ctrl+V there) | see "Box clipboard" |
 | Phase 3 | todo | |
 
@@ -971,6 +972,50 @@ the result check; (b) plant a lock (self-DoS only). Needs state the agent
 uid cannot write: e.g. keep base/inflight in the host guard daemon (the box
 already talks to it), or a root-owned helper. Add a red-team cell for it.
 
+## Box network (2026-11-09)
+
+Before: the box was on the default bridge. Verified from inside a box: every
+host service on host.docker.internal answered (obs-api :12436, coordinator
+:3034, dashboard :3032, Qdrant :6333, …) and the internet was open through the
+host's web proxy (:3128); direct egress failed only because of that proxy.
+
+Now (default; `CODING_BOX_NETWORK=open` restores the bridge, audited as
+`box.network.open`): per box an `--internal` network `<box>-net` plus a gate
+container `<box>-gate` (same image, `nobody`, `--read-only`, `--cap-drop ALL`,
+no-new-privileges, no mounts) on bridge + that network. The box gets
+`--network <box>-net --add-host host.docker.internal:<gate ip>`, so every
+routing URL keeps working. `docker/agent-box/gate/gate.mjs`:
+- TCP forwards ONLY `LLM_CLI_PROXY_PORT` (12435) and the guard port (the
+  red-team's scratch guard port in a run) → any other port: refused.
+- CONNECT proxy :3128 for `gate/egress-allow.json` — the agent's own LOGIN
+  hosts, port 443, exact names (claude: platform.claude.com / claude.ai /
+  claude.com — Claude Code's OAuth refresh goes to platform.claude.com, found
+  in the 2.x binary; copilot: github.com / api.github.com; pi, opencode:
+  none). No model API (api.anthropic.com, api.githubcopilot.com …) — that
+  would bypass the proxy. Chains through the host's web proxy when the
+  launcher has one. Plain-HTTP proxying refused.
+- every refusal → a JSON line; `run` prints a summary when the box exits;
+  red-team cells record them as `networkDenied`.
+- teardown in `run`'s finally; orphans (launcher pid dead — not "box missing",
+  a fresh gate precedes its box) are swept by the next `startGate`.
+- the red-team runner boxes on the same locked network.
+
+**Verified here** (inside a box: no Docker socket): gate over real sockets
+(`tests/agents/box-gate` 9/9: forward, refused port, CONNECT allow / deny /
+wrong port, plain HTTP refused, upstream chaining), argv
+(`tests/agents/box-network` 11/11), box + launcher + red-team suites.
+**Not verified:** a real locked box on the host. Needs `coding box build`,
+then: `coding` → a model answer (proxy), `coding guard status` / an override
+request from inside (guard), `curl host.docker.internal:12436` from inside →
+refused, `curl https://example.com` → 403 from the gate; a claude OAuth
+refresh after token expiry (if it fails, the exit summary names the host);
+then `coding box redteam`.
+
+**Open:** graphify MCP (:3851) — another session is wiring MCP servers into
+the boxed claude (uncommitted `stageClaudeSession` in agent-box.mjs); its MCP
+endpoint is not forwarded. Decide: forward MCP ports the box's MCP config
+names, or keep `coding svc graphify` only.
+
 ## Box clipboard (2026-11-08)
 
 Image paste from the host into boxed agents. `clipboard-shim.mjs` answers
@@ -1035,3 +1080,7 @@ there. `CODING_BOX_PASTE=off` runs an agent bare. Tests:
 - **2026-11-09 (midday)** — copilot verified live in the box. Result-check
   lock: dead-holder takeover, orphan sweep, wider read-only list (cm
   1a84f40). Found: result-check state is agent-writable (Phase 3).
+- **2026-11-09 (afternoon)** — box network locked to the LLM proxy and the
+  guard: per-box internal network + gate (forwards 2 ports, login-only
+  CONNECT allow-list, refusals reported); `CODING_BOX_NETWORK=open` audited;
+  red-team on the locked network; docs/diagram updated. Live check pending.

@@ -96,6 +96,63 @@ export const BOX_PI_DIR = `${BOX_HOME}/.pi/agent`;
  */
 export const COPILOT_SESSIONS = path.join('.copilot', 'session-state');
 
+/** Web-proxy env the box would inherit from the host. */
+const WEB_PROXY_ENV = ['HTTPS_PROXY', 'HTTP_PROXY', 'https_proxy', 'http_proxy'];
+/** The gate's allow-list CONNECT proxy, inside the box network. */
+export const GATE_CONNECT_PORT = 3128;
+/** Where the image keeps the gate (docker/agent-box/gate/). */
+const GATE_DIR = '/opt/coding-box/gate';
+
+/**
+ * Box network mode: 'locked' (default) — the box reaches only the LLM proxy
+ * and the guard, through a gate container — or 'open' (CODING_BOX_NETWORK=open:
+ * the default bridge, as before; recorded in the guard audit log).
+ */
+export function boxNetworkMode(env = process.env) {
+  return String(env.CODING_BOX_NETWORK || '').toLowerCase() === 'open' ? 'open' : 'locked';
+}
+
+/** The host ports the gate forwards: the LLM proxy and the guard daemon. Nothing else. */
+export function gatePorts(env = process.env, guardPortNum = guardPort(env)) {
+  const proxy = Number(env.LLM_CLI_PROXY_PORT || 12435);
+  return [...new Set([proxy, Number(guardPortNum)])];
+}
+
+/**
+ * `docker run` argv for the gate of box `name`. Pure. It starts on the default
+ * bridge (its way to the host); the caller then connects it to the box's
+ * internal network. Runs as nobody, read-only, without capabilities.
+ */
+export function gateRunArgs({ name, agent, ports, network, upstream = null, platform = process.platform, image = IMAGE, pid = process.pid }) {
+  const argv = ['run', '-d', '--rm', '--name', `${name}-gate`,
+    '--label', 'coding.box.gate=1', '--label', `coding.box.gate.for=${name}`, '--label', `coding.box.gate.network=${network}`, '--label', `coding.box.gate.pid=${pid}`,
+    '--network', 'bridge', '--user', '65534:65534', '--read-only', '--cap-drop', 'ALL',
+    '--security-opt', 'no-new-privileges', '--entrypoint', 'node'];
+  if (platform === 'linux') argv.push('--add-host', 'host.docker.internal:host-gateway');
+  argv.push(image, `${GATE_DIR}/gate.mjs`, '--target', 'host.docker.internal');
+  for (const p of ports) argv.push('--forward', String(p));
+  argv.push('--connect', String(GATE_CONNECT_PORT), '--allow-file', `${GATE_DIR}/egress-allow.json`, '--agent', agent);
+  if (upstream) argv.push('--upstream', upstream);
+  return argv;
+}
+
+/** The host's web proxy as the gate sees it (localhost → host.docker.internal), or null. */
+export function gateUpstream(env = process.env) {
+  const v = env.HTTPS_PROXY || env.https_proxy || env.HTTP_PROXY || env.http_proxy || '';
+  return v ? toBoxUrl(v) : null;
+}
+
+/** Refusals from the gate's log lines (JSON per line): [{ dest, count }], most first. */
+export function gateDenials(logText) {
+  const counts = new Map();
+  for (const line of String(logText || '').split('\n')) {
+    let o;
+    try { o = JSON.parse(line); } catch { continue; }
+    if (o && typeof o.deny === 'string') counts.set(o.deny, (counts.get(o.deny) || 0) + 1);
+  }
+  return [...counts].map(([dest, count]) => ({ dest, count })).sort((a, b) => b.count - a.count);
+}
+
 function git(args, cwd = REPO) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 }
@@ -176,7 +233,7 @@ export function boxRunArgs({
   home = os.homedir(), platform = process.platform, uid, gid, tty = false,
   image = IMAGE, name = `coding-box-${agent}-${process.pid}`, exists = fs.existsSync,
   guardDir = guardHome(env, home), guardPortNum = guardPort(env), boxToken = null,
-  piAgentDir = null,
+  piAgentDir = null, gate = null,
 }) {
   const command = AGENT_COMMANDS[agent];
   if (!command) throw new Error(`unknown agent '${agent}' (one of: ${Object.keys(AGENT_COMMANDS).join(', ')})`);
@@ -189,7 +246,13 @@ export function boxRunArgs({
   // process cannot change it (an env var could be set by a nested agent).
   argv.push('--name', name, '--hostname', name, '--label', 'coding.box=1', '--label', `coding.box.agent=${agent}`);
   argv.push('-e', `CODING_BOX_UID=${uid ?? 1000}`, '-e', `CODING_BOX_GID=${gid ?? 1000}`, '-e', 'CODING_BOX=1');
-  if (platform === 'linux') argv.push('--add-host', 'host.docker.internal:host-gateway');
+  if (gate) {
+    // Locked network: an --internal network with no route out; the gate is the
+    // only other container on it, and host.docker.internal IS the gate.
+    argv.push('--network', gate.network, '--add-host', `host.docker.internal:${gate.ip}`);
+  } else if (platform === 'linux') {
+    argv.push('--add-host', 'host.docker.internal:host-gateway');
+  }
 
   const mounts = new Map(); // box path → [host path, mode]
   const mount = (host, mode = 'rw') => {
@@ -212,6 +275,7 @@ export function boxRunArgs({
     const value = env[key];
     if (value === undefined || value === '') continue;
     if (key === 'PI_CODING_AGENT_DIR') continue; // never the host's: see PATH_ENV, set below from the staged copy
+    if (gate && WEB_PROXY_ENV.includes(key)) continue; // locked: the gate's CONNECT proxy, set below
     let boxed = value;
     if (/^no_proxy$/i.test(key)) {
       boxed = `${value},host.docker.internal`;
@@ -225,6 +289,16 @@ export function boxRunArgs({
       boxed = toBoxUrl(value);
     }
     argv.push('-e', `${key}=${boxed}`);
+  }
+
+  if (gate) {
+    // Web traffic goes to the gate's allow-list proxy (the agent's own login);
+    // the LLM proxy and the guard are reached directly on the gate's forwards.
+    const via = `http://host.docker.internal:${GATE_CONNECT_PORT}`;
+    for (const k of WEB_PROXY_ENV) argv.push('-e', `${k}=${via}`);
+    if (!env.NO_PROXY && !env.no_proxy) {
+      argv.push('-e', 'NO_PROXY=host.docker.internal,localhost,127.0.0.1', '-e', 'no_proxy=host.docker.internal,localhost,127.0.0.1');
+    }
   }
 
   // Host guard (scripts/coding-guard-daemon.mjs): where to ask, and who is asking.
@@ -396,6 +470,79 @@ export async function registerBox(session, { env = process.env, release = false 
   }
 }
 
+function docker(args, opts = {}) {
+  return spawnSync('docker', args, { encoding: 'utf8', ...opts });
+}
+
+/** Is the launcher that owns a gate still running (on this host)? */
+function launcherAlive(pid) {
+  const n = Number(pid);
+  if (!Number.isInteger(n) || n <= 0) return false;
+  try { process.kill(n, 0); return true; } catch (err) { return err.code === 'EPERM'; }
+}
+
+/**
+ * Gates and box networks whose LAUNCHER is gone (killed before its cleanup).
+ * Judged by the launcher's pid, not by whether the box container exists yet:
+ * a fresh gate lives a moment before its box starts, and a parallel launch
+ * must not sweep it. Matched by label, never by name pattern.
+ */
+function sweepOrphanGates() {
+  const gates = docker(['ps', '-a', '--filter', 'label=coding.box.gate=1', '--format', '{{.Names}}\t{{.Label "coding.box.gate.pid"}}\t{{.Label "coding.box.gate.network"}}']).stdout || '';
+  for (const line of gates.split('\n').filter(Boolean)) {
+    const [gateName, pid, network] = line.split('\t');
+    if (launcherAlive(pid)) continue;
+    docker(['rm', '-f', gateName]);
+    if (network) docker(['network', 'rm', network]);
+  }
+  const nets = docker(['network', 'ls', '--filter', 'label=coding.box.network=1', '--format', '{{.Name}}\t{{.Label "coding.box.network.pid"}}']).stdout || '';
+  for (const line of nets.split('\n').filter(Boolean)) {
+    const [network, pid] = line.split('\t');
+    if (!launcherAlive(pid)) docker(['network', 'rm', network]);
+  }
+}
+
+/**
+ * Locked network for box `name`: an --internal network plus its gate.
+ * Returns { network, ip, gateName } — or throws, and leaves nothing behind.
+ */
+export function startGate({ name, agent, env = process.env, platform = process.platform, guardPortNum = guardPort(env) }) {
+  sweepOrphanGates();
+  const network = `${name}-net`;
+  const gateName = `${name}-gate`;
+  const fail = (what, res) => {
+    docker(['rm', '-f', gateName]);
+    docker(['network', 'rm', network]);
+    throw new Error(`box network: ${what} failed: ${(res.stderr || res.stdout || '').trim()}`);
+  };
+  let res = docker(['network', 'create', '--internal', '--label', 'coding.box.network=1', '--label', `coding.box.network.for=${name}`, '--label', `coding.box.network.pid=${process.pid}`, network]);
+  if (res.status !== 0) fail('creating the internal network', res);
+  res = docker(gateRunArgs({ name, agent, ports: gatePorts(env, guardPortNum), network, upstream: gateUpstream(env), platform }));
+  if (res.status !== 0) fail('starting the gate', res);
+  res = docker(['network', 'connect', network, gateName]);
+  if (res.status !== 0) fail('connecting the gate', res);
+  res = docker(['inspect', '-f', `{{(index .NetworkSettings.Networks "${network}").IPAddress}}`, gateName]);
+  const ip = (res.stdout || '').trim();
+  if (res.status !== 0 || !/^\d+\.\d+\.\d+\.\d+$/.test(ip)) fail('reading the gate address', res);
+  // Ready once it logs {"ready":true} — well under a second; ten is the cap.
+  for (let i = 0; i < 100; i++) {
+    const logs = docker(['logs', gateName]);
+    if (/"ready":true/.test(logs.stdout)) return { network, ip, gateName };
+    if (/"fatal"/.test(`${logs.stderr}${logs.stdout}`)) fail('the gate', logs);
+    spawnSync('sleep', ['0.1']);
+  }
+  fail('waiting for the gate', { stderr: 'not ready after 10 s' });
+  return null;
+}
+
+/** Stop the gate and its network; returns what the gate refused. */
+export function stopGate({ network, gateName }) {
+  const denials = gateDenials(docker(['logs', gateName]).stdout);
+  docker(['rm', '-f', gateName]);
+  docker(['network', 'rm', network]);
+  return denials;
+}
+
 async function run(agent, args) {
   const built = imageDigest();
   if (!built) {
@@ -427,11 +574,24 @@ async function run(agent, args) {
     }
   }
   const name = `coding-box-${agent}-${process.pid}`;
+  let gate = null;
+  if (boxNetworkMode() === 'locked') {
+    try {
+      gate = startGate({ name, agent });
+    } catch (err) {
+      process.stderr.write(`agent-box: ${err.message}\nagent-box: refusing to start the box without its network lock (CODING_BOX_NETWORK=open runs it on the open bridge, recorded).\n`);
+      if (piAgentDir) fs.rmSync(piAgentDir, { recursive: true, force: true });
+      return 1;
+    }
+  } else {
+    process.stderr.write('agent-box: CODING_BOX_NETWORK=open — the box can reach every host service and the internet\n');
+    spawnSync(process.execPath, [path.join(REPO, 'scripts', 'coding-guard.mjs'), 'note', 'box.network.open', `agent=${agent}`, `box=${name}`], { stdio: 'ignore' });
+  }
   const boxToken = await registerBox(name);
   if (!boxToken) process.stderr.write('agent-box: the host guard did not register this box — `coding svc` will be refused inside it\n');
   try {
     const argv = boxRunArgs({
-      agent, args, name, boxToken, piAgentDir,
+      agent, args, name, boxToken, piAgentDir, gate,
       uid: process.getuid?.(), gid: process.getgid?.(),
       tty: Boolean(process.stdin.isTTY),
     });
@@ -440,6 +600,13 @@ async function run(agent, args) {
   } finally {
     if (boxToken) await registerBox(name, { release: true });
     if (piAgentDir) fs.rmSync(piAgentDir, { recursive: true, force: true });
+    if (gate) {
+      const denied = stopGate(gate);
+      if (denied.length) {
+        const shown = denied.slice(0, 8).map((d) => `${d.dest}${d.count > 1 ? ` ×${d.count}` : ''}`).join(', ');
+        process.stderr.write(`agent-box: the box network refused ${shown}${denied.length > 8 ? ', …' : ''} (allow-list: docker/agent-box/gate/egress-allow.json)\n`);
+      }
+    }
   }
 }
 
