@@ -203,7 +203,39 @@ Fewer known mistakes to clean up.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-7" aria-labelledby="overview-measure" markdown="1">
+<section class="overview-slide overview-wide" id="slide-7" aria-labelledby="overview-contain" markdown="1">
+<div class="overview-copy" markdown="1">
+
+<p class="overview-kicker">Contain</p>
+
+## The agent works on your project, not your machine {#overview-contain}
+
+claude, copilot and pi run in the **agent box** by default: a Linux container
+that sees your project and very little else.
+
+**Grey** is the same agent on the host. It runs as you, so it reaches your
+keys, Docker, every service and its own guard.
+
+**In the box**, it cannot see the rest of your home or start containers, and
+it cannot switch its guard off. A rule is overridden only by a grant you
+approve on the host.
+
+**Not locked yet:** the other host services and the internet (orange).
+
+</div>
+<figure class="overview-figure" markdown="1">
+
+[![Every path an agent can read or write. The host agent, greyed, reaches all of them. The boxed agent: project read-write, coding repo and guard read-only, own settings, transcripts read-write; the rest of home, guard keys, Docker socket, host processes, MCP servers and GitHub keys blocked; coding containers, the guard daemon and overrides only through the guard; LLM proxy allowed; other host services and the internet still reachable.](images/agent-box-access.svg)](images/agent-box-access.svg){: target="_blank" rel="noopener" title="Open full-size image" }
+
+<figcaption>Every path, both ways: grey for the host, colour for the box.</figcaption>
+</figure>
+<p class="overview-takeaway" markdown="1">
+Your keys, Docker and the guard stay out of the agent's reach.
+[Agent Box & Overrides](core-systems/agent-box.md)
+</p>
+</section>
+
+<section class="overview-slide" id="slide-8" aria-labelledby="overview-measure" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Measure</p>
@@ -229,7 +261,7 @@ Know what a change saved before you keep it.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-8" aria-labelledby="overview-route" markdown="1">
+<section class="overview-slide" id="slide-9" aria-labelledby="overview-route" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Route</p>
@@ -262,7 +294,7 @@ One place to count, route and fall back.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-9" aria-labelledby="overview-connect" markdown="1">
+<section class="overview-slide" id="slide-10" aria-labelledby="overview-connect" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Stay connected</p>
@@ -292,7 +324,7 @@ Move between networks. The agent keeps working.
 </p>
 </section>
 
-<section class="overview-slide" id="slide-10" aria-labelledby="overview-compose" markdown="1">
+<section class="overview-slide" id="slide-11" aria-labelledby="overview-compose" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Compose</p>

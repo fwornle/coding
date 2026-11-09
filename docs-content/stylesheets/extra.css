@@ -283,3 +283,24 @@
 .gauge-warn    { color: #ffff00; background: #5f5f00; }
 .gauge-high    { color: #ff8700; background: #875f00; }
 .gauge-crit    { color: #ff0000; background: #5f0000; font-weight: 700; }
+
+/* Overview deck: a slide whose figure is a dense diagram (agent-box access).
+   Narrow copy, figure as large as the screen allows. Selectors out-rank
+   assets/overview.css (shared with glass), which loads after this file. */
+.overview-deck .overview-slide.overview-wide {
+  grid-template-columns: minmax(0, .55fr) minmax(0, 1.7fr);
+  max-width: 120rem;
+}
+.overview-deck .overview-wide .overview-figure img {
+  max-height: 84dvh;
+  padding: 0;
+}
+@media (max-width: 800px) {
+  .overview-deck .overview-slide.overview-wide {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .overview-deck .overview-wide .overview-figure img {
+    max-height: none;
+  }
+}
+
