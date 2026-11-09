@@ -22,6 +22,21 @@
 # Surfaces the tail of the captured launch output so the real error (a failed
 # MCP gate, missing config, proxy/auth hiccup) is visible instead of a silent
 # drop back to the shell prompt.
+# Reset terminal state — tmux/agent may leave the terminal in raw mode, causing
+# "staircase" output (LF without CR). Called right after attach returns, BEFORE
+# anything is printed (a fast-exit report written to a raw terminal is
+# unreadable), and again at the end. Goes through /dev/tty so it works even
+# when stdin/stdout are redirected. Idempotent.
+# Note: intentionally NOT using '\ec' (RIS / full terminal reset) here.
+# RIS resets terminal geometry and column tracking, which corrupts VS Code's
+# integrated terminal and causes garbled/wrapped output on the next launch.
+_tmux_wrapper_reset_tty() {
+  { : </dev/tty; } 2>/dev/null || return 0   # no controlling terminal
+  stty sane </dev/tty 2>/dev/null || true
+  # focus reporting, mouse modes, bracketed paste off; leave alt screen; cursor on
+  printf '\e[?1004l\e[?1000l\e[?1002l\e[?1003l\e[?1006l\e[?2004l\e[?1049l\e[?25h' >/dev/tty 2>/dev/null || true
+}
+
 _tmux_wrapper_report_fast_exit() {
   local session_name="$1"
   local log_file="$2"
@@ -499,6 +514,7 @@ EOF_MOUSE_COPY
 
   tmux attach-session -t "$session_name"
   local attach_rc=$?
+  _tmux_wrapper_reset_tty
 
   # If attach itself failed (non-zero) but the session is still alive, the agent
   # is running detached — surface the failure and preserve the session instead
@@ -533,13 +549,5 @@ EOF_MOUSE_COPY
   # After attach returns, clean up the session if it still exists
   tmux kill-session -t "$session_name" 2>/dev/null || true
 
-  # Reset terminal state — tmux/agent may leave the terminal in raw mode,
-  # causing "staircase" output (LF without CR) after detach/exit
-  stty sane 2>/dev/null || true
-  printf '\e[?1004l' 2>/dev/null || true   # Disable focus reporting
-  printf '\e[?1049l' 2>/dev/null || true   # Exit alternate screen buffer (if stuck)
-  printf '\e[?25h' 2>/dev/null || true     # Ensure cursor is visible
-  # Note: intentionally NOT using '\ec' (RIS / full terminal reset) here.
-  # RIS resets terminal geometry and column tracking, which corrupts VS Code's
-  # integrated terminal and causes garbled/wrapped output on the next launch.
+  _tmux_wrapper_reset_tty
 }

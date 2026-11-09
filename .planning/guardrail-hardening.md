@@ -293,7 +293,7 @@ request path (proxy repo); team scope fails closed with a route test.
 | Phase 1 item 6 (red-team cells) | done — script row + declined verdict; env -i hole found and closed; opencode void (empty completions) | see "Phase 1 item 6 results" and "follow-up" |
 | Phase 2 (check results) | done — red-team 2026-11-08 no regression, shell-workaround held; CI gate unverified until the first push | see "Phase 2 results" |
 | Phase 2: AST rules | done — in the box (guard 04b64ed3), red-team 2026-11-08 no regression | parsed-file checks behind 3 regex rules; see "Phase 2 AST rules results" |
-| Box default (copilot, pi) | code + tests done; live launch on the host pending | see "Box default" |
+| Box default (copilot, pi) | pi verified live on the host; copilot fix needs `coding box build` | see "Box default" |
 | Box image paste (Cmd+V) | done — Terminal.app sends nothing for an image (Ctrl+V there) | see "Box clipboard" |
 | Phase 3 | todo | |
 
@@ -923,6 +923,27 @@ socket)**: an interactive `coding --copilot` / `coding --pi` in the box —
 pi answering through the staged models.json, a copilot session appearing in
 the LSL. No image rebuild needed: nothing under `docker/agent-box` changed.
 
+**Live check 2026-11-09** — `coding --pi`: answered through the staged
+models.json (rapid-proxy-pi / claude-sonnet-5). `coding --copilot`: exited
+after 4 s. Cause: Docker created `~/.copilot` (parent of the new
+session-state mount) ROOT-owned in the home volume, so copilot could not
+write its config and quit (`~/.pi` likewise; pi only writes in the mounted
+agent dir, so it survived). Fix: the entrypoint's chown loop covers
+`.copilot` and `.pi` too — needs `coding box build`; the next box start
+chowns the existing root dirs. Drift test: every nested mount under the box
+home must have its top-level parent in that loop (it fails on the old
+entrypoint, naming ~/.copilot).
+
+The same failed launch left the host terminal stair-stepping (LF without
+CR). The launcher's cleanup trap fired on INT/TERM while the terminal was
+still raw, then the handler RETURNED and the wrapper kept printing (cleanup,
+fast-exit report) — the reset ran only at the very end. Now: the wrapper
+resets the tty (via /dev/tty) immediately after `tmux attach` returns;
+`_cleanup_session` resets first and runs once; INT/TERM exit (130/143)
+after cleaning up. Test: `tests/launcher/terminal-reset` (runs the scripts'
+own lines in bash). Where the signal came from was not established (could
+not reproduce Terminal.app + tmux from inside the box).
+
 ## Box clipboard (2026-11-08)
 
 Image paste from the host into boxed agents. `clipboard-shim.mjs` answers
@@ -979,3 +1000,8 @@ there. `CODING_BOX_PASTE=off` runs an agent bare. Tests:
   store mounted for LSL; pi gets a staged, host-pointed copy of its config dir
   instead of a rw mount of the host's); opencode stays opt-in (SQLite WAL
   store cannot be shared with the box). Live launch check pending on the host.
+- **2026-11-09 (late morning)** — live: pi OK in the box; copilot exited
+  (root-owned ~/.copilot from the nested mount) → entrypoint chown + drift
+  test; terminal left raw by the failed launch → tty reset right after attach,
+  cleanup once, INT/TERM exit. llm-proxy 502s of 11-08 evening–11-09 morning:
+  the laptop had lost internet (fixed by reboot), not an agent action.

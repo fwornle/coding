@@ -24,10 +24,12 @@ home=/home/agent
 mkdir -p "$home"
 chown "$uid:$gid" "$home"
 # Docker creates the missing parents of a nested mount as root: ~/.claude when
-# it mounts the host's ~/.claude/projects into the home volume. Left that way,
-# the agent cannot write ~/.claude/.credentials.json and /login fails. Only the
+# it mounts the host's ~/.claude/projects into the home volume, ~/.copilot for
+# ~/.copilot/session-state, ~/.pi for the staged ~/.pi/agent. Left that way,
+# the agent cannot write its own config there: /login fails for claude, and
+# copilot exits at once (it writes ~/.copilot/config.json on start). Only the
 # directory itself — never the mount below it.
-for dir in "$home/.claude"; do
+for dir in "$home/.claude" "$home/.copilot" "$home/.pi"; do
   if [ -d "$dir" ] && ! mountpoint -q "$dir"; then chown "$uid:$gid" "$dir"; fi
 done
 # Tools that look the user up (git, ssh, npm) need a passwd/group entry.
