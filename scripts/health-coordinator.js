@@ -592,6 +592,7 @@ function ingestSignal(signal) {
         sessionId: sid,
         projectPath,
         projectName,
+        pid: Number.isInteger(signal.payload?.pid) ? signal.payload.pid : null,
         transcriptPath: signal.payload?.transcriptPath,
         tmuxPane: signal.payload?.tmux_pane || null,
         // Real-time content-activity ts from the ETM (null until genuine growth
@@ -3006,10 +3007,11 @@ function reapEtmsForClosedSessions() {
  * @param {string} why reason, logged verbatim
  */
 function killEtmEntry(key, e, why) {
-  // pid is embedded in the heartbeat key (`etm-<pid>-<start>:project`), the
-  // same convention _probeHolderLiveness relies on.
-  const m = /^[a-z]+-(\d+)-/.exec(key);
-  const pid = m ? parseInt(m[1], 10) : 0;
+  // The ETM reports its own pid. Only an `etm-<pid>-` key embeds it; a launcher
+  // SESSION_ID (`opencode-<pid>-<ts>`) embeds the LAUNCHER's, and killing that
+  // aborted `coding` mid-startup.
+  const m = /^etm-(\d+)-/.exec(key);
+  const pid = Number.isInteger(e.pid) ? e.pid : (m ? parseInt(m[1], 10) : 0);
   if (pid > 0) {
     try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
   }

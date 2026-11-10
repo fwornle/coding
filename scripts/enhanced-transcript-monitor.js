@@ -996,8 +996,10 @@ class EnhancedTranscriptMonitor {
       if (!r.ok) return { staleMs: null, stalled: false };
       const state = await r.json();
       const lsl = state?.lsl || {};
-      // Match the holder's lsl entry by pid embedded in the key (etm-<pid>-...).
-      const entry = Object.entries(lsl).find(([key]) => key.includes(`-${pid}-`))?.[1];
+      // Match the holder's lsl entry by its reported pid; the key embeds a pid
+      // only for a process-derived id (etm-<pid>-...), never for a launcher's.
+      const entry = Object.values(lsl).find((e) => e?.pid === pid)
+        || Object.entries(lsl).find(([key]) => key.startsWith(`etm-${pid}-`))?.[1];
       // Pure policy: heartbeat-staleness AND the holder's self-reported
       // observation-stall (status:'stalled'). See singleton-reclaim.mjs.
       return evaluateHolderLiveness(entry, Date.now(), { reclaimStaleMs });
@@ -5599,6 +5601,9 @@ ORDER BY m.time_created ASC;`;
         status: observationStalled ? 'stalled' : (isSuspiciousActivity ? 'degraded' : 'running'),
         payload: {
           projectPath: this.config.projectPath,
+          // The session id is the LAUNCHER's (`opencode-<launcherPid>-<ts>`), so
+          // the pid it embeds is not ours. Report our own for anyone who kills us.
+          pid: process.pid,
           transcriptPath: this.transcriptPath,
           exchangeCount: this.exchangeCount,
           tmux_pane: process.env.TMUX_PANE || null,
