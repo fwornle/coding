@@ -394,8 +394,12 @@ EOF_MOUSE_COPY
     PI_CODING_AGENT_DIR PI_CODING_AGENT_SESSION_DIR PI_OFFLINE PI_TELEMETRY PI_SKIP_VERSION_CHECK
     CODING_PROJECT_ID
   )
+  # The box's protection level (--strict-box) and network mode, read by
+  # scripts/agent-box.mjs inside this session — exact in the same way: a
+  # strict launch must not leave the next plain --box launch strict (or open).
+  local box_vars=(CODING_BOX_STRICT CODING_BOX_NETWORK)
   local unset_routing=""
-  for var in "${routing_vars[@]}"; do
+  for var in "${routing_vars[@]}" "${box_vars[@]}"; do
     if [ -n "${!var}" ]; then
       env_vars+=("$var")
     else

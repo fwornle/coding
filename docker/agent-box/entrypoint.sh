@@ -37,6 +37,14 @@ if ! getent group "$gid" >/dev/null; then echo "agent:x:$gid:" >> /etc/group; fi
 if ! getent passwd "$uid" >/dev/null; then echo "agent:x:$uid:$gid:agent:$home:/bin/bash" >> /etc/passwd; fi
 
 export HOME="$home"
+# The host's web UIs at their usual localhost:<port> (localhost-relay.mjs), for a
+# browser in the box — view-only, enforced by the gate. Started as nobody, so the
+# agent can neither stop it nor take its ports. Not in --strict-box (the launcher
+# then does not set CODING_BOX_HOST_VIEW).
+if [ -n "${CODING_BOX_HOST_VIEW:-}" ]; then
+  setpriv --reuid=65534 --regid=65534 --clear-groups --no-new-privs -- \
+    node /opt/coding-box/localhost-relay.mjs "$CODING_BOX_HOST_VIEW" >/tmp/coding-box-localhost-relay.log 2>&1 &
+fi
 # Cmd+V image paste (clipboard/paste-bridge.py): the agents' Linux builds ignore
 # the empty bracketed paste a Mac terminal sends for an image-only clipboard;
 # the bridge turns it into their Ctrl+V. copilot also gets a private X display,

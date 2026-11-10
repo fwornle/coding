@@ -39,6 +39,30 @@ RUN npm install -g --no-audit --no-fund \
       "@earendil-works/pi-coding-agent@${PI_VERSION}" \
  && npm cache clean --force
 
+# A browser for UI and docs checks. Chromium at the revision the coding repo's
+# Playwright expects (`coding box build` passes the version from its
+# package-lock.json, so `npx playwright test` and the repo's own scripts find
+# it), with the system libraries it needs, in a root-owned folder. It reaches
+# only what the box reaches: pages served inside the box, and — not in
+# --strict-box — the host's web UIs, view-only, through the gate.
+ARG PLAYWRIGHT_VERSION=1.58.2
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
+RUN npm install -g --no-audit --no-fund "playwright@${PLAYWRIGHT_VERSION}" \
+ && playwright install --with-deps chromium \
+ && rm -rf /var/lib/apt/lists/* \
+ && npm cache clean --force \
+ && chown -R root:root /opt/ms-playwright \
+ && chmod -R u=rwX,go=rX /opt/ms-playwright
+
+# The docs toolchain (mkdocs.yml, as CI's deploy-docs installs it), so an
+# agent can build and serve the docs it changed and look at them.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends python3-venv \
+ && rm -rf /var/lib/apt/lists/* \
+ && python3 -m venv /opt/mkdocs \
+ && /opt/mkdocs/bin/pip install --no-cache-dir mkdocs-material mkdocs-minify-plugin \
+ && ln -s /opt/mkdocs/bin/mkdocs /usr/local/bin/mkdocs
+
 # The guard: root-owned, not writable by the agent user. The hook finds its
 # rules through CONSTRAINT_CONFIG_PATH set in the managed hook command, so a
 # CODING_REPO pointing at the (writable) workspace never reaches them.
@@ -92,6 +116,10 @@ COPY gate/gate.mjs gate/egress-allow.json /opt/coding-box/gate/
 RUN chown -R root:root /opt/coding-box/gate \
  && chmod 0755 /opt/coding-box/gate \
  && chmod 0644 /opt/coding-box/gate/gate.mjs /opt/coding-box/gate/egress-allow.json
+# localhost:<port> in the box → the gate's view-only relay for the host's web
+# UIs (started by the entrypoint as nobody; not in --strict-box).
+COPY localhost-relay.mjs /opt/coding-box/localhost-relay.mjs
+RUN chown root:root /opt/coding-box/localhost-relay.mjs && chmod 0644 /opt/coding-box/localhost-relay.mjs
 # git push|fetch|pull|ls-remote and gh through the host guard (lib/guard/vcs.mjs):
 # /usr/local/bin precedes /usr/bin, so the shims see those verbs first and hand
 # every other git command to the real /usr/bin/git untouched.

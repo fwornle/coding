@@ -670,7 +670,7 @@ launch_agent() {
     _agent_log "DRY-RUN: All startup logic completed successfully"
     _agent_log "DRY-RUN: Would launch in tmux: $AGENT_COMMAND"
     _agent_log "DRY-RUN: Agent=$AGENT_NAME, Docker=$DOCKER_MODE, Platform=$PLATFORM"
-    _agent_log "DRY-RUN: Agent box=${CODING_BOX:-false} (${CODING_BOX_SOURCE:-unset})"
+    _agent_log "DRY-RUN: Agent box=${CODING_BOX:-false} strict=${CODING_BOX_STRICT:-false} (${CODING_BOX_SOURCE:-unset})"
     _agent_log "DRY-RUN: Features=${CODING_FEATURES:-none} (docker needed: $CODING_NEEDS_DOCKER)"
     _agent_log "DRY-RUN: Project=$TARGET_PROJECT_DIR"
     _agent_log "DRY-RUN: Network: CN=$INSIDE_CN, Proxy=$PROXY_WORKING, Required=$PROXY_REQUIRED"
@@ -782,7 +782,10 @@ launch_agent() {
     if ! node "$CODING_REPO/scripts/coding-guard.mjs" status >/dev/null 2>&1; then
       _agent_log "⚠️  Host guard daemon not reachable — the box runs, but cannot request overrides or use 'coding svc'"
     fi
-    _agent_log "📦 Launching ${AGENT_DISPLAY_NAME} in the agent box... (--no-box runs it on the host)"
+    case "${CODING_BOX_STRICT:-}" in
+      1|true|TRUE|yes|on) _agent_log "📦 Launching ${AGENT_DISPLAY_NAME} in the STRICT agent box... (host web UIs hidden; --box shows them read-only)" ;;
+      *) _agent_log "📦 Launching ${AGENT_DISPLAY_NAME} in the agent box... (--strict-box hides the host web UIs; --no-box runs on the host)" ;;
+    esac
     tmux_session_wrapper node "$CODING_REPO/scripts/agent-box.mjs" run "$AGENT_NAME" -- "${AGENT_COMMAND_ARGS[@]}" "$@"
   else
     # Outside the box the agent runs as you, with write access to its own guard.

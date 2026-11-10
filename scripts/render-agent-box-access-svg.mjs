@@ -30,6 +30,7 @@ const END = '<!-- agent-box-access:end -->';
 export const KINDS = {
   rw:     { color: '#2e7d32', dash: '',      label: 'read-write' },
   ro:     { color: '#1565c0', dash: '',      label: 'read-only' },
+  view:   { color: '#0288d1', dash: '6 4',   label: 'view-only; hidden with --strict-box' },
   own:    { color: '#00838f', dash: '',      label: "box's own copy" },
   guard:  { color: '#6a1b9a', dash: '7 5',   label: 'through the guard: you approve' },
   login:  { color: '#8d6e63', dash: '9 3 2 3', label: "the agent's own login only" },
@@ -57,7 +58,9 @@ export const ROWS = [
   ['guard', 'Guard daemon  :3035',                   'can ask, never approve',   'override requests and coding svc; approving needs your factor'],
   ['ro',    'Health coordinator  :3034',             'GET /health/state only',   'the health line on each prompt; every other route refused at the gate'],
   ['ro',    'Graphify MCP  :3851',                   'read tools, default graph', 'the coding code graph; other tools and other projects refused at the gate'],
-  ['block', 'Other host services',                   'refused at the gate',      'obs-api :12436, dashboard :3032, Qdrant :6333 …'],
+  ['view',  'Host web UIs  :3032 :3033 :12436',       'look, never change',       'dashboard, its API, knowledge viewer: GET only; writes, WebSocket, cookies refused'],
+  ['block', 'Other host services',                   'refused at the gate',      'Qdrant :6333, Redis, the containers\' own ports …'],
+  ['rw',    'A browser in the box',                  'Chromium, Playwright, mkdocs', 'screenshots of pages served in the box, the docs it builds, the UIs above'],
   ['login', 'Internet',                              'login hosts only',         'e.g. platform.claude.com for claude; every refusal is reported'],
   'You and your accounts',
   ['rw',    'Your terminal',                         'keys, screen, paste',      'tmux pane; Cmd+V image paste goes through a bridge'],
@@ -66,9 +69,9 @@ export const ROWS = [
 ];
 
 const FOOTNOTE = [
-  'Box network: an internal Docker network; its gate forwards the LLM proxy and the guard, relays GET /health/state and the graphify read tools. CODING_BOX_NETWORK=open lifts it (recorded).',
-  'Planned (Phase 3): result-check state out of the agent’s reach.',
-  'Default: claude, copilot and pi run in the box; opencode with --box. --no-box runs on the host and is recorded in the guard audit log.',
+  'Levels: --no-box (grey, on the host) · --box, the default (all colours) · --strict-box (no dashed light-blue rows: those UIs show every repo).',
+  'Box network: an internal Docker network; its gate forwards the LLM proxy and the guard and relays the listed reads. CODING_BOX_NETWORK=open lifts it (recorded).',
+  'Default: claude, copilot and pi run in the box; opencode with --box. --no-box is recorded in the guard audit log. Planned (Phase 3): result-check state out of the agent’s reach.',
 ];
 
 /** The kinds some row uses, in KINDS order — the legend shows only these. */
@@ -148,6 +151,7 @@ export function render() {
   out.push(`<text x="${(WALL_X + BOX_R) / 2}" y="${TOP + 42}" text-anchor="middle" font-size="12" fill="#3a4f6b">Linux container · your uid, not root</text>`);
   out.push(`<text x="${(WALL_X + BOX_R) / 2}" y="${TOP + 58}" text-anchor="middle" font-size="12" fill="#3a4f6b">no_new_privs · no Docker socket</text>`);
   out.push(`<text x="${(WALL_X + BOX_R) / 2}" y="${TOP + 74}" text-anchor="middle" font-size="12" fill="#3a4f6b">network: gate only</text>`);
+  out.push(`<text x="${(WALL_X + BOX_R) / 2}" y="${bottom - 12}" text-anchor="middle" font-size="12" fill="#3a4f6b">--strict-box: no dashed light-blue paths</text>`);
 
   // cards, connectors, inner fan
   for (const { r: [kind, name, verdict, detail], y: ry } of rowsY) {
@@ -172,7 +176,7 @@ export function render() {
   out.push(`<rect x="${AX}" y="${midY - AH / 2}" width="${AW}" height="${AH}" rx="14" fill="#1565c0"/>`);
   out.push(`<text x="${AX + AW / 2}" y="${midY - 22}" text-anchor="middle" font-size="17" font-weight="700" fill="#ffffff">Agent in the box</text>`);
   out.push(`<text x="${AX + AW / 2}" y="${midY + 4}" text-anchor="middle" font-size="12.5" fill="#dbe8fb">claude · copilot · pi</text>`);
-  out.push(`<text x="${AX + AW / 2}" y="${midY + 22}" text-anchor="middle" font-size="12.5" fill="#dbe8fb">by default</text>`);
+  out.push(`<text x="${AX + AW / 2}" y="${midY + 22}" text-anchor="middle" font-size="12.5" fill="#dbe8fb">by default (--box)</text>`);
   out.push(`<text x="${AX + AW / 2}" y="${midY + 40}" text-anchor="middle" font-size="12.5" fill="#dbe8fb">opencode with --box</text>`);
 
   let fy = bottom + 34;
@@ -194,7 +198,7 @@ function gate(x, y, color) {
   return `<g><rect x="${x - 9}" y="${y - 9}" width="18" height="18" transform="rotate(45 ${x} ${y})" fill="#ffffff" stroke="${color}" stroke-width="2.4"/><circle cx="${x}" cy="${y}" r="3" fill="${color}"/></g>`;
 }
 
-const MARK = { rw: '✅', ro: '👁️', own: '📦', guard: '🔐', login: '🔑', gap: '⚠️', block: '⛔' };
+const MARK = { rw: '✅', ro: '👁️', view: '🔎', own: '📦', guard: '🔐', login: '🔑', gap: '⚠️', block: '⛔' };
 
 /** The same rows as a Markdown table (docs page, between START and END). */
 export function table() {
@@ -204,7 +208,7 @@ export function table() {
     const [kind, name, verdict, detail] = r;
     lines.push(`| ${MARK[kind]} | ${name.replace(/\s+/g, ' ')} | ${verdict} | ${detail.replace(/\|/g, '\\|')} |`);
   }
-  lines.push('', `${usedKinds().map(([k, v]) => `${MARK[k]} ${v.label}`).join(' · ')}. On the host, the agent has every one of these.`);
+  lines.push('', `${usedKinds().map(([k, v]) => `${MARK[k]} ${v.label}`).join(' · ')}. On the host (\`--no-box\`), the agent has every one of these; with \`--strict-box\`, the 🔎 rows are blocked too.`);
   return lines.join('\n');
 }
 

@@ -112,6 +112,40 @@ export function boxNetworkMode(env = process.env) {
   return String(env.CODING_BOX_NETWORK || '').toLowerCase() === 'open' ? 'open' : 'locked';
 }
 
+/**
+ * Strict box (`coding --strict-box`, or CODING_BOX_STRICT=true): the box sees
+ * nothing of the host beyond what the work itself needs. The default box adds
+ * view-only access to the host's web UIs (BOX_HOST_VIEWS) — which show other
+ * repos' sessions, health and knowledge; strict leaves them out.
+ */
+export function boxStrict(env = process.env) {
+  return /^(1|true|yes|on)$/i.test(String(env.CODING_BOX_STRICT || '').trim());
+}
+
+/**
+ * The host's web UIs a default (non-strict) box may LOOK at, through the
+ * gate's view relay: GET/HEAD/OPTIONS only, no WebSocket, no cookies. Each at
+ * its usual localhost port inside the box too (localhost-relay.mjs), because
+ * the pages call each other at fixed localhost URLs.
+ */
+export const BOX_HOST_VIEWS = [
+  { name: 'health dashboard', env: 'SYSTEM_HEALTH_DASHBOARD_PORT', port: 3032 },
+  { name: 'health dashboard API', env: 'SYSTEM_HEALTH_API_PORT', port: 3033 },
+  { name: 'knowledge viewer / observations API', env: 'OBSERVATIONS_API_PORT', port: 12436 },
+];
+
+/**
+ * The view ports for this launch: none in strict mode; otherwise each UI's
+ * port (env override first), minus any port the gate already serves another
+ * way — a view relay must never shadow the LLM proxy or the guard.
+ */
+export function hostViewPorts(env = process.env, taken = []) {
+  if (boxStrict(env)) return [];
+  const ports = BOX_HOST_VIEWS.map((v) => Number(env[v.env] || v.port))
+    .filter((p) => Number.isInteger(p) && p > 0 && p < 65536 && !taken.includes(p));
+  return [...new Set(ports)];
+}
+
 /** The host ports the gate forwards: the LLM proxy and the guard daemon. Nothing else. */
 export function gatePorts(env = process.env, guardPortNum = guardPort(env)) {
   const proxy = Number(env.LLM_CLI_PROXY_PORT || 12435);
@@ -179,7 +213,7 @@ export function boxCodingHooks(isEnabled) {
  * bridge (its way to the host); the caller then connects it to the box's
  * internal network. Runs as nobody, read-only, without capabilities.
  */
-export function gateRunArgs({ name, agent, ports, network, upstream = null, relays = [], mcpRelays = [], platform = process.platform, image = IMAGE, pid = process.pid }) {
+export function gateRunArgs({ name, agent, ports, network, upstream = null, relays = [], mcpRelays = [], views = [], platform = process.platform, image = IMAGE, pid = process.pid }) {
   const argv = ['run', '-d', '--rm', '--name', `${name}-gate`,
     '--label', 'coding.box.gate=1', '--label', `coding.box.gate.for=${name}`, '--label', `coding.box.gate.network=${network}`, '--label', `coding.box.gate.pid=${pid}`,
     '--network', 'bridge', '--user', '65534:65534', '--read-only', '--cap-drop', 'ALL',
@@ -189,6 +223,7 @@ export function gateRunArgs({ name, agent, ports, network, upstream = null, rela
   for (const p of ports) argv.push('--forward', String(p));
   for (const r of relays) argv.push('--http-get', `${r.port}:${r.paths.join(',')}`);
   for (const r of mcpRelays) argv.push('--mcp', `${r.port}:${r.path}:${r.tools.join(',')}`);
+  for (const p of views) argv.push('--view', String(p));
   argv.push('--connect', String(GATE_CONNECT_PORT), '--allow-file', `${GATE_DIR}/egress-allow.json`, '--agent', agent);
   if (upstream) argv.push('--upstream', upstream);
   return argv;
@@ -311,6 +346,7 @@ export function boxRunArgs({
   image = IMAGE, name = `coding-box-${agent}-${process.pid}`, exists = fs.existsSync,
   guardDir = guardHome(env, home), guardPortNum = guardPort(env), boxToken = null,
   piAgentDir = null, gate = null, claudeSessionDir = null, gitIdentity = null, codingHooks = [],
+  hostViews = [], strict = false,
 }) {
   const command = AGENT_COMMANDS[agent];
   if (!command) throw new Error(`unknown agent '${agent}' (one of: ${Object.keys(AGENT_COMMANDS).join(', ')})`);
@@ -399,6 +435,11 @@ export function boxRunArgs({
   // locked, the host itself when open.
   if (codingHooks.length) argv.push('-e', `CODING_BOX_HOOKS=${codingHooks.join(',')}`);
   argv.push('-e', `HEALTH_COORDINATOR_URL=http://host.docker.internal:${healthCoordinatorPort(env)}`);
+  // Which protection level this box runs at, for the agent and its tools to read.
+  argv.push('-e', `CODING_BOX_MODE=${strict ? 'strict' : 'box'}`);
+  // The host's web UIs at localhost:<port> in the box (view-only via the gate);
+  // the entrypoint starts the relay only when this is set — never when strict.
+  if (!strict && hostViews.length) argv.push('-e', `CODING_BOX_HOST_VIEW=${hostViews.join(',')}`);
 
   argv.push('-v', `${HOME_VOLUME}:${BOX_HOME}`);
   // Claude transcripts on the host's disk, where session logging reads them.
@@ -614,6 +655,22 @@ export function prepareCopilotConfig(workspace, cwd, fsImpl = fs) {
   return roots;
 }
 
+/** Playwright default for the image, when the lockfile cannot say. */
+export const PLAYWRIGHT_FALLBACK = '1.58.2';
+
+/**
+ * The Playwright version the coding repo locks: the box's Chromium must be the
+ * revision that version looks for, or every launch fails with "Executable
+ * doesn't exist". From package-lock.json; the fallback when it is unreadable.
+ */
+export function playwrightVersion(repo = REPO, readFile = (f) => fs.readFileSync(f, 'utf8')) {
+  try {
+    const v = JSON.parse(readFile(path.join(repo, 'package-lock.json'))).packages?.['node_modules/playwright']?.version;
+    if (typeof v === 'string' && /^\d+\.\d+\.\d+$/.test(v)) return v;
+  } catch { /* fall through */ }
+  return PLAYWRIGHT_FALLBACK;
+}
+
 function build() {
   const changes = uncommittedGuardChanges();
   if (changes.length) {
@@ -625,6 +682,7 @@ function build() {
     stageContext(dir, src);
     process.stderr.write(`agent-box: building ${IMAGE} (guard ${src.digest}: constraint-monitor ${src.submodule.slice(0, 9)}, rules ${src.rules.slice(0, 9)})\n`);
     const res = spawnSync('docker', ['build', '-t', IMAGE,
+      '--build-arg', `PLAYWRIGHT_VERSION=${playwrightVersion()}`,
       '--label', `coding.guard.digest=${src.digest}`,
       '--label', `coding.guard.submodule=${src.submodule}`,
       '--label', `coding.guard.rules=${src.rules}`,
@@ -715,7 +773,11 @@ export function startGate({ name, agent, env = process.env, platform = process.p
   };
   let res = docker(['network', 'create', '--internal', '--label', 'coding.box.network=1', '--label', `coding.box.network.for=${name}`, '--label', `coding.box.network.pid=${process.pid}`, network]);
   if (res.status !== 0) fail('creating the internal network', res);
-  res = docker(gateRunArgs({ name, agent, ports: gatePorts(env, guardPortNum), network, upstream: gateUpstream(env), relays: gateRelays(env), mcpRelays: gateMcpRelays(env), platform }));
+  const ports = gatePorts(env, guardPortNum);
+  const relays = gateRelays(env);
+  const mcpRelays = gateMcpRelays(env);
+  const taken = [...ports, ...relays.map((r) => r.port), ...mcpRelays.map((r) => r.port), GATE_CONNECT_PORT];
+  res = docker(gateRunArgs({ name, agent, ports, network, upstream: gateUpstream(env), relays, mcpRelays, views: hostViewPorts(env, taken), platform }));
   if (res.status !== 0) fail('starting the gate', res);
   res = docker(['network', 'connect', network, gateName]);
   if (res.status !== 0) fail('connecting the gate', res);
@@ -789,6 +851,12 @@ async function run(agent, args) {
     }
   }
   const name = `coding-box-${agent}-${process.pid}`;
+  const strict = boxStrict();
+  const viewTaken = [...gatePorts(), ...gateRelays().map((r) => r.port), ...gateMcpRelays().map((r) => r.port), GATE_CONNECT_PORT];
+  const hostViews = hostViewPorts(process.env, viewTaken);
+  process.stderr.write(strict
+    ? 'agent-box: strict box — the host\'s web UIs (dashboard, viewer) stay hidden from the agent\n'
+    : `agent-box: box — the agent can VIEW the host's web UIs at localhost:${hostViews.join(', ')} (read-only; --strict-box hides them)\n`);
   let gate = null;
   if (boxNetworkMode() === 'locked') {
     try {
@@ -810,6 +878,7 @@ async function run(agent, args) {
     const argv = boxRunArgs({
       agent, args, name, boxToken, piAgentDir, gate, claudeSessionDir,
       gitIdentity: hostGitIdentity(process.env.TARGET_PROJECT_DIR || process.cwd()), codingHooks,
+      hostViews, strict,
       uid: process.getuid?.(), gid: process.getgid?.(),
       tty: Boolean(process.stdin.isTTY),
     });

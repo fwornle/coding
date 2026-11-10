@@ -6,6 +6,11 @@ your project, but it cannot touch the guard that checks its tool calls, and it
 cannot approve its own rule bypasses. Approving takes your fingerprint, face,
 phone, security key or password, in a host browser page.
 
+There are three [protection levels](#protection-levels): `--no-box` (the host,
+no boundary), `--box` (the default: the box, and the agent may *look* at the
+host's dashboard and viewer) and `--strict-box` (the box, with those hidden
+too).
+
 ![Agent box architecture](../images/agent-box-architecture.png)
 
 ## Why a box
@@ -57,14 +62,16 @@ The same, as a table:
 | 🔐 | Guard daemon :3035 | can ask, never approve | override requests and coding svc; approving needs your factor |
 | 👁️ | Health coordinator :3034 | GET /health/state only | the health line on each prompt; every other route refused at the gate |
 | 👁️ | Graphify MCP :3851 | read tools, default graph | the coding code graph; other tools and other projects refused at the gate |
-| ⛔ | Other host services | refused at the gate | obs-api :12436, dashboard :3032, Qdrant :6333 … |
+| 🔎 | Host web UIs :3032 :3033 :12436 | look, never change | dashboard, its API, knowledge viewer: GET only; writes, WebSocket, cookies refused |
+| ⛔ | Other host services | refused at the gate | Qdrant :6333, Redis, the containers' own ports … |
+| ✅ | A browser in the box | Chromium, Playwright, mkdocs | screenshots of pages served in the box, the docs it builds, the UIs above |
 | 🔑 | Internet | login hosts only | e.g. platform.claude.com for claude; every refusal is reported |
 | | **You and your accounts** | | |
 | ✅ | Your terminal | keys, screen, paste | tmux pane; Cmd+V image paste goes through a bridge |
 | 🔐 | Overriding a rule | only grants you sign | host: one line in the transcript, which the agent can type itself |
 | 🔐 | git push / fetch, gh | via the guard | pinned remotes only, no force or delete; gh reads free, PR writes need you |
 
-✅ read-write · 👁️ read-only · 📦 box's own copy · 🔐 through the guard: you approve · 🔑 the agent's own login only · ⛔ blocked / not visible. On the host, the agent has every one of these.
+✅ read-write · 👁️ read-only · 🔎 view-only; hidden with --strict-box · 📦 box's own copy · 🔐 through the guard: you approve · 🔑 the agent's own login only · ⛔ blocked / not visible. On the host (`--no-box`), the agent has every one of these; with `--strict-box`, the 🔎 rows are blocked too.
 <!-- agent-box-access:end -->
 
 The diagram and this table come from one list in
@@ -79,7 +86,16 @@ read-only and without capabilities. Inside the box, `host.docker.internal` is th
 gate, so every URL the launcher hands the agent keeps working. The gate:
 
 - forwards the **LLM proxy** (`:12435`) and the **guard** (`:3035`) to the host.
-  Any other port is refused, including obs-api, the dashboard and Qdrant;
+  Any port not listed here is refused, including Qdrant and Redis;
+- in the default box (not with `--strict-box`), relays the host's **web UIs**
+  for viewing: the health dashboard (`:3032`), its API (`:3033`) and the
+  knowledge viewer / observations API (`:12436`). `GET`, `HEAD` and `OPTIONS`
+  of any path pass, with the query; `POST`, `PUT`, `PATCH`, `DELETE` and every
+  WebSocket upgrade get 403 and never reach the host; cookies and
+  `Authorization` are dropped both ways. Inside the box the same UIs answer at
+  their usual `localhost:<port>`, because the pages call each other at fixed
+  localhost URLs: a small relay (`localhost-relay.mjs`, running as `nobody`)
+  passes those ports to the gate, where the rules are enforced;
 - relays one read from the **health coordinator** (`:3034`): `GET /health/state`,
   which the health prompt hook asks for. Any other method or path gets 403, so
   the coordinator's other routes (`PUT /features`, `POST /health/remediate`,
@@ -109,14 +125,51 @@ A gate left over from a killed launcher is removed by the next launch.
 as before, where every host service and the internet are reachable. It says
 so when it starts and records `box.network.open` in the guard audit log.
 
+## Protection levels
+
+Choose one per launch. The box is the default; the other two trade in either
+direction.
+
+| | `--no-box` | `--box` (default) | `--strict-box` |
+|---|---|---|---|
+| Where the agent runs | on the host, as you | in the box | in the box |
+| Your project | read-write | read-write | read-write |
+| Rest of your home, other repos, `~/.ssh`, Docker | **everything** | not visible | not visible |
+| Its own guard and rules | can edit or switch off | root-owned, read-only | root-owned, read-only |
+| Rule overrides | one typed line | only grants you approve | only grants you approve |
+| Models (LLM proxy), `git push`, `gh`, `coding svc` | directly | through the proxy and the guard | through the proxy and the guard |
+| Graphify code graph | every project | coding graph, read tools | coding graph, read tools |
+| Browser and `mkdocs` in the box | your own | ✅ pages served in the box | ✅ pages served in the box |
+| Host web UIs (dashboard `:3032`, API `:3033`, viewer `:12436`) | full use | **view only**: look, never change | **hidden** |
+| `npm install`, `pip install`, WebFetch | ✅ | host shell or `--no-box` | host shell or `--no-box` |
+| Recorded in the guard audit log | yes, where the box is the default | no | no |
+
+**Why `--strict-box` exists.** The host UIs are views over *every* repo and
+team on the machine: other projects' session logs, observations, knowledge
+and health. The default box lets the agent look at them, which is what you
+want when it should check its own change in the dashboard or the viewer, at
+the cost that what they show becomes readable inside the box. With
+`--strict-box` the box sees only the project and the coding repo; checking a
+host UI is then yours to do, or a job for a `--box` session.
+
+What none of the box levels allow, whichever you pick: writing to a host UI
+(a feature toggle, a remediation, a workflow run), a WebSocket to it, the
+guard's keys, the Docker socket, or approving its own override.
+
 ## Launching
 
 | Command | Where the agent runs |
 |---------|---------------------|
 | `coding` / `coding --claude`, `coding --copilot`, `coding --pi` | in the box: the default when the `constraints` feature is on |
+| `coding --strict-box` (with any of those) | in the box, with the host web UIs hidden too |
 | `coding --no-box` (with any of those) | on the host; this is **recorded in the guard audit log** |
 | `coding --opencode --box` | in the box, opt-in (see below) |
 | `CODING_BOX=false coding` | on the host (same as `--no-box`, also recorded) |
+| `CODING_BOX_STRICT=true coding` | strict, as a standing choice (e.g. in your shell profile); `--box` on the command line overrides it |
+
+The launch line says which level is running, for example
+`agent-box: box — the agent can VIEW the host's web UIs at localhost:3032, 3033, 12436 (read-only; --strict-box hides them)`.
+Inside the box, `CODING_BOX_MODE` is `box` or `strict`.
 
 Only the final command changes: tmux, the status line and all host services
 stay as they are. With the `constraints` feature off (the Docker-free `harness`
@@ -134,6 +187,28 @@ coding box status     # current / stale / missing
 The image contains only what is committed. If an agent edits the guard inside
 the mounted repo, nothing reaches the box. When the image is older than the
 committed guard, the launcher warns, but it never rebuilds on its own.
+
+## Looking at pages from the box
+
+The image carries a browser, so an agent can check a UI or docs change itself
+instead of asking you for a screenshot:
+
+- **Chromium** at the revision the coding repo's Playwright expects
+  (`coding box build` reads the version from `package-lock.json`), with its
+  system libraries, in `/opt/ms-playwright` (root-owned;
+  `PLAYWRIGHT_BROWSERS_PATH` points there). `npx playwright test`, the
+  `playwright` CLI (`playwright screenshot <url> shot.png`) and
+  `/playwright-cli` work as on the host. gsd-browser is not in the image yet.
+- **mkdocs** with the Material theme and the minify plugin, as CI builds the
+  docs: `mkdocs build` or `mkdocs serve`, then open the page.
+- The browser reaches what the box reaches, nothing more: pages served inside
+  the box (a dev server, `mkdocs serve`, a built `site/`, a test's own
+  `webServer`), and in the default box the host web UIs above at
+  `http://localhost:3032` and so on, view-only. Fonts or scripts a page loads
+  from the internet are refused at the gate, so such pages can look plainer
+  than on the host.
+- A box-local server cannot use `3032`, `3033` or `12436` in the default box:
+  the localhost relay holds them. Pick another port, or use `--strict-box`.
 
 ## Each agent's guard
 
@@ -580,6 +655,9 @@ chain, and `audit` names the first broken line.
   [box network](#box-network) gate (web search works, because it runs on the
   model's side). Install dependencies from a host shell, or run the session
   with `--no-box`.
+- The host web UIs are view-only from the default box and hidden with
+  `--strict-box`. Anything that needs a WebSocket (the dashboard's live
+  updates, for example) does not update in the box; reload the page instead.
 - Of the MCP servers, only graphify reaches the box, through the
   [box network](#box-network) gate's MCP relay, and only its read tools on the
   default graph. `coding svc graphify` still runs the graphify CLI.

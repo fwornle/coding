@@ -130,7 +130,9 @@ OPTIONS:
   --project DIR      Set target project directory (default: current dir)
   --verbose          Enable verbose logging
   --dry-run          Run startup logic but stop before launching agent
-  --box              Run the agent in the agent box (default for claude)
+  --box              Run the agent in the agent box (default for claude, copilot, pi).
+                     The agent can VIEW the host's web UIs (dashboard, viewer) read-only
+  --strict-box       Agent box, and the host's web UIs stay hidden too (CODING_BOX_STRICT=true)
   --no-box           Run the agent directly on the host (recorded in the guard audit log)
   --help             Show this help
 
@@ -250,6 +252,15 @@ while [[ $# -gt 0 ]]; do
     --box)
       # Run the agent inside the coding agent box (docker/agent-box/).
       export CODING_BOX=true
+      export CODING_BOX_STRICT=false
+      CODING_BOX_SOURCE=flag
+      shift
+      ;;
+    --strict-box)
+      # The box, plus: the host's web UIs (dashboard, viewer — which show every
+      # repo's data) stay hidden. scripts/agent-box.mjs reads CODING_BOX_STRICT.
+      export CODING_BOX=true
+      export CODING_BOX_STRICT=true
       CODING_BOX_SOURCE=flag
       shift
       ;;
