@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  boxRunArgs, boxPath, toBoxUrl, guardSource, configRoots, prepareCopilotConfig, stageBoxPiDir,
+  boxRunArgs, boxPath, toBoxUrl, guardSource, configRoots, prepareCopilotConfig, stageBoxPiDir, boxOpencodeConfig, opencodeConfigFile, PROXY_NO_AUTH,
   boxClaudeSettings, claudeMcpConfigPath, stageClaudeSession, hostGitIdentity, gitIdentityEnv, boxCodingHooks, BOX_CODING_HOOKS,
   IMAGE, HOME_VOLUME, BOX_HOME, BOX_GUARD_KEYS, BOX_PI_DIR, BOX_CLAUDE_SESSION, HOST_COMMAND_SETTINGS,
 } from '../../scripts/agent-box.mjs';
@@ -265,6 +265,64 @@ describe('per-agent guards (Phase 1 item 5)', () => {
     } finally {
       fs.rmSync(ws, { recursive: true, force: true });
     }
+  });
+});
+
+describe('boxOpencodeConfig', () => {
+  /** Stands in for whatever key the host file holds; it must never reach the box. */
+  const HOST_ONLY = 'host-value-not-for-the-box';
+  // What the launcher sends (opencodeConfigContent): per-launch overlays only.
+  const launch = JSON.stringify({
+    enabled_providers: ['rapid-proxy', 'github-copilot'],
+    provider: {
+      'rapid-proxy': { options: { headers: { 'x-project': 'coding' } }, models: { 'gpt-4o': { variants: { cheap: {} } } } },
+      'github-copilot': { options: { baseURL: 'http://127.0.0.1:12435/v1/opencode' } },
+    },
+  });
+  // The host's file config, which the box does not have.
+  const hostFile = JSON.stringify({
+    model: 'rapid-proxy/claude-sonnet-5',
+    small_model: 'qwen-laptop/qwen3.8-27b-local',
+    provider: {
+      'rapid-proxy': { npm: '@ai-sdk/openai-compatible', name: 'Proxy', options: { baseURL: 'http://localhost:12435/v1', apiKey: HOST_ONLY }, models: { 'gpt-4o': { name: 'GPT-4o' }, 'claude-sonnet-5': {} } },
+      'qwen-laptop': { npm: '@ai-sdk/openai-compatible', options: { baseURL: 'http://127.0.0.1:8081/v1' } },
+    },
+  });
+
+  test('the enabled providers get their definition from the host file; the launch values win', () => {
+    const cfg = JSON.parse(boxOpencodeConfig(launch, hostFile));
+    const rp = cfg.provider['rapid-proxy'];
+    assert.equal(rp.npm, '@ai-sdk/openai-compatible');
+    assert.equal(rp.options.baseURL, 'http://localhost:12435/v1', 'the URL opencode reported missing ("Invalid URL")');
+    assert.deepEqual(rp.options.headers, { 'x-project': 'coding' });
+    assert.deepEqual(rp.models['gpt-4o'], { name: 'GPT-4o', variants: { cheap: {} } });
+    assert.ok(rp.models['claude-sonnet-5']);
+    assert.equal(cfg.provider['github-copilot'].options.baseURL, 'http://127.0.0.1:12435/v1/opencode');
+    assert.equal(cfg.model, 'rapid-proxy/claude-sonnet-5');
+  });
+
+  test('never the host key, never a provider the launch did not enable', () => {
+    const cfg = JSON.parse(boxOpencodeConfig(launch, hostFile));
+    assert.equal(cfg.provider['rapid-proxy'].options.apiKey, PROXY_NO_AUTH);
+    assert.equal(cfg.provider['qwen-laptop'], undefined);
+    assert.equal(cfg.small_model, undefined, 'its provider is not enabled');
+    assert.ok(!boxOpencodeConfig(launch, hostFile).includes(HOST_ONLY));
+  });
+
+  test('a model the launch chose is kept; unparseable input leaves the content alone', () => {
+    const own = JSON.stringify({ ...JSON.parse(launch), model: 'github-copilot/gpt-4o' });
+    assert.equal(JSON.parse(boxOpencodeConfig(own, hostFile)).model, 'github-copilot/gpt-4o');
+    assert.equal(boxOpencodeConfig(launch, '{ not json'), launch);
+  });
+
+  test('loopback URLs reach the host once boxed', () => {
+    assert.match(toBoxUrl(boxOpencodeConfig(launch, hostFile)), /"baseURL":"http:\/\/host\.docker\.internal:12435\/v1"/);
+  });
+
+  test('the host file: OPENCODE_CONFIG, else XDG_CONFIG_HOME, else ~/.config', () => {
+    assert.equal(opencodeConfigFile({ OPENCODE_CONFIG: '/x/oc.json' }, '/Users/u'), '/x/oc.json');
+    assert.equal(opencodeConfigFile({ XDG_CONFIG_HOME: '/xdg' }, '/Users/u'), '/xdg/opencode/opencode.json');
+    assert.equal(opencodeConfigFile({}, '/Users/u'), '/Users/u/.config/opencode/opencode.json');
   });
 });
 

@@ -19,7 +19,7 @@
  * Plan: .planning/guardrail-hardening.md (Phase 1, item 1).
  */
 
-import { spawnSync, execFileSync } from 'node:child_process';
+import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -177,10 +177,12 @@ export function boxCodingHooks(isEnabled) {
 /**
  * `docker run` argv for the gate of box `name`. Pure. It starts on the default
  * bridge (its way to the host); the caller then connects it to the box's
- * internal network. Runs as nobody, read-only, without capabilities.
+ * internal network. Runs as nobody, read-only, without capabilities. Not
+ * --rm: a gate that dies keeps its log (why it died) and can be restarted in
+ * place (watchGate); stopGate and the orphan sweep remove it.
  */
 export function gateRunArgs({ name, agent, ports, network, upstream = null, relays = [], mcpRelays = [], platform = process.platform, image = IMAGE, pid = process.pid }) {
-  const argv = ['run', '-d', '--rm', '--name', `${name}-gate`,
+  const argv = ['run', '-d', '--name', `${name}-gate`,
     '--label', 'coding.box.gate=1', '--label', `coding.box.gate.for=${name}`, '--label', `coding.box.gate.network=${network}`, '--label', `coding.box.gate.pid=${pid}`,
     '--network', 'bridge', '--user', '65534:65534', '--read-only', '--cap-drop', 'ALL',
     '--security-opt', 'no-new-privileges', '--entrypoint', 'node'];
@@ -578,6 +580,57 @@ export function stageBoxPiDir(srcDir, stageDir, fsImpl = fs) {
   return copied;
 }
 
+/**
+ * What a box provider sends as its key to the LLM proxy, which does not
+ * authenticate — the value pi's staged config uses (proxy-routing.mjs). Not a credential.
+ */
+export const PROXY_NO_AUTH = 'coding-local-proxy-no-auth';
+
+/** opencode's file config on the host — the one OPENCODE_CONFIG_CONTENT is merged over. */
+export function opencodeConfigFile(env = process.env, home = os.homedir()) {
+  if (env.OPENCODE_CONFIG) return env.OPENCODE_CONFIG;
+  return path.join(env.XDG_CONFIG_HOME || path.join(home, '.config'), 'opencode', 'opencode.json');
+}
+
+/**
+ * OPENCODE_CONFIG_CONTENT for a box session. The launcher's content
+ * (opencodeConfigContent) holds only per-launch values and leans on the host's
+ * file config for the providers themselves — npm package, baseURL, models — and
+ * for the default model. The box has no such file (its home is a volume), so
+ * opencode there had a rapid-proxy with no URL and failed every turn with
+ * "Invalid URL". Carry over, from `hostText`, each ENABLED provider's
+ * definition (the launch's own values win) and the default models when their
+ * provider is enabled — never a host apiKey (a placeholder instead). Loopback
+ * URLs are pointed at the host later (toBoxUrl).
+ * Pure. Unparseable input → the content unchanged.
+ */
+export function boxOpencodeConfig(content, hostText) {
+  let cfg;
+  let host;
+  try { cfg = JSON.parse(content || '{}'); host = JSON.parse(hostText); } catch { return content; }
+  if (!host || typeof host !== 'object') return content;
+  const enabled = Array.isArray(cfg.enabled_providers) ? cfg.enabled_providers : Object.keys(cfg.provider || {});
+  cfg.provider = cfg.provider || {};
+  for (const id of enabled) {
+    const fromHost = host.provider?.[id];
+    if (!fromHost) continue;
+    const own = cfg.provider[id] || {};
+    const models = { ...(fromHost.models || {}) };
+    for (const [m, v] of Object.entries(own.models || {})) models[m] = { ...(models[m] || {}), ...v };
+    // Never the host's key: the proxy does not authenticate, and a credential
+    // has no business in the box.
+    const { apiKey, ...hostOptions } = fromHost.options || {};
+    const options = { ...hostOptions, ...(apiKey !== undefined ? { apiKey: PROXY_NO_AUTH } : {}), ...(own.options || {}) };
+    if (fromHost.options?.headers || own.options?.headers) options.headers = { ...(fromHost.options?.headers || {}), ...(own.options?.headers || {}) };
+    cfg.provider[id] = { ...fromHost, ...own, options, models };
+  }
+  const usable = (ref) => typeof ref === 'string' && enabled.includes(ref.split('/')[0]);
+  for (const key of ['model', 'small_model']) {
+    if (cfg[key] === undefined && usable(host[key])) cfg[key] = host[key];
+  }
+  return JSON.stringify(cfg);
+}
+
 /** The workspace and every directory below it down to `cwd`. */
 export function configRoots(workspace, cwd) {
   const rel = path.relative(workspace, cwd);
@@ -733,6 +786,95 @@ export function startGate({ name, agent, env = process.env, platform = process.p
   return null;
 }
 
+/**
+ * Why a gate died, from its log: its {"fatal"} line, else the first error line
+ * of a Node stack trace (an unhandled 'error' event), else null.
+ */
+export function gateExitReason(logText) {
+  let reason = null;
+  for (const line of String(logText || '').split('\n')) {
+    try {
+      const o = JSON.parse(line);
+      if (o && typeof o.fatal === 'string') reason = o.fatal;
+      continue;
+    } catch { /* not a log line */ }
+    if (!reason && /^\w*Error\b.*:/.test(line.trim())) reason = line.trim();
+  }
+  return reason;
+}
+
+/** How often watchGate restarts a dead gate before it gives up. */
+export const GATE_MAX_RESTARTS = 3;
+
+/**
+ * Watch the gate while its box runs. The box reaches the host only through
+ * the gate, at a fixed address (--add-host), so a dead gate leaves an agent
+ * that retries ECONNREFUSED with nothing in its pane to say why. On a death:
+ * say so, with the gate's own reason, and restart it in place — accepted only
+ * if it comes back at the same address. Past `maxRestarts`, or at a new
+ * address, say the box has no network and stop watching. Returns { stop() }.
+ *
+ * `ops` are the docker side (injectable for tests): wait(name) → { done:
+ * Promise<exit code>, cancel() }, logs(name) → text, restart(name) → ip|null.
+ */
+export function watchGate(gate, { write = (s) => process.stderr.write(s), maxRestarts = GATE_MAX_RESTARTS, ops = gateOps(gate) } = {}) {
+  let stopped = false;
+  let current = null;
+  let restarts = 0;
+  const say = (s) => write(`\r\nagent-box: ${s}\r\n`);
+  const loop = async () => {
+    while (!stopped) {
+      current = ops.wait(gate.gateName);
+      const code = await current.done;
+      if (stopped) return;
+      const reason = gateExitReason(ops.logs(gate.gateName)) || `exit code ${code}`;
+      if (restarts >= maxRestarts) {
+        say(`the box network gate died again (${reason}); restarted ${restarts}× already — the box has NO network now. Quit and relaunch it.`);
+        return;
+      }
+      restarts++;
+      const ip = ops.restart(gate.gateName);
+      if (ip !== gate.ip) {
+        say(`the box network gate died (${reason}) and could not be restored${ip ? ` (new address ${ip}, the box expects ${gate.ip})` : ''} — the box has NO network now. Quit and relaunch it.`);
+        return;
+      }
+      say(`the box network gate died (${reason}); restarted it (${restarts}/${maxRestarts}). Requests in flight were lost — retry them.`);
+    }
+  };
+  const done = loop().catch((err) => say(`cannot watch the box network gate: ${err.message}`));
+  return {
+    done,
+    stop() { stopped = true; current?.cancel(); },
+  };
+}
+
+/** The docker side of watchGate. */
+function gateOps({ network }) {
+  return {
+    wait(name) {
+      const child = spawn('docker', ['wait', name], { stdio: ['ignore', 'pipe', 'ignore'] });
+      let out = '';
+      child.stdout.on('data', (d) => { out += d; });
+      const done = new Promise((resolve) => {
+        child.on('error', () => resolve(null));
+        child.on('exit', () => resolve(out.trim() === '' ? null : Number(out.trim())));
+      });
+      return { done, cancel: () => child.kill() };
+    },
+    logs: (name) => { const r = docker(['logs', name]); return `${r.stdout || ''}${r.stderr || ''}`; },
+    restart(name) {
+      if (docker(['start', name]).status !== 0) return null;
+      for (let i = 0; i < 100; i++) {
+        const r = docker(['inspect', '-f', `{{.State.Running}} {{(index .NetworkSettings.Networks "${network}").IPAddress}}`, name]);
+        const [running, ip] = (r.stdout || '').trim().split(' ');
+        if (running === 'true' && /^\d+\.\d+\.\d+\.\d+$/.test(ip || '')) return ip;
+        spawnSync('sleep', ['0.1']);
+      }
+      return null;
+    },
+  };
+}
+
 /** Stop the gate and its network; returns what the gate refused. */
 export function stopGate({ network, gateName }) {
   const denials = gateDenials(docker(['logs', gateName]).stdout);
@@ -762,6 +904,16 @@ async function run(agent, args) {
   if (agent === 'copilot') {
     // Created here, as the user: docker would create a missing source as root.
     fs.mkdirSync(path.join(os.homedir(), COPILOT_SESSIONS), { recursive: true });
+  }
+  if (agent === 'opencode') {
+    const file = opencodeConfigFile();
+    let hostText = null;
+    try { hostText = fs.readFileSync(file, 'utf8'); } catch { /* none */ }
+    if (hostText === null) {
+      process.stderr.write(`agent-box: no opencode config at ${file} — opencode in the box has only its built-in providers\n`);
+    } else {
+      process.env.OPENCODE_CONFIG_CONTENT = boxOpencodeConfig(process.env.OPENCODE_CONFIG_CONTENT, hostText);
+    }
   }
   let piAgentDir = null;
   if (agent === 'pi') {
@@ -813,8 +965,15 @@ async function run(agent, args) {
       uid: process.getuid?.(), gid: process.getgid?.(),
       tty: Boolean(process.stdin.isTTY),
     });
-    const res = spawnSync('docker', argv, { stdio: 'inherit' });
-    return res.status ?? 1;
+    // Async, so the gate can be watched while the box runs.
+    const box = spawn('docker', argv, { stdio: 'inherit' });
+    const watcher = gate ? watchGate(gate) : null;
+    const status = await new Promise((resolve) => {
+      box.on('error', (err) => { process.stderr.write(`agent-box: docker: ${err.message}\n`); resolve(1); });
+      box.on('exit', (code) => resolve(code ?? 1));
+    });
+    watcher?.stop();
+    return status;
   } finally {
     if (boxToken) await registerBox(name, { release: true });
     if (piAgentDir) fs.rmSync(piAgentDir, { recursive: true, force: true });

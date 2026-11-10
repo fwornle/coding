@@ -8,7 +8,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  boxRunArgs, boxNetworkMode, gatePorts, gateRunArgs, gateRelays, gateMcpRelays, healthCoordinatorPort, gateUpstream, gateDenials, GATE_CONNECT_PORT, IMAGE,
+  boxRunArgs, boxNetworkMode, gatePorts, gateRunArgs, gateRelays, gateMcpRelays, healthCoordinatorPort, gateUpstream, gateDenials, gateExitReason, watchGate, GATE_CONNECT_PORT, IMAGE,
 } from '../../scripts/agent-box.mjs';
 
 const base = {
@@ -76,6 +76,7 @@ describe('locked box network — the gate', () => {
     assert.deepEqual(flag(argv, '--user'), ['65534:65534']);
     assert.deepEqual(flag(argv, '--network'), ['bridge']);
     assert.ok(argv.includes('coding.box.gate.pid=4242'));
+    assert.ok(!argv.includes('--rm'), 'a dead gate keeps its log and can be restarted');
     assert.ok(!argv.some((a) => /docker\.sock/.test(a)));
     assert.ok(!argv.includes('-v'), 'the gate mounts nothing');
     const tail = argv.slice(argv.indexOf(IMAGE) + 1);
@@ -125,5 +126,74 @@ describe('locked box network — the gate', () => {
     ].join('\n');
     assert.deepEqual(gateDenials(log), [{ dest: 'example.com:443', count: 2 }, { dest: 'api.anthropic.com:443', count: 1 }]);
     assert.deepEqual(gateDenials(''), []);
+  });
+  test('why a gate died: its fatal line, else the unhandled error of a Node stack', () => {
+    assert.equal(gateExitReason('{"ready":true}\n{"fatal":"gate: bad --forward port"}'), 'gate: bad --forward port');
+    const stack = ['{"ready":true}', '{"deny":"api.anthropic.com:443"}', 'node:events:497', '      throw er; // Unhandled \'error\' event', '      ^', '', 'Error: read ECONNRESET', '    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)'].join('\n');
+    assert.equal(gateExitReason(stack), 'Error: read ECONNRESET');
+    assert.equal(gateExitReason('{"ready":true}'), null);
+  });
+});
+
+describe('locked box network — gate liveness', () => {
+  /** Fake docker side: the gate dies once per entry in `deaths`, restarts at `ips` in turn. */
+  function fakeOps({ deaths, ips, log = 'Error: read ECONNRESET' }) {
+    const calls = { wait: 0, restart: 0, cancelled: 0 };
+    return {
+      calls,
+      ops: {
+        wait() {
+          calls.wait++;
+          const dies = calls.wait <= deaths;
+          let cancel;
+          const done = dies ? Promise.resolve(1) : new Promise((r) => { cancel = () => { calls.cancelled++; r(null); }; });
+          return { done, cancel: () => cancel?.() };
+        },
+        logs: () => log,
+        restart: () => ips[calls.restart++] ?? null,
+      },
+    };
+  }
+  const gate = { gateName: 'b-gate', network: 'b-net', ip: '172.20.0.2' };
+  const tick = () => new Promise((r) => setTimeout(r, 10));
+
+  test('a dead gate is restarted at its address and the pane is told why', async () => {
+    const out = [];
+    const { ops, calls } = fakeOps({ deaths: 1, ips: ['172.20.0.2'] });
+    const w = watchGate(gate, { ops, write: (s) => out.push(s) });
+    await tick();
+    assert.equal(calls.restart, 1);
+    assert.equal(calls.wait, 2, 'watches the restarted gate');
+    assert.match(out.join(''), /gate died \(Error: read ECONNRESET\); restarted it \(1\/3\)/);
+    w.stop();
+    await w.done;
+    assert.equal(calls.cancelled, 1, 'stop() ends the docker wait');
+  });
+
+  test('a gate that comes back at another address is not trusted: the box has no network', async () => {
+    const out = [];
+    const { ops, calls } = fakeOps({ deaths: 1, ips: ['172.20.0.3'] });
+    const w = watchGate(gate, { ops, write: (s) => out.push(s) });
+    await w.done;
+    assert.equal(calls.wait, 1);
+    assert.match(out.join(''), /new address 172\.20\.0\.3, the box expects 172\.20\.0\.2.*NO network/);
+  });
+
+  test('restarts are capped', async () => {
+    const out = [];
+    const { ops, calls } = fakeOps({ deaths: 9, ips: Array(9).fill('172.20.0.2') });
+    const w = watchGate(gate, { ops, write: (s) => out.push(s), maxRestarts: 2 });
+    await w.done;
+    assert.equal(calls.restart, 2);
+    assert.match(out.at(-1), /restarted 2× already — the box has NO network/);
+  });
+
+  test('stopping before any death says nothing', async () => {
+    const out = [];
+    const { ops } = fakeOps({ deaths: 0, ips: [] });
+    const w = watchGate(gate, { ops, write: (s) => out.push(s) });
+    w.stop();
+    await w.done;
+    assert.deepEqual(out, []);
   });
 });
