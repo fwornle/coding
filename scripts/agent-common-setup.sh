@@ -255,8 +255,9 @@ start_statusline_health_monitor() {
     fi
   fi
 
-  # Ensure lock is cleaned up on exit
-  trap "rm -rf '$lockdir' 2>/dev/null" EXIT
+  # No `trap ... EXIT` here: this runs in the launcher's shell, where it would
+  # replace the launcher's _cleanup_session EXIT trap. Every path below releases
+  # the lock, and one left by an abort goes stale after a minute (above).
 
   # Check PID file first (faster than pgrep)
   if [ -f "$pidfile" ]; then
