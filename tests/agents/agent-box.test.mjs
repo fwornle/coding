@@ -586,3 +586,26 @@ describe('the coding hooks in the box', () => {
     }
   });
 });
+
+describe('claudeGaugeSession — the boxed session id the host gauge reads', async () => {
+  const { claudeGaugeSession, claudeLaunchModel } = await import('../../scripts/agent-box.mjs');
+  const id = '11111111-2222-3333-4444-555555555555';
+  test('a fresh launch is pinned to a new id', () => {
+    const r = claudeGaugeSession(['--settings', 'x'], () => id);
+    assert.deepStrictEqual(r, { args: ['--settings', 'x', '--session-id', id], sessionId: id });
+  });
+  test('an explicit --resume or --session-id is read back, args untouched', () => {
+    assert.deepStrictEqual(claudeGaugeSession(['--resume', id]), { args: ['--resume', id], sessionId: id });
+    assert.deepStrictEqual(claudeGaugeSession([`--session-id=${id}`]), { args: [`--session-id=${id}`], sessionId: id });
+  });
+  test('continue, picker resume and fork leave the id to Claude', () => {
+    for (const args of [['-c'], ['--resume'], ['-r', '--model', 'opus'], ['--resume', id, '--fork-session']]) {
+      assert.deepStrictEqual(claudeGaugeSession(args), { args, sessionId: null }, args.join(' '));
+    }
+  });
+  test('model: --model, then staged settings, then env', () => {
+    assert.strictEqual(claudeLaunchModel(['--model', 'opus[1m]']), 'opus[1m]');
+    assert.strictEqual(claudeLaunchModel([], null, { ANTHROPIC_MODEL: 'sonnet' }), 'sonnet');
+    assert.strictEqual(claudeLaunchModel([], '/nonexistent', {}), null);
+  });
+});

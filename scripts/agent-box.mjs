@@ -20,8 +20,9 @@
  */
 
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -266,6 +267,86 @@ export const BOX_CLAUDE_SESSION = '/opt/coding-box/claude-session';
  * bar is drawn by tmux on the host either way.
  */
 export const HOST_COMMAND_SETTINGS = ['hooks', 'statusLine', 'apiKeyHelper', 'awsAuthRefresh', 'awsCredentialExport', 'otelHeadersHelper'];
+
+/**
+ * WHICH CLAUDE SESSION THE BOX IS RUNNING — for the host's tmux context gauge
+ * ---------------------------------------------------------------------------
+ * On the host, Claude's status-line command tells the gauge its session id
+ * (scripts/claude-statusline.cjs → recordClaudeSession). The box drops that
+ * command (HOST_COMMAND_SETTINGS), so for a boxed Claude nothing ever did, and
+ * the gauge fell back to the project's newest transcript — another session's
+ * number, or GAUGE_ZERO when that one had no bridge file. That was the "stuck
+ * on 0%, then 25%, then 0% again" gauge.
+ *
+ * So the launcher fixes the id itself: a fresh session gets `--session-id
+ * <uuid>`, and a `--resume <id>` / `--session-id <id>` is read back from the
+ * args. `--continue`, a bare `--resume` (picker) and `--fork-session` leave the
+ * id to Claude, so there is nothing to record and the gauge keeps today's
+ * fallback. Pure, so tests can pin it.
+ *
+ * @returns {{ args: string[], sessionId: string|null }}
+ */
+export function claudeGaugeSession(args = [], uuid = randomUUID) {
+  let sessionId = null;
+  let unknowable = false;
+  for (let i = 0; i < args.length; i++) {
+    const a = String(args[i]);
+    const eq = a.indexOf('=');
+    const flag = a.startsWith('--') && eq > 0 ? a.slice(0, eq) : a;
+    const inline = flag !== a ? a.slice(eq + 1) : null;
+    const next = args[i + 1] != null && !String(args[i + 1]).startsWith('-') ? String(args[i + 1]) : null;
+    if (flag === '--session-id') sessionId = inline ?? next;
+    else if (flag === '--resume' || flag === '-r') {
+      if (inline ?? next) sessionId = inline ?? next;
+      else unknowable = true;
+    } else if (flag === '--continue' || flag === '-c' || flag === '--fork-session') unknowable = true;
+  }
+  const uuidShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (unknowable) return { args, sessionId: null };
+  if (sessionId) return { args, sessionId: uuidShape.test(sessionId) ? sessionId : null };
+  const id = uuid();
+  return { args: [...args, '--session-id', id], sessionId: id };
+}
+
+/** The model a boxed Claude starts on: `--model`, else the staged settings, else the env. */
+export function claudeLaunchModel(args = [], settingsFile = null, env = process.env) {
+  for (let i = 0; i < args.length; i++) {
+    const a = String(args[i]);
+    if (a.startsWith('--model=')) return a.slice(8) || null;
+    if (a === '--model' && args[i + 1]) return String(args[i + 1]);
+  }
+  if (settingsFile) {
+    try {
+      const m = JSON.parse(fs.readFileSync(settingsFile, 'utf8'))?.model;
+      if (typeof m === 'string' && m) return m;
+    } catch { /* no staged settings */ }
+  }
+  return env.ANTHROPIC_MODEL || null;
+}
+
+/**
+ * Tell the host gauge which session this tmux session is drawing, and keep
+ * telling it: the record has a 24h TTL (context-gauge.cjs), and a boxed session
+ * can outlive that. Returns a stop function; a no-op outside tmux.
+ */
+function recordBoxedClaudeForGauge({ sessionId, model, cwd }) {
+  if (!sessionId || !process.env.TMUX || !process.env.TMUX_PANE) return () => {};
+  let tmuxSession;
+  try {
+    tmuxSession = execFileSync('tmux', ['display-message', '-p', '-t', process.env.TMUX_PANE, '#{session_name}'],
+      { encoding: 'utf8', timeout: 1000, stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch { return () => {}; }
+  if (!tmuxSession) return () => {};
+  let gauge;
+  try {
+    gauge = createRequire(import.meta.url)(path.join(REPO, 'lib', 'statusline', 'context-gauge.cjs'));
+  } catch { return () => {}; }
+  const write = () => { try { gauge.recordClaudeSession({ tmuxSession, sessionId, cwd, model }); } catch { /* best effort */ } };
+  write();
+  const timer = setInterval(write, 60 * 60 * 1000);
+  timer.unref?.();
+  return () => clearInterval(timer);
+}
 
 function git(args, cwd = REPO) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
@@ -994,6 +1075,16 @@ async function run(agent, args) {
       process.stderr.write(`agent-box: ${err.message} — Claude starts without this project's settings, slash commands and MCP servers\n`);
     }
   }
+  let stopGaugeRecord = () => {};
+  if (agent === 'claude') {
+    const pinned = claudeGaugeSession(args);
+    args = pinned.args;
+    stopGaugeRecord = recordBoxedClaudeForGauge({
+      sessionId: pinned.sessionId,
+      model: claudeLaunchModel(args, claudeSessionDir && path.join(claudeSessionDir, 'settings.json')),
+      cwd: process.env.TARGET_PROJECT_DIR || process.cwd(),
+    });
+  }
   let codingHooks = [];
   if (agent === 'claude') {
     try {
@@ -1017,6 +1108,7 @@ async function run(agent, args) {
       process.stderr.write(`agent-box: ${err.message}\nagent-box: refusing to start the box without its network lock (CODING_BOX_NETWORK=open runs it on the open bridge, recorded).\n`);
       if (piAgentDir) fs.rmSync(piAgentDir, { recursive: true, force: true });
       if (claudeSessionDir) fs.rmSync(claudeSessionDir, { recursive: true, force: true });
+      stopGaugeRecord();
       return 1;
     }
   } else {
@@ -1044,6 +1136,7 @@ async function run(agent, args) {
     watcher?.stop();
     return status;
   } finally {
+    stopGaugeRecord();
     if (boxToken) await registerBox(name, { release: true });
     if (piAgentDir) fs.rmSync(piAgentDir, { recursive: true, force: true });
     if (claudeSessionDir) fs.rmSync(claudeSessionDir, { recursive: true, force: true });

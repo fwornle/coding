@@ -1341,3 +1341,67 @@ describe('paneIdentity (the cache-key coupling)', () => {
     expect(paneIdentity({}).suffix).toBe('');
   });
 });
+
+// ---------------------------------------------------------------------------
+// A boxed Claude has no bridge file: the transcript is the fallback
+// ---------------------------------------------------------------------------
+//
+// agent-box drops `statusLine` from the box's settings, so nothing writes
+// claude-ctx-<id>.json for a boxed session and the gauge sat on GAUGE_ZERO. The
+// host still sees the box's transcript (~/.claude/projects is mounted in), and
+// its last main-thread usage IS the occupancy.
+
+describe('readClaude transcript fallback', () => {
+  let configDir;
+  let savedConfigDir;
+  const project = '/Users/someone/work/proj';
+  const sid = '11111111-2222-3333-4444-555555555555';
+  const entry = (usage, extra = {}) => JSON.stringify({
+    type: 'assistant', timestamp: new Date().toISOString(),
+    message: { model: 'claude-opus-5-5', usage }, ...extra,
+  });
+
+  beforeEach(() => {
+    savedConfigDir = process.env.CLAUDE_CONFIG_DIR;
+    configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ctx-gauge-claude-'));
+    process.env.CLAUDE_CONFIG_DIR = configDir;
+    fs.mkdirSync(path.join(configDir, 'projects', '-Users-someone-work-proj'), { recursive: true });
+  });
+  afterEach(() => {
+    if (savedConfigDir === undefined) delete process.env.CLAUDE_CONFIG_DIR;
+    else process.env.CLAUDE_CONFIG_DIR = savedConfigDir;
+    fs.rmSync(configDir, { recursive: true, force: true });
+    try { fs.unlinkSync(path.join(os.tmpdir(), 'claude-tmux-session-ctx-gauge-boxed.json')); } catch { /* none */ }
+  });
+  const writeTranscript = (lines) => fs.writeFileSync(
+    path.join(configDir, 'projects', '-Users-someone-work-proj', `${sid}.jsonl`), lines.join('\n') + '\n');
+
+  test('reads the last main-thread usage, ignoring sidechains', () => {
+    writeTranscript([
+      entry({ input_tokens: 5, cache_read_input_tokens: 10_000, cache_creation_input_tokens: 0 }),
+      entry({ input_tokens: 2, cache_read_input_tokens: 90_000, cache_creation_input_tokens: 10_000 }),
+      entry({ input_tokens: 1, cache_read_input_tokens: 5, cache_creation_input_tokens: 0 }, { isSidechain: true }),
+    ]);
+    const r = gauge.readContextUsage({ agent: 'claude', sessionId: sid, projectPath: project });
+    expect(r.source).toBe('claude-transcript');
+    // 100,002 of a 200K window → remaining 50% → usable (50-16.5)/83.5.
+    expect(r.usedPct).toBeCloseTo(100 - ((50 - 0.001 - 16.5) / 83.5) * 100, 1);
+  });
+
+  test('the recorded [1m] model sizes the window the transcript cannot name', () => {
+    writeTranscript([entry({ input_tokens: 0, cache_read_input_tokens: 100_000, cache_creation_input_tokens: 0 })]);
+    gauge.recordClaudeSession({ tmuxSession: 'ctx-gauge-boxed', sessionId: sid, model: 'opus[1m]' });
+    const r = gauge.readContextUsage({ agent: 'claude', sessionId: sid, projectPath: project, tmuxSession: 'ctx-gauge-boxed' });
+    expect(r.usedPct).toBeCloseTo(100 - ((90 - 16.5) / 83.5) * 100, 1);
+  });
+
+  test('occupancy beyond 200K proves the 1M window', () => {
+    writeTranscript([entry({ input_tokens: 0, cache_read_input_tokens: 300_000, cache_creation_input_tokens: 0 })]);
+    const r = gauge.readContextUsage({ agent: 'claude', sessionId: sid });
+    expect(r.usedPct).toBeCloseTo(100 - ((70 - 16.5) / 83.5) * 100, 1);
+  });
+
+  test('no bridge and no transcript is still null', () => {
+    expect(gauge.readContextUsage({ agent: 'claude', sessionId: sid, projectPath: project })).toBeNull();
+  });
+});
