@@ -113,8 +113,8 @@ Switch later with `coding-features profile <tier>`, one feature with
 
 ```bash
 cd ~/my-project
-coding                     # best available agent
-coding --claude            # or --copilot, --opencode, --pi
+coding                     # Claude Code (the default)
+coding pi                  # or copilot, opencode, claude — same as --pi etc.
 coding --project DIR       # another directory
 coding --dry-run           # resolve everything, launch nothing
 ```

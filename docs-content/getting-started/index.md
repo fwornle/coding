@@ -79,8 +79,8 @@ is kept — about five minutes for the `harness` tier, a little longer with Dock
 
     ```bash
     cd ~/my-project
-    coding                  # the best available agent
-    coding --claude         # or pick one: --copilot, --opencode, --pi
+    coding                  # Claude Code (the default)
+    coding pi               # or pick one: copilot, opencode, claude (--pi etc. work too)
     coding --project DIR    # start in another directory
     ```
 
