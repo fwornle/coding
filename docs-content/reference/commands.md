@@ -8,22 +8,29 @@ CLI commands and shell usage reference.
 
 Launch a coding agent with all integrations (Docker services, LSL, health monitoring, constraints).
 
+The agent is named by the first word after `coding`, or by the equivalent flag.
+Without one, `coding` starts Claude Code.
+
 ```bash
-# Launch specific agents
-coding --claude      # Claude Code (Anthropic OAuth / Max subscription)
-coding --opencode    # OpenCode (auto-selects provider based on network)
-coding --copilot     # GitHub Copilot CLI
-coding --copi        # Alias for --copilot
+# Launch specific agents (bare word or flag — same thing)
+coding               # Claude Code (the default)
+coding claude        # Claude Code (Anthropic OAuth / Max subscription) — or --claude
+coding opencode      # OpenCode (auto-selects provider based on network) — or --opencode
+coding copilot       # GitHub Copilot CLI — or --copilot / --copi
+coding pi            # Pi — or --pi
+
+# Only the FIRST word picks the agent; the rest goes to the agent
+coding claude explain this repo
 
 # Specify project directory
 coding --project ~/my-project
 
 # Clean start (kills all coding processes, frees all ports, then launches)
 coding --force
-coding --force --claude
+coding --force claude
 
 # Dry run (validates config, network, Docker — does not launch)
-coding --opencode --dry-run
+coding opencode --dry-run
 
 # Help
 coding --help

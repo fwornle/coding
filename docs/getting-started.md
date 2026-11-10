@@ -451,9 +451,11 @@ coding
 # Or specify project
 coding --project ~/Agentic/my-project
 
-# Force specific AI agent
-coding --claude    # Claude Code (default)
-coding --copilot   # GitHub CoPilot
+# Pick a specific AI agent (bare word or flag: `coding pi` = `coding --pi`)
+coding claude      # Claude Code (default)
+coding copilot     # GitHub CoPilot
+coding opencode    # OpenCode
+coding pi          # Pi
 ```
 
 ### Knowledge Base Updates

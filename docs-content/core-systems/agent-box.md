@@ -160,10 +160,10 @@ guard's keys, the Docker socket, or approving its own override.
 
 | Command | Where the agent runs |
 |---------|---------------------|
-| `coding` / `coding --claude`, `coding --copilot`, `coding --pi` | in the box: the default when the `constraints` feature is on |
+| `coding` / `coding claude`, `coding copilot`, `coding pi` (or `--claude`, `--copilot`, `--pi`) | in the box: the default when the `constraints` feature is on |
 | `coding --strict-box` (with any of those) | in the box, with the host web UIs hidden too |
 | `coding --no-box` (with any of those) | on the host; this is **recorded in the guard audit log** |
-| `coding --opencode --box` | in the box, opt-in (see below) |
+| `coding opencode --box` | in the box, opt-in (see below) |
 | `CODING_BOX=false coding` | on the host (same as `--no-box`, also recorded) |
 | `CODING_BOX_STRICT=true coding` | strict, as a standing choice (e.g. in your shell profile); `--box` on the command line overrides it |
 

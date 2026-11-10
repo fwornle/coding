@@ -37,7 +37,7 @@ Commands, ports, paths and environment variables — the things you look up rath
 
     ```bash
     coding                   # launch the default agent (Claude Code)
-    coding --copilot         # or Copilot CLI / --opencode / --pi
+    coding copilot           # or opencode / pi / claude (--copilot etc. work too)
     coding --health          # check every service
     coding --project ~/p     # run against another directory
 

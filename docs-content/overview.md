@@ -63,9 +63,9 @@ Use the agent you already know: **Claude Code, Copilot CLI, OpenCode or pi**.
 
 ```bash
 coding              # Claude Code
-coding --copilot    # GitHub Copilot CLI
-coding --opencode   # OpenCode
-coding --pi         # pi
+coding copilot      # GitHub Copilot CLI   (or --copilot)
+coding opencode     # OpenCode             (or --opencode)
+coding pi           # pi                   (or --pi)
 ```
 
 The launcher checks the network, starts what is missing and hands over to the
