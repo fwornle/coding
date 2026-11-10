@@ -10,12 +10,14 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { randomBytes } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
   boxRunArgs, boxPath, toBoxUrl, guardSource, configRoots, prepareCopilotConfig, stageBoxPiDir,
-  IMAGE, HOME_VOLUME, BOX_HOME, BOX_GUARD_KEYS, BOX_PI_DIR,
+  boxClaudeSettings, claudeMcpConfigPath, stageClaudeSession, hostGitIdentity, gitIdentityEnv,
+  IMAGE, HOME_VOLUME, BOX_HOME, BOX_GUARD_KEYS, BOX_PI_DIR, BOX_CLAUDE_SESSION, HOST_COMMAND_SETTINGS,
 } from '../../scripts/agent-box.mjs';
 
 const base = {
@@ -319,6 +321,138 @@ describe('entrypoint ↔ nested mounts', () => {
         if (rel.length < 2) continue; // a direct child is the mount itself, not a created parent
         assert.ok(chowned.includes(rel[0]), `${agent}: ${target} needs "$home/${rel[0]}" in the entrypoint chown loop (has: ${chowned.join(', ')})`);
       }
+    }
+  });
+});
+
+describe('a boxed Claude gets what a host Claude gets', () => {
+  // claude-mcp-launcher.sh gives a host Claude --settings, --plugin-dir and
+  // --mcp-config; until 2026-11-09 the box got none of them, so a boxed session
+  // had no /sl (or any project command), none of the user's settings and no MCP.
+  const REPO = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..');
+
+  test('the session dir is mounted read-only, only for claude', () => {
+    const dir = '/tmp/coding-box-claude-x';
+    assert.ok(volumes(boxRunArgs({ ...base, claudeSessionDir: dir })).includes(`${dir}:${BOX_CLAUDE_SESSION}:ro`));
+    assert.ok(!volumes(boxRunArgs({ ...base, agent: 'opencode', claudeSessionDir: dir })).some((v) => v.includes(BOX_CLAUDE_SESSION)));
+  });
+
+  test('the session dir may not expose the guard home', () => {
+    assert.throws(() => boxRunArgs({ ...base, claudeSessionDir: '/Users/u/.coding/guard' }), /guard's keys/);
+  });
+
+  test('the env the slash commands read points at the coding repo in the box', () => {
+    const e = envs(boxRunArgs(base));
+    assert.strictEqual(e.CODING_REPO, '/Users/u/coding');
+    assert.strictEqual(e.CODING_TOOLS_PATH, '/Users/u/coding');
+    assert.strictEqual(e.CODING_KNOWLEDGE_EXPORT, '/Users/u/coding/.data/knowledge-export');
+    assert.strictEqual(envs(boxRunArgs({ ...base, platform: 'win32', codingRepo: 'C:\\Users\\u\\coding' })).CODING_REPO, '/host/c/Users/u/coding');
+  });
+
+  test('settings keep the user\'s choices but drop everything that runs a host command', () => {
+    const derived = { model: 'opus[1m]', autoMode: { allow: ['x'] }, env: { A: '1' }, hooks: { PreToolUse: [] }, statusLine: { command: 'node /x' }, apiKeyHelper: '/x' };
+    const boxed = boxClaudeSettings(derived);
+    assert.deepStrictEqual(boxed, { model: 'opus[1m]', autoMode: { allow: ['x'] }, env: { A: '1' } });
+    for (const k of HOST_COMMAND_SETTINGS) assert.ok(!(k in boxed));
+    assert.ok('hooks' in derived, 'the input is not mutated');
+  });
+
+  test('the MCP config is picked the way the host launcher picks it', () => {
+    const has = (...files) => (f) => files.includes(f);
+    assert.strictEqual(claudeMcpConfigPath('/r', {}, has('/r/claude-code-mcp-docker.json', '/r/claude-code-mcp-processed.json')), '/r/claude-code-mcp-docker.json');
+    assert.strictEqual(claudeMcpConfigPath('/r', { MCP_CONFIG: '/m.json' }, has('/m.json', '/r/claude-code-mcp-processed.json')), '/m.json');
+    assert.strictEqual(claudeMcpConfigPath('/r', {}, has('/r/claude-code-mcp-processed.json')), '/r/claude-code-mcp-processed.json');
+    assert.strictEqual(claudeMcpConfigPath('/r', {}, has()), null);
+  });
+
+  test('staging with the real generator: commands, settings, MCP with host URLs', () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'box-claude-test-'));
+    try {
+      const home = path.join(tmp, 'home');
+      const repo = path.join(tmp, 'repo');
+      const stage = path.join(tmp, 'stage');
+      fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
+      fs.writeFileSync(path.join(home, '.claude', 'settings.json'), JSON.stringify({ model: 'opus[1m]', statusLine: { type: 'command', command: 'node /host/only.js' } }));
+      // A repo with the real generator and its feature libs, and two commands.
+      fs.mkdirSync(path.join(repo, 'scripts'), { recursive: true });
+      fs.copyFileSync(path.join(REPO, 'scripts', 'build-claude-runtime-config.mjs'), path.join(repo, 'scripts', 'build-claude-runtime-config.mjs'));
+      fs.symlinkSync(path.join(REPO, 'lib'), path.join(repo, 'lib'));
+      fs.symlinkSync(path.join(REPO, 'node_modules'), path.join(repo, 'node_modules'));
+      fs.mkdirSync(path.join(repo, '.claude', 'commands'), { recursive: true });
+      fs.writeFileSync(path.join(repo, '.claude', 'commands', 'sl.md'), '# sl');
+      fs.writeFileSync(path.join(repo, '.claude', 'commands', 'graphify.md'), '# graphify');
+      fs.writeFileSync(path.join(repo, 'claude-code-mcp-docker.json'), JSON.stringify({ mcpServers: { graphify: { type: 'http', url: 'http://localhost:3851/mcp' } } }));
+      fs.mkdirSync(stage);
+
+      const env = { PATH: process.env.PATH, HOME: home, CODING_FEATURE_LSL: 'on' };
+      const args = stageClaudeSession(stage, { repo, env });
+
+      assert.deepStrictEqual(args, [
+        '--settings', `${BOX_CLAUDE_SESSION}/settings.json`,
+        '--plugin-dir', `${BOX_CLAUDE_SESSION}/claude-plugin`,
+        '--mcp-config', `${BOX_CLAUDE_SESSION}/mcp.json`,
+        '--strict-mcp-config',
+      ]);
+      assert.deepStrictEqual(fs.readdirSync(path.join(stage, 'claude-plugin', 'commands')).sort(), ['graphify.md', 'sl.md']);
+      assert.ok(fs.existsSync(path.join(stage, 'claude-plugin', '.claude-plugin', 'plugin.json')));
+      const settings = JSON.parse(fs.readFileSync(path.join(stage, 'settings.json'), 'utf8'));
+      assert.strictEqual(settings.model, 'opus[1m]');
+      assert.ok(!('hooks' in settings) && !('statusLine' in settings));
+      assert.match(fs.readFileSync(path.join(stage, 'mcp.json'), 'utf8'), /http:\/\/host\.docker\.internal:3851\/mcp/);
+      assert.deepStrictEqual(fs.readdirSync(stage).sort(), ['claude-plugin', 'mcp.json', 'settings.json'], 'nothing else is left in the mounted dir');
+      assert.ok(!fs.existsSync(path.join(repo, '.coding')), "the repo's own .coding/ is never touched");
+
+      assert.ok(!stageClaudeSession(fs.mkdtempSync(path.join(tmp, 's-')), { repo, env: { ...env, CODING_MCP_STRICT: '0' } }).includes('--strict-mcp-config'));
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
+
+  test('a failing generator is reported, not silently ignored', () => {
+    const run = () => ({ status: 1, stdout: '', stderr: 'boom\nlast line' });
+    assert.throws(() => stageClaudeSession('/nonexistent', { run }), /last line/);
+  });
+});
+
+describe('git identity in the box', () => {
+  // The box has no ~/.gitconfig: on 2026-11-09 a boxed commit failed with
+  // "Author identity unknown". Name and email are passed; the file is not.
+  test('name and email become author and committer env', () => {
+    const e = envs(boxRunArgs({ ...base, gitIdentity: { name: 'Ada Lovelace', email: 'ada@example.com' } }));
+    assert.strictEqual(e.GIT_AUTHOR_NAME, 'Ada Lovelace');
+    assert.strictEqual(e.GIT_COMMITTER_NAME, 'Ada Lovelace');
+    assert.strictEqual(e.GIT_AUTHOR_EMAIL, 'ada@example.com');
+    assert.strictEqual(e.GIT_COMMITTER_EMAIL, 'ada@example.com');
+  });
+
+  test('no identity on the host → nothing is set, and ~/.gitconfig is never mounted', () => {
+    const argv = boxRunArgs({ ...base, gitIdentity: { name: null, email: null } });
+    assert.ok(!Object.keys(envs(argv)).some((k) => k.startsWith('GIT_')));
+    assert.ok(!volumes(argv).some((v) => v.includes('.gitconfig')));
+    assert.deepStrictEqual(gitIdentityEnv({ name: 'A', email: null }), { GIT_AUTHOR_NAME: 'A', GIT_COMMITTER_NAME: 'A' });
+  });
+
+  test('read with git config in the workspace, so a repo-local identity wins', () => {
+    const calls = [];
+    const run = (cmd, args, opts) => {
+      calls.push([cmd, args, opts.cwd]);
+      return args[2] === 'user.name' ? { status: 0, stdout: 'Ada\n' } : { status: 1, stdout: '' };
+    };
+    assert.deepStrictEqual(hostGitIdentity('/w', run), { name: 'Ada', email: null });
+    assert.deepStrictEqual(calls.map((c) => [c[0], c[1].join(' '), c[2]]), [
+      ['git', 'config --get user.name', '/w'], ['git', 'config --get user.email', '/w'],
+    ]);
+  });
+
+  test('against a real repo', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'box-git-id-'));
+    try {
+      execFileSync('git', ['init', '-q'], { cwd: dir });
+      execFileSync('git', ['config', 'user.name', 'Repo Local'], { cwd: dir });
+      execFileSync('git', ['config', 'user.email', 'local@example.com'], { cwd: dir });
+      assert.deepStrictEqual(hostGitIdentity(dir), { name: 'Repo Local', email: 'local@example.com' });
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
     }
   });
 });

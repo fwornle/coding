@@ -50,6 +50,7 @@ import {
   networkProbeIntervalMs,
 } from '../lib/network/location-probe.mjs';
 import { hidIdleMs, humanPresentByHid, HUMAN_HID_IDLE_MAX_MS } from '../lib/presence/hid-idle.mjs';
+import { isAgentProcess } from '../lib/agents/agent-process.mjs';
 import { settleModeFlip, classifyNetClass } from '../lib/network/proxy-mode-flip.mjs';
 import { decidePostKickstartRecovery } from '../lib/network/post-kickstart-recovery.mjs';
 import { loadFeatures, FeatureConfigError, loadProfiles, profileAliases, configPaths } from '../lib/features/index.mjs';
@@ -2249,22 +2250,13 @@ const ETM_SPAWN_INTERVAL_MS = 30_000;
 const ETM_TRANSCRIPT_ACTIVE_MS = 120_000; // jsonl mtime within 2 min = active
 let _lastEtmSpawnCheck = 0;
 
-/**
- * Agent processes a launcher puts inside a tmux pane.
- *
- * Matched against the pane process AND every descendant, because the two
- * shapes genuinely differ and checking only one gets half the fleet wrong:
- * `claude` runs as a CHILD of claude-mcp-launcher.sh, while `opencode` and
- * `pi` ARE the pane process itself. (Measured 2026-09-05: walking children
- * only reported three live agents as husks; `#{pane_current_command}` is no
- * better — it reads `bash` for a live Claude, because the launcher shell is
- * the pane leader.)
- *
- * The trailing `(\s|$)` is what keeps the launcher script itself from
- * matching: `.../scripts/claude-mcp-launcher.sh` contains `/claude`, but
- * followed by `-`, so only the real `claude ...` argv matches.
- */
-const AGENT_PROCESS_RE = /(^|\/)(claude|opencode|pi|copilot)(\s|$)/;
+// Agent processes a launcher puts inside a tmux pane: lib/agents/agent-process.mjs.
+// Matched against the pane process AND every descendant, because the shapes
+// genuinely differ: `claude` runs as a CHILD of claude-mcp-launcher.sh, `opencode`
+// and `pi` ARE the pane process, and a boxed agent is only visible as its
+// agent-box.mjs launcher (the agent itself runs inside Docker). (Measured
+// 2026-09-05: walking children only reported three live agents as husks;
+// `#{pane_current_command}` is no better — it reads `bash` for a live Claude.)
 
 /**
  * A pane younger than this counts as agent-live even with nothing matching in
@@ -2368,7 +2360,7 @@ function paneHasLiveAgent(panePid, snap, now) {
     if (seen.has(pid)) continue;
     seen.add(pid);
     const proc = snap.byPid.get(pid);
-    if (proc && AGENT_PROCESS_RE.test(proc.cmd)) return true;
+    if (proc && isAgentProcess(proc.cmd)) return true;
     for (const child of snap.childrenOf.get(pid) || []) stack.push(child);
   }
   return false;
