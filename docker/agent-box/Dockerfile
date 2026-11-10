@@ -101,8 +101,12 @@ RUN chown -R root:root /opt/coding-box/vcs /usr/local/bin/git /usr/local/bin/gh 
  && chmod 0755 /opt/coding-box/vcs /usr/local/bin/git /usr/local/bin/gh \
  && chmod 0644 /opt/coding-box/vcs/vcs-client.mjs
 COPY managed-settings.json /etc/claude-code/managed-settings.json
+# The coding project's own hooks (tool-call capture, health line): the policy
+# calls this runner, which runs them from the mounted coding repo.
+COPY coding-hook.mjs /opt/coding-box/coding-hook.mjs
 COPY entrypoint.sh /usr/local/sbin/coding-box-entrypoint
 RUN chmod 0644 /etc/claude-code/managed-settings.json \
+ && chown root:root /opt/coding-box/coding-hook.mjs && chmod 0644 /opt/coding-box/coding-hook.mjs \
  && chmod 0755 /usr/local/sbin/coding-box-entrypoint
 
 ENTRYPOINT ["/usr/local/sbin/coding-box-entrypoint"]

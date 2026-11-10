@@ -118,12 +118,45 @@ export function gatePorts(env = process.env, guardPortNum = guardPort(env)) {
   return [...new Set([proxy, Number(guardPortNum)])];
 }
 
+/** The health coordinator's port on the host (the prompt hook asks it for /health/state). */
+export function healthCoordinatorPort(env = process.env) {
+  try {
+    const u = new URL(env.HEALTH_COORDINATOR_URL);
+    if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(u.hostname) && u.port) return Number(u.port);
+  } catch { /* unset or not a URL */ }
+  return 3034;
+}
+
+/**
+ * Read-only relays through the gate: GET of exactly these paths, nothing else
+ * on that port. The coordinator also takes PUT /features, POST
+ * /health/remediate, /experiments/run …, which a boxed agent must not reach.
+ */
+export function gateRelays(env = process.env) {
+  return [{ port: healthCoordinatorPort(env), paths: ['/health/state'] }];
+}
+
+/**
+ * The coding project's own Claude hooks (build-claude-runtime-config.mjs), by
+ * the name docker/agent-box/coding-hook.mjs runs them under, with the feature
+ * that installs each on the host. The constraint guard is not here: in the box
+ * it is the managed policy's own, fixed hook.
+ */
+export const BOX_CODING_HOOKS = { 'tool-interaction': 'lsl', 'health-prompt': 'health' };
+
+/** The coding hooks whose feature is on — what a host Claude would run. Fails closed. */
+export function boxCodingHooks(isEnabled) {
+  return Object.entries(BOX_CODING_HOOKS).filter(([, feature]) => {
+    try { return Boolean(isEnabled(feature)); } catch { return false; }
+  }).map(([name]) => name);
+}
+
 /**
  * `docker run` argv for the gate of box `name`. Pure. It starts on the default
  * bridge (its way to the host); the caller then connects it to the box's
  * internal network. Runs as nobody, read-only, without capabilities.
  */
-export function gateRunArgs({ name, agent, ports, network, upstream = null, platform = process.platform, image = IMAGE, pid = process.pid }) {
+export function gateRunArgs({ name, agent, ports, network, upstream = null, relays = [], platform = process.platform, image = IMAGE, pid = process.pid }) {
   const argv = ['run', '-d', '--rm', '--name', `${name}-gate`,
     '--label', 'coding.box.gate=1', '--label', `coding.box.gate.for=${name}`, '--label', `coding.box.gate.network=${network}`, '--label', `coding.box.gate.pid=${pid}`,
     '--network', 'bridge', '--user', '65534:65534', '--read-only', '--cap-drop', 'ALL',
@@ -131,6 +164,7 @@ export function gateRunArgs({ name, agent, ports, network, upstream = null, plat
   if (platform === 'linux') argv.push('--add-host', 'host.docker.internal:host-gateway');
   argv.push(image, `${GATE_DIR}/gate.mjs`, '--target', 'host.docker.internal');
   for (const p of ports) argv.push('--forward', String(p));
+  for (const r of relays) argv.push('--http-get', `${r.port}:${r.paths.join(',')}`);
   argv.push('--connect', String(GATE_CONNECT_PORT), '--allow-file', `${GATE_DIR}/egress-allow.json`, '--agent', agent);
   if (upstream) argv.push('--upstream', upstream);
   return argv;
@@ -167,7 +201,8 @@ export const BOX_CLAUDE_SESSION = '/opt/coding-box/claude-session';
  * Settings that run a HOST command. Inside the box the command does not exist
  * (host node paths, host scripts), and hooks are the managed policy's alone
  * there (allowManagedHooksOnly), so these are dropped from the box's copy. The
- * coding status bar is drawn by tmux on the host either way.
+ * policy runs the coding hooks itself (BOX_CODING_HOOKS); the coding status
+ * bar is drawn by tmux on the host either way.
  */
 export const HOST_COMMAND_SETTINGS = ['hooks', 'statusLine', 'apiKeyHelper', 'awsAuthRefresh', 'awsCredentialExport', 'otelHeadersHelper'];
 
@@ -251,7 +286,7 @@ export function boxRunArgs({
   home = os.homedir(), platform = process.platform, uid, gid, tty = false,
   image = IMAGE, name = `coding-box-${agent}-${process.pid}`, exists = fs.existsSync,
   guardDir = guardHome(env, home), guardPortNum = guardPort(env), boxToken = null,
-  piAgentDir = null, gate = null, claudeSessionDir = null, gitIdentity = null,
+  piAgentDir = null, gate = null, claudeSessionDir = null, gitIdentity = null, codingHooks = [],
 }) {
   const command = AGENT_COMMANDS[agent];
   if (!command) throw new Error(`unknown agent '${agent}' (one of: ${Object.keys(AGENT_COMMANDS).join(', ')})`);
@@ -335,6 +370,11 @@ export function boxRunArgs({
   // The image pins each agent's version (rebuilt by `coding box build`), and
   // its npm prefix is root-owned: a self-update can only fail, loudly, mid-session.
   argv.push('-e', 'DISABLE_AUTOUPDATER=1');
+  // The coding hooks a host Claude runs (coding-hook.mjs in the image runs only
+  // these), and where the health one asks: the gate's /health/state relay when
+  // locked, the host itself when open.
+  if (codingHooks.length) argv.push('-e', `CODING_BOX_HOOKS=${codingHooks.join(',')}`);
+  argv.push('-e', `HEALTH_COORDINATOR_URL=http://host.docker.internal:${healthCoordinatorPort(env)}`);
 
   argv.push('-v', `${HOME_VOLUME}:${BOX_HOME}`);
   // Claude transcripts on the host's disk, where session logging reads them.
@@ -651,7 +691,7 @@ export function startGate({ name, agent, env = process.env, platform = process.p
   };
   let res = docker(['network', 'create', '--internal', '--label', 'coding.box.network=1', '--label', `coding.box.network.for=${name}`, '--label', `coding.box.network.pid=${process.pid}`, network]);
   if (res.status !== 0) fail('creating the internal network', res);
-  res = docker(gateRunArgs({ name, agent, ports: gatePorts(env, guardPortNum), network, upstream: gateUpstream(env), platform }));
+  res = docker(gateRunArgs({ name, agent, ports: gatePorts(env, guardPortNum), network, upstream: gateUpstream(env), relays: gateRelays(env), platform }));
   if (res.status !== 0) fail('starting the gate', res);
   res = docker(['network', 'connect', network, gateName]);
   if (res.status !== 0) fail('connecting the gate', res);
@@ -716,6 +756,14 @@ async function run(agent, args) {
       process.stderr.write(`agent-box: ${err.message} — Claude starts without this project's settings, slash commands and MCP servers\n`);
     }
   }
+  let codingHooks = [];
+  if (agent === 'claude') {
+    try {
+      codingHooks = boxCodingHooks((await import('../lib/features/index.mjs')).isEnabled);
+    } catch (err) {
+      process.stderr.write(`agent-box: cannot read the feature config (${err.message}) — no coding hooks in the box\n`);
+    }
+  }
   const name = `coding-box-${agent}-${process.pid}`;
   let gate = null;
   if (boxNetworkMode() === 'locked') {
@@ -737,7 +785,7 @@ async function run(agent, args) {
   try {
     const argv = boxRunArgs({
       agent, args, name, boxToken, piAgentDir, gate, claudeSessionDir,
-      gitIdentity: hostGitIdentity(process.env.TARGET_PROJECT_DIR || process.cwd()),
+      gitIdentity: hostGitIdentity(process.env.TARGET_PROJECT_DIR || process.cwd()), codingHooks,
       uid: process.getuid?.(), gid: process.getgid?.(),
       tty: Boolean(process.stdin.isTTY),
     });

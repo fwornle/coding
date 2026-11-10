@@ -10,15 +10,18 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
 import { randomBytes } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import http from 'node:http';
+import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
   boxRunArgs, boxPath, toBoxUrl, guardSource, configRoots, prepareCopilotConfig, stageBoxPiDir,
-  boxClaudeSettings, claudeMcpConfigPath, stageClaudeSession, hostGitIdentity, gitIdentityEnv,
+  boxClaudeSettings, claudeMcpConfigPath, stageClaudeSession, hostGitIdentity, gitIdentityEnv, boxCodingHooks, BOX_CODING_HOOKS,
   IMAGE, HOME_VOLUME, BOX_HOME, BOX_GUARD_KEYS, BOX_PI_DIR, BOX_CLAUDE_SESSION, HOST_COMMAND_SETTINGS,
 } from '../../scripts/agent-box.mjs';
+import { hookScript, HOOK_SCRIPTS } from '../../docker/agent-box/coding-hook.mjs';
 
 const base = {
   agent: 'claude', cwd: '/Users/u/proj', codingRepo: '/Users/u/coding', home: '/Users/u',
@@ -453,6 +456,75 @@ describe('git identity in the box', () => {
       assert.deepStrictEqual(hostGitIdentity(dir), { name: 'Repo Local', email: 'local@example.com' });
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('the coding hooks in the box', () => {
+  const policy = JSON.parse(fs.readFileSync(new URL('../../docker/agent-box/managed-settings.json', import.meta.url), 'utf8')).hooks;
+  const runner = (name) => `/usr/bin/env -u NODE_OPTIONS /usr/local/bin/node /opt/coding-box/coding-hook.mjs ${name}`;
+
+  test('the managed policy runs them where a host Claude does: after each tool call, on each prompt', () => {
+    assert.ok(policy.PostToolUse.some((e) => e.matcher === '*' && e.hooks[0].command === runner('tool-interaction')));
+    assert.strictEqual(policy.UserPromptSubmit[0].hooks[0].command, runner('health-prompt'));
+    assert.ok(policy.UserPromptSubmit[0].hooks[0].timeout <= 5, 'a slow coordinator must not hold up the prompt');
+    // The guard stays first and unchanged.
+    assert.match(policy.PostToolUse[0].hooks[0].command, /^\/usr\/bin\/env -i .* \/opt\/coding-guard\//);
+  });
+
+  test('the runner runs the same scripts the host config installs, and the image ships it', () => {
+    const host = fs.readFileSync(new URL('../../scripts/build-claude-runtime-config.mjs', import.meta.url), 'utf8');
+    for (const rel of Object.values(HOOK_SCRIPTS)) {
+      assert.ok(host.includes(`\${repoPath}/${rel}`), rel);
+      assert.ok(fs.existsSync(new URL(`../../${rel}`, import.meta.url)), rel);
+    }
+    assert.deepStrictEqual(Object.keys(HOOK_SCRIPTS).sort(), Object.keys(BOX_CODING_HOOKS).sort());
+    const dockerfile = fs.readFileSync(new URL('../../docker/agent-box/Dockerfile', import.meta.url), 'utf8');
+    assert.match(dockerfile, /^COPY coding-hook\.mjs \/opt\/coding-box\/coding-hook\.mjs$/m);
+  });
+
+  test('only hooks whose feature is on reach the box (fail closed)', () => {
+    assert.deepStrictEqual(boxCodingHooks(() => true), ['tool-interaction', 'health-prompt']);
+    assert.deepStrictEqual(boxCodingHooks((f) => f === 'health'), ['health-prompt']);
+    assert.deepStrictEqual(boxCodingHooks(() => { throw new Error('broken config'); }), []);
+    const e = envs(boxRunArgs({ ...base, codingHooks: ['tool-interaction', 'health-prompt'] }));
+    assert.strictEqual(e.CODING_BOX_HOOKS, 'tool-interaction,health-prompt');
+    assert.strictEqual(e.HEALTH_COORDINATOR_URL, 'http://host.docker.internal:3034');
+    assert.ok(!('CODING_BOX_HOOKS' in envs(boxRunArgs(base))));
+  });
+
+  test('the runner picks a script only when it is enabled and present', () => {
+    const env = { CODING_REPO: '/repo', CODING_BOX_HOOKS: 'tool-interaction' };
+    const yes = () => true;
+    assert.strictEqual(hookScript('tool-interaction', env, yes), '/repo/scripts/tool-interaction-hook-wrapper.js');
+    assert.strictEqual(hookScript('health-prompt', env, yes), null, 'feature off');
+    assert.strictEqual(hookScript('tool-interaction', env, () => false), null, 'missing script');
+    assert.strictEqual(hookScript('tool-interaction', { ...env, CODING_REPO: 'repo' }, yes), null, 'relative repo');
+    assert.strictEqual(hookScript('constructor', { ...env, CODING_BOX_HOOKS: 'constructor' }, yes), null, 'unknown name');
+  });
+
+  test('the health hook, run by the runner, reads the coordinator and exits 0', async () => {
+    const srv = http.createServer((req, res) => {
+      res.writeHead(200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify({ overallStatus: 'healthy', services: {} }));
+    });
+    await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+    try {
+      const repo = fileURLToPath(new URL('../..', import.meta.url));
+      const out = await new Promise((resolve) => {
+        const child = spawn(process.execPath, [fileURLToPath(new URL('../../docker/agent-box/coding-hook.mjs', import.meta.url)), 'health-prompt'], {
+          env: { PATH: process.env.PATH, CODING_REPO: repo, CODING_TOOLS_PATH: repo, CODING_BOX_HOOKS: 'health-prompt', HEALTH_COORDINATOR_URL: `http://127.0.0.1:${srv.address().port}` },
+        });
+        let stdout = '';
+        child.stdout.on('data', (d) => { stdout += d; });
+        child.stdin.end(JSON.stringify({ prompt: 'hi' }));
+        child.on('exit', (code) => resolve({ code, stdout }));
+      });
+      assert.strictEqual(out.code, 0);
+      assert.strictEqual(JSON.parse(out.stdout).hookSpecificOutput.hookEventName, 'UserPromptSubmit');
+      assert.match(JSON.parse(out.stdout).hookSpecificOutput.additionalContext, /System Health/);
+    } finally {
+      await new Promise((r) => srv.close(r));
     }
   });
 });

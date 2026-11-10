@@ -8,7 +8,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  boxRunArgs, boxNetworkMode, gatePorts, gateRunArgs, gateUpstream, gateDenials, GATE_CONNECT_PORT, IMAGE,
+  boxRunArgs, boxNetworkMode, gatePorts, gateRunArgs, gateRelays, healthCoordinatorPort, gateUpstream, gateDenials, GATE_CONNECT_PORT, IMAGE,
 } from '../../scripts/agent-box.mjs';
 
 const base = {
@@ -82,6 +82,16 @@ describe('locked box network — the gate', () => {
     assert.deepEqual(flag(tail, '--forward'), ['12435', '3035']);
     assert.deepEqual(flag(tail, '--agent'), ['claude']);
     assert.deepEqual(flag(tail, '--connect'), [String(GATE_CONNECT_PORT)]);
+  });
+
+  test('the health coordinator is relayed for GET /health/state only', () => {
+    assert.deepEqual(gateRelays({}), [{ port: 3034, paths: ['/health/state'] }]);
+    assert.equal(healthCoordinatorPort({ HEALTH_COORDINATOR_URL: 'http://localhost:4034' }), 4034);
+    assert.equal(healthCoordinatorPort({ HEALTH_COORDINATOR_URL: 'http://example.com:4034' }), 3034, 'only a host-local coordinator');
+    assert.equal(healthCoordinatorPort({ HEALTH_COORDINATOR_URL: 'off' }), 3034);
+    const argv = gateRunArgs({ name: 'b', agent: 'claude', ports: [12435, 3035], network: 'n', relays: gateRelays({}), platform: 'darwin' });
+    assert.deepEqual(flag(argv.slice(argv.indexOf(IMAGE) + 1), '--http-get'), ['3034:/health/state']);
+    assert.deepEqual(flag(argv.slice(argv.indexOf(IMAGE) + 1), '--forward'), ['12435', '3035'], 'not a raw forward');
   });
 
   test('the gate chains through the host web proxy when there is one', () => {

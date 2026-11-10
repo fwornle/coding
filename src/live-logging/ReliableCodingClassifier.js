@@ -835,6 +835,8 @@ class ReliableCodingClassifier {
         const keywordAnalysisStart = Date.now();
         const keywordResult = await this.keywordMatcher.matchKeywords(exchange);
         const keywordAnalysisTime = Date.now() - keywordAnalysisStart;
+        // Layer 0 below reads this, so it lives outside the embedding branch.
+        let embeddingResult = null;
         
         decisionPath.push({
           layer: 'keyword',
@@ -860,7 +862,7 @@ class ReliableCodingClassifier {
         } else {
           // Layer 3: Embedding Classification (semantic vector similarity)
           const embeddingAnalysisStart = Date.now();
-          const embeddingResult = await this.embeddingClassifier.classifyByEmbedding(exchange);
+          embeddingResult = await this.embeddingClassifier.classifyByEmbedding(exchange);
           const embeddingAnalysisTime = Date.now() - embeddingAnalysisStart;
           
           decisionPath.push({

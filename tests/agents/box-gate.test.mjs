@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import net from 'node:net';
 import http from 'node:http';
 import fs from 'node:fs';
-import { createGate, parseArgs, parseAuthority, allowed, allowListFor } from '../../docker/agent-box/gate/gate.mjs';
+import { createGate, parseArgs, parseAuthority, parseRelay, allowed, allowListFor } from '../../docker/agent-box/gate/gate.mjs';
 
 const closers = [];
 after(async () => { for (const c of closers.reverse()) await c(); });
@@ -128,6 +128,56 @@ describe('gate helpers', () => {
     assert.ok(!allowed(['claude.ai'], { host: 'evil.claude.ai', port: 443 }));
     assert.ok(!allowed(['claude.ai'], { host: 'claude.ai.evil.com', port: 443 }));
     assert.ok(!allowed(['claude.ai'], { host: 'claude.ai', port: 80 }));
+  });
+
+  test('a read-only relay passes GET of its paths and refuses everything else', async () => {
+    const seen = [];
+    const svc = http.createServer((req, res) => {
+      seen.push(`${req.method} ${req.url} ${req.headers.authorization ?? ''}`.trim());
+      res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': 'x=1' });
+      res.end('{"overallStatus":"healthy"}');
+    });
+    await new Promise((r) => svc.listen(0, '127.0.0.1', r));
+    closers.push(() => new Promise((r) => svc.close(r)));
+    const port = svc.address().port;
+    const { g, out } = await gate({ httpGet: [{ listen: 0, port, paths: ['/health/state'] }] });
+    const ask = (method, p, headers = {}) => new Promise((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port: g.ports[`get:${port}`], method, path: p, headers }, (res) => {
+        let body = '';
+        res.on('data', (d) => { body += d; });
+        res.on('end', () => resolve({ status: res.statusCode, body, headers: res.headers }));
+      });
+      req.on('error', reject);
+      req.end(method === 'GET' ? undefined : '{}');
+    });
+
+    const ok = await ask('GET', '/health/state?x=1', { authorization: 'Bearer t' });
+    assert.equal(ok.status, 200);
+    assert.equal(ok.body, '{"overallStatus":"healthy"}');
+    assert.equal(ok.headers['set-cookie'], undefined, 'only the content type comes back');
+    for (const [method, p] of [['POST', '/health/remediate'], ['PUT', '/features'], ['POST', '/health/state'], ['GET', '/features'], ['GET', '/health/state/../../features']]) {
+      assert.equal((await ask(method, p)).status, 403, `${method} ${p}`);
+    }
+    assert.deepEqual(seen, ['GET /health/state'], 'no query, no client headers, nothing else upstream');
+    assert.ok(out.lines.some((l) => l.deny === `http://127.0.0.1:${port}/features` && l.method === 'PUT'));
+  });
+
+  test('a relay whose service is down answers 502', async () => {
+    const dead = await echoServer();
+    const { g } = await gate({ httpGet: [{ listen: 0, port: dead + 1, paths: ['/health/state'] }] });
+    const status = await new Promise((resolve) => {
+      http.get({ host: '127.0.0.1', port: g.ports[`get:${dead + 1}`], path: '/health/state' }, (res) => { res.resume(); resolve(res.statusCode); })
+        .on('error', () => resolve('error'));
+    });
+    assert.equal(status, 502);
+  });
+
+  test('parseRelay takes a port and absolute paths only', () => {
+    assert.deepEqual(parseRelay('3034:/health/state'), { port: 3034, paths: ['/health/state'] });
+    assert.deepEqual(parseRelay('1:/a,/b'), { port: 1, paths: ['/a', '/b'] });
+    for (const bad of ['3034', '3034:', '3034:health', '0:/a', '70000:/a', '3034:/a?b', '3034:/a,b', 'x:/a']) assert.equal(parseRelay(bad), null, bad);
+    assert.deepEqual(parseArgs(['--target', 't', '--http-get', '3034:/health/state']).httpGet, [{ port: 3034, paths: ['/health/state'] }]);
+    assert.throws(() => parseArgs(['--target', 't', '--http-get', '3034:*']), /bad --http-get/);
   });
 
   test('parseArgs builds the options the launcher passes, and rejects anything else', () => {

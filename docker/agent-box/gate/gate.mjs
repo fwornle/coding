@@ -4,7 +4,7 @@
  *
  * The box sits on its own `--internal` Docker network: no route anywhere.
  * This gate is the only other container on that network, and inside the box
- * `host.docker.internal` points at it. It offers exactly two things:
+ * `host.docker.internal` points at it. It offers exactly three things:
  *
  *   1. TCP forwards for fixed ports (the LLM proxy and the guard daemon) to the
  *      real host. Any other port is simply not listened on: refused.
@@ -13,13 +13,17 @@
  *      Everything else gets 403 and one JSON line on stdout, which the
  *      launcher summarises when the box exits.
  *
+ *   3. Read-only HTTP relays: GET of a fixed list of paths on a host service
+ *      (the health coordinator's /health/state for the prompt hook). Any other
+ *      method or path gets 403, so the rest of that service stays out of reach.
+ *
  * Runs from the box image as `nobody`, read-only, no capabilities. The agent
  * has no Docker socket, so it cannot reach into this container or change its
  * arguments. Plan: .planning/guardrail-hardening.md, "Box network".
  *
  *   node gate.mjs --target host.docker.internal --forward 12435 --forward 3035 \
  *     --connect 3128 --allow-file /opt/coding-box/egress-allow.json --agent claude \
- *     [--upstream http://host.docker.internal:3128]
+ *     [--upstream http://host.docker.internal:3128] [--http-get 3034:/health/state]
  */
 
 import fs from 'node:fs';
@@ -38,6 +42,15 @@ export function parseAuthority(s) {
   const port = Number(m[2]);
   if (port < 1 || port > 65535) return null;
   return { host: m[1].toLowerCase(), port };
+}
+
+/** "port:/a,/b" → { port, paths }, or null for anything malformed. */
+export function parseRelay(s) {
+  const m = /^(\d{1,5}):(\/[A-Za-z0-9._\/-]*(?:,\/[A-Za-z0-9._\/-]*)*)$/.exec(String(s || ''));
+  if (!m) return null;
+  const port = Number(m[1]);
+  if (port < 1 || port > 65535) return null;
+  return { port, paths: m[2].split(',') };
 }
 
 /** Exact host names only — no wildcards, no IPs, so the list says precisely what is reachable. */
@@ -82,7 +95,7 @@ function viaUpstream(upstream, { host, port }) {
  * gate listens (all interfaces in the container); tests use 127.0.0.1.
  */
 export async function createGate({
-  target, forward = [], connectPort = null, allow = [], allowPorts = [443], upstream = null,
+  target, forward = [], connectPort = null, allow = [], allowPorts = [443], upstream = null, httpGet = [],
   listenHost = '0.0.0.0', out = process.stdout,
 }) {
   const servers = [];
@@ -100,6 +113,35 @@ export async function createGate({
       pipeBoth(client, up);
     });
     ports[port] = await listen(srv, lport);
+    servers.push(srv);
+  }
+
+  for (const r of httpGet) {
+    const { listen: lport, port, paths } = { listen: r.port, ...r };
+    const srv = http.createServer((req, res) => {
+      let pathname = null;
+      try { pathname = new URL(req.url, 'http://gate').pathname; } catch { /* malformed: refused below */ }
+      // Exact paths, GET only, and only the path goes upstream: no query, no
+      // client headers, no body — a relay for reading one document, nothing more.
+      if (req.method !== 'GET' || !paths.includes(pathname)) {
+        log({ deny: `http://${target}:${port}${pathname ?? req.url}`, method: req.method }, out);
+        res.writeHead(403, { 'content-type': 'text/plain' });
+        res.end('coding agent box: only GET of a fixed list of paths is relayed to this host service\n');
+        return;
+      }
+      const up = http.request({ host: target, port, path: pathname, method: 'GET', headers: { accept: 'application/json' } }, (upRes) => {
+        const headers = upRes.headers['content-type'] ? { 'content-type': upRes.headers['content-type'] } : {};
+        res.writeHead(upRes.statusCode || 502, headers);
+        upRes.pipe(res);
+      });
+      up.on('error', (err) => {
+        log({ relay: port, error: err.code || err.message }, out);
+        if (!res.headersSent) res.writeHead(502, { 'content-type': 'text/plain' });
+        res.end();
+      });
+      up.end();
+    });
+    ports[`get:${port}`] = await listen(srv, lport);
     servers.push(srv);
   }
 
@@ -144,7 +186,7 @@ export async function createGate({
 
 /** argv → options. Unknown flags are an error: the launcher builds this argv. */
 export function parseArgs(argv) {
-  const o = { forward: [], allowFile: null, agent: null, target: null, connectPort: null, upstream: null };
+  const o = { forward: [], httpGet: [], allowFile: null, agent: null, target: null, connectPort: null, upstream: null };
   for (let i = 0; i < argv.length; i++) {
     const v = argv[i + 1];
     switch (argv[i]) {
@@ -154,6 +196,11 @@ export function parseArgs(argv) {
       case '--allow-file': o.allowFile = v; i++; break;
       case '--agent': o.agent = v; i++; break;
       case '--upstream': o.upstream = v || null; i++; break;
+      case '--http-get': {
+        const r = parseRelay(v);
+        if (!r) throw new Error(`gate: bad --http-get ${v}`);
+        o.httpGet.push(r); i++; break;
+      }
       default: throw new Error(`gate: unknown argument ${argv[i]}`);
     }
   }
@@ -176,8 +223,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   try {
     const o = parseArgs(process.argv.slice(2));
     const allow = o.allowFile ? allowListFor(o.allowFile, o.agent) : [];
-    const gate = await createGate({ target: o.target, forward: o.forward, connectPort: o.connectPort, allow, upstream: o.upstream });
-    log({ ready: true, forward: o.forward, connect: o.connectPort, allow, upstream: o.upstream });
+    const gate = await createGate({ target: o.target, forward: o.forward, connectPort: o.connectPort, allow, upstream: o.upstream, httpGet: o.httpGet });
+    log({ ready: true, forward: o.forward, connect: o.connectPort, allow, upstream: o.upstream, httpGet: o.httpGet });
     const stop = () => gate.close().then(() => process.exit(0));
     process.on('SIGTERM', stop);
     process.on('SIGINT', stop);

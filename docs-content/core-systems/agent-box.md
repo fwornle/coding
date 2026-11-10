@@ -55,7 +55,8 @@ The same, as a table:
 | | **Network** | | |
 | ✅ | LLM proxy :12435 | every model call | routed, metered and logged; from the box through the network gate |
 | 🔐 | Guard daemon :3035 | can ask, never approve | override requests and coding svc; approving needs your factor |
-| ⛔ | Other host services | refused at the gate | obs-api :12436, coordinator :3034, dashboard :3032, Qdrant :6333 … |
+| 👁️ | Health coordinator :3034 | GET /health/state only | the health line on each prompt; every other route refused at the gate |
+| ⛔ | Other host services | refused at the gate | obs-api :12436, dashboard :3032, Qdrant :6333, MCP servers … |
 | 🔑 | Internet | login hosts only | e.g. platform.claude.com for claude; every refusal is reported |
 | | **You and your accounts** | | |
 | ✅ | Your terminal | keys, screen, paste | tmux pane; Cmd+V image paste goes through a bridge |
@@ -76,9 +77,14 @@ with one other container: its **gate**, started from the same image as `nobody`,
 read-only and without capabilities. Inside the box, `host.docker.internal` is the
 gate, so every URL the launcher hands the agent keeps working. The gate:
 
-- forwards the **LLM proxy** (`:12435`) and the **guard** (`:3035`) to the host,
-  and nothing else. Any other port is refused, including obs-api, the health
-  coordinator, the dashboard, Qdrant and the MCP servers;
+- forwards the **LLM proxy** (`:12435`) and the **guard** (`:3035`) to the host.
+  Any other port is refused, including obs-api, the dashboard, Qdrant and the
+  MCP servers;
+- relays one read from the **health coordinator** (`:3034`): `GET /health/state`,
+  which the health prompt hook asks for. Any other method or path gets 403, so
+  the coordinator's other routes (`PUT /features`, `POST /health/remediate`,
+  `POST /experiments/run` and so on) stay out of reach. Only the path goes
+  upstream: no query, headers or body;
 - runs a CONNECT proxy for the agent's **own login** only: an exact list of hosts,
   port 443, in `docker/agent-box/gate/egress-allow.json` (claude:
   `platform.claude.com`, `claude.ai`, `claude.com`; copilot: `github.com`,
@@ -533,11 +539,18 @@ chain, and `audit` names the first broken line.
 
 ## What is not in the box yet
 
-- No MCP servers, and no knowledge-injection or session-logging hooks inside the
-  box. Session logs still work for claude, Copilot and pi, because their
-  session files land on your disk: Claude's transcript folder and Copilot's
-  `~/.copilot/session-state` are mounted, and pi already writes its sessions
-  into the project (`.observations/pi-sessions`).
+- A boxed Claude runs the coding project's own hooks as the host does: the
+  tool-interaction hook after each tool call (feature `lsl`) and the health
+  line on each prompt (feature `health`). Only managed hooks load in the box,
+  so the managed policy calls `/opt/coding-box/coding-hook.mjs`. That script
+  runs the hook scripts from the mounted coding repo, and only those whose
+  feature is on for the host (`CODING_BOX_HOOKS`). Your personal hooks from
+  `~/.claude/settings.json` do not run in the box: their scripts are on the
+  host.
+- No MCP servers inside the box. Session logs still work for claude, Copilot
+  and pi, because their session files land on your disk: Claude's transcript
+  folder and Copilot's `~/.copilot/session-state` are mounted, and pi already
+  writes its sessions into the project (`.observations/pi-sessions`).
 - pi gets a **copy** of its config directory for each box session (provider
   config with `localhost` pointed at the host, plus the extensions the launcher
   installed; no credentials, no old sessions). The host directory is never

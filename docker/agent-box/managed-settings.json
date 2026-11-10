@@ -23,6 +23,15 @@
             "timeout": 30
           }
         ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/env -u NODE_OPTIONS /usr/local/bin/node /opt/coding-box/coding-hook.mjs tool-interaction"
+          }
+        ]
       }
     ],
     "PostToolUseFailure": [
@@ -33,6 +42,17 @@
             "type": "command",
             "command": "/usr/bin/env -i HOME=/home/agent PATH=/usr/local/bin:/usr/bin:/bin CODING_GUARD_MODE=box CODING_GUARD_KEYS=/etc/coding-guard CODING_GUARD_AGENT=claude CONSTRAINT_CONFIG_PATH=/opt/coding-guard/config/constraints/constraint-monitor.yaml /usr/local/bin/node /opt/coding-guard/integrations/constraint-monitor/src/hooks/post-tool-hook.js",
             "timeout": 30
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/env -u NODE_OPTIONS /usr/local/bin/node /opt/coding-box/coding-hook.mjs health-prompt",
+            "timeout": 5
           }
         ]
       }
