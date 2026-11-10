@@ -116,14 +116,18 @@ show_help() {
 Coding Agent Unified Launcher
 
 USAGE:
-  coding-agent [OPTIONS] [COMMAND_ARGS...]
+  coding [AGENT] [OPTIONS] [COMMAND_ARGS...]
+
+  AGENT is claude, copilot, opencode or pi (or any name with a
+  config/agents/<name>.sh), given as a bare word or as a --flag.
+  Without one, coding launches Claude Code.
 
 OPTIONS:
-  --agent AGENT      Force specific agent (any name with config/agents/<name>.sh)
-  --claude           Force Claude Code (same as --agent claude)
-  --copilot, --copi  Force CoPilot (same as --agent copilot)
-  --opencode         Force OpenCode (same as --agent opencode)
-  --pi               Force Pi (same as --agent pi)
+  --agent AGENT      Use a specific agent (any name with config/agents/<name>.sh)
+  --claude           Claude Code (same as: coding claude) — the default
+  --copilot, --copi  CoPilot (same as: coding copilot)
+  --opencode         OpenCode (same as: coding opencode)
+  --pi               Pi (same as: coding pi)
   --force            Kill ALL coding-related processes for a clean start
   --copilot-stop     Stop all CoPilot fallback services
   --config FILE      Use specific config file
@@ -144,14 +148,15 @@ SUBCOMMANDS:
   svc <verb> ...     Fixed Docker verbs for agents in the box (status, logs, restart, graphify, up, rebuild)
 
 EXAMPLES:
-  coding-agent --lsl-status           # Show LSL system status
-  coding-agent --lsl-validate         # Run LSL system validation  coding-agent                    # Use best available agent
-  coding-agent --copilot          # Force CoPilot
-  coding-agent --copilot-stop     # Stop CoPilot services
-  coding-agent --claude           # Force Claude Code
-  coding-agent --pi               # Force Pi
-  coding-agent --project /path/to/project  # Work in specific project
-  coding-agent suggest "add tests" # Pass command to agent
+  coding                          # Claude Code (the default)
+  coding pi                       # Pi            (same as: coding --pi)
+  coding copilot                  # CoPilot       (same as: coding --copilot)
+  coding opencode --box           # OpenCode, in the agent box
+  coding --project /path/to/project  # Work in specific project
+  coding claude suggest "add tests"  # Pass command to the agent
+  coding --copilot-stop           # Stop CoPilot services
+  coding --lsl-status             # Show LSL system status
+  coding --lsl-validate           # Run LSL system validation
 
 AGENTS:
   claude     Claude Code with MCP servers (memory, browser, logging)
@@ -282,10 +287,11 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      # Bare-word agent selection: if this is the first positional arg, no agent
-      # has been forced yet, and a matching config/agents/<word>.sh exists, treat
-      # it as the agent selector (e.g. `coding opencode`, `coding copilot`).
-      # Otherwise it's a command arg for the agent (e.g. `coding suggest "..."`).
+      # Bare-word agent selection — `coding claude|copilot|opencode|pi`, the same
+      # as the --flag. Only the FIRST positional word, only while no agent has
+      # been chosen, and only when config/agents/<word>.sh exists; anything else
+      # is a command arg for the agent (`coding suggest "..."`, and the "pi" in
+      # `coding claude explain pi` reaches claude untouched).
       if [ -z "$FORCE_AGENT" ] && [ ${#ARGS[@]} -eq 0 ] \
          && [ -f "$SCRIPT_DIR/../config/agents/$1.sh" ]; then
         FORCE_AGENT="$1"
@@ -312,17 +318,13 @@ fi
 # Use forced agent if specified
 if [ -n "$FORCE_AGENT" ]; then
   AGENT="$FORCE_AGENT"
-  log "Using forced agent: $AGENT"
+  log "Using agent: $AGENT"
 else
-  # Auto-detect best available agent
-  log "Detecting best available agent..."
-  AGENT=$(node "$SCRIPT_DIR/../lib/agent-detector.js" --best)
-  
-  if [ "$AGENT" = "null" ] || [ -z "$AGENT" ]; then
-    error "No supported agent found. Please install Claude Code or GitHub CoPilot CLI."
-  fi
-  
-  log "Detected agent: $AGENT"
+  # No agent named → Claude Code. Deliberately NOT auto-detected: falling back to
+  # whichever agent happens to be installed launched a different agent than the
+  # one `coding` is documented to start, with nothing but a log line to say so.
+  AGENT="claude"
+  log "Using default agent: $AGENT"
 fi
 
 # Box mode. claude, copilot and pi run in the agent box unless told otherwise
