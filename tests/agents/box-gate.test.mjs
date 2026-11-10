@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import net from 'node:net';
 import http from 'node:http';
 import fs from 'node:fs';
-import { createGate, parseArgs, parseAuthority, parseRelay, allowed, allowListFor } from '../../docker/agent-box/gate/gate.mjs';
+import { createGate, parseArgs, parseAuthority, parseRelay, parseMcpRelay, mcpRefusal, filterToolList, allowed, allowListFor } from '../../docker/agent-box/gate/gate.mjs';
 
 const closers = [];
 after(async () => { for (const c of closers.reverse()) await c(); });
@@ -170,6 +170,78 @@ describe('gate helpers', () => {
         .on('error', () => resolve('error'));
     });
     assert.equal(status, 502);
+  });
+
+  test('an MCP relay passes the listed tools on the default graph and refuses the rest', async () => {
+    const seen = [];
+    const svc = http.createServer((req, res) => {
+      let body = '';
+      req.on('data', (d) => { body += d; });
+      req.on('end', () => {
+        const msg = JSON.parse(body);
+        seen.push(`${msg.method} ${req.headers['mcp-session-id'] ?? '-'} ${req.headers.cookie ?? ''}`.trim());
+        const result = msg.method === 'tools/list'
+          ? { tools: [
+            { name: 'graph_stats', inputSchema: { type: 'object', properties: { project_path: { type: 'string' } } } },
+            { name: 'list_prs', inputSchema: { type: 'object', properties: {} } },
+          ] }
+          : { content: [{ type: 'text', text: 'Nodes: 3' }] };
+        // Streamable HTTP answers as an SSE stream.
+        res.writeHead(200, { 'content-type': 'text/event-stream', 'mcp-session-id': 's1', 'set-cookie': 'x=1' });
+        res.end(`event: message\ndata: ${JSON.stringify({ jsonrpc: '2.0', id: msg.id, result })}\n\n`);
+      });
+    });
+    await new Promise((r) => svc.listen(0, '127.0.0.1', r));
+    closers.push(() => new Promise((r) => svc.close(r)));
+    const port = svc.address().port;
+    const { g, out } = await gate({ mcp: [{ listen: 0, port, path: '/mcp', tools: ['graph_stats'] }] });
+    const call = async (body, p = '/mcp') => {
+      const r = await fetch(`http://127.0.0.1:${g.ports[`mcp:${port}`]}${p}`, {
+        method: 'POST', body: JSON.stringify(body),
+        headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', 'mcp-session-id': 's1', cookie: 'c=1' },
+      });
+      const text = await r.text();
+      const data = text.includes('data: ') ? JSON.parse(text.split('data: ')[1]) : (text.startsWith('{') ? JSON.parse(text) : text);
+      return { status: r.status, data, cookie: r.headers.get('set-cookie'), session: r.headers.get('mcp-session-id') };
+    };
+
+    const list = await call({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
+    assert.deepEqual(list.data.result.tools.map((t) => t.name), ['graph_stats'], 'only the relayable tools are offered');
+    assert.equal(list.data.result.tools[0].inputSchema.properties.project_path, undefined);
+    assert.equal(list.session, 's1');
+    assert.equal(list.cookie, null);
+    const ok = await call({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'graph_stats', arguments: {} } });
+    assert.equal(ok.data.result.content[0].text, 'Nodes: 3');
+
+    for (const [body, why] of [
+      [{ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'list_prs', arguments: {} } }, /tool list_prs/],
+      [{ jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'graph_stats', arguments: { project_path: '/workspace/other' } } }, /project_path/],
+      [{ jsonrpc: '2.0', id: 5, method: 'logging/setLevel', params: {} }, /method logging\/setLevel/],
+    ]) {
+      const r = await call(body);
+      assert.equal(r.data.id, body.id);
+      assert.match(r.data.error.message, why);
+    }
+    assert.equal((await call([{ jsonrpc: '2.0', id: 6, method: 'ping' }, { jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'list_prs' } }])).status, 403, 'one bad message refuses the batch');
+    assert.equal((await call({ jsonrpc: '2.0', id: 8, method: 'tools/list' }, '/admin')).status, 403);
+    assert.deepEqual(seen, ['tools/list s1', 'tools/call s1'], 'refused messages never reach the server; no cookies go upstream');
+    assert.ok(out.lines.some((l) => l.why === 'tool list_prs'));
+  });
+
+  test('mcpRefusal, filterToolList and parseMcpRelay', () => {
+    const tools = ['query_graph'];
+    assert.equal(mcpRefusal({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }, tools), null);
+    assert.equal(mcpRefusal({ jsonrpc: '2.0', id: 1, result: {} }, tools), null, "the client's answer to a server request");
+    assert.equal(mcpRefusal({ method: 'tools/call', params: { name: 'query_graph', arguments: { project_path: '' } } }, tools), null, 'empty = default graph');
+    assert.match(mcpRefusal({ method: 'tools/call', params: { name: 'query_graph', arguments: { project_path: '/x' } } }, tools), /project_path/);
+    assert.match(mcpRefusal({ method: 'tools/call', params: { name: 'constructor' } }, tools), /tool constructor/);
+    assert.match(mcpRefusal([], tools), /not a JSON-RPC/);
+    assert.equal(filterToolList('not json', tools), 'not json');
+    assert.equal(JSON.parse(filterToolList(JSON.stringify({ result: { tools: [{ name: 'query_graph' }, { name: 'x' }] } }), tools)).result.tools.length, 1);
+    assert.deepEqual(parseMcpRelay('3851:/mcp:query_graph,get_node'), { port: 3851, path: '/mcp', tools: ['query_graph', 'get_node'] });
+    for (const bad of ['3851:/mcp', '3851:/mcp:', '3851:mcp:a', '0:/mcp:a', '3851:/mcp:a b', '3851:/mcp:*']) assert.equal(parseMcpRelay(bad), null, bad);
+    assert.deepEqual(parseArgs(['--target', 't', '--mcp', '3851:/mcp:a']).mcp, [{ port: 3851, path: '/mcp', tools: ['a'] }]);
+    assert.throws(() => parseArgs(['--target', 't', '--mcp', '3851']), /bad --mcp/);
   });
 
   test('parseRelay takes a port and absolute paths only', () => {

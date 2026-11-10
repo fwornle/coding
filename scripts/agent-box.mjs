@@ -137,6 +137,29 @@ export function gateRelays(env = process.env) {
 }
 
 /**
+ * MCP relays through the gate: the HTTP MCP servers in config/code-graph.json
+ * (graphify), each with only the tools listed there. The box's mcp.json points
+ * them at host.docker.internal, which in a locked box is the gate. A missing or
+ * broken config → no relay, and the agent sees the server as unreachable.
+ */
+export function gateMcpRelays(env = process.env, repo = REPO, readFile = (f) => fs.readFileSync(f, 'utf8')) {
+  let config;
+  try { config = JSON.parse(readFile(path.join(repo, 'config', 'code-graph.json'))); } catch { return []; }
+  const relays = [];
+  for (const backend of Object.values(config.backends || {})) {
+    const mcp = backend?.mcp;
+    if (mcp?.transport !== 'http' || !Array.isArray(mcp.tools) || !mcp.tools.length) continue;
+    // ${VAR:-default} as the host launcher expands it.
+    const url = String(mcp.url || '').replace(/\$\{(\w+):-([^}]*)\}/g, (_, k, d) => env[k] || d);
+    let u;
+    try { u = new URL(url); } catch { continue; }
+    if (!/^(localhost|127\.0\.0\.1)$/.test(u.hostname) || !u.port) continue;
+    relays.push({ port: Number(u.port), path: u.pathname, tools: mcp.tools });
+  }
+  return relays;
+}
+
+/**
  * The coding project's own Claude hooks (build-claude-runtime-config.mjs), by
  * the name docker/agent-box/coding-hook.mjs runs them under, with the feature
  * that installs each on the host. The constraint guard is not here: in the box
@@ -156,7 +179,7 @@ export function boxCodingHooks(isEnabled) {
  * bridge (its way to the host); the caller then connects it to the box's
  * internal network. Runs as nobody, read-only, without capabilities.
  */
-export function gateRunArgs({ name, agent, ports, network, upstream = null, relays = [], platform = process.platform, image = IMAGE, pid = process.pid }) {
+export function gateRunArgs({ name, agent, ports, network, upstream = null, relays = [], mcpRelays = [], platform = process.platform, image = IMAGE, pid = process.pid }) {
   const argv = ['run', '-d', '--rm', '--name', `${name}-gate`,
     '--label', 'coding.box.gate=1', '--label', `coding.box.gate.for=${name}`, '--label', `coding.box.gate.network=${network}`, '--label', `coding.box.gate.pid=${pid}`,
     '--network', 'bridge', '--user', '65534:65534', '--read-only', '--cap-drop', 'ALL',
@@ -165,6 +188,7 @@ export function gateRunArgs({ name, agent, ports, network, upstream = null, rela
   argv.push(image, `${GATE_DIR}/gate.mjs`, '--target', 'host.docker.internal');
   for (const p of ports) argv.push('--forward', String(p));
   for (const r of relays) argv.push('--http-get', `${r.port}:${r.paths.join(',')}`);
+  for (const r of mcpRelays) argv.push('--mcp', `${r.port}:${r.path}:${r.tools.join(',')}`);
   argv.push('--connect', String(GATE_CONNECT_PORT), '--allow-file', `${GATE_DIR}/egress-allow.json`, '--agent', agent);
   if (upstream) argv.push('--upstream', upstream);
   return argv;
@@ -691,7 +715,7 @@ export function startGate({ name, agent, env = process.env, platform = process.p
   };
   let res = docker(['network', 'create', '--internal', '--label', 'coding.box.network=1', '--label', `coding.box.network.for=${name}`, '--label', `coding.box.network.pid=${process.pid}`, network]);
   if (res.status !== 0) fail('creating the internal network', res);
-  res = docker(gateRunArgs({ name, agent, ports: gatePorts(env, guardPortNum), network, upstream: gateUpstream(env), relays: gateRelays(env), platform }));
+  res = docker(gateRunArgs({ name, agent, ports: gatePorts(env, guardPortNum), network, upstream: gateUpstream(env), relays: gateRelays(env), mcpRelays: gateMcpRelays(env), platform }));
   if (res.status !== 0) fail('starting the gate', res);
   res = docker(['network', 'connect', network, gateName]);
   if (res.status !== 0) fail('connecting the gate', res);

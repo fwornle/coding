@@ -51,12 +51,13 @@ export const ROWS = [
   ['block', 'Docker socket',                         'no socket',                'host: start, stop, rebuild any container, mount any folder'],
   ['guard', 'coding containers',                     'via coding svc',           'box: status, logs, restart, graphify; up / rebuild need your approval'],
   ['block', 'Host processes and daemons',            'not visible',              'host: kill, launchctl / systemctl, restart services'],
-  ['block', 'MCP servers, knowledge injection',      'not loaded',               'loaded for the host agent only'],
+  ['block', 'Knowledge injection',                   'not loaded',               'loaded for the host agent only'],
   'Network',
   ['rw',    'LLM proxy  :12435',                     'every model call',         'routed, metered and logged; from the box through the network gate'],
   ['guard', 'Guard daemon  :3035',                   'can ask, never approve',   'override requests and coding svc; approving needs your factor'],
   ['ro',    'Health coordinator  :3034',             'GET /health/state only',   'the health line on each prompt; every other route refused at the gate'],
-  ['block', 'Other host services',                   'refused at the gate',      'obs-api :12436, dashboard :3032, Qdrant :6333, MCP servers …'],
+  ['ro',    'Graphify MCP  :3851',                   'read tools, default graph', 'the coding code graph; other tools and other projects refused at the gate'],
+  ['block', 'Other host services',                   'refused at the gate',      'obs-api :12436, dashboard :3032, Qdrant :6333 …'],
   ['login', 'Internet',                              'login hosts only',         'e.g. platform.claude.com for claude; every refusal is reported'],
   'You and your accounts',
   ['rw',    'Your terminal',                         'keys, screen, paste',      'tmux pane; Cmd+V image paste goes through a bridge'],
@@ -65,7 +66,7 @@ export const ROWS = [
 ];
 
 const FOOTNOTE = [
-  'Box network: an internal Docker network; its gate forwards the LLM proxy and the guard, and relays GET /health/state. CODING_BOX_NETWORK=open lifts it (recorded).',
+  'Box network: an internal Docker network; its gate forwards the LLM proxy and the guard, relays GET /health/state and the graphify read tools. CODING_BOX_NETWORK=open lifts it (recorded).',
   'Planned (Phase 3): result-check state out of the agent’s reach.',
   'Default: claude, copilot and pi run in the box; opencode with --box. --no-box runs on the host and is recorded in the guard audit log.',
 ];

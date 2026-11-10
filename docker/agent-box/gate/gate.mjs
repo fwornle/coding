@@ -4,7 +4,7 @@
  *
  * The box sits on its own `--internal` Docker network: no route anywhere.
  * This gate is the only other container on that network, and inside the box
- * `host.docker.internal` points at it. It offers exactly three things:
+ * `host.docker.internal` points at it. It offers exactly four things:
  *
  *   1. TCP forwards for fixed ports (the LLM proxy and the guard daemon) to the
  *      real host. Any other port is simply not listened on: refused.
@@ -16,6 +16,11 @@
  *   3. Read-only HTTP relays: GET of a fixed list of paths on a host service
  *      (the health coordinator's /health/state for the prompt hook). Any other
  *      method or path gets 403, so the rest of that service stays out of reach.
+ *   4. MCP relays: one MCP endpoint (graphify's /mcp), where each JSON-RPC
+ *      message is checked before it goes on. Only the listed tools can be
+ *      called, and only on the server's default graph: a call that names a
+ *      project_path is refused, because the services container sees every repo
+ *      under ~/Agentic and the box must not.
  *
  * Runs from the box image as `nobody`, read-only, no capabilities. The agent
  * has no Docker socket, so it cannot reach into this container or change its
@@ -23,7 +28,8 @@
  *
  *   node gate.mjs --target host.docker.internal --forward 12435 --forward 3035 \
  *     --connect 3128 --allow-file /opt/coding-box/egress-allow.json --agent claude \
- *     [--upstream http://host.docker.internal:3128] [--http-get 3034:/health/state]
+ *     [--upstream http://host.docker.internal:3128] [--http-get 3034:/health/state] \
+ *     [--mcp 3851:/mcp:query_graph,get_node]
  */
 
 import fs from 'node:fs';
@@ -51,6 +57,60 @@ export function parseRelay(s) {
   const port = Number(m[1]);
   if (port < 1 || port > 65535) return null;
   return { port, paths: m[2].split(',') };
+}
+
+/** "port:/path:tool,tool" → { port, path, tools }, or null for anything malformed. */
+export function parseMcpRelay(s) {
+  const m = /^(\d{1,5}):(\/[A-Za-z0-9._\/-]*):([A-Za-z0-9_-]+(?:,[A-Za-z0-9_-]+)*)$/.exec(String(s || ''));
+  if (!m) return null;
+  const port = Number(m[1]);
+  if (port < 1 || port > 65535) return null;
+  return { port, path: m[2], tools: m[3].split(',') };
+}
+
+/** JSON-RPC methods a client may send through an MCP relay: discovery, reads, tool calls. */
+export const MCP_METHODS = [
+  'initialize', 'ping', 'tools/list', 'tools/call', 'resources/list', 'resources/templates/list', 'resources/read',
+  'prompts/list', 'notifications/initialized', 'notifications/cancelled', 'notifications/progress',
+];
+
+/** Why the MCP message `msg` is refused, or null when it may pass. */
+export function mcpRefusal(msg, tools) {
+  if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return 'not a JSON-RPC message';
+  if (msg.method === undefined) return null; // the client's answer to a server request
+  if (!MCP_METHODS.includes(msg.method)) return `method ${msg.method}`;
+  if (msg.method === 'tools/call') {
+    const name = msg.params?.name;
+    if (!tools.includes(name)) return `tool ${name}`;
+    // graphify reads <project_path>/…/graph.json, with project_path resolved inside
+    // the services container, which sees all of ~/Agentic. Empty means the default.
+    if (msg.params?.arguments?.project_path) return 'project_path (the box queries the default graph only)';
+  }
+  return null;
+}
+
+/**
+ * A tools/list answer with only the relayable tools in it, and without the
+ * project_path argument, as JSON or as an SSE
+ * stream of `data:` lines. Anything it cannot parse comes back unchanged.
+ */
+export function filterToolList(text, tools) {
+  const keep = (line) => {
+    try {
+      const msg = JSON.parse(line);
+      if (Array.isArray(msg?.result?.tools)) {
+        msg.result.tools = msg.result.tools.filter((t) => tools.includes(t?.name));
+        // Refused by mcpRefusal, so not offered either.
+        for (const t of msg.result.tools) {
+          delete t.inputSchema?.properties?.project_path;
+          if (Array.isArray(t.inputSchema?.required)) t.inputSchema.required = t.inputSchema.required.filter((r) => r !== 'project_path');
+        }
+      }
+      return JSON.stringify(msg);
+    } catch { return line; }
+  };
+  if (!/^\s*(event:|data:|id:|:)/m.test(text)) return keep(text);
+  return text.split('\n').map((l) => (l.startsWith('data: ') ? `data: ${keep(l.slice(6))}` : l)).join('\n');
 }
 
 /** Exact host names only — no wildcards, no IPs, so the list says precisely what is reachable. */
@@ -95,7 +155,7 @@ function viaUpstream(upstream, { host, port }) {
  * gate listens (all interfaces in the container); tests use 127.0.0.1.
  */
 export async function createGate({
-  target, forward = [], connectPort = null, allow = [], allowPorts = [443], upstream = null, httpGet = [],
+  target, forward = [], connectPort = null, allow = [], allowPorts = [443], upstream = null, httpGet = [], mcp = [],
   listenHost = '0.0.0.0', out = process.stdout,
 }) {
   const servers = [];
@@ -145,6 +205,79 @@ export async function createGate({
     servers.push(srv);
   }
 
+  for (const r of mcp) {
+    const { listen: lport, port, path: mcpPath, tools } = { listen: r.port, ...r };
+    const srv = http.createServer((req, res) => {
+      let pathname = null;
+      try { pathname = new URL(req.url, 'http://gate').pathname; } catch { /* malformed: refused below */ }
+      const refuse = (status, why, id) => {
+        log({ deny: `mcp://${target}:${port}${pathname ?? req.url}`, method: req.method, why }, out);
+        if (id !== undefined) {
+          // A refused request still gets its JSON-RPC answer, so the agent sees why.
+          res.writeHead(200, { 'content-type': 'application/json' });
+          res.end(JSON.stringify({ jsonrpc: '2.0', id, error: { code: -32001, message: `coding agent box: ${why} is not allowed here` } }));
+          return;
+        }
+        res.writeHead(status, { 'content-type': 'text/plain' });
+        res.end(`coding agent box: ${why} is not allowed here\n`);
+      };
+      if (pathname !== mcpPath || !['POST', 'GET', 'DELETE'].includes(req.method)) return refuse(403, `${req.method} ${pathname}`);
+
+      const chunks = [];
+      let size = 0;
+      req.on('data', (c) => {
+        size += c.length;
+        if (size > 1024 * 1024) { req.destroy(); return; }
+        chunks.push(c);
+      });
+      req.on('end', () => {
+        const body = Buffer.concat(chunks);
+        let listing = false;
+        if (req.method === 'POST') {
+          let msgs;
+          try { msgs = JSON.parse(body.toString('utf8')); } catch { return refuse(400, 'a body that is not JSON'); }
+          const list = Array.isArray(msgs) ? msgs : [msgs];
+          for (const m of list) {
+            const why = mcpRefusal(m, tools);
+            if (why) return refuse(403, why, Array.isArray(msgs) ? undefined : m?.id);
+          }
+          listing = list.some((m) => m?.method === 'tools/list');
+        }
+        // Only what the MCP transport needs goes upstream: no cookies or auth.
+        const headers = {};
+        for (const h of ['content-type', 'accept', 'mcp-session-id', 'mcp-protocol-version', 'last-event-id']) {
+          if (req.headers[h]) headers[h] = req.headers[h];
+        }
+        if (body.length) headers['content-length'] = String(body.length);
+        const up = http.request({ host: target, port, path: mcpPath, method: req.method, headers }, (upRes) => {
+          const back = {};
+          for (const h of ['content-type', 'mcp-session-id', 'cache-control']) if (upRes.headers[h]) back[h] = upRes.headers[h];
+          if (!listing) {
+            res.writeHead(upRes.statusCode || 502, back);
+            upRes.pipe(res);
+            return;
+          }
+          // The tool list is short: read it whole and drop the tools the box cannot call.
+          const parts = [];
+          upRes.on('data', (c) => parts.push(c));
+          upRes.on('end', () => {
+            res.writeHead(upRes.statusCode || 502, back);
+            res.end(filterToolList(Buffer.concat(parts).toString('utf8'), tools));
+          });
+        });
+        up.on('error', (err) => {
+          log({ relay: port, error: err.code || err.message }, out);
+          if (!res.headersSent) res.writeHead(502, { 'content-type': 'text/plain' });
+          res.end();
+        });
+        res.on('close', () => up.destroy());
+        up.end(body);
+      });
+    });
+    ports[`mcp:${port}`] = await listen(srv, lport);
+    servers.push(srv);
+  }
+
   if (connectPort !== null) {
     const proxy = http.createServer((req, res) => {
       // Plain-HTTP proxying is never offered: only CONNECT to allow-listed hosts.
@@ -186,7 +319,7 @@ export async function createGate({
 
 /** argv → options. Unknown flags are an error: the launcher builds this argv. */
 export function parseArgs(argv) {
-  const o = { forward: [], httpGet: [], allowFile: null, agent: null, target: null, connectPort: null, upstream: null };
+  const o = { forward: [], httpGet: [], mcp: [], allowFile: null, agent: null, target: null, connectPort: null, upstream: null };
   for (let i = 0; i < argv.length; i++) {
     const v = argv[i + 1];
     switch (argv[i]) {
@@ -200,6 +333,11 @@ export function parseArgs(argv) {
         const r = parseRelay(v);
         if (!r) throw new Error(`gate: bad --http-get ${v}`);
         o.httpGet.push(r); i++; break;
+      }
+      case '--mcp': {
+        const r = parseMcpRelay(v);
+        if (!r) throw new Error(`gate: bad --mcp ${v}`);
+        o.mcp.push(r); i++; break;
       }
       default: throw new Error(`gate: unknown argument ${argv[i]}`);
     }
@@ -223,8 +361,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   try {
     const o = parseArgs(process.argv.slice(2));
     const allow = o.allowFile ? allowListFor(o.allowFile, o.agent) : [];
-    const gate = await createGate({ target: o.target, forward: o.forward, connectPort: o.connectPort, allow, upstream: o.upstream, httpGet: o.httpGet });
-    log({ ready: true, forward: o.forward, connect: o.connectPort, allow, upstream: o.upstream, httpGet: o.httpGet });
+    const gate = await createGate({ target: o.target, forward: o.forward, connectPort: o.connectPort, allow, upstream: o.upstream, httpGet: o.httpGet, mcp: o.mcp });
+    log({ ready: true, forward: o.forward, connect: o.connectPort, allow, upstream: o.upstream, httpGet: o.httpGet, mcp: o.mcp });
     const stop = () => gate.close().then(() => process.exit(0));
     process.on('SIGTERM', stop);
     process.on('SIGINT', stop);

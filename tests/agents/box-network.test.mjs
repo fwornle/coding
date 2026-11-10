@@ -8,7 +8,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  boxRunArgs, boxNetworkMode, gatePorts, gateRunArgs, gateRelays, healthCoordinatorPort, gateUpstream, gateDenials, GATE_CONNECT_PORT, IMAGE,
+  boxRunArgs, boxNetworkMode, gatePorts, gateRunArgs, gateRelays, gateMcpRelays, healthCoordinatorPort, gateUpstream, gateDenials, GATE_CONNECT_PORT, IMAGE,
 } from '../../scripts/agent-box.mjs';
 
 const base = {
@@ -92,6 +92,18 @@ describe('locked box network — the gate', () => {
     const argv = gateRunArgs({ name: 'b', agent: 'claude', ports: [12435, 3035], network: 'n', relays: gateRelays({}), platform: 'darwin' });
     assert.deepEqual(flag(argv.slice(argv.indexOf(IMAGE) + 1), '--http-get'), ['3034:/health/state']);
     assert.deepEqual(flag(argv.slice(argv.indexOf(IMAGE) + 1), '--forward'), ['12435', '3035'], 'not a raw forward');
+  });
+
+  test('graphify is relayed as MCP with the tools config/code-graph.json lists', () => {
+    const relays = gateMcpRelays({});
+    assert.deepEqual(relays.map((r) => [r.port, r.path]), [[3851, '/mcp']]);
+    assert.ok(relays[0].tools.includes('query_graph'));
+    assert.ok(!relays[0].tools.some((t) => /pr/.test(t)), 'no PR tools: they run gh in the services container');
+    assert.equal(gateMcpRelays({ GRAPHIFY_MCP_PORT: '4851' })[0].port, 4851);
+    assert.deepEqual(gateMcpRelays({}, '/nonexistent'), [], 'no config → no relay');
+    const argv = gateRunArgs({ name: 'b', agent: 'claude', ports: [1], network: 'n', mcpRelays: [{ port: 3851, path: '/mcp', tools: ['a', 'b'] }], platform: 'darwin' });
+    assert.deepEqual(flag(argv.slice(argv.indexOf(IMAGE) + 1), '--mcp'), ['3851:/mcp:a,b']);
+    assert.ok(!flag(argv, '--forward').includes('3851'), 'not a raw forward');
   });
 
   test('the gate chains through the host web proxy when there is one', () => {

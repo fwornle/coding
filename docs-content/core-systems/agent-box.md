@@ -51,12 +51,13 @@ The same, as a table:
 | ⛔ | Docker socket | no socket | host: start, stop, rebuild any container, mount any folder |
 | 🔐 | coding containers | via coding svc | box: status, logs, restart, graphify; up / rebuild need your approval |
 | ⛔ | Host processes and daemons | not visible | host: kill, launchctl / systemctl, restart services |
-| ⛔ | MCP servers, knowledge injection | not loaded | loaded for the host agent only |
+| ⛔ | Knowledge injection | not loaded | loaded for the host agent only |
 | | **Network** | | |
 | ✅ | LLM proxy :12435 | every model call | routed, metered and logged; from the box through the network gate |
 | 🔐 | Guard daemon :3035 | can ask, never approve | override requests and coding svc; approving needs your factor |
 | 👁️ | Health coordinator :3034 | GET /health/state only | the health line on each prompt; every other route refused at the gate |
-| ⛔ | Other host services | refused at the gate | obs-api :12436, dashboard :3032, Qdrant :6333, MCP servers … |
+| 👁️ | Graphify MCP :3851 | read tools, default graph | the coding code graph; other tools and other projects refused at the gate |
+| ⛔ | Other host services | refused at the gate | obs-api :12436, dashboard :3032, Qdrant :6333 … |
 | 🔑 | Internet | login hosts only | e.g. platform.claude.com for claude; every refusal is reported |
 | | **You and your accounts** | | |
 | ✅ | Your terminal | keys, screen, paste | tmux pane; Cmd+V image paste goes through a bridge |
@@ -78,13 +79,20 @@ read-only and without capabilities. Inside the box, `host.docker.internal` is th
 gate, so every URL the launcher hands the agent keeps working. The gate:
 
 - forwards the **LLM proxy** (`:12435`) and the **guard** (`:3035`) to the host.
-  Any other port is refused, including obs-api, the dashboard, Qdrant and the
-  MCP servers;
+  Any other port is refused, including obs-api, the dashboard and Qdrant;
 - relays one read from the **health coordinator** (`:3034`): `GET /health/state`,
   which the health prompt hook asks for. Any other method or path gets 403, so
   the coordinator's other routes (`PUT /features`, `POST /health/remediate`,
   `POST /experiments/run` and so on) stay out of reach. Only the path goes
   upstream: no query, headers or body;
+- relays the **graphify MCP server** (`:3851/mcp`) and checks every JSON-RPC
+  message on the way. Only the tools listed in `config/code-graph.json` can be
+  called (`query_graph`, `get_node`, `get_neighbors`, `shortest_path`,
+  `graph_stats`, `god_nodes`), and only on the default graph: the coding code
+  graph a host agent queries. A call with a `project_path` is refused, because
+  the services container sees every repo under `~/Agentic`. The tool list the
+  agent gets shows only these tools, without `project_path`. A refused call gets
+  a JSON-RPC error that names the reason, and never reaches graphify;
 - runs a CONNECT proxy for the agent's **own login** only: an exact list of hosts,
   port 443, in `docker/agent-box/gate/egress-allow.json` (claude:
   `platform.claude.com`, `claude.ai`, `claude.com`; copilot: `github.com`,
@@ -547,10 +555,10 @@ chain, and `audit` names the first broken line.
   feature is on for the host (`CODING_BOX_HOOKS`). Your personal hooks from
   `~/.claude/settings.json` do not run in the box: their scripts are on the
   host.
-- No MCP servers inside the box. Session logs still work for claude, Copilot
-  and pi, because their session files land on your disk: Claude's transcript
-  folder and Copilot's `~/.copilot/session-state` are mounted, and pi already
-  writes its sessions into the project (`.observations/pi-sessions`).
+- Session logs work for claude, Copilot and pi, because their session files
+  land on your disk: Claude's transcript folder and Copilot's
+  `~/.copilot/session-state` are mounted, and pi already writes its sessions
+  into the project (`.observations/pi-sessions`).
 - pi gets a **copy** of its config directory for each box session (provider
   config with `localhost` pointed at the host, plus the extensions the launcher
   installed; no credentials, no old sessions). The host directory is never
@@ -572,9 +580,9 @@ chain, and `audit` names the first broken line.
   [box network](#box-network) gate (web search works, because it runs on the
   model's side). Install dependencies from a host shell, or run the session
   with `--no-box`.
-- MCP servers do not reach the box: their ports are not forwarded by the
-  [box network](#box-network) gate. Graphify is available through
-  `coding svc graphify`.
+- Of the MCP servers, only graphify reaches the box, through the
+  [box network](#box-network) gate's MCP relay, and only its read tools on the
+  default graph. `coding svc graphify` still runs the graphify CLI.
 - The result check keeps its state where the agent's user can write it, so an
   agent could tamper with what the check compares against. Planned: keep that
   state out of the agent's reach.
