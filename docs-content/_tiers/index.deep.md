@@ -112,10 +112,12 @@ While Claude Code is the primary and default agent, **coding** is fully agent-ag
 
 | Agent | Launch | Status |
 |-------|--------|--------|
-| **Claude Code** (default) | `coding` or `coding --claude` | Full MCP integration |
-| **GitHub Copilot CLI** | `coding --copilot` | Pipe-pane I/O capture |
-| **OpenCode** | `coding --opencode` | Pipe-pane I/O capture |
-| **Pi** | `coding --pi` | Native session JSONL |
+| **Claude Code** (default) | `coding` or `coding claude` | Full MCP integration |
+| **GitHub Copilot CLI** | `coding copilot` | Pipe-pane I/O capture |
+| **OpenCode** | `coding opencode` | Pipe-pane I/O capture |
+| **Pi** | `coding pi` | Native session JSONL |
+
+The agent is the first word after `coding`; the flag form (`--claude`, `--copilot`, `--opencode`, `--pi`) works the same. Plain `coding` always starts Claude Code.
 
 All agents share the same infrastructure: tmux session wrapping, status line, health monitoring, LSL session logging, knowledge management, and constraint enforcement. Missing agent CLIs are auto-installed on first launch.
 

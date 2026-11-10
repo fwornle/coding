@@ -15,11 +15,11 @@ View the published online documentation [here](https://fwornle.github.io/coding/
 # Start Claude Code with all features
 coding
 
-# Or use specific agent
-coding --claude
-coding --copilot
-coding --opencode
-coding --pi
+# Or name the agent (bare word or flag: `coding pi` = `coding --pi`)
+coding claude
+coding copilot
+coding opencode
+coding pi
 
 # Clean start (kills all orphaned processes, frees ports)
 coding --force
@@ -35,8 +35,8 @@ The coding stack runs in Docker — there is no native fallback.
 
 ```bash
 # Start Claude or CoPilot — Docker services start automatically
-coding --claude
-coding --copilot
+coding claude
+coding copilot
 ```
 
 **Benefits**: Persistent MCP servers, shared browser automation across sessions, isolated database containers, no duplicate containers when switching agents.
@@ -47,14 +47,16 @@ coding --copilot
 
 ![Coding Environment — Tmux Status Bar](docs/images/status-line.png)
 
-**Multi-Agent Support**: While Claude Code is the primary and default agent (`coding` or `coding --claude`), the system is fully agent-agnostic. Any coding agent can be integrated with a single config file in `config/agents/`. Currently supported:
+**Multi-Agent Support**: While Claude Code is the primary and default agent (`coding`, `coding claude` or `coding --claude`), the system is fully agent-agnostic. Any coding agent can be integrated with a single config file in `config/agents/`. Currently supported:
 
 | Agent | Launch Command | Detection |
 |-------|---------------|-----------|
-| **Claude Code** (default) | `coding` or `coding --claude` | Native transcript support |
-| **GitHub Copilot CLI** | `coding --copilot` | Pipe-pane I/O capture |
-| **OpenCode** | `coding --opencode` | Pipe-pane I/O capture |
-| **Pi** | `coding --pi` | Native session JSONL |
+| **Claude Code** (default) | `coding` or `coding claude` | Native transcript support |
+| **GitHub Copilot CLI** | `coding copilot` | Pipe-pane I/O capture |
+| **OpenCode** | `coding opencode` | Pipe-pane I/O capture |
+| **Pi** | `coding pi` | Native session JSONL |
+
+The agent is the first word after `coding`; the flag form (`coding --claude`, `--copilot`, `--opencode`, `--pi`) works the same. Plain `coding` always starts Claude Code.
 
 All agents get the same infrastructure: tmux session wrapping, status line, health monitoring, LSL session logging, knowledge management, constraint enforcement, and **shared skills** (see [Skills System](docs/skills-system.md)). Missing agent CLIs are auto-installed on first launch (with user confirmation).
 

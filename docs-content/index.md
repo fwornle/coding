@@ -77,10 +77,13 @@ builds knowledge from them, and stops known mistakes before they happen.
 
     | Agent | Launch |
     |-------|--------|
-    | Claude Code (default) | `coding` or `coding --claude` |
-    | GitHub Copilot CLI | `coding --copilot` |
-    | OpenCode | `coding --opencode` |
-    | Pi | `coding --pi` |
+    | Claude Code (default) | `coding` or `coding claude` |
+    | GitHub Copilot CLI | `coding copilot` |
+    | OpenCode | `coding opencode` |
+    | Pi | `coding pi` |
+
+    The agent is the first word after `coding`; the flag form (`--claude`, `--copilot`,
+    `--opencode`, `--pi`) works the same.
 
     All four share the same tmux wrapping, status line, health monitoring, session logging,
     knowledge base and constraint enforcement. Adding a fifth is a single config file in
