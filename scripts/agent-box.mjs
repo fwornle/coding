@@ -332,6 +332,9 @@ export function boxRunArgs({
   // Who commits: the box has no ~/.gitconfig, so without these every commit
   // fails with "Author identity unknown".
   for (const [key, value] of Object.entries(gitIdentityEnv(gitIdentity))) argv.push('-e', `${key}=${value}`);
+  // The image pins each agent's version (rebuilt by `coding box build`), and
+  // its npm prefix is root-owned: a self-update can only fail, loudly, mid-session.
+  argv.push('-e', 'DISABLE_AUTOUPDATER=1');
 
   argv.push('-v', `${HOME_VOLUME}:${BOX_HOME}`);
   // Claude transcripts on the host's disk, where session logging reads them.
@@ -395,6 +398,27 @@ export function hostGitIdentity(cwd = process.cwd(), run = spawnSync) {
     return value || null;
   };
   return { name: get('user.name'), email: get('user.email') };
+}
+
+/**
+ * The remote urls of the workspace repo and its submodules, read on the host
+ * BEFORE the agent starts. The guard pins them: from inside the box, git push
+ * and gh reach only these (lib/guard/vcs.mjs). Relative submodule urls are
+ * resolved by the guard against `origin`, which comes first.
+ */
+export function hostRemotes(cwd = process.cwd(), run = spawnSync) {
+  const lines = (args) => {
+    const res = run('git', args, { cwd, encoding: 'utf8', timeout: 10_000 });
+    return res.status === 0 ? String(res.stdout).split('\n').map((l) => l.trim()).filter(Boolean) : [];
+  };
+  const value = (l) => l.split(/\s+/).slice(1).join(' ');
+  const origin = lines(['config', '--get', 'remote.origin.url']);
+  return [...new Set([
+    ...origin,
+    ...lines(['config', '--get-regexp', '^remote\\..*\\.(push)?url$']).map(value),
+    ...lines(['config', '-f', '.gitmodules', '--get-regexp', '^submodule\\..*\\.url$']).map(value),
+    ...lines(['submodule', 'foreach', '--quiet', '--recursive', 'git config --get remote.origin.url || true']),
+  ])].filter(Boolean);
 }
 
 /** GIT_AUTHOR_* / GIT_COMMITTER_* for an identity; unset parts are left out. */
@@ -565,12 +589,12 @@ function status() {
  * token that binds its `coding svc` calls to `session`; release it on exit.
  * No guard running → null, and the box starts without `coding svc`.
  */
-export async function registerBox(session, { env = process.env, release = false } = {}) {
+export async function registerBox(session, { env = process.env, release = false, workspace = null, remotes = [] } = {}) {
   try {
     const res = await fetch(`http://127.0.0.1:${guardPort(env)}/boxes${release ? '/release' : ''}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${readToken(guardPaths(guardHome(env)))}` },
-      body: JSON.stringify({ session }),
+      body: JSON.stringify(release ? { session } : { session, workspace, remotes }),
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;
@@ -707,7 +731,8 @@ async function run(agent, args) {
     process.stderr.write('agent-box: CODING_BOX_NETWORK=open — the box can reach every host service and the internet\n');
     spawnSync(process.execPath, [path.join(REPO, 'scripts', 'coding-guard.mjs'), 'note', 'box.network.open', `agent=${agent}`, `box=${name}`], { stdio: 'ignore' });
   }
-  const boxToken = await registerBox(name);
+  const workspace = process.env.TARGET_PROJECT_DIR || process.cwd();
+  const boxToken = await registerBox(name, { workspace, remotes: hostRemotes(workspace) });
   if (!boxToken) process.stderr.write('agent-box: the host guard did not register this box — `coding svc` will be refused inside it\n');
   try {
     const argv = boxRunArgs({

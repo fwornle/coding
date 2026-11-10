@@ -92,6 +92,14 @@ COPY gate/gate.mjs gate/egress-allow.json /opt/coding-box/gate/
 RUN chown -R root:root /opt/coding-box/gate \
  && chmod 0755 /opt/coding-box/gate \
  && chmod 0644 /opt/coding-box/gate/gate.mjs /opt/coding-box/gate/egress-allow.json
+# git push|fetch|pull|ls-remote and gh through the host guard (lib/guard/vcs.mjs):
+# /usr/local/bin precedes /usr/bin, so the shims see those verbs first and hand
+# every other git command to the real /usr/bin/git untouched.
+COPY vcs/vcs-client.mjs /opt/coding-box/vcs/vcs-client.mjs
+COPY vcs/git vcs/gh /usr/local/bin/
+RUN chown -R root:root /opt/coding-box/vcs /usr/local/bin/git /usr/local/bin/gh \
+ && chmod 0755 /opt/coding-box/vcs /usr/local/bin/git /usr/local/bin/gh \
+ && chmod 0644 /opt/coding-box/vcs/vcs-client.mjs
 COPY managed-settings.json /etc/claude-code/managed-settings.json
 COPY entrypoint.sh /usr/local/sbin/coding-box-entrypoint
 RUN chmod 0644 /etc/claude-code/managed-settings.json \

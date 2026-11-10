@@ -1,0 +1,4 @@
+#!/bin/sh
+# gh in the agent box: runs on the host through the guard, for this repo only
+# (reads free, writes after your approval) — see lib/guard/vcs.mjs.
+exec /usr/local/bin/node /opt/coding-box/vcs/vcs-client.mjs gh "$@"
