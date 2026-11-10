@@ -76,6 +76,22 @@ describe('box gate', () => {
     assert.ok(out.lines.some((l) => l.allow === `localhost:${svc}`));
   });
 
+  test('a client that resets after a refused CONNECT does not take the gate down', async () => {
+    // Claude probes api.anthropic.com through HTTPS_PROXY at start, gets the 403
+    // and resets the socket; an unhandled ECONNRESET there killed the gate, and
+    // every later request from the box was ECONNREFUSED.
+    const svc = await echoServer();
+    const { g } = await gate({ connectPort: 0, allow: ['localhost'], allowPorts: [svc] });
+    await new Promise((resolve, reject) => {
+      const s = net.connect(g.ports.connect, '127.0.0.1', () => s.write('CONNECT example.com:443 HTTP/1.1\r\nHost: example.com:443\r\n\r\n'));
+      s.once('data', () => { s.resetAndDestroy(); setTimeout(resolve, 50); });
+      s.once('error', reject);
+    });
+    const ok = await connectThrough(g.ports.connect, `localhost:${svc}`);
+    assert.equal(ok.status, 200);
+    ok.sock.destroy();
+  });
+
   test('plain HTTP through the proxy is refused (only CONNECT is offered)', async () => {
     const { g, out } = await gate({ connectPort: 0, allow: ['localhost'] });
     const status = await new Promise((resolve, reject) => {

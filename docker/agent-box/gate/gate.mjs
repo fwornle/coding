@@ -286,6 +286,10 @@ export async function createGate({
       res.end('coding agent box: only the LLM proxy and the guard are reachable (see the box network docs)\n');
     });
     proxy.on('connect', async (req, client, head) => {
+      // The socket is ours now, without the HTTP server's error handling: a
+      // client that resets after its 403 (Claude probing api.anthropic.com)
+      // would otherwise throw an unhandled ECONNRESET and end the gate.
+      client.on('error', () => {});
       const dest = parseAuthority(req.url);
       if (!dest || !allowed(allow, dest, allowPorts)) {
         log({ deny: req.url }, out);
