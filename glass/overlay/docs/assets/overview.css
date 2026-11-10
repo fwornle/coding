@@ -167,6 +167,27 @@
   overflow-wrap: anywhere;
 }
 
+/* A small table in the copy column (slide 7's protection levels). Material's
+   default cell padding makes three rows taller than the figure beside them,
+   and a flag like `--strict-box` must never break at its hyphen. */
+.overview-deck .overview-copy .md-typeset__table {
+  margin: .6rem 0;
+}
+
+.overview-deck .overview-copy table:not([class]) {
+  font-size: clamp(.6rem, .95vw, .7rem);
+}
+
+.overview-deck .overview-copy table:not([class]) th,
+.overview-deck .overview-copy table:not([class]) td {
+  padding: .35em .7em;
+  line-height: 1.35;
+}
+
+.overview-deck .overview-copy table:not([class]) code {
+  white-space: nowrap;
+}
+
 .overview-benefits {
   padding: .25rem 1rem;
   border-left: 3px solid var(--overview-blue);
