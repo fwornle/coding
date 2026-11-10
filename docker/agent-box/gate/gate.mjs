@@ -4,7 +4,7 @@
  *
  * The box sits on its own `--internal` Docker network: no route anywhere.
  * This gate is the only other container on that network, and inside the box
- * `host.docker.internal` points at it. It offers exactly four things:
+ * `host.docker.internal` points at it. It offers exactly five things:
  *
  *   1. TCP forwards for fixed ports (the LLM proxy and the guard daemon) to the
  *      real host. Any other port is simply not listened on: refused.
@@ -21,6 +21,13 @@
  *      called, and only on the server's default graph: a call that names a
  *      project_path is refused, because the services container sees every repo
  *      under ~/Agentic and the box must not.
+ *   5. View relays (not in --strict-box): the host's web UIs — dashboard, its
+ *      API, the knowledge viewer — for LOOKING only. GET, HEAD and OPTIONS of
+ *      any path pass; every write method, every WebSocket upgrade and every
+ *      cookie is refused. A browser in the box sees the live UIs and cannot
+ *      press a button that changes anything. What those UIs show (other repos'
+ *      sessions, health, knowledge) does become visible to the box, which is
+ *      exactly what --strict-box leaves out.
  *
  * Runs from the box image as `nobody`, read-only, no capabilities. The agent
  * has no Docker socket, so it cannot reach into this container or change its
@@ -29,7 +36,7 @@
  *   node gate.mjs --target host.docker.internal --forward 12435 --forward 3035 \
  *     --connect 3128 --allow-file /opt/coding-box/egress-allow.json --agent claude \
  *     [--upstream http://host.docker.internal:3128] [--http-get 3034:/health/state] \
- *     [--mcp 3851:/mcp:query_graph,get_node]
+ *     [--mcp 3851:/mcp:query_graph,get_node] [--view 3032 --view 3033]
  */
 
 import fs from 'node:fs';
@@ -113,6 +120,43 @@ export function filterToolList(text, tools) {
   return text.split('\n').map((l) => (l.startsWith('data: ') ? `data: ${keep(l.slice(6))}` : l)).join('\n');
 }
 
+/** Methods a view relay passes: reading, and the CORS preflight a page sends before a read. */
+export const VIEW_METHODS = ['GET', 'HEAD', 'OPTIONS'];
+
+/**
+ * Request headers a view relay never sends on: credentials, and everything
+ * that would turn the request into something other than one plain read
+ * (hop-by-hop, upgrade, a body). Host is rewritten, not copied.
+ */
+const VIEW_DROP_REQUEST = new Set(['host', 'cookie', 'authorization', 'proxy-authorization', 'connection', 'upgrade',
+  'keep-alive', 'te', 'trailer', 'transfer-encoding', 'content-length', 'content-type', 'expect', 'proxy-connection']);
+/** Response headers a view relay never hands back. */
+const VIEW_DROP_RESPONSE = new Set(['set-cookie', 'connection', 'keep-alive', 'transfer-encoding', 'upgrade', 'trailer']);
+
+/** Why the view request (method, headers) is refused, or null when it may pass. */
+export function viewRefusal(method, headers = {}) {
+  if (!VIEW_METHODS.includes(method)) return `method ${method} (view only)`;
+  if (headers.upgrade) return `upgrade to ${headers.upgrade} (view only)`;
+  return null;
+}
+
+/** The headers a view relay sends upstream for `reqHeaders`, addressed to localhost:`port`. */
+export function viewRequestHeaders(reqHeaders, port) {
+  const out = {};
+  for (const [k, v] of Object.entries(reqHeaders || {})) if (!VIEW_DROP_REQUEST.has(k.toLowerCase())) out[k] = v;
+  // The UIs check Host (dev servers refuse unknown ones) and expect the
+  // localhost origin they were built for; the box browser uses that too.
+  out.host = `localhost:${port}`;
+  return out;
+}
+
+/** The response headers a view relay hands back. */
+export function viewResponseHeaders(upHeaders) {
+  const out = {};
+  for (const [k, v] of Object.entries(upHeaders || {})) if (!VIEW_DROP_RESPONSE.has(k.toLowerCase())) out[k] = v;
+  return out;
+}
+
 /** Exact host names only — no wildcards, no IPs, so the list says precisely what is reachable. */
 export function allowed(list, { host, port }, ports = [443]) {
   return ports.includes(port) && list.includes(host);
@@ -155,7 +199,7 @@ function viaUpstream(upstream, { host, port }) {
  * gate listens (all interfaces in the container); tests use 127.0.0.1.
  */
 export async function createGate({
-  target, forward = [], connectPort = null, allow = [], allowPorts = [443], upstream = null, httpGet = [], mcp = [],
+  target, forward = [], connectPort = null, allow = [], allowPorts = [443], upstream = null, httpGet = [], mcp = [], view = [],
   listenHost = '0.0.0.0', out = process.stdout,
 }) {
   const servers = [];
@@ -278,6 +322,42 @@ export async function createGate({
     servers.push(srv);
   }
 
+  for (const v of view) {
+    const { listen: lport, port } = typeof v === 'number' ? { listen: v, port: v } : { listen: v.port, ...v };
+    const srv = http.createServer((req, res) => {
+      const why = viewRefusal(req.method, req.headers);
+      if (why) {
+        log({ deny: `http://${target}:${port}${req.url}`, method: req.method, why }, out);
+        res.writeHead(403, { 'content-type': 'text/plain' });
+        res.end(`coding agent box: ${why} — the host's web UIs are view-only from the box\n`);
+        req.resume();
+        return;
+      }
+      // Path and query as sent; no body ever goes up (a GET has none to send).
+      req.resume();
+      const up = http.request({ host: target, port, path: req.url, method: req.method, headers: viewRequestHeaders(req.headers, port) }, (upRes) => {
+        res.writeHead(upRes.statusCode || 502, viewResponseHeaders(upRes.headers));
+        upRes.pipe(res);
+      });
+      up.on('error', (err) => {
+        log({ view: port, error: err.code || err.message }, out);
+        if (!res.headersSent) res.writeHead(502, { 'content-type': 'text/plain' });
+        res.end();
+      });
+      // A closed page (an SSE stream, a long poll) must not keep the upstream open.
+      res.on('close', () => up.destroy());
+      up.end();
+    });
+    // A WebSocket handshake arrives as 'upgrade', not as a request: refuse it here.
+    srv.on('upgrade', (req, socket) => {
+      socket.on('error', () => {});
+      log({ deny: `http://${target}:${port}${req.url}`, method: req.method, why: `upgrade to ${req.headers.upgrade} (view only)` }, out);
+      socket.end('HTTP/1.1 403 Forbidden\r\ncontent-type: text/plain\r\nconnection: close\r\n\r\ncoding agent box: the host\'s web UIs are view-only from the box\n');
+    });
+    ports[`view:${port}`] = await listen(srv, lport);
+    servers.push(srv);
+  }
+
   if (connectPort !== null) {
     const proxy = http.createServer((req, res) => {
       // Plain-HTTP proxying is never offered: only CONNECT to allow-listed hosts.
@@ -323,7 +403,7 @@ export async function createGate({
 
 /** argv → options. Unknown flags are an error: the launcher builds this argv. */
 export function parseArgs(argv) {
-  const o = { forward: [], httpGet: [], mcp: [], allowFile: null, agent: null, target: null, connectPort: null, upstream: null };
+  const o = { forward: [], httpGet: [], mcp: [], view: [], allowFile: null, agent: null, target: null, connectPort: null, upstream: null };
   for (let i = 0; i < argv.length; i++) {
     const v = argv[i + 1];
     switch (argv[i]) {
@@ -343,11 +423,13 @@ export function parseArgs(argv) {
         if (!r) throw new Error(`gate: bad --mcp ${v}`);
         o.mcp.push(r); i++; break;
       }
+      case '--view': o.view.push(Number(v)); i++; break;
       default: throw new Error(`gate: unknown argument ${argv[i]}`);
     }
   }
   if (!o.target) throw new Error('gate: --target is required');
   if (o.forward.some((p) => !Number.isInteger(p) || p < 1 || p > 65535)) throw new Error('gate: bad --forward port');
+  if (o.view.some((p) => !Number.isInteger(p) || p < 1 || p > 65535)) throw new Error('gate: bad --view port');
   return o;
 }
 
@@ -365,8 +447,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   try {
     const o = parseArgs(process.argv.slice(2));
     const allow = o.allowFile ? allowListFor(o.allowFile, o.agent) : [];
-    const gate = await createGate({ target: o.target, forward: o.forward, connectPort: o.connectPort, allow, upstream: o.upstream, httpGet: o.httpGet, mcp: o.mcp });
-    log({ ready: true, forward: o.forward, connect: o.connectPort, allow, upstream: o.upstream, httpGet: o.httpGet, mcp: o.mcp });
+    const gate = await createGate({ target: o.target, forward: o.forward, connectPort: o.connectPort, allow, upstream: o.upstream, httpGet: o.httpGet, mcp: o.mcp, view: o.view });
+    log({ ready: true, forward: o.forward, connect: o.connectPort, allow, upstream: o.upstream, httpGet: o.httpGet, mcp: o.mcp, view: o.view });
     const stop = () => gate.close().then(() => process.exit(0));
     process.on('SIGTERM', stop);
     process.on('SIGINT', stop);

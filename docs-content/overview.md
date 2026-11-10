@@ -220,15 +220,22 @@ keys, Docker, every service and its own guard.
 it cannot switch its guard off. A rule is overridden only by a grant you
 approve on the host.
 
-Its network reaches the LLM proxy and the guard, plus its own login. Nothing
-else.
+Its network reaches the LLM proxy and the guard, plus its own login. It can
+**look at** your dashboard and viewer (dashed light blue), never change them,
+and test its own pages in a browser inside the box.
+
+| | sees | for |
+|---|---|---|
+| `--box` | project + host UIs, view-only | the default |
+| `--strict-box` | project only | other repos stay hidden |
+| `--no-box` | everything, as you | work the box refuses |
 
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Every path an agent can read or write. The host agent, greyed, reaches all of them. The boxed agent: project read-write, coding repo and guard read-only, own settings, transcripts read-write; the rest of home, guard keys, Docker socket, host processes, other host services and GitHub keys blocked; graphify MCP read-only; coding containers, the guard daemon and overrides only through the guard; LLM proxy allowed; internet only for its own login.](images/agent-box-access.svg)](images/agent-box-access.svg){: target="_blank" rel="noopener" title="Open full-size image" }
+[![Every path an agent can read or write. The host agent, greyed, reaches all of them. The boxed agent: project read-write, coding repo and guard read-only, own settings, transcripts read-write; the rest of home, guard keys, Docker socket, host processes and other host services blocked; graphify MCP read-only; the host web UIs view-only, and hidden with --strict-box; a browser inside the box; coding containers, the guard daemon, git push and overrides only through the guard; LLM proxy allowed; internet only for its own login.](images/agent-box-access.svg)](images/agent-box-access.svg){: target="_blank" rel="noopener" title="Open full-size image" }
 
-<figcaption>Every path, both ways: grey for the host, colour for the box.</figcaption>
+<figcaption>Every path, both ways: grey for the host, colour for the box; <code>--strict-box</code> drops the dashed light-blue one.</figcaption>
 </figure>
 <p class="overview-takeaway" markdown="1">
 Your keys, Docker and the guard stay out of the agent's reach.
