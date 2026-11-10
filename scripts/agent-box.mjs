@@ -153,6 +153,24 @@ export function gateDenials(logText) {
   return [...counts].map(([dest, count]) => ({ dest, count })).sort((a, b) => b.count - a.count);
 }
 
+/**
+ * Where a boxed Claude finds its per-launch session files: settings.json,
+ * mcp.json and claude-plugin/ (this repo's slash commands). The same three
+ * things claude-mcp-launcher.sh hands a host Claude as --settings, --mcp-config
+ * and --plugin-dir — without them a boxed Claude starts bare: no /sl or other
+ * project commands, none of the user's settings, no MCP servers. Staged per
+ * launch on the host (stageClaudeSession) and mounted read-only.
+ */
+export const BOX_CLAUDE_SESSION = '/opt/coding-box/claude-session';
+
+/**
+ * Settings that run a HOST command. Inside the box the command does not exist
+ * (host node paths, host scripts), and hooks are the managed policy's alone
+ * there (allowManagedHooksOnly), so these are dropped from the box's copy. The
+ * coding status bar is drawn by tmux on the host either way.
+ */
+export const HOST_COMMAND_SETTINGS = ['hooks', 'statusLine', 'apiKeyHelper', 'awsAuthRefresh', 'awsCredentialExport', 'otelHeadersHelper'];
+
 function git(args, cwd = REPO) {
   return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
 }
@@ -233,7 +251,7 @@ export function boxRunArgs({
   home = os.homedir(), platform = process.platform, uid, gid, tty = false,
   image = IMAGE, name = `coding-box-${agent}-${process.pid}`, exists = fs.existsSync,
   guardDir = guardHome(env, home), guardPortNum = guardPort(env), boxToken = null,
-  piAgentDir = null, gate = null,
+  piAgentDir = null, gate = null, claudeSessionDir = null, gitIdentity = null,
 }) {
   const command = AGENT_COMMANDS[agent];
   if (!command) throw new Error(`unknown agent '${agent}' (one of: ${Object.keys(AGENT_COMMANDS).join(', ')})`);
@@ -305,6 +323,15 @@ export function boxRunArgs({
   argv.push('-e', `CODING_GUARD_URL=http://host.docker.internal:${guardPortNum}`, '-e', `CODING_GUARD_SESSION=${name}`);
   // Binds `coding svc` to THIS box's session (registerBox); the agent may read it — it is only this box's.
   if (boxToken) argv.push('-e', `CODING_GUARD_BOX_TOKEN=${boxToken}`);
+  // What claude-mcp-launcher.sh exports on the host: the slash commands find the
+  // coding repo (and its knowledge exports) through these.
+  const repoInBox = boxPath(codingRepo, platform);
+  argv.push('-e', `CODING_REPO=${repoInBox}`, '-e', `CODING_TOOLS_PATH=${repoInBox}`,
+    '-e', `CODING_KNOWLEDGE_BASE=${repoInBox}/.data/knowledge-graph`,
+    '-e', `CODING_KNOWLEDGE_EXPORT=${repoInBox}/.data/knowledge-export`);
+  // Who commits: the box has no ~/.gitconfig, so without these every commit
+  // fails with "Author identity unknown".
+  for (const [key, value] of Object.entries(gitIdentityEnv(gitIdentity))) argv.push('-e', `${key}=${value}`);
 
   argv.push('-v', `${HOME_VOLUME}:${BOX_HOME}`);
   // Claude transcripts on the host's disk, where session logging reads them.
@@ -318,6 +345,12 @@ export function boxRunArgs({
       throw new Error(`refusing to mount ${piAgentDir}: it contains the guard's keys (${guardDir})`);
     }
     argv.push('-v', `${piAgentDir}:${BOX_PI_DIR}`, '-e', `PI_CODING_AGENT_DIR=${BOX_PI_DIR}`);
+  }
+  if (agent === 'claude' && claudeSessionDir) {
+    if (exposesGuardHome(claudeSessionDir, guardDir)) {
+      throw new Error(`refusing to mount ${claudeSessionDir}: it contains the guard's keys (${guardDir})`);
+    }
+    argv.push('-v', `${claudeSessionDir}:${BOX_CLAUDE_SESSION}:ro`);
   }
   for (const [target, [host, mode]] of mounts) argv.push('-v', `${host}:${target}${mode === 'ro' ? ':ro' : ''}`);
   // The directory, not the file: single-file bind mounts go stale on VirtioFS.
@@ -347,6 +380,83 @@ export function boxAgentConfig(agent, { home = os.homedir(), readFile = (f) => f
     files.push({ path: rel, content: toBoxUrl(text) });
   }
   return files;
+}
+
+/**
+ * The host user's git identity, as git resolves it in `cwd` (repo config, then
+ * global). Only the name and email reach the box, never ~/.gitconfig itself: it
+ * can hold credential helpers, includes and aliases that run commands, which the
+ * box must not inherit. Missing values come back null.
+ */
+export function hostGitIdentity(cwd = process.cwd(), run = spawnSync) {
+  const get = (key) => {
+    const res = run('git', ['config', '--get', key], { cwd, encoding: 'utf8' });
+    const value = res.status === 0 ? String(res.stdout).trim() : '';
+    return value || null;
+  };
+  return { name: get('user.name'), email: get('user.email') };
+}
+
+/** GIT_AUTHOR_* / GIT_COMMITTER_* for an identity; unset parts are left out. */
+export function gitIdentityEnv(identity) {
+  const env = {};
+  if (identity?.name) Object.assign(env, { GIT_AUTHOR_NAME: identity.name, GIT_COMMITTER_NAME: identity.name });
+  if (identity?.email) Object.assign(env, { GIT_AUTHOR_EMAIL: identity.email, GIT_COMMITTER_EMAIL: identity.email });
+  return env;
+}
+
+/** The box's copy of the derived Claude settings: everything except what runs a host command. */
+export function boxClaudeSettings(derived) {
+  const settings = { ...derived };
+  for (const key of HOST_COMMAND_SETTINGS) delete settings[key];
+  return settings;
+}
+
+/** The MCP config claude-mcp-launcher.sh would pick: the Docker one, then $MCP_CONFIG, then the processed default. */
+export function claudeMcpConfigPath(repo = REPO, env = process.env, exists = fs.existsSync) {
+  const candidates = [path.join(repo, 'claude-code-mcp-docker.json'), env.MCP_CONFIG, path.join(repo, 'claude-code-mcp-processed.json')];
+  return candidates.find((f) => f && exists(f)) ?? null;
+}
+
+/**
+ * Stage a boxed Claude's session files in `stageDir` and return the claude
+ * arguments that load them from BOX_CLAUDE_SESSION — the box's counterpart of
+ * the arguments claude-mcp-launcher.sh builds for a host Claude:
+ *
+ *   --settings      the derived settings (scripts/build-claude-runtime-config.mjs:
+ *                   the user's own settings.json plus this project's), minus
+ *                   whatever runs a host command (boxClaudeSettings)
+ *   --plugin-dir    this repo's .claude/commands, filtered by feature, as a plugin
+ *   --mcp-config    the same MCP config, loopback URLs pointed at the host
+ *   --strict-mcp-config   unless CODING_MCP_STRICT=0, as on the host
+ *
+ * Copies, never the repo's own .coding/ files: those are regenerated (deleted
+ * and rewritten) by every host launch, and the box must not be able to write
+ * anything a host session later loads.
+ */
+export function stageClaudeSession(stageDir, { repo = REPO, env = process.env, run = spawnSync, fsImpl = fs } = {}) {
+  const gen = path.join(stageDir, 'generated');
+  const res = run(process.execPath, [path.join(repo, 'scripts', 'build-claude-runtime-config.mjs')], {
+    env: { ...env, CODING_REPO: repo, CODING_RUNTIME_DIR: gen }, encoding: 'utf8',
+  });
+  if (res.status !== 0) throw new Error(`build-claude-runtime-config.mjs failed: ${(res.stderr || '').trim().split('\n').pop()}`);
+  const [settingsFile, pluginDir] = String(res.stdout).trim().split('\n');
+  const args = [];
+  const derived = JSON.parse(fsImpl.readFileSync(settingsFile, 'utf8'));
+  fsImpl.writeFileSync(path.join(stageDir, 'settings.json'), `${JSON.stringify(boxClaudeSettings(derived), null, 2)}\n`);
+  args.push('--settings', `${BOX_CLAUDE_SESSION}/settings.json`);
+  if (pluginDir && fsImpl.existsSync(pluginDir)) {
+    fsImpl.renameSync(pluginDir, path.join(stageDir, 'claude-plugin'));
+    args.push('--plugin-dir', `${BOX_CLAUDE_SESSION}/claude-plugin`);
+  }
+  fsImpl.rmSync(gen, { recursive: true, force: true });
+  const mcp = claudeMcpConfigPath(repo, env, (f) => fsImpl.existsSync(f));
+  if (mcp) {
+    fsImpl.writeFileSync(path.join(stageDir, 'mcp.json'), toBoxUrl(fsImpl.readFileSync(mcp, 'utf8')));
+    args.push('--mcp-config', `${BOX_CLAUDE_SESSION}/mcp.json`);
+    if (env.CODING_MCP_STRICT !== '0') args.push('--strict-mcp-config');
+  }
+  return args;
 }
 
 /** The top-level files of pi's config dir a box session gets (never auth.json / models-store.json). */
@@ -573,6 +683,15 @@ async function run(agent, args) {
       process.stderr.write(`agent-box: no pi provider config in ${src} — pi in the box will have no model\n`);
     }
   }
+  let claudeSessionDir = null;
+  if (agent === 'claude') {
+    claudeSessionDir = fs.mkdtempSync(path.join(os.tmpdir(), 'coding-box-claude-'));
+    try {
+      args = [...stageClaudeSession(claudeSessionDir), ...args];
+    } catch (err) {
+      process.stderr.write(`agent-box: ${err.message} — Claude starts without this project's settings, slash commands and MCP servers\n`);
+    }
+  }
   const name = `coding-box-${agent}-${process.pid}`;
   let gate = null;
   if (boxNetworkMode() === 'locked') {
@@ -581,6 +700,7 @@ async function run(agent, args) {
     } catch (err) {
       process.stderr.write(`agent-box: ${err.message}\nagent-box: refusing to start the box without its network lock (CODING_BOX_NETWORK=open runs it on the open bridge, recorded).\n`);
       if (piAgentDir) fs.rmSync(piAgentDir, { recursive: true, force: true });
+      if (claudeSessionDir) fs.rmSync(claudeSessionDir, { recursive: true, force: true });
       return 1;
     }
   } else {
@@ -591,7 +711,8 @@ async function run(agent, args) {
   if (!boxToken) process.stderr.write('agent-box: the host guard did not register this box — `coding svc` will be refused inside it\n');
   try {
     const argv = boxRunArgs({
-      agent, args, name, boxToken, piAgentDir, gate,
+      agent, args, name, boxToken, piAgentDir, gate, claudeSessionDir,
+      gitIdentity: hostGitIdentity(process.env.TARGET_PROJECT_DIR || process.cwd()),
       uid: process.getuid?.(), gid: process.getgid?.(),
       tty: Boolean(process.stdin.isTTY),
     });
@@ -600,6 +721,7 @@ async function run(agent, args) {
   } finally {
     if (boxToken) await registerBox(name, { release: true });
     if (piAgentDir) fs.rmSync(piAgentDir, { recursive: true, force: true });
+    if (claudeSessionDir) fs.rmSync(claudeSessionDir, { recursive: true, force: true });
     if (gate) {
       const denied = stopGate(gate);
       if (denied.length) {
