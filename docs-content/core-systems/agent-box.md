@@ -60,7 +60,7 @@ The same, as a table:
 | | **You and your accounts** | | |
 | ✅ | Your terminal | keys, screen, paste | tmux pane; Cmd+V image paste goes through a bridge |
 | 🔐 | Overriding a rule | only grants you sign | host: one line in the transcript, which the agent can type itself |
-| ⛔ | Pushing to GitHub | no keys: commits stay local | host: your SSH keys and gh login |
+| 🔐 | git push / fetch, gh | via the guard | pinned remotes only, no force or delete; gh reads free, PR writes need you |
 
 ✅ read-write · 👁️ read-only · 📦 box's own copy · 🔐 through the guard: you approve · 🔑 the agent's own login only · ⛔ blocked / not visible. On the host, the agent has every one of these.
 <!-- agent-box-access:end -->
@@ -348,6 +348,45 @@ without a token, with another box's session, or after the box has exited is
 refused, and the refusal is in the audit log. If the guard is not running at
 launch, the box still starts, without `coding svc`.
 
+## git and gh from the box
+
+The box has no SSH keys, no `gh` login and no route to GitHub, yet
+`git push`, `git fetch`, `git pull`, `git ls-remote` and `gh` work in it as
+usual. Small shims (`/usr/local/bin/git`, `/usr/local/bin/gh`) send exactly
+those commands to the host guard, which does the network part with your
+credentials. Every other git command is the real git, untouched.
+
+| From the box | What happens |
+|---|---|
+| `git push`, `git push -u origin <branch>`, `git push origin a:b` | new commits go to the remote; never forced, never a delete |
+| `git fetch [--all] [--prune]`, `git pull [--rebase\|--ff-only]` | the remote's new commits come in; the merge or rebase runs in the box |
+| `git ls-remote` | as usual |
+| `gh run list\|view [--log-failed]`, `gh pr list\|view\|checks\|diff`, `gh issue …`, `gh api <GET repos/{owner}/{repo}/…>`, `gh run rerun` | run on the host for **this repository only** |
+| `gh pr create\|merge\|comment`, `gh issue create\|comment`, `gh run cancel`, `gh workflow run` | **need your approval** (the same approve page as an override) |
+| `git push --force`, deleting a branch, pushing tags, `--mirror` | refused: run them from a host shell |
+
+**The host never runs git inside the agent's repository.** Its
+`.git/config` and hooks are writable from the box, and git runs commands
+they name (`core.fsmonitor`, `core.sshCommand`, hooks). So the guard keeps
+its own mirror of each remote under `~/.coding/guard/vcs/`, and the box and
+the guard exchange git bundles, which are data only. A push sends the box's
+new commits as a bundle. The guard adds them to its mirror and pushes them
+from there. A fetch works the other way round.
+
+**Only the remotes the repository had at launch.** The launcher reads the
+remotes of the workspace and its submodules on the host, before the agent
+starts. The first launch of a workspace pins them. A remote added later, for
+instance by the agent itself, needs your approval before the guard pushes to
+it or fetches from it. Local paths, `file://` and other transports are never
+used, because they would read or write host folders or run a command. `gh`
+always gets the repository from the pinned remote: `-R`, `--hostname`,
+`--web`, `@file` arguments and `--input` are refused. A `--body-file` is
+read in the box and sent as text.
+
+A `pre-push` hook in the repository runs in the box, as it would locally.
+Every call is in the [audit log](#audit-log) (`vcs.push`, `vcs.fetch`,
+`vcs.gh`, `vcs.refused`).
+
 ## Pasting images from the host clipboard
 
 Inside the box the agents are Linux programs. To paste an image (Ctrl+V in
@@ -515,6 +554,11 @@ chain, and `audit` names the first broken line.
   agent's own process and could change a call after it was checked. For the
   files such a call writes, the result check judges what lands on disk;
   anything else the plugin does is not checked.
+- Package registries and web pages are not reachable from the box:
+  `npm install`, `pip install` and Claude's WebFetch fail at the
+  [box network](#box-network) gate (web search works, because it runs on the
+  model's side). Install dependencies from a host shell, or run the session
+  with `--no-box`.
 - MCP servers do not reach the box: their ports are not forwarded by the
   [box network](#box-network) gate. Graphify is available through
   `coding svc graphify`.

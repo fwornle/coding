@@ -54,7 +54,7 @@
  * Plan: .planning/guardrail-hardening.md (Phase 1, items 2 and 3).
  */
 
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -68,6 +68,7 @@ import { Ceremonies } from '../lib/guard/ceremonies.mjs';
 import { appendAudit, readAudit, verifyAudit } from '../lib/guard/audit.mjs';
 import { svcPlan, parsePrograms, SvcError, SERVICES_CONTAINER } from '../lib/guard/svc.mjs';
 import { peekClipboardImage, readClipboardImage } from '../lib/guard/clipboard.mjs';
+import { VcsError, gitRequest, ghPlan, parseRemoteUrl, parseRefs, normaliseRemotes, pinRemotes } from '../lib/guard/vcs.mjs';
 import { listenLocal, isAllowedHost } from '../lib/network/local-only.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -84,6 +85,8 @@ const PAGES = { approve: path.join(UI_DIR, 'approve.html'), enroll: path.join(UI
 const CSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
 const MAX_BODY = 64 * 1024;
+/** `/vcs` carries git bundles (base64) both ways. */
+const MAX_VCS_BODY = 512 * 1024 * 1024;
 const MAX_PENDING = 100;
 const MAX_NEW_PER_MINUTE = 30;
 const REQUEST_TTL_MS = 24 * 60 * 60 * 1000;
@@ -115,6 +118,40 @@ function dockerRunner(argv, { timeout = 60_000 } = {}) {
 }
 
 /**
+ * Default runner for host git/gh: argv only, never a shell, never a cwd inside
+ * an agent's repo (see lib/guard/vcs.mjs). stdout comes back as a Buffer
+ * (bundles); `input` is written to stdin.
+ */
+export function hostRunner(cmd, argv, { timeout = 10 * 60_000, env = {}, cwd } = {}) {
+  return new Promise((resolve) => {
+    let child;
+    const out = [];
+    const err = [];
+    let size = 0;
+    try {
+      child = spawn(cmd, argv, { cwd, env: { ...process.env, GIT_TERMINAL_PROMPT: '0', ...env }, stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (e) {
+      resolve({ code: 127, stdout: Buffer.alloc(0), stderr: String(e.message) });
+      return;
+    }
+    const timer = setTimeout(() => child.kill('SIGTERM'), timeout);
+    child.stdout.on('data', (d) => { size += d.length; if (size <= MAX_VCS_BODY) out.push(d); });
+    child.stderr.on('data', (d) => err.push(d));
+    child.on('error', (e) => { err.push(Buffer.from(`${cmd}: ${e.message}\n`)); });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      resolve({ code: code ?? 1, stdout: Buffer.concat(out), stderr: Buffer.concat(err).toString('utf8') });
+    });
+  });
+}
+
+/** gh is not on launchd's PATH on a Homebrew Mac. */
+function findGh() {
+  for (const p of ['/opt/homebrew/bin/gh', '/usr/local/bin/gh', '/usr/bin/gh']) if (fs.existsSync(p)) return p;
+  return 'gh';
+}
+
+/**
  * The request handler, with every side effect injected so tests can drive it
  * against a temp guard home and a fake docker.
  */
@@ -122,6 +159,7 @@ export function createGuard({
   paths = guardPaths(), runDocker = dockerRunner, now = () => Date.now(), codingRepo = REPO, port = guardPort(),
   clipboard = { peek: peekClipboardImage, read: readClipboardImage },
   clipboardEnabled = () => process.env.CODING_GUARD_CLIPBOARD !== 'off',
+  runHost = hostRunner, ghPath = findGh(),
 } = {}) {
   const keys = ensureGuardHome(paths);
   writeGuardEndpoint(paths, port);
@@ -131,7 +169,7 @@ export function createGuard({
   const ceremonies = new Ceremonies(factors, { origins: [pageOrigin], now });
   const fingerprint = createHash('sha256').update(keys.publicPem).digest('hex').slice(0, 16);
   const tokenBuf = Buffer.from(keys.token);
-  let state = { requests: {}, grants: {}, boxes: {} };
+  let state = { requests: {}, grants: {}, boxes: {}, vcsPins: {} };
   try {
     state = { ...state, ...JSON.parse(fs.readFileSync(paths.state, 'utf8')) };
   } catch { /* first start, or unreadable: start empty — grants are re-requestable */ }
@@ -306,6 +344,111 @@ export function createGuard({
     const code = results.find((r) => r.code !== 0)?.code ?? 0;
     audit({ event: 'svc.run', verb, args, session, code });
     return { verb, code, results };
+  }
+
+  /**
+   * git/gh for the box (lib/guard/vcs.mjs). The url must be pinned for the
+   * box's workspace, or approved (`vcs:remote <url>`) — then it is pinned.
+   */
+  function requireGrant(session, rule, agent, reason) {
+    const grant = liveGrants(session).find((g) => g.payload.rule === rule);
+    if (!grant) {
+      const r = newRequest({ rule, session, agent, tool: 'vcs', reason });
+      throw new HttpError(403, `${reason} needs your approval: ${r.approve}`, { request: r });
+    }
+    if (grant.payload.scope === 'call') grant.consumed = now();
+    save();
+  }
+
+  function checkPinned(req, session, remote, agent) {
+    if (!req.headers['x-coding-box-token']) return; // the host user (approver token)
+    const box = Object.values(state.boxes).find((b) => b.session === session);
+    const pins = (box?.workspace && state.vcsPins?.[box.workspace]) || [];
+    if (pins.includes(remote.url)) return;
+    requireGrant(session, `vcs:remote ${remote.url}`, agent, `using the new remote ${remote.url}`);
+    if (box?.workspace) {
+      state.vcsPins[box.workspace] = [...pins, remote.url];
+      save();
+      audit({ event: 'vcs.pinned', workspace: box.workspace, remotes: [remote.url], session });
+    }
+  }
+
+  const vcsDir = path.join(paths.dir, 'vcs');
+  const git = (argv, opts) => runHost('git', ['-c', 'core.hooksPath=/dev/null', ...argv], opts);
+  const text = (r) => (Buffer.isBuffer(r.stdout) ? r.stdout.toString('utf8') : String(r.stdout || ''));
+
+  /** The daemon's own bare mirror of `url`, fetched up to date. */
+  async function mirrorOf(url) {
+    const dir = path.join(vcsDir, `${createHash('sha256').update(url).digest('hex').slice(0, 20)}.git`);
+    if (!fs.existsSync(path.join(dir, 'HEAD'))) {
+      fs.mkdirSync(vcsDir, { recursive: true, mode: 0o700 });
+      const init = await git(['init', '-q', '--bare', dir]);
+      if (init.code !== 0) throw new HttpError(500, `cannot create the mirror: ${init.stderr}`);
+    }
+    const f = await git(['-C', dir, 'fetch', '-q', '--prune', '--no-write-fetch-head', url, '+refs/heads/*:refs/heads/*', '+refs/tags/*:refs/tags/*']);
+    return { dir, fetch: f };
+  }
+
+  async function runVcs(req, body) {
+    const session = svcSession(req, body);
+    const tool = body.tool;
+    try {
+      if (tool === 'gh') {
+        const remote = parseRemoteUrl(body.url);
+        const plan = ghPlan(body.args, remote);
+        checkPinned(req, session, remote, body.agent);
+        if (plan.gated) requireGrant(session, plan.rule, body.agent, `gh ${plan.rule.slice(3)}`);
+        const r = await runHost(ghPath, plan.argv, { env: plan.env, cwd: vcsDir, timeout: 5 * 60_000 });
+        audit({ event: 'vcs.gh', args: plan.argv.map((a) => clip(a, 200)), repo: plan.env.GH_REPO, session, code: r.code });
+        return { code: r.code, stdout: text(r), stderr: r.stderr };
+      }
+      if (tool !== 'git') throw new VcsError("tool must be 'git' or 'gh'");
+      const op = gitRequest(body);
+      checkPinned(req, session, op.remote, body.agent);
+      const url = op.remote.url;
+      if (op.op === 'ls-remote') {
+        const r = await git(['ls-remote', ...(op.heads ? ['--heads'] : []), ...(op.tags ? ['--tags'] : []), url, ...op.patterns], { cwd: vcsDir });
+        audit({ event: 'vcs.ls-remote', url, session, code: r.code });
+        return { code: r.code, stdout: text(r), stderr: r.stderr };
+      }
+      const { dir, fetch } = await mirrorOf(url);
+      if (op.op === 'fetch') {
+        if (fetch.code !== 0) return { code: fetch.code, stdout: '', stderr: fetch.stderr };
+        const refs = parseRefs(text(await git(['-C', dir, 'for-each-ref', '--format=%(objectname) %(refname)', 'refs/heads', 'refs/tags'])));
+        let have = [];
+        if (op.have.length) {
+          const known = await Promise.all(op.have.map((s) => git(['-C', dir, 'cat-file', '-e', `${s}^{commit}`])));
+          have = op.have.filter((_, i) => known[i].code === 0);
+        }
+        const tmp = path.join(vcsDir, `out-${randomBytes(6).toString('hex')}.bundle`);
+        const b = await git(['-C', dir, 'bundle', 'create', '-q', tmp, '--branches', '--tags', ...(have.length ? ['--not', ...have] : [])]);
+        let bundle = null;
+        if (b.code === 0 && fs.existsSync(tmp)) bundle = fs.readFileSync(tmp).toString('base64');
+        fs.rmSync(tmp, { force: true });
+        audit({ event: 'vcs.fetch', url, session, refs: refs.length, bytes: bundle ? bundle.length : 0 });
+        return { code: 0, refs, bundle, stderr: fetch.stderr };
+      }
+      // push
+      if (op.bundle) {
+        const tmp = path.join(vcsDir, `in-${randomBytes(6).toString('hex')}.bundle`);
+        fs.writeFileSync(tmp, Buffer.from(op.bundle, 'base64'), { mode: 0o600 });
+        const u = await git(['-C', dir, 'bundle', 'unbundle', tmp]);
+        fs.rmSync(tmp, { force: true });
+        if (u.code !== 0) {
+          return { code: u.code, stdout: '', stderr: `the box's bundle does not apply to the remote's history (${u.stderr.trim()})`, retryFull: true };
+        }
+      }
+      const r = await git(['-C', dir, 'push', '--porcelain', url, `${op.sha}:refs/heads/${op.branch}`]);
+      if (r.code === 0) await git(['-C', dir, 'update-ref', `refs/heads/${op.branch}`, op.sha]);
+      audit({ event: 'vcs.push', url, branch: op.branch, sha: op.sha, session, code: r.code });
+      return { code: r.code, stdout: text(r), stderr: r.stderr };
+    } catch (err) {
+      if (err instanceof VcsError) {
+        audit({ event: 'vcs.refused', tool: clip(tool, 10), session, error: err.message });
+        throw new HttpError(400, err.message);
+      }
+      throw err;
+    }
   }
 
   /**
@@ -484,9 +627,19 @@ export function createGuard({
       if (typeof session !== 'string' || !/^[A-Za-z0-9_.-]{1,120}$/.test(session)) throw new HttpError(400, 'session required');
       if (parts.length === 1) {
         const tok = randomBytes(32).toString('base64url');
-        state.boxes[tokenHash(tok)] = { session, created: now() };
+        const box = { session, created: now() };
+        if (typeof body.workspace === 'string' && path.isAbsolute(body.workspace)) {
+          box.workspace = body.workspace;
+          const listed = Array.isArray(body.remotes) ? body.remotes.slice(0, 200) : [];
+          const reported = normaliseRemotes(listed, typeof listed[0] === 'string' ? listed[0] : null);
+          const { pins, added, unpinned } = pinRemotes(state.vcsPins || {}, box.workspace, reported);
+          state.vcsPins = pins;
+          if (added.length) audit({ event: 'vcs.pinned', workspace: box.workspace, remotes: added });
+          if (unpinned.length) audit({ event: 'vcs.unpinned', workspace: box.workspace, remotes: unpinned, session });
+        }
+        state.boxes[tokenHash(tok)] = box;
         save();
-        audit({ event: 'box.registered', session });
+        audit({ event: 'box.registered', session, ...(box.workspace ? { workspace: box.workspace } : {}) });
         return { token: tok };
       }
       if (parts.length === 2 && parts[1] === 'release') {
@@ -498,6 +651,7 @@ export function createGuard({
       }
     }
     if (m === 'POST' && url.pathname === '/svc') return runSvc(body, svcSession(req, body));
+    if (m === 'POST' && url.pathname === '/vcs') return runVcs(req, body);
     if (m === 'GET' && url.pathname === '/clipboard') return readClipboard(req, url);
 
     if (m === 'GET' && url.pathname === '/audit') {
@@ -558,11 +712,15 @@ export function createGuard({
       }
       const pageUrl = new URL(req.url, 'http://guard.local');
       if (servePage(req, res, pageUrl)) return;
-      let raw = '';
+      const limit = req.method === 'POST' && pageUrl.pathname === '/vcs' ? MAX_VCS_BODY : MAX_BODY;
+      const chunks = [];
+      let length = 0;
       for await (const chunk of req) {
-        raw += chunk;
-        if (raw.length > MAX_BODY) throw new HttpError(413, 'body too large');
+        length += chunk.length;
+        if (length > limit) throw new HttpError(413, 'body too large');
+        chunks.push(chunk);
       }
+      const raw = Buffer.concat(chunks).toString('utf8');
       let body = {};
       if (raw) {
         try { body = JSON.parse(raw); } catch { throw new HttpError(400, 'invalid JSON'); }

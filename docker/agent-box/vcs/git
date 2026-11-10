@@ -1,0 +1,15 @@
+#!/bin/sh
+# git in the agent box. The network verbs (push, fetch, pull, ls-remote) go to
+# the host guard through vcs-client.mjs — the box has no credentials and no
+# route out; everything else is the real git, untouched.
+skip=0
+for a do
+  if [ "$skip" = 1 ]; then skip=0; continue; fi
+  case "$a" in
+    -C|-c|--git-dir|--work-tree|--namespace) skip=1 ;;
+    -*) ;;
+    push|fetch|pull|ls-remote) exec /usr/local/bin/node /opt/coding-box/vcs/vcs-client.mjs git "$@" ;;
+    *) break ;;
+  esac
+done
+exec /usr/bin/git "$@"

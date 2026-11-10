@@ -1016,6 +1016,39 @@ the boxed claude (uncommitted `stageClaudeSession` in agent-box.mjs); its MCP
 endpoint is not forwarded. Decide: forward MCP ports the box's MCP config
 names, or keep `coding svc graphify` only.
 
+## Box transparency: git and gh (2026-11-10)
+
+Question from the user: with the box locked, does every git push and CI check
+have to happen outside it? If so, the default goes back to `--no-box`. The
+answer is a host-side broker, not a wider network:
+
+- **git push/fetch/pull/ls-remote, gh**: shims in the image send these to the
+  guard's `POST /vcs` (`lib/guard/vcs.mjs`, `docker/agent-box/vcs/`). The guard
+  NEVER runs git in the agent repo (agent-writable `.git/config`/hooks = host
+  code execution). It runs it in its own bare mirror per remote
+  (`~/.coding/guard/vcs/`), and the two sides swap git bundles. Remotes are
+  pinned per workspace at box registration (launcher reads them on the host
+  first; the first launch is the baseline, a new url needs `vcs:remote <url>`
+  approval). Only https/ssh/scp urls. Push is never forced and never a delete;
+  tags stay on the host. gh: GH_REPO is fixed from the pinned remote; reads and
+  `run rerun` are free; PR/issue writes, `run cancel` and `workflow run` need
+  approval (`gh:<group> <verb>`).
+- **git identity**: GIT_AUTHOR_*/GIT_COMMITTER_* from the host (the
+  feat/box-claude-session work).
+- **Claude self-update**: `DISABLE_AUTOUPDATER=1` in the box. The image pins
+  the version, and the npm prefix is root-owned, so the update failed loudly
+  every session.
+
+Still outside the box (documented under "not in the box yet"): package
+registries (npm/pip), WebFetch, force pushes and tags. Candidate next step: a
+time-boxed, approved "open" window for a registry host on the gate (CONNECT
+cannot tell a download from a publish, so this needs an approval rather than
+an allow-list entry).
+
+Needs on the host: `coding box build` (image digest changed) and a guard
+daemon restart (new route). Live check: push a branch from a boxed session,
+`gh run list`, `gh pr create` → approve page.
+
 ## Box clipboard (2026-11-08)
 
 Image paste from the host into boxed agents. `clipboard-shim.mjs` answers

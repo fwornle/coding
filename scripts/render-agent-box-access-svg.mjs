@@ -60,7 +60,7 @@ export const ROWS = [
   'You and your accounts',
   ['rw',    'Your terminal',                         'keys, screen, paste',      'tmux pane; Cmd+V image paste goes through a bridge'],
   ['guard', 'Overriding a rule',                     'only grants you sign',     'host: one line in the transcript, which the agent can type itself'],
-  ['block', 'Pushing to GitHub',                     'no keys: commits stay local', 'host: your SSH keys and gh login'],
+  ['guard', 'git push / fetch, gh',                  'via the guard',            'pinned remotes only, no force or delete; gh reads free, PR writes need you'],
 ];
 
 const FOOTNOTE = [
