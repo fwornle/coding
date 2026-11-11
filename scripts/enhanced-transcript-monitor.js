@@ -48,6 +48,7 @@ const HOST_CODING_PATH = resolveHostCodingPath();
 const { isToolsRepo, samePath } = require('../lib/scope/resolve.cjs');
 const { isEnabled: featureEnabled } = require('../lib/features/resolve.cjs');
 const { projectIdFor } = require('../lib/teams/config.cjs');
+const { opencodeDbs, hostOpencodeDb } = require('../lib/lsl/opencode-dbs.cjs');
 
 /**
  * "Not applicable here", as distinct from "it broke". The classification logger
@@ -2790,10 +2791,12 @@ class EnhancedTranscriptMonitor {
   }
 
   /**
-   * OpenCode SQLite database path
+   * The OpenCode store the current session was found in — the host's own
+   * database, or the agent box's exported snapshot (lib/lsl/opencode-dbs.cjs).
+   * Set by findOpenCodeTranscript; every per-session read follows it.
    */
   get openCodeDbPath() {
-    return path.join(os.homedir(), '.local', 'share', 'opencode', 'opencode.db');
+    return this._openCodeDb || hostOpencodeDb();
   }
 
   /**
@@ -2934,17 +2937,33 @@ class EnhancedTranscriptMonitor {
    * Returns a virtual path like "opencode://<session_id>" since there's no file to watch.
    */
   findOpenCodeTranscript() {
-    const dbPath = this.openCodeDbPath;
-    if (!fs.existsSync(dbPath)) {
-      this.debug('OpenCode database not found');
-      return null;
-    }
-
     const projectPath = this.config.projectPath;
     // Resolve symlinks so we match regardless of which path alias was used
     let resolvedPath;
     try { resolvedPath = fs.realpathSync(projectPath); } catch { resolvedPath = projectPath; }
 
+    // Host store and the agent box's snapshot: the newest matching session wins,
+    // and its store becomes openCodeDbPath for every read that follows.
+    const stores = opencodeDbs();
+    if (stores.length === 0) {
+      this.debug('OpenCode database not found');
+      return null;
+    }
+    let best = null;
+    for (const dbPath of stores) {
+      const parts = this._queryOpenCodeSession(dbPath, resolvedPath, projectPath);
+      if (parts && parts[0] && (!best || Number(parts[2]) > Number(best.parts[2]))) best = { dbPath, parts };
+    }
+    if (best) this._openCodeDb = best.dbPath;
+    return this._resolveOpenCodeSession(best ? best.parts : null);
+  }
+
+  /**
+   * The project's most recently active session in one OpenCode store, as
+   * [id, directory, last_activity, title], or null.
+   * @private
+   */
+  _queryOpenCodeSession(dbPath, resolvedPath, projectPath) {
     // Prefer better-sqlite3 (in-process, read-only) — no `sqlite3` CLI spawn, so no
     // ETIMEDOUT when the OpenCode DB is busy/locked. Mirrors readOpenCodeMessages.
     try {
@@ -2966,7 +2985,7 @@ class EnhancedTranscriptMonitor {
          ORDER BY last_activity DESC LIMIT 1`
       ).get(resolvedPath, projectPath);
       db.close();
-      return this._resolveOpenCodeSession(row ? [row.id, row.directory, row.last_activity, row.title] : null);
+      return row ? [row.id, row.directory, row.last_activity, row.title] : null;
     } catch (error) {
       this.debug(`better-sqlite3 OpenCode lookup failed (${error.message}); falling back to sqlite3 CLI`);
     }
@@ -2981,7 +3000,7 @@ class EnhancedTranscriptMonitor {
         encoding: 'utf-8',
         timeout: 5000
       }).trim();
-      return this._resolveOpenCodeSession(result ? result.split('|') : null);
+      return result ? result.split('|') : null;
     } catch (error) {
       this.debug(`Error finding OpenCode transcript: ${error.message}`);
       return null;
@@ -5167,7 +5186,7 @@ ORDER BY m.time_created ASC;`;
            // Check OpenCode sessions — query the DB for recent messages
           if (!hasActiveSession && this.openCodeSessionId) {
             try {
-              const dbPath = path.join(os.homedir(), '.local', 'share', 'opencode', 'opencode.db');
+              const dbPath = this.openCodeDbPath;
               if (fs.existsSync(dbPath)) {
                 let latestMs = 0;
                 try {

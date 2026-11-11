@@ -1,7 +1,7 @@
 # Agent Box & Overrides
 
-`coding` runs claude, copilot and pi inside a container, the **agent box**
-(opencode with `--box`). The agent can edit
+`coding` runs claude, copilot, opencode and pi inside a container, the
+**agent box**. The agent can edit
 your project, but it cannot touch the guard that checks its tool calls, and it
 cannot approve its own rule bypasses. Approving takes your fingerprint, face,
 phone, security key or password, in a host browser page.
@@ -160,10 +160,9 @@ guard's keys, the Docker socket, or approving its own override.
 
 | Command | Where the agent runs |
 |---------|---------------------|
-| `coding` / `coding claude`, `coding copilot`, `coding pi` (or `--claude`, `--copilot`, `--pi`) | in the box: the default when the `constraints` feature is on |
+| `coding` / `coding claude`, `coding copilot`, `coding opencode`, `coding pi` (or `--claude`, `--copilot`, `--opencode`, `--pi`) | in the box: the default when the `constraints` feature is on |
 | `coding --strict-box` (with any of those) | in the box, with the host web UIs hidden too |
 | `coding --no-box` (with any of those) | on the host; this is **recorded in the guard audit log** |
-| `coding opencode --box` | in the box, opt-in (see below) |
 | `CODING_BOX=false coding` | on the host (same as `--no-box`, also recorded) |
 | `CODING_BOX_STRICT=true coding` | strict, as a standing choice (e.g. in your shell profile); `--box` on the command line overrides it |
 
@@ -630,19 +629,26 @@ chain, and `audit` names the first broken line.
   feature is on for the host (`CODING_BOX_HOOKS`). Your personal hooks from
   `~/.claude/settings.json` do not run in the box: their scripts are on the
   host.
-- Session logs work for claude, Copilot and pi, because their session files
-  land on your disk: Claude's transcript folder and Copilot's
-  `~/.copilot/session-state` are mounted, and pi already writes its sessions
-  into the project (`.observations/pi-sessions`).
+- Session logs work for every agent, because their sessions reach your disk:
+  Claude's transcript folder and Copilot's `~/.copilot/session-state` are
+  mounted, pi already writes its sessions into the project
+  (`.observations/pi-sessions`), and opencode's are exported (next point).
 - pi gets a **copy** of its config directory for each box session (provider
   config with `localhost` pointed at the host, plus the extensions the launcher
   installed; no credentials, no old sessions). The host directory is never
   mounted, because pi loads extensions from it: a writable mount would let the
   box plant code that the host pi then runs.
-- opencode runs in the box only with `--box`. Its session store is a SQLite
-  database in WAL mode, which a Linux box must not share with the macOS host
-  over the VM file share, so a boxed opencode session is not in the session
-  logs.
+- opencode keeps all its sessions in one SQLite database in WAL mode, which a
+  Linux box must not share with the macOS host over the VM file share (its
+  shared-memory index does not cross the VM boundary). So the box has its own
+  database on the box's home volume (`OPENCODE_DB`), and opencode runs under
+  `scripts/box-opencode-sync.mjs`, which copies that database with SQLite's
+  backup API every few seconds and when opencode exits, as a single file, into
+  `~/.coding/box/opencode/opencode.db` on the host. Session logging, token
+  capture and the context gauge read that copy next to the host's own
+  database (`lib/lsl/opencode-dbs.cjs`), so a boxed session reaches them a few
+  seconds late. Problems with the copy go to `~/.coding/box/opencode/sync.log`,
+  never to the terminal.
 - Copilot needs a login in the box unless it is routed through the proxy
   (the launcher does that whenever the proxy is healthy).
 - Plugins or extensions the agent writes itself (an opencode project plugin,

@@ -134,7 +134,7 @@ OPTIONS:
   --project DIR      Set target project directory (default: current dir)
   --verbose          Enable verbose logging
   --dry-run          Run startup logic but stop before launching agent
-  --box              Run the agent in the agent box (default for claude, copilot, pi).
+  --box              Run the agent in the agent box (the default for every agent).
                      The agent can VIEW the host's web UIs (dashboard, viewer) read-only
   --strict-box       Agent box, and the host's web UIs stay hidden too (CODING_BOX_STRICT=true)
   --no-box           Run the agent directly on the host (recorded in the guard audit log)
@@ -151,7 +151,7 @@ EXAMPLES:
   coding                          # Claude Code (the default)
   coding pi                       # Pi            (same as: coding --pi)
   coding copilot                  # CoPilot       (same as: coding --copilot)
-  coding opencode --box           # OpenCode, in the agent box
+  coding opencode --no-box        # OpenCode, on the host (recorded)
   coding --project /path/to/project  # Work in specific project
   coding claude suggest "add tests"  # Pass command to the agent
   coding --copilot-stop           # Stop CoPilot services
@@ -327,20 +327,20 @@ else
   log "Using default agent: $AGENT"
 fi
 
-# Box mode. claude, copilot and pi run in the agent box unless told otherwise
-# (--no-box, or CODING_BOX=false in the environment). opencode stays opt-in
-# (--box): its session store is a SQLite WAL database, which a Linux box must
-# not share with the macOS host over VirtioFS, so a boxed opencode session is
-# invisible to session logging (.planning/guardrail-hardening.md, "Box
-# default"). The box is how the `constraints` feature is enforced, so with that
-# feature off (the Docker-free `harness` tier) the default is the host.
+# Box mode. Every agent runs in the agent box unless told otherwise (--no-box,
+# or CODING_BOX=false in the environment). opencode joined last: its session
+# store is a SQLite WAL database the box must not share with the macOS host, so
+# the box keeps its own and exports a single-file snapshot that session logging
+# reads (scripts/box-opencode-sync.mjs, lib/lsl/opencode-dbs.cjs). The box is
+# how the `constraints` feature is enforced, so with that feature off (the
+# Docker-free `harness` tier) the default is the host.
 # CODING_BOX_DEFAULT tells launch-agent-common.sh whether running on the host
 # is leaving the default (and so goes into the guard audit log).
 box_default_feature() {
   node "$SCRIPT_DIR/coding-features" enabled constraints >/dev/null 2>&1
 }
 case "$AGENT" in
-  claude|copilot|pi) CODING_BOX_DEFAULT=true ;;
+  claude|copilot|opencode|pi) CODING_BOX_DEFAULT=true ;;
   *) CODING_BOX_DEFAULT=false ;;
 esac
 if [ "$CODING_BOX_DEFAULT" = true ] && ! box_default_feature; then

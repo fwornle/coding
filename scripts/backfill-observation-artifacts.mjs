@@ -48,6 +48,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 import EnhancedTranscriptMonitor, { extractFileChanges, subagentFileChanges, relativizeArtifact } from './enhanced-transcript-monitor.js';
 import { execFileSync } from 'node:child_process';
+import opencodeStores from '../lib/lsl/opencode-dbs.cjs';
 import { setArtifactsInPlace } from './lib/artifacts-patch-util.mjs';
 import ConfigurableRedactor from '../src/live-logging/ConfigurableRedactor.js';
 
@@ -172,16 +173,19 @@ async function indexOtherAgents(idx, sinceMs) {
   etm.debug = () => {};
   etm.config = {};
   const sources = [];
-  // opencode: one virtual path per session updated since SINCE
-  try {
-    const db = path.join(os.homedir(), '.local', 'share', 'opencode', 'opencode.db');
-    const out = execFileSync('sqlite3', ['-readonly', '-separator', '\t', db,
-      `select id, directory from session where time_updated >= ${sinceMs};`], { encoding: 'utf8', timeout: 20_000 });
-    for (const line of out.split('\n').filter(Boolean)) {
-      const [id, dir] = line.split('\t');
-      sources.push({ agent: 'opencode', path: `opencode://${id}`, cwd: dir || null });
-    }
-  } catch { /* no opencode */ }
+  // opencode: one virtual path per session updated since SINCE, from the host
+  // store and the agent box's snapshot (lib/lsl/opencode-dbs.cjs). ETM reads a
+  // session from the store it was found in, so remember which.
+  for (const db of opencodeStores.opencodeDbs({ home: os.homedir() })) {
+    try {
+      const out = execFileSync('sqlite3', ['-readonly', '-separator', '\t', db,
+        `select id, directory from session where time_updated >= ${sinceMs};`], { encoding: 'utf8', timeout: 20_000 });
+      for (const line of out.split('\n').filter(Boolean)) {
+        const [id, dir] = line.split('\t');
+        sources.push({ agent: 'opencode', path: `opencode://${id}`, cwd: dir || null, opencodeDb: db });
+      }
+    } catch { /* store unreadable */ }
+  }
   // copilot: ~/.copilot/session-state/<id>/events.jsonl
   const copilotRoot = path.join(os.homedir(), '.copilot', 'session-state');
   for (const d of (() => { try { return fs.readdirSync(copilotRoot); } catch { return []; } })()) {
@@ -204,6 +208,7 @@ async function indexOtherAgents(idx, sinceMs) {
   const counts = {};
   for (const src of sources) {
     etm.agentType = src.agent;
+    etm._openCodeDb = src.opencodeDb; // ETM's openCodeDbPath follows the session's store
     let msgs;
     let exchanges;
     try {

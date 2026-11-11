@@ -42,6 +42,7 @@ import path from 'node:path';
 import process from 'node:process';
 
 import { createRegistry } from '../lib/lsl/registry.mjs';
+import opencodeStores from '../lib/lsl/opencode-dbs.cjs';
 import {
   startOpencodeWatcher,
   stopOpencodeWatcher,
@@ -133,10 +134,10 @@ function printHelp() {
  * returns undefined, which the watcher treats as a cold start. That is the
  * safe direction: a lost cursor costs a replay, a wrong one loses observations.
  */
-function readCursorFromStateFile(filePath) {
+function readCursorFromStateFile(filePath, key = 'cursor') {
   try {
     const raw = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-    return raw && typeof raw === 'object' ? raw.cursor : undefined;
+    return raw && typeof raw === 'object' ? raw[key] : undefined;
   } catch {
     return undefined;
   }
@@ -187,19 +188,23 @@ async function main() {
   const dbPath = args.dbPath || defaultDbPath();
   const projectRoot = args.projectRoot || defaultProjectRoot();
   const stateFile = args.stateFile || defaultStateFile();
+  // The agent box's exported snapshot (lib/lsl/opencode-dbs.cjs) is a second
+  // store with its own cursor (`box_cursor`). --db / LSL_OPENCODE_DB pin one.
+  const boxDb = (args.dbPath || process.env.LSL_OPENCODE_DB) ? null : opencodeStores.boxOpencodeDb();
+  const anyStore = () => fs.existsSync(dbPath) || Boolean(boxDb && fs.existsSync(boxDb));
 
   // No db = opencode is not installed, or has never run. Wait for it instead of
   // exiting: under KeepAlive / Restart=always an exit is a restart every
   // ThrottleInterval for as long as opencode stays absent — a crash loop on
   // every machine without opencode (found by tests/cleanroom/services.sh).
-  if (!fs.existsSync(dbPath)) {
+  if (!anyStore()) {
     process.stderr.write(
       `[live-opencode] db not found: ${dbPath} — waiting for opencode to create it\n`,
     );
-    while (!fs.existsSync(dbPath)) {
+    while (!anyStore()) {
       await new Promise((r) => setTimeout(r, 60_000));
     }
-    process.stderr.write(`[live-opencode] db appeared: ${dbPath}\n`);
+    process.stderr.write('[live-opencode] db appeared\n');
   }
 
   const registry = createRegistry();
@@ -246,46 +251,67 @@ async function main() {
     };
   }
 
-  process.stderr.write(
-    `[live-opencode] watching ${dbPath} (poll=${args.pollIntervalMs}ms)\n`,
-  );
-
-  const resumeCursor = readCursorFromStateFile(stateFile);
-  process.stderr.write(
-    resumeCursor
-      ? `[live-opencode] resuming from cursor (last_poll_time=${resumeCursor.last_poll_time})\n`
-      : '[live-opencode] no cursor in state file — cold start, replaying history\n',
-  );
-
-  const handle = await startOpencodeWatcher({
-    dbPath,
-    registry,
-    observationWriter,
-    projectRoot,
-    cursor: resumeCursor,
-    pollIntervalMs: args.pollIntervalMs,
-    onError: (err) => {
+  // One watcher per store, started as soon as its store exists (a store that
+  // appears later — the first boxed session — is picked up by the recheck).
+  const stores = [{ dbPath, cursorKey: 'cursor', label: 'host', handle: null }];
+  if (boxDb) stores.push({ dbPath: boxDb, cursorKey: 'box_cursor', label: 'box', handle: null });
+  async function ensureWatchers() {
+    for (const store of stores) {
+      if (store.handle || store.starting || !fs.existsSync(store.dbPath)) continue;
+      store.starting = true;
+      const resumeCursor = readCursorFromStateFile(stateFile, store.cursorKey);
       process.stderr.write(
-        `[live-opencode] error: ${err && err.message ? err.message : String(err)}\n`,
+        `[live-opencode] watching ${store.dbPath} (${store.label}, poll=${args.pollIntervalMs}ms)\n`
+        + (resumeCursor
+          ? `[live-opencode] ${store.label}: resuming from cursor (last_poll_time=${resumeCursor.last_poll_time})\n`
+          : `[live-opencode] ${store.label}: no cursor in state file — cold start, replaying history\n`),
       );
-      trackError(err);
-    },
-  });
+      try {
+        store.handle = await startOpencodeWatcher({
+          dbPath: store.dbPath,
+          registry,
+          observationWriter,
+          projectRoot,
+          cursor: resumeCursor,
+          pollIntervalMs: args.pollIntervalMs,
+          onError: (err) => {
+            process.stderr.write(
+              `[live-opencode] error (${store.label}): ${err && err.message ? err.message : String(err)}\n`,
+            );
+            trackError(err);
+          },
+        });
+      } catch (err) {
+        process.stderr.write(`[live-opencode] ${store.label}: cannot watch yet: ${err.message}\n`);
+      } finally {
+        store.starting = false;
+      }
+    }
+  }
+  await ensureWatchers();
+  const recheckTimer = stores.length > 1 ? setInterval(() => { ensureWatchers(); }, 60_000) : null;
+  recheckTimer?.unref?.();
 
   // ---- Heartbeat loop -----------------------------------------------------
   function writeHeartbeat(extra = {}) {
-    const stats = handle.getStats();
+    const all = stores.map((st) => ({ st, stats: st.handle ? st.handle.getStats() : null }));
+    const live = all.filter((a) => a.stats);
+    const sum = (k) => live.reduce((n, a) => n + (Number(a.stats[k]) || 0), 0);
+    const lastPoll = live.map((a) => a.stats.last_poll_at).filter(Boolean).sort().pop() ?? null;
     const payload = {
       agent: 'opencode',
       last_heartbeat_at: new Date().toISOString(),
-      polls: stats.polls,
-      registered: stats.registered,
-      last_poll_at: stats.last_poll_at,
-      errors: stats.errors,
-      // Resume point for the NEXT process. Persisted here rather than in a
-      // file of its own so there is exactly one state write to reason about,
-      // and so the shutdown heartbeat checkpoints a clean stop for free.
-      cursor: stats.cursor,
+      polls: sum('polls'),
+      registered: registry.listByAgent('opencode').length,
+      last_poll_at: lastPoll,
+      errors: sum('errors'),
+      // Resume point for the NEXT process, per store. Persisted here rather than
+      // in a file of its own so there is exactly one state write to reason
+      // about, and so the shutdown heartbeat checkpoints a clean stop for free.
+      // A store not watched yet keeps the cursor it had.
+      ...Object.fromEntries(all.map(({ st, stats }) => [
+        st.cursorKey, stats ? stats.cursor : readCursorFromStateFile(stateFile, st.cursorKey),
+      ])),
       // Phase 51 Plan 51-13 (CR-02): mirror Plan 51-07/51-09 daemons by
       // emitting registry_rows so lib/lsl/registry-reader.mjs:145 can
       // enumerate live OpenCode sub-agents. Without this, the registry
@@ -329,12 +355,16 @@ async function main() {
     shuttingDown = true;
     process.stderr.write(`[live-opencode] received ${signal}; shutting down\n`);
     clearInterval(heartbeatTimer);
-    try {
-      await stopOpencodeWatcher(handle);
-    } catch (err) {
-      process.stderr.write(
-        `[live-opencode] stopOpencodeWatcher failed: ${err.message}\n`,
-      );
+    if (recheckTimer) clearInterval(recheckTimer);
+    for (const store of stores) {
+      if (!store.handle) continue;
+      try {
+        await stopOpencodeWatcher(store.handle);
+      } catch (err) {
+        process.stderr.write(
+          `[live-opencode] stopOpencodeWatcher failed (${store.label}): ${err.message}\n`,
+        );
+      }
     }
     try {
       if (observationWriter && typeof observationWriter.close === 'function') {

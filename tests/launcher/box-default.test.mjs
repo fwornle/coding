@@ -1,8 +1,8 @@
 /**
- * bin/coding: claude, copilot and pi run in the agent box by default; `--no-box`
- * (or CODING_BOX=false) is the escape hatch, and launch-agent-common.sh records
- * it. opencode stays opt-in (its SQLite session store cannot be shared with the
- * box, so a boxed session would be invisible to session logging).
+ * bin/coding: every agent runs in the agent box by default; `--no-box` (or
+ * CODING_BOX=false) is the escape hatch, and launch-agent-common.sh records it.
+ * opencode included: the box keeps its own session store and exports a
+ * snapshot that session logging reads (scripts/box-opencode-sync.mjs).
  *
  * The decision block is sliced out of bin/coding and evaluated in bash, so the
  * test runs the launcher's own lines rather than a restatement of them.
@@ -37,24 +37,27 @@ function decide({ agent, env = {}, source = '', constraints = true, showDefault 
 }
 
 describe('box mode default', () => {
-  test('claude, copilot and pi → box, by default', () => {
-    for (const agent of ['claude', 'copilot', 'pi']) assert.equal(decide({ agent }), 'true default', agent);
+  test('claude, copilot, opencode and pi → box, by default', () => {
+    for (const agent of ['claude', 'copilot', 'opencode', 'pi']) assert.equal(decide({ agent }), 'true default', agent);
+  });
+
+  test('an agent with no box support (any other config/agents/<name>.sh) stays on the host', () => {
+    assert.equal(decide({ agent: 'someagent' }), 'false default');
   });
 
   test('with the constraints feature off (harness tier, no Docker) every agent stays on the host', () => {
-    for (const agent of ['claude', 'copilot', 'pi']) {
+    for (const agent of ['claude', 'copilot', 'opencode', 'pi']) {
       assert.equal(decide({ agent, constraints: false }), 'false default', agent);
     }
   });
 
-  test('opencode stays opt-in (its session store cannot be shared with the box)', () => {
-    assert.equal(decide({ agent: 'opencode' }), 'false default');
-    assert.equal(decide({ agent: 'opencode', env: { CODING_BOX: 'true' }, source: 'flag' }), 'true flag');
+  test('opencode can still leave the box (--no-box), which is recorded like any other agent', () => {
+    assert.equal(decide({ agent: 'opencode', env: { CODING_BOX: 'false' }, source: 'flag', showDefault: true }), 'false flag true');
   });
 
   test('CODING_BOX_DEFAULT says what the default was, even when a flag overrides it', () => {
     assert.equal(decide({ agent: 'copilot', env: { CODING_BOX: 'false' }, source: 'flag', showDefault: true }), 'false flag true');
-    assert.equal(decide({ agent: 'opencode', showDefault: true }), 'false default false');
+    assert.equal(decide({ agent: 'opencode', showDefault: true }), 'true default true');
     assert.equal(decide({ agent: 'pi', constraints: false, showDefault: true }), 'false default false');
   });
 

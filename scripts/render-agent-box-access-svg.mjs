@@ -71,7 +71,7 @@ export const ROWS = [
 const FOOTNOTE = [
   'Levels: --no-box (grey, on the host) · --box, the default (all colours) · --strict-box (no dashed light-blue rows: those UIs show every repo).',
   'Box network: an internal Docker network; its gate forwards the LLM proxy and the guard and relays the listed reads. CODING_BOX_NETWORK=open lifts it (recorded).',
-  'Default: claude, copilot and pi run in the box; opencode with --box. --no-box is recorded in the guard audit log. Planned (Phase 3): result-check state out of the agent’s reach.',
+  'Default: every agent (claude, copilot, opencode, pi) runs in the box. --no-box is recorded in the guard audit log. Planned (Phase 3): result-check state out of the agent’s reach.',
 ];
 
 /** The kinds some row uses, in KINDS order — the legend shows only these. */
@@ -142,7 +142,7 @@ export function render() {
   out.push(`<rect x="${HX}" y="${midY - HH / 2}" width="${HW}" height="${HH}" rx="14" fill="#f2f3f5" stroke="#c9cdd2" stroke-width="2"/>`);
   out.push(`<text x="${HX + HW / 2}" y="${midY - 14}" text-anchor="middle" font-size="17" font-weight="700" fill="#8a929c">Agent on the host</text>`);
   out.push(`<text x="${HX + HW / 2}" y="${midY + 10}" text-anchor="middle" font-size="12.5" fill="#9aa1aa">runs as you</text>`);
-  out.push(`<text x="${HX + HW / 2}" y="${midY + 28}" text-anchor="middle" font-size="12.5" fill="#9aa1aa">--no-box, or opencode</text>`);
+  out.push(`<text x="${HX + HW / 2}" y="${midY + 28}" text-anchor="middle" font-size="12.5" fill="#9aa1aa">with --no-box</text>`);
 
   // the box
   const AX = WALL_X + 70, AW = BOX_R - AX - 20, AH = 128;
@@ -175,9 +175,9 @@ export function render() {
   }
   out.push(`<rect x="${AX}" y="${midY - AH / 2}" width="${AW}" height="${AH}" rx="14" fill="#1565c0"/>`);
   out.push(`<text x="${AX + AW / 2}" y="${midY - 22}" text-anchor="middle" font-size="17" font-weight="700" fill="#ffffff">Agent in the box</text>`);
-  out.push(`<text x="${AX + AW / 2}" y="${midY + 4}" text-anchor="middle" font-size="12.5" fill="#dbe8fb">claude · copilot · pi</text>`);
-  out.push(`<text x="${AX + AW / 2}" y="${midY + 22}" text-anchor="middle" font-size="12.5" fill="#dbe8fb">by default (--box)</text>`);
-  out.push(`<text x="${AX + AW / 2}" y="${midY + 40}" text-anchor="middle" font-size="12.5" fill="#dbe8fb">opencode with --box</text>`);
+  out.push(`<text x="${AX + AW / 2}" y="${midY + 4}" text-anchor="middle" font-size="12.5" fill="#dbe8fb">claude · copilot</text>`);
+  out.push(`<text x="${AX + AW / 2}" y="${midY + 22}" text-anchor="middle" font-size="12.5" fill="#dbe8fb">opencode · pi</text>`);
+  out.push(`<text x="${AX + AW / 2}" y="${midY + 40}" text-anchor="middle" font-size="12.5" fill="#dbe8fb">by default (--box)</text>`);
 
   let fy = bottom + 34;
   for (const line of FOOTNOTE) {
