@@ -293,7 +293,7 @@ request path (proxy repo); team scope fails closed with a route test.
 | Phase 1 item 6 (red-team cells) | done — script row + declined verdict; env -i hole found and closed; opencode void (empty completions) | see "Phase 1 item 6 results" and "follow-up" |
 | Phase 2 (check results) | done — red-team 2026-11-08 no regression, shell-workaround held; CI gate unverified until the first push | see "Phase 2 results" |
 | Phase 2: AST rules | done — in the box (guard 04b64ed3), red-team 2026-11-08 no regression | parsed-file checks behind 3 regex rules; see "Phase 2 AST rules results" |
-| Box default (copilot, pi) | pi verified live on the host; copilot fix needs `coding box build` | see "Box default" |
+| Box default (copilot, pi, opencode) | pi verified live on the host; copilot fix needs `coding box build`; opencode by default since 2026-11-11 — live check pending | see "Box default" and "opencode in the box" |
 | Result-check lock | fixed (cm 1a84f40), needs box build; state dir agent-writable → Phase 3 | see "Result-check lock" |
 | Box network locked (proxy + guard) | code + tests done; needs `coding box build` + live check on the host | see "Box network" |
 | Box image paste (Cmd+V) | done — Terminal.app sends nothing for an image (Ctrl+V there) | see "Box clipboard" |
@@ -906,7 +906,8 @@ launch path, which lagged the red-team runner:
   host's opencode history; not sharing it means boxed sessions are not logged.
   Options: a box-only data dir mounted from the host + a second db path in the
   opencode LSL adapter (single writer in the box, host reads read-only), or
-  export at session end. Not done.
+  export at session end. DONE 2026-11-11 as a snapshot export — see
+  "opencode in the box".
 - Launcher: `bin/coding` exports `CODING_BOX_DEFAULT` (agent in
   claude|copilot|pi AND `constraints` on); `launch-agent-common.sh` writes
   `box.bypass` whenever that is true and the agent runs on the host (was:
@@ -1117,3 +1118,45 @@ there. `CODING_BOX_PASTE=off` runs an agent bare. Tests:
   guard: per-box internal network + gate (forwards 2 ports, login-only
   CONNECT allow-list, refusals reported); `CODING_BOX_NETWORK=open` audited;
   red-team on the locked network; docs/diagram updated. Live check pending.
+
+## opencode in the box (2026-11-11)
+
+opencode now runs in the box by default, like the other three agents.
+
+- **Store** — the box's own database on the box home volume, pinned with
+  `OPENCODE_DB` (opencode 1.19.5 reads it; WAL is forced, there is no switch).
+  Single writer, same kernel: WAL is safe there. The host's
+  `~/.local/share/opencode` is never mounted.
+- **Export** — the box runs `node --no-warnings scripts/box-opencode-sync.mjs
+  --db … --out /var/lib/coding-box/opencode-export -- opencode …`. Every 3 s
+  when the db or its WAL changed, and once after opencode exits: SQLite backup
+  API → `journal_mode = DELETE` on the copy → rename into the host dir
+  `~/.coding/box/opencode/opencode.db` (`CODING_BOX_OPENCODE_EXPORT`). The host
+  only reads a complete single-file database nothing on the host writes.
+  Errors → `sync.log` next to it, never the TTY. Exit status = opencode's.
+- **Readers** — `lib/lsl/opencode-dbs.cjs` lists host store + snapshot; every
+  reader goes through it: ETM (newest matching session wins, its store becomes
+  `openCodeDbPath`), coordinator spawn sweep, context gauge, adapter search
+  paths (sweep-sub-agents, foreground-sessions), stop-adapter + route-trace
+  locators (newest store), auto-measure (one pass per store), live sub-agent
+  poller (a watcher per store, `box_cursor` in its state file), artifacts
+  backfill. Explicit overrides (`LSL_OPENCODE_DB`, `OPENCODE_DB_PATH`, `--db`)
+  still pin one store.
+- **Trust** — the snapshot is written by the agent, so its content is the
+  agent's word — the same standing as the Claude transcripts it writes into
+  the mounted `~/.claude/projects`.
+- Launcher: `claude|copilot|opencode|pi` → `CODING_BOX_DEFAULT=true`.
+
+**Verified (in the box, no Docker)** — `tests/agents/box-opencode` 15/15
+(store list, real WAL→single-file snapshot under a live writer, exit code and
+signal propagation, wrapped argv + mount + `OPENCODE_DB`, guard-home refusal,
+search paths), `tests/launcher/*` 32/32, agents/redteam/measurement/token/route
+suites 158 pass (7 fail only on the macOS better-sqlite3 binary), features +
+guard 361/361. Gauge across two stores checked ad hoc with node:sqlite.
+
+**Not verified (needs the host)** — a live `coding opencode`: answers in the
+box, `~/.coding/box/opencode/opencode.db` appears and refreshes, the session
+shows up in the LSL and the status-line context gauge; the better-sqlite3
+suites (adapter-opencode, live-opencode-sqlite-poll, sub-agent-live-opencode,
+context-gauge, stop-adapter) on the host. No image rebuild: the exporter is
+in the mounted coding repo.

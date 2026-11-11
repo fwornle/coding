@@ -29,6 +29,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { ROUTING_ENV_VARS } from '../lib/agents/proxy-routing.mjs';
 import { guardHome, guardPaths, guardPort, exposesGuardHome, readToken } from '../lib/guard/home.mjs';
+import opencodeDbs from '../lib/lsl/opencode-dbs.cjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -96,6 +97,17 @@ export const BOX_PI_DIR = `${BOX_HOME}/.pi/agent`;
  * copilot loads no code from it.
  */
 export const COPILOT_SESSIONS = path.join('.copilot', 'session-state');
+/**
+ * opencode's session database in the box: on the box's own Linux home volume,
+ * written only by the boxed opencode. Its store is SQLite in WAL mode, which
+ * must not be shared with the macOS host over VirtioFS, so the host never
+ * mounts it — scripts/box-opencode-sync.mjs runs opencode and exports a
+ * single-file snapshot to BOX_OPENCODE_EXPORT, a host directory
+ * (lib/lsl/opencode-dbs.cjs) that session logging reads. Pinned with
+ * OPENCODE_DB so a release-channel build cannot pick another file name.
+ */
+export const BOX_OPENCODE_DB = `${BOX_HOME}/.local/share/opencode/opencode.db`;
+export const BOX_OPENCODE_EXPORT = '/var/lib/coding-box/opencode-export';
 
 /** Web-proxy env the box would inherit from the host. */
 const WEB_PROXY_ENV = ['HTTPS_PROXY', 'HTTP_PROXY', 'https_proxy', 'http_proxy'];
@@ -429,7 +441,7 @@ export function boxRunArgs({
   image = IMAGE, name = `coding-box-${agent}-${process.pid}`, exists = fs.existsSync,
   guardDir = guardHome(env, home), guardPortNum = guardPort(env), boxToken = null,
   piAgentDir = null, gate = null, claudeSessionDir = null, gitIdentity = null, codingHooks = [],
-  hostViews = [], strict = false,
+  hostViews = [], strict = false, opencodeExport = null,
 }) {
   const command = AGENT_COMMANDS[agent];
   if (!command) throw new Error(`unknown agent '${agent}' (one of: ${Object.keys(AGENT_COMMANDS).join(', ')})`);
@@ -537,6 +549,12 @@ export function boxRunArgs({
     }
     argv.push('-v', `${piAgentDir}:${BOX_PI_DIR}`, '-e', `PI_CODING_AGENT_DIR=${BOX_PI_DIR}`);
   }
+  if (agent === 'opencode' && opencodeExport) {
+    if (exposesGuardHome(opencodeExport, guardDir)) {
+      throw new Error(`refusing to mount ${opencodeExport}: it contains the guard's keys (${guardDir})`);
+    }
+    argv.push('-v', `${opencodeExport}:${BOX_OPENCODE_EXPORT}`, '-e', `OPENCODE_DB=${BOX_OPENCODE_DB}`);
+  }
   if (agent === 'claude' && claudeSessionDir) {
     if (exposesGuardHome(claudeSessionDir, guardDir)) {
       throw new Error(`refusing to mount ${claudeSessionDir}: it contains the guard's keys (${guardDir})`);
@@ -548,7 +566,13 @@ export function boxRunArgs({
   const publicDir = guardPaths(guardDir).publicDir;
   if (exists(publicDir)) argv.push('-v', `${publicDir}:${BOX_GUARD_KEYS}:ro`);
 
-  argv.push('-w', boxPath(cwd, platform), image, command, ...(AGENT_GUARD_ARGS[agent] ?? []), ...args);
+  const agentArgv = [command, ...(AGENT_GUARD_ARGS[agent] ?? []), ...args];
+  // opencode runs under the exporter so its sessions reach the host (see BOX_OPENCODE_DB).
+  const wrapped = agent === 'opencode' && opencodeExport
+    ? ['node', '--no-warnings', `${repoInBox}/scripts/box-opencode-sync.mjs`,
+      '--db', BOX_OPENCODE_DB, '--out', BOX_OPENCODE_EXPORT, '--', ...agentArgv]
+    : agentArgv;
+  argv.push('-w', boxPath(cwd, platform), image, ...wrapped);
   return argv;
 }
 
@@ -1048,6 +1072,12 @@ async function run(agent, args) {
     // Created here, as the user: docker would create a missing source as root.
     fs.mkdirSync(path.join(os.homedir(), COPILOT_SESSIONS), { recursive: true });
   }
+  let opencodeExport = null;
+  if (agent === 'opencode') {
+    // Created here, as the user: docker would create a missing source as root.
+    opencodeExport = opencodeDbs.boxOpencodeExportDir();
+    fs.mkdirSync(opencodeExport, { recursive: true });
+  }
   if (agent === 'opencode') {
     const file = opencodeConfigFile();
     let hostText = null;
@@ -1120,7 +1150,7 @@ async function run(agent, args) {
   if (!boxToken) process.stderr.write('agent-box: the host guard did not register this box — `coding svc` will be refused inside it\n');
   try {
     const argv = boxRunArgs({
-      agent, args, name, boxToken, piAgentDir, gate, claudeSessionDir,
+      agent, args, name, boxToken, piAgentDir, gate, claudeSessionDir, opencodeExport,
       gitIdentity: hostGitIdentity(process.env.TARGET_PROJECT_DIR || process.cwd()), codingHooks,
       hostViews, strict,
       uid: process.getuid?.(), gid: process.getgid?.(),

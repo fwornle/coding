@@ -210,7 +210,7 @@ Fewer known mistakes to clean up.
 
 ## The agent works on your project, not your machine {#overview-contain}
 
-claude, copilot and pi run in the **agent box** by default: a Linux container
+claude, copilot, opencode and pi run in the **agent box** by default: a Linux container
 that sees your project and very little else.
 
 **Grey** is the same agent on the host. It runs as you, so it reaches your

@@ -43,6 +43,7 @@ import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { tokenUsageDb } from '../lib/paths/index.mjs';
+import opencodeStores from '../lib/lsl/opencode-dbs.cjs';
 
 function log(msg) { process.stderr.write(`[auto-measure] ${msg}\n`); }
 
@@ -677,6 +678,14 @@ async function claudePass(dbPath) {
 
 async function main() {
   const dbPath = arg('--db', DEFAULT_OPENCODE_DB);
+  // Sessions come from the host store and the agent box's snapshot
+  // (lib/lsl/opencode-dbs.cjs); --db pins one. Ids are unique across both.
+  const stores = () => (HAS('--db') ? [dbPath] : opencodeStores.opencodeDbs({ primary: DEFAULT_OPENCODE_DB }));
+  const opencodePasses = async () => {
+    for (const store of stores()) {
+      try { await onePass(store); } catch (e) { log(`pass error (${store}): ${e.message}`); }
+    }
+  };
   if (HAS('--reclassify')) {
     await reclassifyPass(dbPath);
     return;
@@ -685,7 +694,7 @@ async function main() {
     log(`daemon mode — every ${INTERVAL_S}s, active-window ${ACTIVE_WINDOW_MS / 60000}min`);
     // eslint-disable-next-line no-constant-condition
     for (let tick = 0; tick < Number.MAX_SAFE_INTEGER; tick++) {
-      try { await onePass(dbPath); } catch (e) { log(`pass error: ${e.message}`); }
+      await opencodePasses();
       try { await copilotPass(); } catch (e) { log(`copilot pass error: ${e.message}`); }
       try { await claudePass(dbPath); } catch (e) { log(`claude pass error: ${e.message}`); }
       await new Promise((res) => setTimeout(res, INTERVAL_S * 1000));
@@ -694,7 +703,7 @@ async function main() {
     // --claude-only: run just the claude pass (e.g. `--backfill --claude-only` to
     // re-title stale claude runs without re-processing every opencode/copilot session).
     if (!HAS('--claude-only')) {
-      await onePass(dbPath);
+      await opencodePasses();
       try { await copilotPass(); } catch (e) { log(`copilot pass error: ${e.message}`); }
     }
     try { await claudePass(dbPath); } catch (e) { log(`claude pass error: ${e.message}`); }

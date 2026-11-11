@@ -48,7 +48,7 @@
 <rect x="30" y="734" width="210" height="110" rx="14" fill="#f2f3f5" stroke="#c9cdd2" stroke-width="2"/>
 <text x="135" y="775" text-anchor="middle" font-size="17" font-weight="700" fill="#8a929c">Agent on the host</text>
 <text x="135" y="799" text-anchor="middle" font-size="12.5" fill="#9aa1aa">runs as you</text>
-<text x="135" y="817" text-anchor="middle" font-size="12.5" fill="#9aa1aa">--no-box, or opencode</text>
+<text x="135" y="817" text-anchor="middle" font-size="12.5" fill="#9aa1aa">with --no-box</text>
 <rect x="1010" y="154" width="286" height="1270" rx="16" fill="#eef4fc" stroke="#1565c0" stroke-width="3"/>
 <text x="1153" y="182" text-anchor="middle" font-size="15" font-weight="700" fill="#1565c0">agent box</text>
 <text x="1153" y="202" text-anchor="middle" font-size="12" fill="#3a4f6b">Linux container · your uid, not root</text>
@@ -215,10 +215,10 @@
 <path d="M 1010 1395 C 1050 1395, 1040 789, 1080 789" fill="none" stroke="#6a1b9a" stroke-width="2" stroke-dasharray="7 5" opacity="0.85"/>
 <rect x="1080" y="725" width="196" height="128" rx="14" fill="#1565c0"/>
 <text x="1178" y="767" text-anchor="middle" font-size="17" font-weight="700" fill="#ffffff">Agent in the box</text>
-<text x="1178" y="793" text-anchor="middle" font-size="12.5" fill="#dbe8fb">claude · copilot · pi</text>
-<text x="1178" y="811" text-anchor="middle" font-size="12.5" fill="#dbe8fb">by default (--box)</text>
-<text x="1178" y="829" text-anchor="middle" font-size="12.5" fill="#dbe8fb">opencode with --box</text>
+<text x="1178" y="793" text-anchor="middle" font-size="12.5" fill="#dbe8fb">claude · copilot</text>
+<text x="1178" y="811" text-anchor="middle" font-size="12.5" fill="#dbe8fb">opencode · pi</text>
+<text x="1178" y="829" text-anchor="middle" font-size="12.5" fill="#dbe8fb">by default (--box)</text>
 <text x="30" y="1452" font-size="13" fill="#5f6b7a">Levels: --no-box (grey, on the host) · --box, the default (all colours) · --strict-box (no dashed light-blue rows: those UIs show every repo).</text>
 <text x="30" y="1472" font-size="13" fill="#5f6b7a">Box network: an internal Docker network; its gate forwards the LLM proxy and the guard and relays the listed reads. CODING_BOX_NETWORK=open lifts it (recorded).</text>
-<text x="30" y="1492" font-size="13" fill="#5f6b7a">Default: claude, copilot and pi run in the box; opencode with --box. --no-box is recorded in the guard audit log. Planned (Phase 3): result-check state out of the agent’s reach.</text>
+<text x="30" y="1492" font-size="13" fill="#5f6b7a">Default: every agent (claude, copilot, opencode, pi) runs in the box. --no-box is recorded in the guard audit log. Planned (Phase 3): result-check state out of the agent’s reach.</text>
 </svg>

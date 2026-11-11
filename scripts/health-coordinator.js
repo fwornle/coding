@@ -41,6 +41,7 @@ import { runIfMain } from '../lib/utils/esm-cli.js';
 import { createRotatingLogger } from '../lib/utils/log-rotator.js';
 import { decideProxydetoxHeal, neededProbes } from '../lib/network/proxydetox-heal-decision.mjs';
 import { restartProxydetox } from '../lib/network/proxydetox-restart.mjs';
+import opencodeStores from '../lib/lsl/opencode-dbs.cjs';
 import { startNetworkChangeWatcher, networkChangeRecent } from '../lib/network/network-change-watcher.mjs';
 import { settleLocation, OPEN_DEMOTION_CONFIRM_TICKS } from '../lib/network/location-hysteresis.mjs';
 import {
@@ -2561,25 +2562,26 @@ function discoverProjectCandidates(agenticDir) {
 function openCodeFreshProjects(now) {
   const homeDir = process.env.HOME;
   if (!homeDir) return new Set();
-  const dbPath = path.join(homeDir, '.local', 'share', 'opencode', 'opencode.db');
-  if (!fs.existsSync(dbPath)) return new Set();
   const cutoff = now - ETM_TRANSCRIPT_ACTIVE_MS;
-  try {
-    const out = spawnSync(
-      'sqlite3',
-      ['-readonly', dbPath, `SELECT DISTINCT directory FROM session WHERE time_updated > ${cutoff};`],
-      { encoding: 'utf8', timeout: 3000 }
-    );
-    if (out.status !== 0 || !out.stdout) return new Set();
-    const paths = new Set();
-    for (const line of out.stdout.split('\n')) {
-      const p = line.trim();
-      if (p) paths.add(p);
+  const paths = new Set();
+  // The host's store and the agent box's exported snapshot (lib/lsl/opencode-dbs.cjs).
+  for (const dbPath of opencodeStores.opencodeDbs({ home: homeDir })) {
+    try {
+      const out = spawnSync(
+        'sqlite3',
+        ['-readonly', dbPath, `SELECT DISTINCT directory FROM session WHERE time_updated > ${cutoff};`],
+        { encoding: 'utf8', timeout: 3000 }
+      );
+      if (out.status !== 0 || !out.stdout) continue;
+      for (const line of out.stdout.split('\n')) {
+        const p = line.trim();
+        if (p) paths.add(p);
+      }
+    } catch {
+      // one unreadable store must not hide the other
     }
-    return paths;
-  } catch {
-    return new Set();
   }
+  return paths;
 }
 
 /**
