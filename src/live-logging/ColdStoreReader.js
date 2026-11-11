@@ -17,6 +17,12 @@
  * eviction is `delete(keys().next().value)`. Default capacity 16 (CONTEXT.md
  * G2 — ~16d of history hot in memory at peak).
  *
+ * The cache is only valid for one version of the file: every read stats it,
+ * and a changed size or mtime (the exporter rewrote it) drops that kind's
+ * buckets. Without this a query whose days were all cached never re-read the
+ * file, so the dashboard's 8-day window showed a frozen "today" until some
+ * other, wider query happened to evict it.
+ *
  * @module ColdStoreReader
  */
 
@@ -45,6 +51,7 @@ export class ColdStoreReader {
     this.exportDir = exportDir || observationExportDir();
     this.cacheSize = Number.isFinite(cacheSize) && cacheSize > 0 ? cacheSize : 16;
     this._cache = new Map();
+    this._fileSig = new Map(); // kind → size:mtime the cached buckets were parsed from
     this._statsObj = { observationsParsed: 0, digestsParsed: 0, cacheHits: 0, cacheMisses: 0 };
   }
 
@@ -87,6 +94,7 @@ export class ColdStoreReader {
       return [];
     }
 
+    this._dropIfChanged(kind, fileName);
     const missDays = buckets.filter((d) => !this._cache.has(`${kind}:${d}`));
 
     // For misses, parse the file once and group rows by day. The freshByDay
@@ -137,6 +145,20 @@ export class ColdStoreReader {
       return ka < kb ? -1 : ka > kb ? 1 : 0;
     });
     return out;
+  }
+
+  /** @private Forget a kind's buckets once its file is not the one they came from. */
+  _dropIfChanged(kind, fileName) {
+    let sig = 'missing';
+    try {
+      const st = fs.statSync(path.join(this.exportDir, fileName));
+      sig = `${st.size}:${st.mtimeMs}`;
+    } catch { /* unreadable: _parseFile reports it */ }
+    if (this._fileSig.get(kind) === sig) return;
+    this._fileSig.set(kind, sig);
+    for (const key of [...this._cache.keys()]) {
+      if (key.startsWith(`${kind}:`)) this._cache.delete(key);
+    }
   }
 
   _groupByDay(rows, keyOfRow) {
