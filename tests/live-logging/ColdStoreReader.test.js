@@ -151,6 +151,30 @@ describe('ColdStoreReader', () => {
     expect(second.length).toBe(first.length);
   });
 
+  it('2b. a rewritten export is re-read even when every day is cached', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'coldstore-fresh-'));
+    try {
+      const file = path.join(dir, 'observations.json');
+      const rows = buildObservationFixtures(3);
+      fs.writeFileSync(file, JSON.stringify(rows));
+      const reader = new ColdStoreReader({ exportDir: dir, cacheSize: 16 });
+      const from = daysAgoIso(5);
+      const to = new Date(Date.now() + 60_000).toISOString();
+      const before = reader.readObservations({ from, to }).length;
+
+      const fresh = { ...rows[0], id: 'fresh', createdAt: new Date().toISOString() };
+      fs.writeFileSync(file, JSON.stringify([...rows, fresh]));
+      const later = new Date(Date.now() + 5_000);
+      fs.utimesSync(file, later, later);
+
+      const after = reader.readObservations({ from, to });
+      expect(after.length).toBe(before + 1);
+      expect(after.some((r) => r.id === 'fresh')).toBe(true);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('3. LRU eviction caps cache at cacheSize entries', () => {
     const reader = new ColdStoreReader({ exportDir: tmpDir, cacheSize: 3 });
     // Five distinct 1-day windows
