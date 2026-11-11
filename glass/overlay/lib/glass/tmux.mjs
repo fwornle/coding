@@ -196,7 +196,9 @@ export function mouseCopyBindings(copy) {
 function currentBinding(table, key) {
   const r = tmux(['list-keys', '-T', table, key]);
   const line = (r.status === 0 ? r.stdout : '').split('\n').find((l) => l.includes(` ${key} `)) || '';
-  return line.replace(new RegExp(`^bind-key\\s+(?:-r\\s+)?-T\\s+${table}\\s+${key}\\s+`), '');
+  // A literal pattern, then compare: table and key never become regex source.
+  const m = /^bind-key\s+(?:-r\s+)?-T\s+(\S+)\s+(\S+)\s+/.exec(line);
+  return m && m[1] === table && m[2] === key ? line.slice(m[0].length) : line;
 }
 
 function bindMouseCopy(tmpDir, which) {
