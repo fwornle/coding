@@ -113,9 +113,9 @@ While Claude Code is the primary and default agent, **coding** is fully agent-ag
 | Agent | Launch | Status |
 |-------|--------|--------|
 | **Claude Code** (default) | `coding` or `coding claude` | Full MCP integration |
-| **GitHub Copilot CLI** | `coding copilot` | Pipe-pane I/O capture |
-| **OpenCode** | `coding opencode` | Pipe-pane I/O capture |
-| **Pi** | `coding pi` | Native session JSONL |
+| **GitHub Copilot CLI** | `coding copilot` | Session logging from `events.jsonl` |
+| **OpenCode** | `coding opencode` | Session logging from its SQLite store (host + box copy) |
+| **Pi** | `coding pi` | Session logging from its session JSONL |
 
 The agent is the first word after `coding`; the flag form (`--claude`, `--copilot`, `--opencode`, `--pi`) works the same. Plain `coding` always starts Claude Code.
 

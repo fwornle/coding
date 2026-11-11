@@ -49,12 +49,14 @@ coding copilot
 
 **Multi-Agent Support**: While Claude Code is the primary and default agent (`coding`, `coding claude` or `coding --claude`), the system is fully agent-agnostic. Any coding agent can be integrated with a single config file in `config/agents/`. Currently supported:
 
-| Agent | Launch Command | Detection |
-|-------|---------------|-----------|
-| **Claude Code** (default) | `coding` or `coding claude` | Native transcript support |
-| **GitHub Copilot CLI** | `coding copilot` | Pipe-pane I/O capture |
-| **OpenCode** | `coding opencode` | Pipe-pane I/O capture |
-| **Pi** | `coding pi` | Native session JSONL |
+| Agent | Launch Command | Session source |
+|-------|---------------|----------------|
+| **Claude Code** (default) | `coding` or `coding claude` | Session transcript (`~/.claude/projects/…/<session>.jsonl`) |
+| **GitHub Copilot CLI** | `coding copilot` | Session events (`~/.copilot/session-state/<id>/events.jsonl`) |
+| **OpenCode** | `coding opencode` | SQLite store — the host's own, plus the agent box's exported copy |
+| **Pi** | `coding pi` | Session JSONL (`<project>/.observations/pi-sessions/`) |
+
+All four run in the agent box by default (`--no-box` runs on the host); see [Session logs from the box](docs-content/core-systems/agent-box.md#session-logs-from-the-box).
 
 The agent is the first word after `coding`; the flag form (`coding --claude`, `--copilot`, `--opencode`, `--pi`) works the same. Plain `coding` always starts Claude Code.
 
@@ -182,8 +184,9 @@ See [LLM Architecture](docs-content/architecture/llm-architecture.md) for detail
 ### Integration Support
 
 - **Claude Code** - Full MCP server integration (default agent)
-- **GitHub Copilot CLI** - Pipe-pane capture with session logging
-- **OpenCode** - Pipe-pane capture with session logging
+- **GitHub Copilot CLI** - Session logging from its `events.jsonl`
+- **OpenCode** - Session logging from its SQLite store
+- **Pi** - Session logging from its session JSONL
 - **Agent Abstraction API** - Unified adapter system for any coding agent
 - **Docker Support** - Containerized deployment with HTTP/SSE transport for MCP servers
 
