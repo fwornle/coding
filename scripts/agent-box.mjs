@@ -30,6 +30,7 @@ import { fileURLToPath } from 'node:url';
 import { ROUTING_ENV_VARS } from '../lib/agents/proxy-routing.mjs';
 import { guardHome, guardPaths, guardPort, exposesGuardHome, readToken } from '../lib/guard/home.mjs';
 import opencodeDbs from '../lib/lsl/opencode-dbs.cjs';
+import boxSessions from '../lib/agents/box-sessions.cjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -1106,8 +1107,10 @@ async function run(agent, args) {
     }
   }
   let stopGaugeRecord = () => {};
+  let claudeSessionId = null;
   if (agent === 'claude') {
     const pinned = claudeGaugeSession(args);
+    claudeSessionId = pinned.sessionId;
     args = pinned.args;
     stopGaugeRecord = recordBoxedClaudeForGauge({
       sessionId: pinned.sessionId,
@@ -1146,6 +1149,11 @@ async function run(agent, args) {
     spawnSync(process.execPath, [path.join(REPO, 'scripts', 'coding-guard.mjs'), 'note', 'box.network.open', `agent=${agent}`, `box=${name}`], { stdio: 'ignore' });
   }
   const workspace = process.env.TARGET_PROJECT_DIR || process.cwd();
+  // Session logging marks what ran here as boxed (lib/agents/box-sessions.cjs).
+  boxSessions.recordBoxEvent({
+    event: 'start', name, agent, workspace, mode: strict ? 'strict' : 'box',
+    sessionId: claudeSessionId || undefined, pid: process.pid,
+  });
   const boxToken = await registerBox(name, { workspace, remotes: hostRemotes(workspace) });
   if (!boxToken) process.stderr.write('agent-box: the host guard did not register this box — `coding svc` will be refused inside it\n');
   try {
@@ -1167,6 +1175,7 @@ async function run(agent, args) {
     return status;
   } finally {
     stopGaugeRecord();
+    boxSessions.recordBoxEvent({ event: 'end', name });
     if (boxToken) await registerBox(name, { release: true });
     if (piAgentDir) fs.rmSync(piAgentDir, { recursive: true, force: true });
     if (claudeSessionDir) fs.rmSync(claudeSessionDir, { recursive: true, force: true });

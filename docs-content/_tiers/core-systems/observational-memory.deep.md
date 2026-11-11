@@ -64,10 +64,14 @@ All four agents generate observations:
 
 | Agent | Method | Project Detection |
 |-------|--------|-------------------|
-| **Claude Code** | ETM transcript monitoring | `path.basename(projectPath)` |
-| **GitHub Copilot** | ETM pipe-pane capture | `path.basename(projectPath)` |
-| **OpenCode** | ETM pipe-pane capture | `path.basename(projectPath)` |
+| **Claude Code** | ETM reads the session transcript (`~/.claude/projects/…/<session>.jsonl`) | `path.basename(projectPath)` |
+| **GitHub Copilot** | ETM reads the session's `events.jsonl` (`~/.copilot/session-state/<id>/`) | `path.basename(projectPath)` |
+| **OpenCode** | ETM reads OpenCode's SQLite store — the host's own, plus the agent box's exported copy | `path.basename(projectPath)` |
 | **Pi** | ETM reads pi's native session JSONL | `path.basename(projectPath)` |
+
+The same holds for an agent running in the agent box; how each store reaches
+the host is in [Agent Box → Session logs from the box](agent-box.md#session-logs-from-the-box).
+Each observation also records where its agent ran — `box`, `strict` or `host`.
 
 ## Dashboard Features
 
@@ -76,6 +80,7 @@ Access at `http://localhost:3032/observations`.
 ![Observation Viewer — list view with filters](../images/log-observations.png)
 
 - **Agent filter** -- checkbox per agent (claude, copilot, opencode, pi)
+- **Box / host badge** -- next to the agent: a solid ▣ `box` / `strict` badge when the agent ran in the agent box, a dashed `host` badge when it ran on the host, none for observations recorded before box runs were tracked
 - **Time range** -- date pickers for from/to
 - **Project filter** -- dropdown of projects with observations
 - **Full-text search** -- FTS5 search across observation summaries

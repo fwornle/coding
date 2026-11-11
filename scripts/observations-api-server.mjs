@@ -3556,6 +3556,8 @@ app.get('/api/coding/observations', async (_req, res) => {
       quality: typeof r.quality === 'string' ? r.quality : 'normal',
       // Surface the progress-snapshot tag to the dashboard (faint/filtered render).
       kind: typeof r.kind === 'string' ? r.kind : null,
+      // Where the agent ran: 'box' | 'strict' | 'host'; null when unknown.
+      runtime: typeof r.runtime === 'string' ? r.runtime : null,
     }));
 
     // Legacy filter semantics, ported from the prior SQLite WHERE-builder.

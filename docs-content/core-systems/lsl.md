@@ -82,6 +82,11 @@ secrets — without you doing anything.
     back into discrete prompts by a per-agent pattern — which is what
     `AGENT_PROMPT_REGEX` in an agent's config file is for.
 
+    All four are captured the same way in the agent box as on the host; only the route their
+    session store takes to the host differs (OpenCode's database is exported as a copy rather
+    than shared). The table is in
+    [Agent Box → Session logs from the box](agent-box.md#session-logs-from-the-box).
+
     ## Reading logs back
 
     `/sl` loads recent logs for continuity at the start of a session. Beyond that the files are

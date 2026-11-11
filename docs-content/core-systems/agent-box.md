@@ -619,6 +619,55 @@ Every override request, approval, denial, failed or locked factor attempt,
 of the one before it, so editing, deleting or reordering a line breaks the
 chain, and `audit` names the first broken line.
 
+## Session logs from the box
+
+Session logging, token capture and the status-line context gauge run on the
+host and read each agent's own session store. All four agents behave the same
+in the box and on the host: every session is logged. They differ only in how
+the store reaches the host.
+
+| Agent | Session store on the host | How a boxed session gets there | How an observation is marked box or host |
+|-------|---------------------------|--------------------------------|------------------------------------------|
+| Claude Code | `~/.claude/projects/<dir>/<session>.jsonl` | the folder is mounted into the box; the boxed Claude writes the same files | by session id: the launcher pins it (`--session-id`) and records it — exact |
+| Copilot CLI | `~/.copilot/session-state/<id>/events.jsonl` | the folder is mounted into the box | by time: a box run of Copilot in that project was live then |
+| OpenCode | `~/.local/share/opencode/opencode.db` (one SQLite database, WAL) | **not** shared: the box keeps its own database and exports a single-file copy to `~/.coding/box/opencode/opencode.db` (below) | by store: read from the box copy or the host database — exact |
+| Pi | `<project>/.observations/pi-sessions/` | already in the project, which the box mounts | by time, as for Copilot |
+
+**Why OpenCode is different.** OpenCode keeps all its sessions in one SQLite
+database in WAL mode, and forces that mode. WAL needs a shared-memory index
+(the `-shm` file, mapped into memory) and file locks, and neither works across
+the VM boundary between the Linux box and the macOS host. Two sides opening
+the same live database could corrupt it. So the box gives OpenCode its own
+database on the box's home volume (`OPENCODE_DB`), where only the boxed
+OpenCode writes, and runs it under `scripts/box-opencode-sync.mjs`. That
+wrapper copies the database with SQLite's backup API every few seconds (when
+it changed) and once more when OpenCode exits, switches the copy to a plain
+single-file journal and renames it into place. The host only ever reads that
+finished copy, next to its own database (`lib/lsl/opencode-dbs.cjs`), so a
+boxed session reaches the logs a few seconds late. Problems with the copy go to
+`~/.coding/box/opencode/sync.log`, never to the terminal.
+
+**Box or host on each observation.** The launcher on the host appends one line
+when a box starts and one when it ends to `~/.coding/box/sessions.jsonl`
+(agent, project, protection level, Claude's session id). The file is outside
+every box mount, so an agent can neither forge nor erase it. Session logging
+looks each observation up there (`lib/agents/box-sessions.cjs`) and stores
+`box`, `strict` or `host`; the dashboard's Observations tab shows it next to
+the agent:
+
+- a solid **▣ box** or **▣ strict** badge — the agent ran in the agent box;
+- a dashed **host** badge — it ran on the host (`--no-box`, or a tier
+  without the box);
+- no badge — the observation is older than the first recorded box run, so it
+  cannot be told.
+
+Matching by time (Copilot, Pi, and a Claude resumed with `--continue`) cannot
+tell two sessions of the same agent apart when one runs boxed and one on the
+host in the same project at the same time. A box run whose launcher was killed
+without writing its end line is closed when its process is gone, so it never
+marks later host sessions as boxed. A session that was already running when
+this was installed is marked from its next launch.
+
 ## What is not in the box yet
 
 - A boxed Claude runs the coding project's own hooks as the host does: the
@@ -629,26 +678,13 @@ chain, and `audit` names the first broken line.
   feature is on for the host (`CODING_BOX_HOOKS`). Your personal hooks from
   `~/.claude/settings.json` do not run in the box: their scripts are on the
   host.
-- Session logs work for every agent, because their sessions reach your disk:
-  Claude's transcript folder and Copilot's `~/.copilot/session-state` are
-  mounted, pi already writes its sessions into the project
-  (`.observations/pi-sessions`), and opencode's are exported (next point).
 - pi gets a **copy** of its config directory for each box session (provider
   config with `localhost` pointed at the host, plus the extensions the launcher
   installed; no credentials, no old sessions). The host directory is never
   mounted, because pi loads extensions from it: a writable mount would let the
   box plant code that the host pi then runs.
-- opencode keeps all its sessions in one SQLite database in WAL mode, which a
-  Linux box must not share with the macOS host over the VM file share (its
-  shared-memory index does not cross the VM boundary). So the box has its own
-  database on the box's home volume (`OPENCODE_DB`), and opencode runs under
-  `scripts/box-opencode-sync.mjs`, which copies that database with SQLite's
-  backup API every few seconds and when opencode exits, as a single file, into
-  `~/.coding/box/opencode/opencode.db` on the host. Session logging, token
-  capture and the context gauge read that copy next to the host's own
-  database (`lib/lsl/opencode-dbs.cjs`), so a boxed session reaches them a few
-  seconds late. Problems with the copy go to `~/.coding/box/opencode/sync.log`,
-  never to the terminal.
+- Session logs work for every agent in the box — see
+  [Session logs from the box](#session-logs-from-the-box).
 - Copilot needs a login in the box unless it is routed through the proxy
   (the launcher does that whenever the proxy is healthy).
 - Plugins or extensions the agent writes itself (an opencode project plugin,
@@ -685,6 +721,8 @@ chain, and `audit` names the first broken line.
 | `integrations/constraint-monitor/src/hooks/result-check.js`, `post-tool-hook.js` | the result check: snapshot, diff, judge, undo |
 | `scripts/guard-check-diff.mjs` | the CI gate on a pushed commit range |
 | `scripts/agent-box.mjs` | `coding box build\|status`, the `docker run` arguments |
+| `scripts/box-opencode-sync.mjs`, `lib/lsl/opencode-dbs.cjs` | OpenCode in the box: the database export, and where the host's readers find it |
+| `lib/agents/box-sessions.cjs` | the box-run registry (`~/.coding/box/sessions.jsonl`) and the box/host label on observations |
 | `scripts/redteam-box.mjs`, `lib/redteam/cells.mjs` | `coding box redteam`: scenarios, evidence, verdicts |
 | `lib/redteam/attacks.mjs` | the `script` row: fixed attack steps and probes, run inside the box |
 | `scripts/coding-guard-daemon.mjs` | the host guard on :3035 |

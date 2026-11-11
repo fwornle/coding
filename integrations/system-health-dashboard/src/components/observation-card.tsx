@@ -1,4 +1,4 @@
-import { Snowflake } from 'lucide-react'
+import { Box, Snowflake } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { AgentBadge } from '@/components/agent-badge'
@@ -34,6 +34,8 @@ export interface Observation {
   quality?: 'high' | 'normal' | 'low'
   /** 'progress' marks a mid-turn ETM snapshot (rendered faint + filterable). */
   kind?: string | null
+  /** Where the agent ran: the agent box ('box' / 'strict') or the host. null = not recorded. */
+  runtime?: 'box' | 'strict' | 'host' | null
   /** Phase 35: 'cold' rows from JSON cold store, 'sqlite' from primary DB. */
   _origin?: 'cold' | 'sqlite'
 }
@@ -143,6 +145,35 @@ function ProgressBadge() {
   )
 }
 
+/** Box vs host: a solid badge for the agent box, a quiet one for the host,
+ *  nothing for observations from before box runs were recorded. */
+function RuntimeBadge({ runtime }: { runtime?: Observation['runtime'] }) {
+  if (runtime === 'box' || runtime === 'strict') {
+    return (
+      <span
+        className="inline-flex items-center gap-1 text-[10px] leading-none px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 border border-indigo-500/40 font-mono whitespace-nowrap"
+        title={runtime === 'strict'
+          ? 'Ran in the agent box, strict (--strict-box): host web UIs hidden too.'
+          : 'Ran in the agent box: project read-write, guard out of reach.'}
+      >
+        <Box className="w-3 h-3 shrink-0" aria-hidden="true" />
+        {runtime}
+      </span>
+    )
+  }
+  if (runtime === 'host') {
+    return (
+      <span
+        className="text-[10px] leading-none px-1.5 py-0.5 rounded text-muted-foreground border border-dashed border-muted-foreground/40 font-mono whitespace-nowrap"
+        title="Ran on the host, outside the agent box (--no-box, or a tier without the box)."
+      >
+        host
+      </span>
+    )
+  }
+  return null
+}
+
 function parseTokens(raw: string | LlmTokens | null | undefined): LlmTokens | null {
   if (!raw) return null
   if (typeof raw === 'string') {
@@ -170,6 +201,7 @@ export function ObservationCard({ observation, isExpanded, onToggle, compact }: 
         onClick={onToggle}
       >
         <AgentBadge agent={observation.agent} />
+        <RuntimeBadge runtime={observation.runtime} />
         {isSub && <SubAgentBadge />}
         {isProgress && <ProgressBadge />}
         <span className="text-[11px] text-muted-foreground whitespace-nowrap flex items-center gap-1">
@@ -208,6 +240,7 @@ export function ObservationCard({ observation, isExpanded, onToggle, compact }: 
           <div className="px-4 py-3 cursor-pointer">
             <div className="flex items-center gap-3 mb-0.5">
               <AgentBadge agent={observation.agent} />
+              <RuntimeBadge runtime={observation.runtime} />
               {isSub && <SubAgentBadge />}
               {isProgress && <ProgressBadge />}
               <span className="text-xs text-muted-foreground flex items-center gap-1">
