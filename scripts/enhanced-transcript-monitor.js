@@ -48,7 +48,8 @@ const HOST_CODING_PATH = resolveHostCodingPath();
 const { isToolsRepo, samePath } = require('../lib/scope/resolve.cjs');
 const { isEnabled: featureEnabled } = require('../lib/features/resolve.cjs');
 const { projectIdFor } = require('../lib/teams/config.cjs');
-const { opencodeDbs, hostOpencodeDb } = require('../lib/lsl/opencode-dbs.cjs');
+const { opencodeDbs, hostOpencodeDb, boxOpencodeDb } = require('../lib/lsl/opencode-dbs.cjs');
+const { runtimeOf } = require('../lib/agents/box-sessions.cjs');
 
 /**
  * "Not applicable here", as distinct from "it broke". The classification logger
@@ -1996,6 +1997,9 @@ class EnhancedTranscriptMonitor {
       // Mid-turn progress snapshot tag — obs-api exempts kind:'progress' from the
       // 4h semantic dedup so a snapshot never suppresses the turn's final obs.
       kind: kind || undefined,
+      // Where the agent ran: 'box' | 'strict' (the agent box) or 'host'.
+      // Unset when it cannot be told (before box runs were recorded).
+      runtime: this._observationRuntime(exchanges) || undefined,
       // Stable per-turn identity so obs-api's semantic dedup only suppresses
       // re-fires of the SAME turn, never two distinct-but-similar user turns.
       turnKey: opts.turnKey || undefined,
@@ -2787,6 +2791,28 @@ class EnhancedTranscriptMonitor {
     } catch (error) {
       this.debug(`Error finding copilot transcript: ${error.message}`);
       return null;
+    }
+  }
+
+  /**
+   * 'box' | 'strict' | 'host' for the turn in `exchanges`, or null
+   * (lib/agents/box-sessions.cjs says how each agent is matched).
+   */
+  _observationRuntime(exchanges) {
+    try {
+      const first = (exchanges || []).find((ex) => ex && ex.timestamp);
+      const atMs = first ? new Date(first.timestamp).getTime() : Date.now();
+      const tp = this.transcriptPath || '';
+      return runtimeOf({
+        agent: this.agentType,
+        projectPath: this.config.projectPath,
+        atMs: Number.isFinite(atMs) ? atMs : Date.now(),
+        sessionId: this.agentType === 'claude' && tp.endsWith('.jsonl') ? path.basename(tp, '.jsonl') : undefined,
+        opencodeDb: this.agentType === 'opencode' ? this.openCodeDbPath : undefined,
+        boxOpencodeDb: boxOpencodeDb(),
+      });
+    } catch {
+      return null; // a label must never cost an observation
     }
   }
 
