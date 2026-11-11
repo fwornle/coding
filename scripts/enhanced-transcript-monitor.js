@@ -49,7 +49,7 @@ const { isToolsRepo, samePath } = require('../lib/scope/resolve.cjs');
 const { isEnabled: featureEnabled } = require('../lib/features/resolve.cjs');
 const { projectIdFor } = require('../lib/teams/config.cjs');
 const { opencodeDbs, hostOpencodeDb, boxOpencodeDb } = require('../lib/lsl/opencode-dbs.cjs');
-const { runtimeOf } = require('../lib/agents/box-sessions.cjs');
+const { runtimeOf, transcriptStartMs } = require('../lib/agents/box-sessions.cjs');
 
 /**
  * "Not applicable here", as distinct from "it broke". The classification logger
@@ -2808,12 +2808,21 @@ class EnhancedTranscriptMonitor {
         projectPath: this.config.projectPath,
         atMs: Number.isFinite(atMs) ? atMs : Date.now(),
         sessionId: this.agentType === 'claude' && tp.endsWith('.jsonl') ? path.basename(tp, '.jsonl') : undefined,
+        sessionStartMs: this._transcriptStartMs(tp),
         opencodeDb: this.agentType === 'opencode' ? this.openCodeDbPath : undefined,
         boxOpencodeDb: boxOpencodeDb(),
       });
     } catch {
       return null; // a label must never cost an observation
     }
+  }
+
+  /** A transcript's session start, read once per transcript (opencode:// has none). */
+  _transcriptStartMs(tp) {
+    if (!tp || this.isOpenCodePath(tp)) return undefined;
+    this._startMsCache = this._startMsCache || new Map();
+    if (!this._startMsCache.has(tp)) this._startMsCache.set(tp, transcriptStartMs(tp));
+    return this._startMsCache.get(tp);
   }
 
   /**

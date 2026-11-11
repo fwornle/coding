@@ -658,8 +658,10 @@ the agent:
 - a solid **▣ box** or **▣ strict** badge — the agent ran in the agent box;
 - a dashed **host** badge — it ran on the host (`--no-box`, or a tier
   without the box);
-- no badge — the observation is older than the first recorded box run, so it
-  cannot be told.
+- no badge — the session was launched before box runs were recorded (the
+  registry's first line), so it cannot be told. This goes by when the
+  *session* started, not the observation: a session launched earlier stays
+  unmarked for as long as it runs.
 
 Matching by time (Copilot, Pi, and a Claude resumed with `--continue`) cannot
 tell two sessions of the same agent apart when one runs boxed and one on the

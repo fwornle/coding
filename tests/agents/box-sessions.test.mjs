@@ -14,7 +14,7 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { readBoxSessions, recordBoxEvent, runtimeOf, boxSessionsFile } = require('../../lib/agents/box-sessions.cjs');
+const { readBoxSessions, recordBoxEvent, runtimeOf, boxSessionsFile, transcriptStartMs } = require('../../lib/agents/box-sessions.cjs');
 
 const REPO = path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..');
 const T0 = Date.parse('2026-11-12T10:00:00Z');
@@ -111,6 +111,34 @@ describe('runtimeOf', () => {
   });
 });
 
+describe('a session launched before recording began', () => {
+  const r = runs({ event: 'start', name: 'b', agent: 'pi', workspace: '/other', pid: 1, at: T0 });
+
+  test('is unmarked even when it observes after recording began — never "host"', () => {
+    assert.equal(runtimeOf({ agent: 'claude', projectPath: '/p', sessionId: 'old', sessionStartMs: T0 - 60 * min, atMs: T0 + 30 * min, runs: r }), null);
+    assert.equal(runtimeOf({ agent: 'pi', projectPath: '/p', sessionStartMs: T0 - min, atMs: T0 + 30 * min, runs: r }), null);
+  });
+
+  test('one launched after it with no box run is host', () => {
+    assert.equal(runtimeOf({ agent: 'claude', projectPath: '/p', sessionId: 'new', sessionStartMs: T0 + min, atMs: T0 + 30 * min, runs: r }), 'host');
+  });
+
+  test('a box match still wins over an old start (a --continue resumed in the box)', () => {
+    const boxed = runs({ event: 'start', name: 'b', agent: 'claude', workspace: '/p', mode: 'box', pid: 1, at: T0 });
+    assert.equal(runtimeOf({ agent: 'claude', projectPath: '/p', sessionId: 'old', sessionStartMs: T0 - 60 * min, atMs: T0 + min, runs: boxed }), 'box');
+  });
+
+  test('transcriptStartMs: the first timestamp in the transcript', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'box-sessions-'));
+    const f = path.join(dir, 's.jsonl');
+    fs.writeFileSync(f, `{"type":"summary"}\n{"type":"user","timestamp":"2026-11-10T08:00:00.000Z"}\n{"timestamp":"2026-11-11T08:00:00.000Z"}\n`);
+    assert.equal(transcriptStartMs(f), Date.parse('2026-11-10T08:00:00.000Z'));
+    fs.writeFileSync(f, '{"timestamp":1762848000000}\n');
+    assert.equal(transcriptStartMs(f), 1762848000000);
+    assert.equal(transcriptStartMs(path.join(dir, 'absent.jsonl')), undefined);
+  });
+});
+
 describe('wiring', () => {
   const read = (f) => fs.readFileSync(path.join(REPO, f), 'utf8');
 
@@ -122,6 +150,7 @@ describe('wiring', () => {
 
   test('runtime travels ETM metadata → export row → /api/coding/observations', () => {
     assert.match(read('scripts/enhanced-transcript-monitor.js'), /runtime: this\._observationRuntime\(exchanges\)/);
+    assert.match(read('scripts/enhanced-transcript-monitor.js'), /sessionStartMs: this\._transcriptStartMs\(tp\)/);
     assert.match(read('src/live-logging/ObservationExporter.js'), /runtime: m\.runtime \|\| null/);
     assert.match(read('scripts/observations-api-server.mjs'), /runtime: typeof r\.runtime === 'string' \? r\.runtime : null/);
     assert.match(read('integrations/system-health-dashboard/src/components/observation-card.tsx'), /<RuntimeBadge runtime=\{observation\.runtime\} \/>/);
