@@ -18,6 +18,8 @@ select:
       # VS Code's built-in Copilot Chat, from the chat sessions VS Code keeps
       - lib/lsl/token/vscode-token-rows.mjs
       - lib/lsl/token/opencode-token-rows.mjs
+      # OpenCode's session stores (host database + the agent box's snapshot)
+      - lib/lsl/opencode-dbs.cjs
       - lib/lsl/token/token-db.mjs
       - lib/lsl/token/reconcile.mjs
       - lib/lsl/token/task-id.mjs
