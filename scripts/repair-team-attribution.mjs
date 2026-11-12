@@ -32,6 +32,18 @@
  *   node scripts/repair-team-attribution.mjs                 # dry run
  *   node scripts/repair-team-attribution.mjs --apply
  *   node scripts/repair-team-attribution.mjs --team=a2a-xpr  # narrow the scan
+ *   node scripts/repair-team-attribution.mjs --refile=<entityId>=<team>   # a decision
+ *     made by hand where there is no evidence (repeatable; recorded as 'manual')
+ *
+ * ANCHORS
+ *
+ *   Re-filing changes an entity's team, but its parent edge — has_insight /
+ *   contains from the old team's Project anchor — stayed, so the graph kept it
+ *   under the old project. Every run now also moves such an edge from a learning
+ *   artifact (Insight, Digest, Observation) to the anchor of the team it is
+ *   filed under, when that anchor exists; structural nodes (Components, Details)
+ *   are never moved. A '.coding' anchor left without children is deleted: it
+ *   was minted for the learning-checkout mis-attribution and names no project.
  *
  * Env: OBS_API_BASE (default http://localhost:12436)
  */
@@ -55,6 +67,13 @@ const { CODING_DIR } = createRequire(import.meta.url)('../lib/history/paths.cjs'
 const KM = process.env.OBS_API_BASE || 'http://localhost:12436';
 const APPLY = process.argv.includes('--apply');
 const TEAM_FILTER = (process.argv.find((a) => a.startsWith('--team=')) || '').split('=')[1] || null;
+const MANUAL = process.argv.filter((a) => a.startsWith('--refile=')).map((a) => {
+  const [id, team] = a.slice('--refile='.length).split('=');
+  if (!id || !team) throw new Error(`--refile expects <entityId>=<team>, got ${a}`);
+  return { id, team };
+});
+const ANCHOR_EDGES = ['has_insight', 'contains'];
+const LEARNING_CLASSES = new Set(['Insight', 'Digest', 'Observation']);
 
 /**
  * Repos whose tracked filenames form the citation index.
@@ -188,6 +207,45 @@ async function main() {
     }
   }
 
+  for (const m of MANUAL) {
+    const e = entities.find((x) => x.id === m.id);
+    if (!e) throw new Error(`--refile: no entity ${m.id}`);
+    const current = (e.metadata ?? {}).team ?? (e.metadata ?? {}).project;
+    const i = decided.findIndex((d) => d.e.id === m.id);
+    if (i >= 0) decided.splice(i, 1);
+    const j = abstained.findIndex((a) => a.e.id === m.id);
+    if (j >= 0) abstained.splice(j, 1);
+    if (current !== m.team) decided.push({ e, from: current, to: m.team, via: 'manual', evidence: ['--refile'] });
+  }
+
+  // Parent edges that follow the OLD team (see ANCHORS above).
+  const finalTeam = new Map(decided.map((d) => [d.e.id, d.to]));
+  const byId = new Map(entities.map((e) => [e.id, e]));
+  const anchors = entities.filter((e) => e.ontologyClass === 'Project' && (e.metadata ?? {}).team);
+  const anchorOf = new Map(anchors.map((a) => [a.metadata.team, a]));
+  const moves = [];
+  const remaining = new Map(); // anchor id -> anchor edges left after the moves
+  for (const a of anchors) {
+    if (TEAM_FILTER && a.metadata.team !== TEAM_FILTER) continue;
+    let left = 0;
+    for (const type of ANCHOR_EDGES) {
+      const rels = await api(`/api/v1/relations?from=${encodeURIComponent(a.id)}&relationType=${type}&limit=5000`);
+      for (const r of rels ?? []) {
+        const child = byId.get(r.target);
+        const md = child?.metadata ?? {};
+        const team = finalTeam.get(r.target) ?? md.team ?? md.project;
+        const to = team && team !== a.metadata.team ? anchorOf.get(team) : null;
+        if (child && LEARNING_CLASSES.has(child.ontologyClass) && to) {
+          moves.push({ key: r.key, type, child, from: a, to });
+        } else {
+          left++;
+        }
+      }
+    }
+    remaining.set(a.id, left);
+  }
+  const drops = anchors.filter((a) => a.metadata.team === CODING_DIR && remaining.get(a.id) === 0);
+
   log('');
   log(`RE-FILE: ${decided.length}`);
   for (const d of decided) {
@@ -200,9 +258,16 @@ async function main() {
   }
   if (abstained.length > 15) log(`  … and ${abstained.length - 15} more`);
 
+  log('');
+  log(`RE-ANCHOR: ${moves.length}`);
+  for (const m of moves) {
+    log(`  ${m.from.name} -${m.type}-> ${m.child.ontologyClass} ${m.child.name.slice(0, 44)}  =>  from ${m.to.name}`);
+  }
+  if (drops.length) log(`DROP empty anchor: ${drops.map((a) => a.name).join(', ')}`);
+
   if (!APPLY) {
     log('');
-    log('DRY RUN complete. Re-run with --apply to write the RE-FILE list.');
+    log('DRY RUN complete. Re-run with --apply to write the RE-FILE / RE-ANCHOR list.');
     return;
   }
 
@@ -230,7 +295,24 @@ async function main() {
     written++;
   }
   log('');
-  log(`DONE: ${written} re-filed, ${abstained.length} abstained.`);
+  // New parent edge first, then drop the old one: an interrupted run leaves a
+  // duplicate edge (harmless, fixed by the next run), never an orphan.
+  let anchored = 0;
+  for (const m of moves) {
+    await api('/api/v1/relations', {
+      method: 'POST',
+      body: JSON.stringify({
+        from: m.to.id,
+        to: m.child.id,
+        relationType: m.type,
+        metadata: { reanchoredFrom: m.from.id, repairedBy: 'repair-team-attribution' },
+      }),
+    });
+    await api(`/api/v1/relations/${encodeURIComponent(m.key)}`, { method: 'DELETE' });
+    anchored++;
+  }
+  for (const a of drops) await api(`/api/v1/entities/${encodeURIComponent(a.id)}`, { method: 'DELETE' });
+  log(`DONE: ${written} re-filed, ${anchored} re-anchored, ${drops.length} empty anchor(s) dropped, ${abstained.length} abstained.`);
 }
 
 main().catch((err) => {
