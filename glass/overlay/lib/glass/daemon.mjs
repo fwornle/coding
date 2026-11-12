@@ -639,7 +639,13 @@ export async function startDaemon({
   let previous = [];
   try { previous = JSON.parse(fs.readFileSync(sessionsFile, 'utf8')); } catch { /* none */ }
   for (const s of Array.isArray(previous) ? previous : []) {
-    if (s && typeof s.token === 'string' && typeof s.taskId === 'string') sessions.set(s.token, { ...s, relays: s.relays || {} });
+    // taskId names the span file closeSession writes: a stored id must already be a
+    // sanitized one (sanitizeTaskId throws on an unsafe one — skip it, don't crash).
+    let safeId = false;
+    try { safeId = typeof s?.taskId === 'string' && sanitizeTaskId(s.taskId) === s.taskId; } catch { /* unsafe */ }
+    if (s && typeof s.token === 'string' && safeId) {
+      sessions.set(s.token, { ...s, relays: s.relays || {} });
+    }
   }
   let ended = 0;
   for (const s of [...sessions.values()]) if (!alive(s.pid)) { await closeSession(s.token); ended++; }

@@ -626,9 +626,12 @@ test('a daemon restart re-adopts sessions whose agent still runs, and closes the
     await daemon.close();
     assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')).map((x) => x.taskId), [live.taskId], 'a stopping daemon keeps the running session');
     assert.ok(fs.existsSync(path.join(dir, 'data', 'measurements', `${gone.taskId}.json`)), 'the ended one is archived');
+    // A stored task id names the span file: one that is not a sanitized id is not re-adopted (CWE-22).
+    const kept = JSON.parse(fs.readFileSync(file, 'utf8'));
+    fs.writeFileSync(file, JSON.stringify([...kept, { ...kept[0], token: `${kept[0].token}x`, taskId: '../../escape' }]));
 
     daemon = await ownDaemon(dir);
-    assert.deepEqual((await api('GET', '/sessions')).body.sessions.map((x) => x.taskId), [live.taskId]);
+    assert.deepEqual((await api('GET', '/sessions')).body.sessions.map((x) => x.taskId), [live.taskId], 'the tampered entry is skipped');
     await intercepted({ host: 'api.githubcopilot.com', token: live.token, route: '/chat/completions', body: { model: 'gpt-5.6-sol', messages: msgs } });
     await settle();
     assert.equal((await rowsFor(live.taskId)).length, 1, 'the same credential is still its session');
