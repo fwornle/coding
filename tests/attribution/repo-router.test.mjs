@@ -59,6 +59,34 @@ describe('repoRootForPath', () => {
     }
   });
 
+  test('a learning checkout (<repo>/.coding, its own git repo) belongs to the repo holding it', () => {
+    const base = fixture();
+    try {
+      _clearCache();
+      const lsl = join(base, 'coding', '.coding', 'history', '2026', '11');
+      mkdirSync(join(base, 'coding', '.coding', '.git'), { recursive: true });
+      mkdirSync(lsl, { recursive: true });
+      writeFileSync(join(lsl, 's.jsonl'), '');
+      assert.equal(repoRootForPath(join(lsl, 's.jsonl')), join(base, 'coding'));
+      assert.equal(teamForPath(join(lsl, 's.jsonl')), 'coding');
+      // ...so a turn that only read session logs is filed under that repo, not '.coding'.
+      assert.equal(routeFromArtifacts([join(lsl, 's.jsonl')]).team, 'coding');
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
+  test('a .coding directory outside any repo resolves to nothing, not to itself', () => {
+    const base = realpathSync(mkdtempSync(join(tmpdir(), 'attr-')));
+    try {
+      _clearCache();
+      mkdirSync(join(base, '.coding', '.git'), { recursive: true });
+      assert.equal(repoRootForPath(join(base, '.coding', 'kb', 'x.json')), null);
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+
   test('returns null outside any repository', () => {
     const base = fixture();
     try {
