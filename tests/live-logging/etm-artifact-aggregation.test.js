@@ -70,6 +70,7 @@ test('fix (a): a read-only batch inherits the turn edit via turnModifiedFiles', 
     // Stub the patch side-effects so we don't hit the instanceof/HTTP branch.
     _recordArtifactPatch: (agent, files) => recorded.push({ agent, files }),
     _patchRecentObservationsWithArtifacts: async () => {},
+    _observationRuntime: () => null, // box/host label: not what these tests pin
   };
 
   proto._fireBatchObservation.call(stub, readOnlyBatch, 'task-1', 'uuid-1', {
@@ -98,6 +99,7 @@ test('fix (a): batch-local edits union with turn aggregate (no double-count)', a
     observationWriter: { processMessages: async (_m, meta) => { captured = meta; return {}; } },
     _recordArtifactPatch: () => {},
     _patchRecentObservationsWithArtifacts: async () => {},
+    _observationRuntime: () => null, // box/host label: not what these tests pin
   };
   proto._fireBatchObservation.call(stub, batch, 't', 'u', {
     turnModifiedFiles: ['a.js', 'b.js'], turnReadFiles: [],

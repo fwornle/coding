@@ -149,7 +149,7 @@ describe('wiring', () => {
   });
 
   test('runtime travels ETM metadata → export row → /api/coding/observations', () => {
-    assert.match(read('scripts/enhanced-transcript-monitor.js'), /runtime: this\._observationRuntime\(exchanges\)/);
+    assert.match(read('scripts/enhanced-transcript-monitor.js'), /runtime: this\._observationRuntime\(exchanges, ctx\)/);
     assert.match(read('scripts/enhanced-transcript-monitor.js'), /sessionStartMs: this\._transcriptStartMs\(tp\)/);
     assert.match(read('src/live-logging/ObservationExporter.js'), /runtime: m\.runtime \|\| null/);
     assert.match(read('scripts/observations-api-server.mjs'), /runtime: typeof r\.runtime === 'string' \? r\.runtime : null/);
