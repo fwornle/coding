@@ -60,6 +60,7 @@ import { createNetworkMonitor } from './network.mjs';
 import { createOffloadStore } from './offload-store.mjs';
 import { createCopilotQuota } from './copilot-quota.mjs';
 import { createGlassJobClasses } from './job-classes.mjs';
+import { createUpdateCheck, UPDATE_CHECK_MS } from './update.mjs';
 import { createOffloader, createTargetHealth, OFFLOAD_AGENTS } from '../../proxy/proxy-bridge/offload.mjs';
 
 const PKG = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8'));
@@ -183,7 +184,7 @@ export function relaysOf(raw) {
 export async function startDaemon({
   home, port, fetch, idleMs = 30 * 60_000, tickMs = 60_000, retentionDays = 7,
   log = (l) => process.stdout.write(`${new Date().toISOString()} ${l}\n`), network,
-  gh, vscodeUserDirs,
+  gh, vscodeUserDirs, launchUpdate,
 }) {
   const p = glassPaths(home);
   for (const d of [p.data, p.ca, p.logs]) fs.mkdirSync(d, { recursive: true });
@@ -229,6 +230,12 @@ export async function startDaemon({
   const copilotQuota = createCopilotQuota({
     statePath: path.join(p.run, 'copilot-quota.json'), config,
     env: () => ({ ...process.env, ...egressEnv }), log, ...(gh ? { run: gh } : {}),
+  });
+  // A newer glass release (update.mjs): offered on the status line and in the UI.
+  // The update it starts must replace this daemon: its home and port, not the defaults.
+  const updateCheck = createUpdateCheck({
+    version: VERSION, dir: p.run, config,
+    env: () => ({ ...process.env, ...egressEnv, GLASS_HOME: home, GLASS_PORT: String(selfPort) }), log, ...(gh ? { run: gh } : {}), ...(launchUpdate ? { launch: launchUpdate } : {}),
   });
 
   const tokenDb = initTokenDb(p.data);
@@ -466,7 +473,7 @@ export async function startDaemon({
   const lineData = (session) => statuslineData({
     session, db: tokenDb?.db, costDb: usageSource.handle()?.db, measurement, egress: upstreamProxy(egressEnv, selfPort), network: netMonitor.facts(), glass: VERSION,
     refusal: lastRefusal, offload: { config: offloadStore.getConfig(), reachable: offloadHealth.usable(offloadStore.getConfig()) },
-    costCfg: loadCostDefaults(home),
+    costCfg: loadCostDefaults(home), update: updateCheck.available(),
   });
 
   const server = http.createServer(async (req, res) => {
@@ -474,7 +481,7 @@ export async function startDaemon({
     try {
       const url = req.url || '';
       if (req.method === 'GET' && url === '/health') {
-        return json(res, 200, { ok: true, glass: VERSION, docs: DOCS, pid: process.pid, port, sessions: sessions.size, data: p.data });
+        return json(res, 200, { ok: true, glass: VERSION, docs: DOCS, pid: process.pid, port, sessions: sessions.size, data: p.data, update: updateCheck.available() });
       }
       if (url === '/sessions' && req.method === 'POST') {
         const body = await readJson(req);
@@ -569,6 +576,13 @@ export async function startDaemon({
       if (url === '/api/glass/sources' && req.method === 'GET') return json(res, 200, sourcesView());
       if (url.split('?')[0] === '/api/glass/copilot-quota' && req.method === 'GET') {
         return json(res, 200, await copilotQuota.refresh({ force: /[?&]refresh=1\b/.test(url) }));
+      }
+      if (url.split('?')[0] === '/api/glass/update') {
+        if (req.method === 'GET') return json(res, 200, await updateCheck.refresh({ force: /[?&]refresh=1\b/.test(url) }));
+        if (req.method !== 'POST') return json(res, 405, { error: 'GET or POST' });
+        if (!uiWriteAllowed(req, selfPort)) return json(res, 403, { error: 'an update starts only from the glass UI' });
+        const r = updateCheck.start();
+        return json(res, r.ok ? 202 : 409, r);
       }
       if (url === '/api/glass/sources') {
         if (req.method !== 'PUT') return json(res, 405, { error: 'GET or PUT' });
@@ -686,6 +700,10 @@ export async function startDaemon({
   observe();
   const observeTimer = setInterval(observe, 15 * 60_000);
   observeTimer.unref();
+  const checkUpdate = () => updateCheck.refresh().catch((err) => logErr(`update check: ${err.message}`));
+  checkUpdate();
+  const updateTimer = setInterval(checkUpdate, UPDATE_CHECK_MS);
+  updateTimer.unref();
   const idleTimer = setInterval(() => {
     // A `glass <agent>` that was killed never closes its session: reap it, or
     // the daemon would never go idle.
@@ -702,6 +720,8 @@ export async function startDaemon({
     clearInterval(idleTimer);
     clearInterval(offloadTimer);
     clearInterval(observeTimer);
+    clearInterval(updateTimer);
+    await updateCheck.settled();
     await copilotQuota.settled(); // a gh still running would write into the home after exit
     netMonitor.stop();
     // Sessions whose agent still runs stay in sessions.json for the next daemon.

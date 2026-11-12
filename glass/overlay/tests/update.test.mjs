@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const { update, newer, viewFailureHint } = await import('../lib/glass/update.mjs');
+const { update, newer, viewFailureHint, createUpdateCheck, UPDATE_CHECK_MS } = await import('../lib/glass/update.mjs');
 
 /** A fake gh/npm: `latest` is the release tag; `fail` names steps that fail (download fails that many times). */
 function fake({ latest = 'v0.2.0', fail = {} } = {}) {
@@ -113,4 +113,72 @@ test('a gateway or network failure points at the network, a refused login at gh 
   for (const stderr of ['HTTP 401: Bad credentials', 'HTTP 404: Not Found', 'To get started with GitHub CLI, please run:  gh auth login']) {
     assert.match(viewFailureHint(stderr, host, {}), /gh auth login --hostname ghe\.example\.com/, stderr);
   }
+});
+
+/** createUpdateCheck with a fake gh (`tags` answered in turn) and a fake launch. */
+function watcher({ tags = ['v0.2.0'], config = {}, exit = 0 } = {}) {
+  const dir = tmpRoot();
+  const calls = []; const launches = []; let t = 1_000_000; const clock = { now: () => t, advance: (ms) => { t += ms; } };
+  const run = async (args) => {
+    calls.push(args);
+    const tag = tags[Math.min(calls.length - 1, tags.length - 1)];
+    return tag instanceof Error ? { ok: false, error: tag.message } : { ok: true, stdout: `${tag}\n` };
+  };
+  const launch = ({ logFile, onExit }) => {
+    launches.push(logFile);
+    fs.writeFileSync(logFile, 'installing glass 0.2.0 (this is 0.1.7)…\ninstalled glass 0.2.0\n');
+    if (exit !== null) onExit(exit);
+  };
+  const check = createUpdateCheck({ version: '0.1.7', dir, config, run, launch, now: clock.now, repo: 'ghe.example.com/acme/glass' });
+  return { check, calls, launches, clock, dir };
+}
+
+test('update check: a newer release is offered, read again only after the interval', async () => {
+  const w = watcher({ tags: ['v0.2.0', 'v0.3.0'] });
+  const v = await w.check.refresh();
+  assert.equal(v.available, '0.2.0');
+  assert.equal(v.current, '0.1.7');
+  assert.deepEqual(w.calls[0].slice(0, 4), ['release', 'view', '--repo', 'ghe.example.com/acme/glass']);
+  await w.check.refresh();
+  assert.equal(w.calls.length, 1, 'cached within the interval');
+  w.clock.advance(UPDATE_CHECK_MS);
+  assert.equal((await w.check.refresh()).available, '0.3.0');
+  assert.equal((await w.check.refresh({ force: true })).available, '0.3.0');
+  assert.equal(w.calls.length, 3);
+});
+
+test('update check: the same or an older release, or a gh failure, offers nothing', async () => {
+  assert.equal((await watcher({ tags: ['v0.1.7'] }).check.refresh()).available, null);
+  assert.equal((await watcher({ tags: ['v0.1.6'] }).check.refresh()).available, null);
+  const failed = await watcher({ tags: [new Error('gh is not installed')] }).check.refresh();
+  assert.equal(failed.available, null);
+  assert.equal(failed.error, 'gh is not installed');
+  const off = watcher({ config: { updateCheck: false } });
+  assert.equal((await off.check.refresh()).enabled, false);
+  assert.equal(off.calls.length, 0, 'updateCheck: false never asks');
+  assert.equal(off.check.start().ok, false);
+});
+
+test('update check: start runs glass update once, only when something is newer, and reports its output', async () => {
+  const none = watcher({ tags: ['v0.1.7'] });
+  await none.check.refresh();
+  assert.equal(none.check.start().ok, false);
+  assert.equal(none.launches.length, 0);
+
+  const w = watcher({ exit: null }); // still running
+  await w.check.refresh();
+  const r = w.check.start();
+  assert.equal(r.ok, true);
+  assert.equal(r.install.running, true);
+  assert.equal(r.install.target, '0.2.0');
+  w.check.start();
+  assert.equal(w.launches.length, 1, 'one update at a time');
+
+  const done = watcher({ exit: 0 });
+  await done.check.refresh();
+  const v = done.check.start();
+  assert.equal(v.install.running, false);
+  assert.equal(v.install.exit, 0);
+  assert.match(v.install.output, /installed glass 0\.2\.0/);
+  assert.equal(path.dirname(done.launches[0]), done.dir, 'its log is in the run directory');
 });

@@ -83,6 +83,23 @@ ended.
 Without `gh` (or not logged in to `bmw.ghe.com`), `glass update` says so; download and
 install the newer tarball by hand as under *Install*.
 
+### When a new release is out
+
+The daemon asks for the latest release with `gh` when it starts and every 6 hours. While
+a newer one is out, glass offers it in three places:
+
+- **Status line:** a `[⬆ 0.1.76]` field after `[glass ●]`. Click it and `glass update`
+  runs in a tmux popup; press a key to close it when it is done.
+- **UI:** an **Update to 0.1.76** button in the header. Click it and glass installs the
+  release, replaces the daemon and reloads the page. When the running daemon is older
+  than 0.1.6 and has live sessions, the button says the new version takes over when they end. If the
+  install fails, the button turns into **Update failed — retry**; its tooltip holds the
+  end of the output.
+- **Terminal:** `glass <agent>` prints a line naming the release before the agent starts.
+
+Without `gh` or its login nothing is offered; `glass update` says why.
+`{ "updateCheck": false }` in `~/.glass/config.json` stops the check.
+
 ## Uninstall
 
 ```sh

@@ -175,6 +175,7 @@ async function runMeasured(agent, argv) {
   const copilot = agent === 'opencode' && !relays['github-copilot'] ? opencodeCopilotUpstream(baseEnv) : null;
   if (copilot) relays['github-copilot'] = copilot;
   const up = await daemonFor({ home, port, env: baseEnv });
+  if (up?.update) err(`glass ${up.update} is available (this is ${VERSION}) — glass update, or click ⬆ on the status line`);
   const session = up ? await openSession(port, {
     agent, intercept, cwd: process.cwd(), project: projectOf(process.cwd()), pid: process.pid, relays,
     // This shell's proxy settings: the daemon adopts them if they differ from
@@ -280,6 +281,7 @@ export function clickTarget(tag, links) {
   if (tag === TAGS.off) return { open: links.models };
   if (tag === TAGS.ctx) return { popup: 'ctx', title: 'glass · context window', fallback: links.explain };
   if (tag === TAGS.net) return { popup: 'net', title: 'glass · network', fallback: links.network };
+  if (tag === TAGS.upd) return { run: ['update', '--hold'], title: 'glass · update', fallback: links.root };
   return null;
 }
 
@@ -306,7 +308,8 @@ async function click(argv) {
   if (target.open) return open(target.open, origin);
   const shown = popup({
     client, pane: opt(argv, '--pane'), title: target.title,
-    argv: [...selfCommand(), 'report', target.popup, '--port', String(port), ...(task ? ['--task', task] : []), '--hold'],
+    argv: target.run ? [...selfCommand(), ...target.run]
+      : [...selfCommand(), 'report', target.popup, '--port', String(port), ...(task ? ['--task', task] : []), '--hold'],
   });
   if (shown) return 0;
   return open(target.fallback, origin);
@@ -418,9 +421,10 @@ async function doctor() {
  * After an update the running daemon is the old glass: replace it when that costs no
  * session. With live sessions the new one starts at once — running agents send their
  * traffic through it, and it re-adopts their sessions; without any, the next
- * `glass <agent>` starts it.
+ * `glass <agent>` starts it — or, with `restart` (an update started from the UI,
+ * which needs a daemon to come back to), the new one starts at once.
  */
-export async function replaceAfterUpdate({ latest, home = glassHome(), port = glassPort(), env = process.env, say = out }) {
+export async function replaceAfterUpdate({ latest, restart = false, home = glassHome(), port = glassPort(), env = process.env, say = out }) {
   const h = await health(port);
   if (!h) { say(`the next glass <agent> starts glass ${latest}`); return null; }
   if (!replaceable(h)) {
@@ -428,9 +432,9 @@ export async function replaceAfterUpdate({ latest, home = glassHome(), port = gl
     return h;
   }
   await stopDaemon(port, { waitMs: 10_000 });
-  if (!h.sessions) { say(`stopped the glass ${h.glass} daemon; the next glass <agent> starts ${latest}`); return null; }
+  if (!h.sessions && !restart) { say(`stopped the glass ${h.glass} daemon; the next glass <agent> starts ${latest}`); return null; }
   const n = await ensureDaemon({ home, port, env });
-  say(n ? `replaced the glass ${h.glass} daemon with glass ${n.glass}; its ${h.sessions} live session(s) carry on`
+  say(n ? `replaced the glass ${h.glass} daemon with glass ${n.glass}${h.sessions ? `; its ${h.sessions} live session(s) carry on` : ''}`
     : `stopped the glass ${h.glass} daemon, but glass ${latest} did not start — glass doctor`);
   return n;
 }
@@ -470,7 +474,12 @@ export async function main(argv) {
       out(stopped ? 'glass daemon stopping' : 'glass daemon was not running');
       return 0;
     }
-    case 'update': return update({ version: VERSION, out, err, check: rest.includes('--check'), afterInstall: (latest) => replaceAfterUpdate({ latest }) });
+    case 'update': {
+      const restart = rest.includes('--restart');
+      const code = await update({ version: VERSION, out, err, check: rest.includes('--check'), afterInstall: (latest) => replaceAfterUpdate({ latest, restart }) });
+      if (rest.includes('--hold')) await waitForKey(); // the status line's popup
+      return code;
+    }
     case 'uninstall': return uninstall(rest);
     case '--version': case '-v': out(VERSION); return 0;
     case undefined: case 'help': case '--help': case '-h': out(HELP); return 0;

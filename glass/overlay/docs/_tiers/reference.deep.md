@@ -43,7 +43,8 @@
 {
   "interceptHosts": ["copilot-api.*.ghe.com", "api.githubcopilot.com", "api.openai.com"],
   "githubHost": "github.example.com",
-  "copilotQuota": true
+  "copilotQuota": true,
+  "updateCheck": true
 }
 ```
 
@@ -54,6 +55,8 @@
   glass uses `GH_HOST`, then the host of the Copilot traffic it measured, then every host `gh` is logged in to (enterprise hosts before github.com), keeping the first with a metered Copilot account.
 - `copilotQuota: false` stops the read of GitHub's own figure
   ([What the Copilot figure covers](token-usage.md#what-the-copilot-figure-covers)).
+- `updateCheck: false` stops the daemon asking for the latest release, and with it the
+  update offer on the status line and in the UI ([Update](getting-started.md#update)).
 
 ## Files
 

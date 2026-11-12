@@ -26,14 +26,22 @@ test('plain, tmux and ansi carry the same fields', () => {
   const plain = renderStatusline(D, { format: 'plain', port: 12445 });
   assert.match(plain, /^\[glass ●\] \[ctx .*5%\] \[↑51\.3K ↓1\.2K ⚡49%\] \[GH €12\.34\] \[N:CN P:ON\]$/);
   const tmux = renderStatusline(D, { format: 'tmux', port: 12445 });
-  // g:off appears only with offload on for the agent (tested below).
-  for (const tag of Object.values(TAGS).filter((t) => t !== TAGS.off)) assert.ok(tmux.includes(`#[range=user|${tag}]`), tag);
+  // g:off appears only with offload on for the agent, g:upd only with a newer release (tested below).
+  for (const tag of Object.values(TAGS).filter((t) => t !== TAGS.off && t !== TAGS.upd)) assert.ok(tmux.includes(`#[range=user|${tag}]`), tag);
   assert.equal(strip(tmux), plain);
   const ansi = renderStatusline(D, { format: 'ansi', port: 12445 });
   assert.ok(ansi.includes(`\x1b]8;;${uiLinks(12445, D.task_id).explain}\x1b\\`), 'ctx links to the explainer');
   assert.ok(ansi.includes(`\x1b]8;;${uiLinks(12445, D.task_id).session}\x1b\\`), 'tokens link to the session');
   assert.ok(ansi.includes(`\x1b]8;;${uiLinks(12445, D.task_id).network}\x1b\\`), 'network links to the report page: no popup outside tmux');
   assert.equal(strip(ansi), plain);
+});
+
+test('a newer release: [⬆ x.y.z] after the health field, a click runs glass update in a popup', () => {
+  assert.doesNotMatch(renderStatusline(D, { port: 1 }), /⬆/, 'nothing while this is the latest');
+  const plain = renderStatusline({ ...D, update: '0.2.0' }, { port: 1 });
+  assert.match(plain, /^\[glass ●\] \[⬆ 0\.2\.0\] \[ctx /);
+  assert.ok(renderStatusline({ ...D, update: '0.2.0' }, { format: 'tmux', port: 1 }).includes(`#[range=user|${TAGS.upd}]`));
+  assert.deepEqual(clickTarget(TAGS.upd, uiLinks(1, D.task_id)), { run: ['update', '--hold'], title: 'glass · update', fallback: uiLinks(1, D.task_id).root });
 });
 
 test('offload: [D:n] [L:n] only while it is on for the agent, hidden at 0; the network report says where calls go', async () => {

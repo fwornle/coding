@@ -614,6 +614,34 @@ test('a session credential the daemon does not know is never guessed, even with 
   }
 });
 
+test('a newer release is named on /health and installed only from the UI', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-update-'));
+  const main = daemon;
+  const launched = [];
+  const gh = async (args) => (args[0] === 'release' ? { ok: true, stdout: 'v99.0.0\n' } : stubGh(args));
+  const launchUpdate = ({ logFile, env, onExit }) => { launched.push(env); fs.writeFileSync(logFile, 'installed glass 99.0.0\n'); onExit(0); };
+  try {
+    daemon = await startDaemon({ home: dir, port: 0, fetch: stubFetch, log: () => {}, network: stubNetwork, gh, launchUpdate, vscodeUserDirs: [] });
+    const v = await eventually(() => api('GET', '/api/glass/update'), (r) => r.body.available);
+    assert.equal(v.body.available, '99.0.0');
+    assert.equal((await api('GET', '/health')).body.update, '99.0.0');
+    assert.equal((await api('POST', '/api/glass/update', {})).status, 403, 'no x-glass-ui header');
+    assert.equal((await uiWrite('POST', '/api/glass/update', {}, { origin: 'https://evil.example' })).status, 403);
+    assert.equal(launched.length, 0);
+    const r = await uiWrite('POST', '/api/glass/update', {});
+    assert.equal(r.status, 202);
+    assert.equal(launched.length, 1);
+    assert.equal(launched[0].GLASS_PORT, new URL(daemon.url).port, 'the update replaces this daemon, not the default port');
+    assert.equal(launched[0].GLASS_HOME, dir);
+    assert.equal(r.body.install.exit, 0);
+    assert.match(r.body.install.output, /installed glass 99\.0\.0/);
+  } finally {
+    await daemon.close();
+    daemon = main;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('a daemon restart re-adopts sessions whose agent still runs, and closes the ended ones', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-adopt-'));
   const main = daemon;

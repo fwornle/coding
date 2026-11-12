@@ -20,7 +20,9 @@ Install glass from the release tarball, check the setup, run your first measured
     Then run an agent through glass — `glass claude`, `glass copilot`, `glass opencode`,
     `glass pi` — and open `glass ui`.
 
-    **Update:** `glass update` (`--check` only reports a newer release).
+    **Update:** `glass update` (`--check` only reports a newer release). When a release is
+    out, the status line shows `[⬆ <version>]` and the UI an **Update** button: one click
+    installs it.
 
     **Remove it again:** `glass uninstall` then `npm rm -g glass`.
 

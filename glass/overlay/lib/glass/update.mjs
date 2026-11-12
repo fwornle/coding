@@ -7,7 +7,10 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+
+import { runGh, ghEnvIn } from './copilot-quota.mjs';
+import { PKG_ROOT } from './home.mjs';
 
 export const RELEASE_REPO = 'bmw.ghe.com/AIMAAD/glass';
 
@@ -105,4 +108,112 @@ export async function update({
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+}
+
+/** How often the daemon asks for the latest release. */
+export const UPDATE_CHECK_MS = 6 * 3_600_000;
+const OUTPUT_TAIL_BYTES = 4096;
+
+function tail(file) {
+  try {
+    const buf = fs.readFileSync(file);
+    return buf.subarray(Math.max(0, buf.length - OUTPUT_TAIL_BYTES)).toString('utf8');
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * `glass update` as a detached process, its output in `logFile`. Detached: when it
+ * replaces the daemon that started it, it must outlive that daemon.
+ */
+export function launchUpdate({ logFile, env, onExit }) {
+  const fd = fs.openSync(logFile, 'w', 0o600);
+  try {
+    // --restart: the UI that asked needs a daemon to come back to, sessions or not.
+    const child = spawn(process.execPath, [path.join(PKG_ROOT, 'bin', 'glass.mjs'), 'update', '--restart'], {
+      detached: true, stdio: ['ignore', fd, fd], env, windowsHide: true,
+    });
+    child.on('error', (e) => { fs.appendFileSync(logFile, `glass: could not start glass update: ${e.message}\n`); onExit(1); });
+    child.on('exit', (code) => onExit(code ?? 1));
+    child.unref();
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+/**
+ * The daemon's watch on new releases: the latest tag through gh (its own login,
+ * the agents' egress), at most every UPDATE_CHECK_MS, and `glass update` started
+ * on request from the UI or the status line. No gh, no login, no network: the
+ * view says so and nothing is offered. ~/.glass/config.json { "updateCheck": false }
+ * stops the check.
+ *
+ * @param {{ version: string, dir: string, config?: object, env?: () => object, repo?: string,
+ *           run?: typeof runGh, launch?: typeof launchUpdate, now?: () => number, log?: Function }} deps
+ */
+export function createUpdateCheck({
+  version, dir, config = {}, env = () => process.env, repo = RELEASE_REPO,
+  run = runGh, launch = launchUpdate, now = Date.now, log = () => {},
+}) {
+  const enabled = config.updateCheck !== false;
+  const state = { latest: null, checkedAt: 0, error: null };
+  let install = null;
+  let pending = null;
+
+  /** The newer release, or null. */
+  const available = () => (state.latest && newer(state.latest, version) ? state.latest : null);
+
+  async function refresh({ force = false } = {}) {
+    if (!enabled) return view();
+    if (!pending && (force || !state.checkedAt || now() - state.checkedAt >= UPDATE_CHECK_MS)) {
+      pending = (async () => {
+        const r = await run(['release', 'view', '--repo', repo, '--json', 'tagName', '-q', '.tagName'], ghEnvIn(path.join(dir, 'gh'), env()));
+        state.checkedAt = now();
+        if (!r.ok) { state.error = r.error; return; }
+        const before = available();
+        state.latest = String(r.stdout || '').trim().replace(/^v/, '') || null;
+        state.error = null;
+        if (available() && available() !== before) log(`update: glass ${available()} is available (this is ${version})`);
+      })().finally(() => { pending = null; });
+    }
+    await pending;
+    return view();
+  }
+
+  /** Start `glass update`; one at a time, and only when there is something newer. */
+  function start() {
+    if (!enabled) return { ok: false, error: 'the update check is switched off (updateCheck: false)' };
+    if (install?.running) return { ok: true, ...view() };
+    if (!available()) return { ok: false, error: `glass ${version} is the latest release` };
+    const logFile = path.join(dir, 'update.log');
+    install = { running: true, target: available(), startedAt: now(), exit: null, logFile };
+    log(`update: installing glass ${install.target}`);
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      launch({
+        logFile, env: env(),
+        onExit: (code) => {
+          install = { ...install, running: false, exit: code };
+          log(`update: glass update exited ${code}`);
+        },
+      });
+    } catch (e) {
+      install = { ...install, running: false, exit: 1, error: e.message };
+    }
+    return { ok: true, ...view() };
+  }
+
+  function view() {
+    return {
+      enabled, current: version, latest: state.latest, available: available(), repo,
+      checkedAt: state.checkedAt ? new Date(state.checkedAt).toISOString() : null, error: state.error,
+      install: install && {
+        running: install.running, target: install.target, exit: install.exit,
+        startedAt: new Date(install.startedAt).toISOString(), output: install.error || tail(install.logFile),
+      },
+    };
+  }
+
+  return { refresh, start, view, available, settled: () => pending || Promise.resolve() };
 }
