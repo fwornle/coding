@@ -66,6 +66,7 @@ test('pi returns null when the session dir has no .jsonl', () => {
 test('unknown agents return null rather than throwing', () => {
   assert.equal(detectForegroundSession('nope'), null);
   assert.equal(detectForegroundSession(undefined), null);
+  for (const name of ['constructor', 'toString', '__proto__']) assert.equal(detectForegroundSession(name), null, name);
 });
 
 test('AUTO_MEASURE_AGENTS covers all four agents, including pi', () => {
