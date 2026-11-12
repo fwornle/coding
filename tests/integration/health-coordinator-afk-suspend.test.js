@@ -76,8 +76,9 @@ describe('health-coordinator — AFK full-suspend contract', () => {
     // The activity clock lives in codingSessionFresh() (called by userActiveNow()).
     // It must read (a) the transcript file mtime and (b) the ETM content-activity ts
     // — both genuine "work happened" signals. The always-fresh daemon heartbeat
-    // (entry.lastBeat) may appear ONLY as the narrow URI-transcript fallback (guarded
-    // by mt === 0), never as the primary clock — that was the always-true bug.
+    // (entry.lastBeat) must not appear at all: as a fallback for un-stattable
+    // transcripts (opencode://, no session yet) it kept user_active true all day
+    // and made the observation stall clock fire after an idle afternoon.
     const fn = src.slice(src.indexOf('function codingSessionFresh()'));
     const body = fn.slice(0, fn.indexOf('\n}\n') + 2);
     // Strip `//` line comments — the body NAMES lastBeat in prose; only live code counts.
@@ -88,7 +89,7 @@ describe('health-coordinator — AFK full-suspend contract', () => {
     expect(code).toMatch(/statSync\([^)]*\)\.mtimeMs/);
     // (b) the non-flapping ETM content-activity ts is the primary signal (probe-cadence fix)
     expect(code).toMatch(/lastContentActivityTs/);
-    // lastBeat only in the guarded mt===0 URI fallback — not the primary always-fresh clock
-    expect(code).toMatch(/mt === 0 && typeof entry\.lastBeat/);
+    // never the always-fresh heartbeat, not even as a fallback
+    expect(code).not.toMatch(/lastBeat/);
   });
 });

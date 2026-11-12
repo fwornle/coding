@@ -913,19 +913,23 @@ function codingSessionFresh() {
       && (now - entry.lastContentActivityTs) < USER_ACTIVE_CONTENT_MAX_AGE_MS) {
       return true;
     }
-    // (2) Fallback freshness timestamp: prefer the transcript file mtime (Claude Code writes real
-    // .specstory/*.md files). Agents whose transcriptPath is a URI rather than a file
-    // path (e.g. opencode's "opencode://ses_..." handle) cannot be statted — fs.statSync
-    // throws → mt=0 → the session looked permanently stale, so user_active stayed false
-    // and the synthetic proxy probe was suspended forever (the "[🧠❓] never clears" bug).
-    // Fall back to the ETM heartbeat (lastBeat, epoch ms) in that case.
-    let mt = 0;
+    // (2) Fallback: the transcript file's mtime. A transcript that cannot be
+    // statted — a URI handle such as opencode's "opencode://ses_...", or an ETM
+    // that has not found a session yet — contributes NOTHING here. It used to
+    // fall back to entry.lastBeat, but lastBeat is stamped by every heartbeat,
+    // so any such monitor read as "a coding session was just written" for as
+    // long as it ran: user_active stayed true all day whenever the human used
+    // the machine for anything, and the observation stall clock counted those
+    // hours as active work ("observations stalled (6h of active work
+    // unrecorded)" on 2026-11-11 after an idle afternoon). OpenCode does not
+    // need the fallback: its ETM stamps lastContentActivityTs on message-count
+    // growth, which (1) above already reads.
     const tp = entry.transcriptPath;
     if (tp && !/^[a-z][a-z0-9+.-]*:\/\//i.test(tp)) {
+      let mt = 0;
       try { mt = fs.statSync(tp).mtimeMs; } catch { mt = 0; }
+      if (mt > 0 && (now - mt) < USER_ACTIVE_HEARTBEAT_MAX_AGE_MS) return true;
     }
-    if (mt === 0 && typeof entry.lastBeat === 'number') mt = entry.lastBeat;
-    if (mt > 0 && (now - mt) < USER_ACTIVE_HEARTBEAT_MAX_AGE_MS) return true;
   }
   return false;
 }
