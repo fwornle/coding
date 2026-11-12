@@ -34,6 +34,8 @@
  *   node scripts/repair-team-attribution.mjs --team=a2a-xpr  # narrow the scan
  *   node scripts/repair-team-attribution.mjs --refile=<entityId>=<team>   # a decision
  *     made by hand where there is no evidence (repeatable; recorded as 'manual')
+ *   node scripts/repair-team-attribution.mjs --anchors-only  # no evidence re-files:
+ *     only --refile decisions, then parent edges follow the (corrected) labels
  *
  * ANCHORS
  *
@@ -66,6 +68,7 @@ const { CODING_DIR } = createRequire(import.meta.url)('../lib/history/paths.cjs'
 
 const KM = process.env.OBS_API_BASE || 'http://localhost:12436';
 const APPLY = process.argv.includes('--apply');
+const ANCHORS_ONLY = process.argv.includes('--anchors-only');
 const TEAM_FILTER = (process.argv.find((a) => a.startsWith('--team=')) || '').split('=')[1] || null;
 const MANUAL = process.argv.filter((a) => a.startsWith('--refile=')).map((a) => {
   const [id, team] = a.slice('--refile='.length).split('=');
@@ -207,6 +210,9 @@ async function main() {
     }
   }
 
+  // --anchors-only: the labels are reviewed; re-file only what --refile names.
+  if (ANCHORS_ONLY) { decided.length = 0; abstained.length = 0; }
+
   for (const m of MANUAL) {
     const e = entities.find((x) => x.id === m.id);
     if (!e) throw new Error(`--refile: no entity ${m.id}`);
@@ -298,8 +304,14 @@ async function main() {
   // New parent edge first, then drop the old one: an interrupted run leaves a
   // duplicate edge (harmless, fixed by the next run), never an orphan.
   let anchored = 0;
+  const linked = new Set(); // to|type|child already written in this run
   for (const m of moves) {
-    await api('/api/v1/relations', {
+    // Two old anchors can hold the same child (or the new one already does):
+    // write the new edge once, drop every old one.
+    const k = `${m.to.id}|${m.type}|${m.child.id}`;
+    const have = linked.has(k) || ((await api(`/api/v1/relations?from=${encodeURIComponent(m.to.id)}&to=${encodeURIComponent(m.child.id)}&relationType=${m.type}`)) ?? []).length > 0;
+    linked.add(k);
+    if (!have) await api('/api/v1/relations', {
       method: 'POST',
       body: JSON.stringify({
         from: m.to.id,
