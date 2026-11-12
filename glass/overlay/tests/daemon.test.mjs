@@ -41,6 +41,7 @@ const CHAT_USAGE = { prompt_tokens: 120, completion_tokens: 5, prompt_tokens_det
 // directory holding one chat session with one finished Copilot request.
 const ghCalls = [];
 const stubGh = async (args) => {
+  if (args[0] === 'release') return { ok: true, stdout: 'v0.0.1\n' }; // the daemon's update check: nothing newer
   ghCalls.push(args.join(' '));
   if (args[0] === 'auth') return { ok: true, stdout: JSON.stringify({ hosts: { 'acme.ghe.com': [{ state: 'success' }], 'github.com': [{ state: 'success' }] } }) };
   if (args.includes('acme.ghe.com')) {
