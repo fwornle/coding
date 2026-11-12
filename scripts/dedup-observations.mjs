@@ -40,11 +40,50 @@ function parseArgs(argv) {
   return args;
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * fetch with a per-attempt timeout and retries. obs-api is single-threaded and
+ * a consolidation can leave it unanswering for minutes (2026-11-12: 11:30-11:37Z);
+ * a bare fetch then waits out undici's 300s header timeout and dies with
+ * 'fetch failed'.
+ */
+async function fetchRetry(url, init = {}, { attempts = 6, timeoutMs = 60_000 } = {}) {
+  let lastErr;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+    } catch (err) {
+      lastErr = err;
+      process.stdout.write(`  obs-api did not answer (${err.cause?.code || err.name}); retry ${i}/${attempts - 1} in 15s\n`);
+      if (i < attempts) await sleep(15_000);
+    }
+  }
+  throw new Error(`${url}: ${lastErr?.message || lastErr}`);
+}
+
+/**
+ * Wait while a consolidation is running: it blocks obs-api, and a digest it
+ * writes could cite a row this run is about to delete.
+ */
+async function waitForConsolidation(base, { maxWaitMs = 30 * 60_000 } = {}) {
+  const until = Date.now() + maxWaitMs;
+  for (;;) {
+    const res = await fetchRetry(`${base}/api/consolidation/status`);
+    const body = await res.json().catch(() => ({}));
+    const inflight = body && body.inflight && body.inflight.alive ? body.inflight : null;
+    if (!inflight) return;
+    if (Date.now() > until) throw new Error(`a consolidation (pid ${inflight.pid}) is still running after ${Math.round(maxWaitMs / 60_000)} min; try again later`);
+    process.stdout.write(`waiting: consolidation running since ${inflight.startedAt} (pid ${inflight.pid}); checking every 30s\n`);
+    await sleep(30_000);
+  }
+}
+
 async function getAll(base, route) {
   const rows = [];
   const limit = 200;
   for (let offset = 0; ; offset += limit) {
-    const res = await fetch(`${base}${route}?limit=${limit}&offset=${offset}`);
+    const res = await fetchRetry(`${base}${route}?limit=${limit}&offset=${offset}`);
     const body = await res.json();
     if (!res.ok || !Array.isArray(body.data)) throw new Error(`${route}: ${JSON.stringify(body).slice(0, 200)}`);
     rows.push(...body.data);
@@ -94,6 +133,8 @@ async function main() {
     return;
   }
   const outDir = args.out || defaultOutDir();
+  if (args.apply) await waitForConsolidation(args.url);
+  process.stdout.write('reading observations and digests…\n');
   const observations = await getAll(args.url, '/api/coding/observations');
   const digests = await getAll(args.url, '/api/coding/digests');
   const cited = new Set(digests.flatMap((d) => d.observationIds || []));
@@ -117,7 +158,7 @@ async function main() {
   const total = { deleted: 0, coldPruned: 0, notFound: 0 };
   const ids = remove.map((r) => r.id);
   for (let i = 0; i < ids.length; i += 100) {
-    const res = await fetch(`${args.url}/api/observations/delete`, {
+    const res = await fetchRetry(`${args.url}/api/observations/delete`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ ids: ids.slice(i, i + 100) }),
@@ -129,6 +170,7 @@ async function main() {
     total.deleted += body.deleted;
     total.coldPruned += body.coldPruned;
     total.notFound += body.notFound.length;
+    process.stdout.write(`  ${Math.min(i + 100, ids.length)}/${ids.length} done\n`);
   }
   process.stdout.write(`deleted ${total.deleted} from km-core, pruned ${total.coldPruned} from the cold store, ${total.notFound} not found\n`);
 }
