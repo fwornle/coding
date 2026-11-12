@@ -51,6 +51,11 @@ const { projectIdFor } = require('../lib/teams/config.cjs');
 const { opencodeDbs, hostOpencodeDb, boxOpencodeDb } = require('../lib/lsl/opencode-dbs.cjs');
 const { runtimeOf, transcriptStartMs } = require('../lib/agents/box-sessions.cjs');
 
+/** The transcript identity a fire belongs to (see _fireContext). */
+function fireContextOf(monitor) {
+  return { agent: monitor.agentType, transcriptPath: monitor.transcriptPath, openCodeDb: monitor._openCodeDb };
+}
+
 /**
  * "Not applicable here", as distinct from "it broke". The classification logger
  * is built inside a try/catch that reports any failure to stderr; a deliberate
@@ -821,6 +826,23 @@ class EnhancedTranscriptMonitor {
     this._lastFiredExchangeUuid = new Map(Object.entries(_persisted.firedExchangeCursors || {}));
     this._progressFiredTokens = new Map(Object.entries(_persisted.progressFiredTokens || {}));
     this._progressFiredAt = new Map(Object.entries(_persisted.progressFiredAt || {}));
+    //   _lastFiredExchangeTs   — start time (ms) of that last fired exchange. The
+    //                            uuid cursor only relocates inside the set that
+    //                            holds it; a REPLAY of older prompt sets (a stale
+    //                            read cursor, see _cursorFor) passes sets without
+    //                            it, and every one used to re-fire. Anything that
+    //                            started at or before this time has been fired.
+    this._lastFiredExchangeTs = new Map(Object.entries(_persisted.firedExchangeTs || {}).map(([k, v]) => [k, Number(v)]));
+    // Read cursor (lastProcessedUuid) of every transcript this monitor has
+    // handled but is not reading right now — a dropped tracker, or the previous
+    // primary after a switch. lastProcessedUuid itself belongs to ONE transcript
+    // (this.transcriptPath); carrying it across a switch made the new transcript
+    // replay its last 10 exchanges (cursor not found) or everything after an old
+    // position (found far back). See _cursorFor.
+    this._knownCursors = new Map();
+    for (const [tPath, st] of Object.entries(_persisted.perTranscript || {})) {
+      if (st && st.lastProcessedUuid) this._knownCursors.set(tPath, st.lastProcessedUuid);
+    }
     // Last-seen turn START id per cursorKey — detects turn boundaries so the
     // wall-clock reference and token mark reset when a new turn begins (not
     // persisted: on restart the first poll re-seeds from the live set's start).
@@ -1048,6 +1070,7 @@ class EnhancedTranscriptMonitor {
     };
     return {
       firedExchangeCursors: prune(this._lastFiredExchangeUuid),
+      firedExchangeTs: prune(this._lastFiredExchangeTs),
       progressFiredTokens: prune(this._progressFiredTokens),
       progressFiredAt: prune(this._progressFiredAt),
     };
@@ -1147,6 +1170,32 @@ class EnhancedTranscriptMonitor {
     return transcripts;
   }
 
+  /** Remember a transcript's read cursor while it is not being read. */
+  _rememberCursor(tPath, uuid) {
+    if (!tPath || !uuid) return;
+    this._knownCursors.delete(tPath); // re-insert: Map order = recency for pruning
+    this._knownCursors.set(tPath, uuid);
+  }
+
+  /**
+   * The read cursor to resume `tPath` from: its live tracker, the primary's own
+   * cursor, or the one remembered when it was last read. null = never read here.
+   */
+  _cursorFor(tPath) {
+    const tracker = this.trackedTranscripts.get(tPath);
+    if (tracker && tracker.lastProcessedUuid) return tracker.lastProcessedUuid;
+    if (tPath === this.transcriptPath && this.lastProcessedUuid) return this.lastProcessedUuid;
+    return this._knownCursors.get(tPath) || null;
+  }
+
+  /** Make `newPath` the primary transcript, swapping in ITS read cursor. */
+  _switchPrimaryTranscript(newPath) {
+    this._rememberCursor(this.transcriptPath, this.lastProcessedUuid);
+    const next = this._cursorFor(newPath);
+    this.transcriptPath = newPath;
+    this.lastProcessedUuid = next;
+  }
+
   /**
    * Load per-transcript state from state file
    */
@@ -1179,6 +1228,11 @@ class EnhancedTranscriptMonitor {
       } catch { /* ignore */ }
 
       const perTranscript = {};
+      // Transcripts no longer tracked keep their cursor (newest 50), so one that
+      // comes back — or a restart — resumes where it was instead of replaying.
+      for (const [tPath, uuid] of [...this._knownCursors].slice(-50)) {
+        perTranscript[tPath] = { lastProcessedUuid: uuid };
+      }
       for (const [tPath, tracker] of this.trackedTranscripts) {
         if (tracker.lastProcessedUuid) {
           perTranscript[tPath] = {
@@ -1217,7 +1271,7 @@ class EnhancedTranscriptMonitor {
       if (!this.trackedTranscripts.has(t.path)) {
         this.trackedTranscripts.set(t.path, {
           lastFileSize: 0,
-          lastProcessedUuid: null,
+          lastProcessedUuid: this._cursorFor(t.path),
           agentType: t.source,
           currentUserPromptSet: [],
           lastTranche: null
@@ -1230,6 +1284,7 @@ class EnhancedTranscriptMonitor {
     // Remove stale transcripts (no longer in active set)
     for (const [tPath] of this.trackedTranscripts) {
       if (!activePaths.has(tPath)) {
+        this._rememberCursor(tPath, this.trackedTranscripts.get(tPath)?.lastProcessedUuid);
         this.trackedTranscripts.delete(tPath);
         removed++;
       }
@@ -1341,7 +1396,7 @@ class EnhancedTranscriptMonitor {
         // Save and swap state to process this transcript
         const savedPath = this.transcriptPath;
         const savedSize = this.lastFileSize;
-        const savedUuid = this.lastProcessedUuid;
+        let savedUuid = this.lastProcessedUuid;
         const savedAgent = this.agentType;
         const savedPromptSet = this.currentUserPromptSet;
         const savedLastTranche = this.lastTranche;
@@ -1443,6 +1498,11 @@ class EnhancedTranscriptMonitor {
           tracker.lastProcessedUuid = this.lastProcessedUuid;
           tracker.currentUserPromptSet = this.currentUserPromptSet;
           tracker.lastTranche = this.lastTranche;
+          // The primary's progress lives in its tracker while several are
+          // tracked; restoring the value saved before this pass would leave the
+          // primary cursor where multi-transcript mode began, and the single-
+          // transcript loop resumes from it when the others drop out.
+          if (tPath === savedPath) savedUuid = this.lastProcessedUuid;
         } catch (error) {
           this.debug(`Error processing transcript ${path.basename(tPath)}: ${error.message}`);
         }
@@ -1477,6 +1537,14 @@ class EnhancedTranscriptMonitor {
     try {
       if (fs.existsSync(this.stateFile)) {
         const state = JSON.parse(fs.readFileSync(this.stateFile, 'utf-8'));
+        // The saved cursor belongs to the transcript saved with it. Resuming a
+        // DIFFERENT transcript from it is the replay bug _cursorFor exists for:
+        // take that transcript's own entry instead (null = never read here).
+        if (state.transcriptPath && this.transcriptPath && state.transcriptPath !== this.transcriptPath) {
+          const own = state.perTranscript?.[this.transcriptPath]?.lastProcessedUuid || null;
+          this.debug(`Saved cursor is for ${path.basename(state.transcriptPath)}; ${path.basename(this.transcriptPath)} resumes from ${own || 'none'}`);
+          return own;
+        }
         this.debug(`Loaded lastProcessedUuid from state file: ${state.lastProcessedUuid}`);
         return state.lastProcessedUuid || null;
       }
@@ -1666,17 +1734,34 @@ class EnhancedTranscriptMonitor {
     // re-fire duplicates. The START id is invariant, so the cursor relocates
     // reliably even after the exchange grows. (Pitfall 4)
     const stableId = (ex) => ex?.uuid || ex?.id || ex?.lastMessageUuid || '';
+    const startMs = (ex) => {
+      const t = ex && ex.timestamp ? new Date(ex.timestamp).getTime() : NaN;
+      return Number.isFinite(t) ? t : null;
+    };
     const cursor = this._lastFiredExchangeUuid.get(cursorKey);
+    const firedUpTo = this._lastFiredExchangeTs.get(cursorKey);
     let pending = exchanges;
-    if (cursor) {
-      const idx = exchanges.findIndex((ex) => stableId(ex) === cursor);
-      if (idx >= 0) pending = exchanges.slice(idx + 1);
+    const idx = cursor ? exchanges.findIndex((ex) => stableId(ex) === cursor) : -1;
+    if (idx >= 0) {
+      pending = exchanges.slice(idx + 1);
+    } else if (Number.isFinite(firedUpTo)) {
+      // The cursor is not in this set: either a new turn (all later than the
+      // last fire) or a replay of turns already fired (none later). An exchange
+      // without a timestamp cannot be placed and is kept.
+      pending = exchanges.filter((ex) => {
+        const t = startMs(ex);
+        return t === null || t > firedUpTo;
+      });
     }
     if (pending.length === 0) return;
 
     // Resolve the active task_id ONCE per fire via the shared single-span
     // reader (D-09). Best-effort: '' when no measurement span is open.
     const taskIdPromise = resolveLiveTaskIdSafe().catch(() => '');
+    // Who/where this turn belongs to, fixed NOW: the batches fire after the
+    // task-id promise, by which time the multi-transcript loop may have swapped
+    // agentType/transcriptPath to another transcript (see _fireContext).
+    const ctx = this._fireContext();
 
     // Fix (a): compute the turn-level file-change aggregate ONCE over the FULL
     // prompt set (not `pending`) so every batch observation lists the whole turn's
@@ -1698,12 +1783,17 @@ class EnhancedTranscriptMonitor {
       // exchange grows (see the stableId rationale above).
       const batchLastMessageUuid = lastEx?.lastMessageUuid || lastEx?.uuid || lastEx?.id || '';
       this._lastFiredExchangeUuid.set(cursorKey, stableId(lastEx));
+      const lastStart = startMs(lastEx);
+      if (lastStart !== null && !(this._lastFiredExchangeTs.get(cursorKey) >= lastStart)) {
+        this._lastFiredExchangeTs.set(cursorKey, lastStart);
+      }
       advanced = true;
       taskIdPromise.then((taskId) => {
         this._fireBatchObservation(batch, taskId, batchLastMessageUuid, {
           turnModifiedFiles: turnChanges.modifiedFiles,
           turnReadFiles: turnChanges.readFiles,
           turnKey,
+          ctx,
         });
       }).catch((err) => {
         // CR-02: best-effort — a single malformed exchange must never become an
@@ -1813,8 +1903,9 @@ class EnhancedTranscriptMonitor {
     const nowIso = new Date().toISOString();
     const taskIdPromise = resolveLiveTaskIdSafe().catch(() => '');
     const turnKey = this._turnKeyForSet(set);
+    const ctx = this._fireContext();
     taskIdPromise.then((taskId) => {
-      this._fireBatchObservation(set, taskId, snapshotUuid, { kind: 'progress', createdAt: nowIso, turnKey });
+      this._fireBatchObservation(set, taskId, snapshotUuid, { kind: 'progress', createdAt: nowIso, turnKey, ctx });
     }).catch((err) => {
       process.stderr.write(`[ObservationTap] progress snapshot fire failed (non-fatal): ${err?.message || err}\n`);
     });
@@ -1873,9 +1964,21 @@ class EnhancedTranscriptMonitor {
    *   land at the right point on the timeline and never collide with the final
    *   observation's (agent, project, createdAt) re-fire-dedup tuple.
    */
+  /**
+   * The transcript a fire belongs to, captured when the fire is DECIDED.
+   * agentType, transcriptPath and the OpenCode store are swapped per transcript
+   * by the multi-transcript loop; a fire that read them after an await took the
+   * NEXT transcript's — a claude turn stamped agent 'opencode' (2026-11-11
+   * 10:37/10:39 in coding), with the runtime of the wrong session too.
+   */
+  _fireContext() {
+    return fireContextOf(this);
+  }
+
   _fireBatchObservation(exchanges, taskId, batchLastMessageUuid, opts = {}) {
     if (!this.observationWriter) return;
     if (!exchanges || exchanges.length === 0) return;
+    const ctx = opts.ctx || fireContextOf(this);
     const kind = opts.kind;
     const createdAtOverride = opts.createdAt;
 
@@ -1905,7 +2008,7 @@ class EnhancedTranscriptMonitor {
           role: 'user',
           content: typeof exchange.userMessage === 'string' ? exchange.userMessage : JSON.stringify(exchange.userMessage),
           createdAt: createdAtOverride || safeIso(exchange.timestamp),
-          metadata: { agent: this.agentType, format: 'live' }
+          metadata: { agent: ctx.agent, format: 'live' }
         });
       }
 
@@ -1946,7 +2049,7 @@ class EnhancedTranscriptMonitor {
           role: 'assistant',
           content: assistantContent,
           createdAt: createdAtOverride || safeIso(exchange.timestamp),
-          metadata: { agent: this.agentType, format: 'live' }
+          metadata: { agent: ctx.agent, format: 'live' }
         });
       }
     }
@@ -1972,7 +2075,7 @@ class EnhancedTranscriptMonitor {
     process.stderr.write(`[ObservationTap] Prompt set: ${exchanges.length} exchanges, ${allToolCalls.length} tool calls [${[...new Set(allToolCalls)].join(',')}], ${modifiedFiles.length} modified (batch ${batchModified.length} + turn ${(opts.turnModifiedFiles || []).length}), ${readFiles.length} read\n`);
 
     const metadata = {
-      agent: this.agentType,
+      agent: ctx.agent,
       sessionId: this.sessionId || null,
       // Evidence that the turn DID something, independent of what the summary
       // LLM says about it. On 2026-09-23 a turn with ~40 tool calls and three
@@ -1990,7 +2093,7 @@ class EnhancedTranscriptMonitor {
       // The transcript this turn was read from, so a later re-derivation (e.g.
       // scripts/backfill-observation-artifacts.mjs) finds it exactly instead of
       // matching rows to turns by timestamp.
-      transcriptPath: this.transcriptPath || undefined,
+      transcriptPath: ctx.transcriptPath || undefined,
       // The repo's project id (lib/teams/config.cjs): its directory name unless
       // a team's `repos:` entry names it. Team membership is derived from this.
       project: projectIdFor(this.config.projectPath || ''),
@@ -1999,7 +2102,7 @@ class EnhancedTranscriptMonitor {
       kind: kind || undefined,
       // Where the agent ran: 'box' | 'strict' (the agent box) or 'host'.
       // Unset when it cannot be told (before box runs were recorded).
-      runtime: this._observationRuntime(exchanges) || undefined,
+      runtime: this._observationRuntime(exchanges, ctx) || undefined,
       // Stable per-turn identity so obs-api's semantic dedup only suppresses
       // re-fires of the SAME turn, never two distinct-but-similar user turns.
       turnKey: opts.turnKey || undefined,
@@ -2019,7 +2122,7 @@ class EnhancedTranscriptMonitor {
       // for a bounded window — catches sibling observations that land AFTER this
       // immediate patch (async enrichment / offline-retry race).
       const scope = { turnKey: opts.turnKey || null, sessionId: this.sessionId || null };
-      this._recordArtifactPatch(this.agentType, modifiedFiles, scope);
+      this._recordArtifactPatch(ctx.agent, modifiedFiles, scope);
       this._patchRecentObservationsWithArtifacts(modifiedFiles, readFiles, undefined, scope);
     }
 
@@ -2798,18 +2901,19 @@ class EnhancedTranscriptMonitor {
    * 'box' | 'strict' | 'host' for the turn in `exchanges`, or null
    * (lib/agents/box-sessions.cjs says how each agent is matched).
    */
-  _observationRuntime(exchanges) {
+  _observationRuntime(exchanges, ctx = fireContextOf(this)) {
     try {
       const first = (exchanges || []).find((ex) => ex && ex.timestamp);
       const atMs = first ? new Date(first.timestamp).getTime() : Date.now();
-      const tp = this.transcriptPath || '';
+      const tp = ctx.transcriptPath || '';
+      const agent = ctx.agent;
       return runtimeOf({
-        agent: this.agentType,
+        agent,
         projectPath: this.config.projectPath,
         atMs: Number.isFinite(atMs) ? atMs : Date.now(),
-        sessionId: this.agentType === 'claude' && tp.endsWith('.jsonl') ? path.basename(tp, '.jsonl') : undefined,
+        sessionId: agent === 'claude' && tp.endsWith('.jsonl') ? path.basename(tp, '.jsonl') : undefined,
         sessionStartMs: this._transcriptStartMs(tp),
-        opencodeDb: this.agentType === 'opencode' ? this.openCodeDbPath : undefined,
+        opencodeDb: agent === 'opencode' ? (ctx.openCodeDb || hostOpencodeDb()) : undefined,
         boxOpencodeDb: boxOpencodeDb(),
       });
     } catch {
@@ -5197,7 +5301,7 @@ ORDER BY m.time_created ASC;`;
         // Also update primary transcript (for health file reporting)
         const newTranscriptPath = this.findCurrentTranscript();
         if (newTranscriptPath && newTranscriptPath !== this.transcriptPath) {
-          this.transcriptPath = newTranscriptPath;
+          this._switchPrimaryTranscript(newTranscriptPath);
           this.lastFileSize = 0;
           this.lastActivityTime = Date.now();
         }
