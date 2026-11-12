@@ -14,6 +14,15 @@
  *   2. distinctive filename citations in the description — a backticked
  *      filename whose basename belongs to exactly ONE known repo.
  *
+ * REVERTS
+ *
+ *   An observation ObservationWriter re-filed by artifacts that were ALL in a
+ *   learning checkout (<repo>/.coding — session logs, kb) goes back to the
+ *   project it was stamped with (attribution.previousTeam): those files are not
+ *   evidence of a turn's subject, and the old router even named the project
+ *   '.coding' after the checkout. A '.coding' digest follows the one '.coding'
+ *   observation of its day, when there is exactly one.
+ *
  * Anything else is ABSTAINED and listed, not rewritten. Embeddings are
  * deliberately not consulted: the reference set cannot discriminate (see the
  * measurements in lib/attribution/repo-router.mjs), so they would launder a
@@ -32,11 +41,16 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
+import { createRequire } from 'node:module';
+
 import {
   routeFromArtifacts,
   routeFromCitations,
   buildDistinctiveIndex,
+  inLearningCheckout,
 } from '../lib/attribution/repo-router.mjs';
+
+const { CODING_DIR } = createRequire(import.meta.url)('../lib/history/paths.cjs');
 
 const KM = process.env.OBS_API_BASE || 'http://localhost:12436';
 const APPLY = process.argv.includes('--apply');
@@ -72,6 +86,7 @@ async function api(p, init) {
 function discoverRepos(teams) {
   const filesByTeam = {};
   for (const team of teams) {
+    if (team === CODING_DIR) continue; // a learning checkout, never a repo of its own
     for (const root of SEARCH_ROOTS) {
       const dir = path.basename(root) === team ? root : path.join(root, team);
       if (!existsSync(path.join(dir, '.git'))) continue;
@@ -108,8 +123,14 @@ async function main() {
   const index = buildDistinctiveIndex(filesByTeam);
   log(`distinctive filenames indexed: ${index.size}`);
 
+  // team, as before — plus a project-only entity (a digest) filed under the
+  // learning checkout, which only the revert pass below handles.
+  const teamOf = (e) => {
+    const md = e.metadata ?? {};
+    return md.team ?? (md.project === CODING_DIR ? CODING_DIR : undefined);
+  };
   const scope = entities.filter((e) => {
-    const t = (e.metadata ?? {}).team;
+    const t = teamOf(e);
     if (!t) return false;
     return TEAM_FILTER ? t === TEAM_FILTER : true;
   });
@@ -118,8 +139,18 @@ async function main() {
   const decided = [];
   const abstained = [];
 
+  const reverted = new Map(); // entity id -> restored team
   for (const e of scope) {
-    const current = (e.metadata ?? {}).team;
+    const current = teamOf(e);
+    const attr = (e.metadata ?? {}).attribution;
+    const evidence = Array.isArray(attr?.evidence) ? attr.evidence : [];
+    if (attr?.stampedFrom === 'artifacts' && attr.previousTeam && attr.previousTeam !== current
+      && evidence.length > 0 && evidence.every(inLearningCheckout)) {
+      decided.push({ e, from: current, to: attr.previousTeam, via: 'revert', evidence });
+      reverted.set(e.id, attr.previousTeam);
+      continue;
+    }
+    if (e.ontologyClass === 'Digest' && current === CODING_DIR) continue; // second pass below
 
     const byArtifact = routeFromArtifacts(artifactsOf(e));
     const byCitation = byArtifact
@@ -140,6 +171,21 @@ async function main() {
       via: byArtifact ? 'artifacts' : 'citations',
       evidence: decision.evidence.slice(0, 3),
     });
+  }
+
+  // A '.coding' digest: the one '.coding' observation of its day decides.
+  const dayOf = (iso) => String(iso ?? '').slice(0, 10);
+  for (const e of scope) {
+    if (e.ontologyClass !== 'Digest' || teamOf(e) !== CODING_DIR) continue;
+    const day = (e.metadata ?? {}).date ?? dayOf(e.createdAt);
+    const sources = scope.filter((o) => o.ontologyClass === 'Observation' && reverted.has(o.id)
+      && dayOf((o.metadata ?? {}).createdAt ?? o.createdAt) === day);
+    const to = new Set(sources.map((o) => reverted.get(o.id)));
+    if (sources.length === 1 && to.size === 1) {
+      decided.push({ e, from: CODING_DIR, to: [...to][0], via: 'revert', evidence: [`observation ${sources[0].id}`] });
+    } else {
+      abstained.push({ e, why: `${sources.length} '.coding' observation(s) on ${day}` });
+    }
   }
 
   log('');

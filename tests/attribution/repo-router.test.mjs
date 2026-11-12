@@ -69,8 +69,11 @@ describe('repoRootForPath', () => {
       writeFileSync(join(lsl, 's.jsonl'), '');
       assert.equal(repoRootForPath(join(lsl, 's.jsonl')), join(base, 'coding'));
       assert.equal(teamForPath(join(lsl, 's.jsonl')), 'coding');
-      // ...so a turn that only read session logs is filed under that repo, not '.coding'.
-      assert.equal(routeFromArtifacts([join(lsl, 's.jsonl')]).team, 'coding');
+      // Session logs are not evidence of a turn's subject: one that only read
+      // them abstains (keeps its cwd project) instead of moving anywhere...
+      assert.equal(routeFromArtifacts([join(lsl, 's.jsonl')]), null);
+      // ...and they do not outvote the files the turn actually worked on.
+      assert.equal(routeFromArtifacts([join(lsl, 's.jsonl'), join(base, 'a2a-xpr', 'scripts', 'x.mjs')]).team, 'a2a-xpr');
     } finally {
       rmSync(base, { recursive: true, force: true });
     }
