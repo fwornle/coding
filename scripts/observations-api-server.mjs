@@ -80,7 +80,7 @@ import { Router } from 'express';
 // `/patch-artifacts/recent` and `/patch-artifacts/historical`. Single
 // source of truth for the regex + meta merge.
 import { patchArtifactsInPlace, setArtifactsInPlace } from './lib/artifacts-patch-util.mjs';
-import { relabelColdStore, validRelabelProject } from './lib/observation-relabel.mjs';
+import { relabelColdStore, pruneColdStore, validRelabelProject } from './lib/observation-relabel.mjs';
 // Experiment API (27 endpoints) — re-homed here from vkb-server so retiring
 // VKB does not take the Experiments feature with it. These handlers use the
 // DEDICATED experiment LevelDB via openExperimentStore(), not the knowledge
@@ -1312,12 +1312,25 @@ app.post('/api/observations/export', async (_req, res) => {
   }
 });
 
+/** The per-repo observation-export slices obs-api may write ('shared' ones are read-only). */
+function writableSlices() {
+  try {
+    return Object.entries(KG_LAYOUT.describe())
+      .filter(([, d]) => d && d.kbDir && d.kind !== 'shared')
+      .map(([p, d]) => ({ project: p, dir: path.join(d.kbDir, 'observation-export') }));
+  } catch {
+    return [];
+  }
+}
+
 /**
  * POST /api/observations/delete — delete observations by km-core entity id.
  *
  * Body: { ids: string[] } — the km-core graph ids (the v7 `019f…` ids the
- * dashboard/cold-store key on, NOT the v4 legacyId returned by the writer).
- * Returns { deleted, notFound, requested }. Single-owner store, so deletion must
+ * dashboard/cold-store key on, NOT the v4 legacyId returned by the writer);
+ * digest and insight ids work too (cold store only).
+ * Returns { deleted, coldPruned, slicePruned, notFound, requested }; notFound
+ * lists ids in neither km-core nor the cold store. Single-owner store, so deletion must
  * go through obs-api. Triggers a re-export so the cold-store/dashboard drop them.
  */
 app.post('/api/observations/delete', async (req, res) => {
@@ -1334,27 +1347,23 @@ app.post('/api/observations/delete', async (req, res) => {
       try { if (await store.deleteEntity(id)) deleted++; else notFound.push(id); }
       catch (err) { process.stderr.write(`[obs-api] /observations/delete ${id} failed: ${err.message}\n`); notFound.push(id); }
     }
-    // Also prune the cold-store JSON: the exporter's safety-merge PRESERVES
-    // existing rows not present in km-core (anti-data-loss), so a km-core delete
-    // alone leaves the row on the dashboard forever. Prune here so the deletion
-    // actually propagates, then re-export from the now-consistent state.
+    // Also prune the cold store: the exporter's safety-merge PRESERVES rows
+    // km-core no longer holds (anti-data-loss), so a km-core delete alone leaves
+    // the row on the dashboard forever. All three files (a digest or insight id
+    // is accepted too) and every writable per-repo slice, which union-merges
+    // and would otherwise keep — and share — the row.
     let coldPruned = 0;
+    let slicePruned = 0;
     try {
-      const coldPath = path.join(observationExportDir(), 'observations.json');
-      if (fs.existsSync(coldPath)) {
-        const arr = JSON.parse(fs.readFileSync(coldPath, 'utf-8'));
-        if (Array.isArray(arr)) {
-          const idSet = new Set(ids);
-          const kept = arr.filter((o) => !idSet.has(o && o.id));
-          coldPruned = arr.length - kept.length;
-          if (coldPruned > 0) fs.writeFileSync(coldPath, JSON.stringify(kept, null, 2));
-        }
-      }
+      const cold = pruneColdStore({ exportDir: observationExportDir(), slices: writableSlices(), ids: new Set(ids) });
+      coldPruned = cold.pruned;
+      slicePruned = cold.slicePruned;
+      for (let i = notFound.length - 1; i >= 0; i--) if (cold.ids.has(notFound[i])) notFound.splice(i, 1);
     } catch (err) {
       process.stderr.write(`[obs-api] /observations/delete cold-store prune failed: ${err.message}\n`);
     }
-    if (deleted > 0 || coldPruned > 0) { scheduleExport(); _stalenessCache.invalidate(); }
-    res.json({ deleted, coldPruned, notFound, requested: ids.length });
+    if (deleted > 0 || coldPruned > 0 || slicePruned > 0) { scheduleExport(); _stalenessCache.invalidate(); }
+    res.json({ deleted, coldPruned, slicePruned, notFound, requested: ids.length });
   } catch (err) {
     process.stderr.write(`[obs-api] /observations/delete error: ${err.message}\n`);
     res.status(500).json({ error: err.message || 'Failed to delete observations' });
@@ -1412,13 +1421,7 @@ app.post('/api/observations/relabel', async (req, res) => {
       km++;
     }
 
-    let slices = [];
-    try {
-      slices = Object.entries(KG_LAYOUT.describe())
-        .filter(([, d]) => d && d.kbDir && d.kind !== 'shared')
-        .map(([p, d]) => ({ project: p, dir: path.join(d.kbDir, 'observation-export') }));
-    } catch { slices = []; }
-    const cold = relabelColdStore({ exportDir: observationExportDir(), slices, ids: new Set(ids), project, dryRun });
+    const cold = relabelColdStore({ exportDir: observationExportDir(), slices: writableSlices(), ids: new Set(ids), project, dryRun });
     const coldIds = cold.ids;
     const notFound = ids.filter((id) => !inKm.has(id) && !(coldIds && coldIds.has(id)));
     if (!dryRun && (km > 0 || cold.relabelled > 0 || cold.slicePruned > 0)) {
