@@ -110,7 +110,7 @@ if [ -n "$pane_session" ] && [ -r "$CODING_REPO/.data/agent-sessions/$pane_sessi
   pane_project="$(python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get("projectPath",""))' "$map" 2>/dev/null || echo "")"
 fi
 
-# macOS opens in the user's Chrome and REUSES an existing tab — the tab-reuse
+# macOS opens in the user's Chrome (Edge with BROWSER=edge) and REUSES an existing tab — the tab-reuse
 # AppleScript, the automation-browser guard and the separate raise live in
 # lib/statusline/browser-tab.mjs, shared with glass's status line.
 

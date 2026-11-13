@@ -828,7 +828,15 @@ test('glass ui: one opener chain per platform, no shell', async () => {
   const wsl = openers(u, 'linux', true, { BROWSER: '/mnt/c/Program\\ Files/Google/Chrome/Application/chrome.exe' });
   assert.deepEqual(wsl[0], [chrome, [u]]);
   assert.deepEqual(wsl.map(([c]) => c).slice(1), ['wslview', 'cmd.exe', '/mnt/c/Windows/System32/cmd.exe']);
-  assert.equal(openers(u, 'linux', false)[0][0], 'xdg-open');
+  assert.equal(openers(u, 'linux', false, {})[0][0], 'xdg-open');
+  // BROWSER=edge names the browser everywhere: Windows `start msedge`, WSL the same
+  // through cmd.exe (a path in BROWSER is still run as given), Linux its launcher.
+  assert.deepEqual(openers(u, 'win32', false, { BROWSER: 'edge' }).map(([, a]) => a[3]), ['msedge', 'http://127.0.0.1:12445/?a=1^&b=2']);
+  assert.deepEqual(openers(u, 'linux', true, { BROWSER: 'Edge' }).slice(0, 2),
+    [['cmd.exe', ['/c', 'start', '""', 'msedge', 'http://127.0.0.1:12445/?a=1^&b=2']], ['/mnt/c/Windows/System32/cmd.exe', ['/c', 'start', '""', 'msedge', 'http://127.0.0.1:12445/?a=1^&b=2']]]);
+  assert.deepEqual(openers(u, 'linux', true, { BROWSER: '/mnt/c/x/msedge.exe' })[0], ['/mnt/c/x/msedge.exe', [u]]);
+  assert.deepEqual(openers(u, 'linux', false, { BROWSER: 'edge' }).map(([c]) => c).slice(0, 3), ['microsoft-edge', 'microsoft-edge-stable', 'xdg-open']);
+  assert.equal(openers(u, 'win32', false, { BROWSER: 'firefox' }).length, 1, 'an unknown name leaves the system default');
   // macOS: coding's tab reuse (lib/statusline/browser-tab.mjs), keyed on the given prefix.
   const { openUrl } = await import('../lib/glass/open-url.mjs');
   const seen = [];

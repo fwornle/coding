@@ -8,10 +8,14 @@
 // `appendWindowsPath=false` takes it off PATH), Windows `cmd /c start`: no
 // scripting bridge there, so a new tab. The first opener that starts wins;
 // none → false.
+//
+// BROWSER=edge or BROWSER=chrome (chosenBrowser) names the browser on every
+// platform: macOS reuses tabs in it, the others start it by name ahead of the
+// system default.
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 
-import { openOrFocusTab } from '../statusline/browser-tab.mjs';
+import { BROWSERS, chosenBrowser, openOrFocusTab } from '../statusline/browser-tab.mjs';
 
 export function isWsl(env = process.env) {
   if (process.platform !== 'linux') return false;
@@ -35,12 +39,16 @@ export function browserFromEnv(url, env = process.env) {
 /** The opener commands to try for `url`, in order. */
 export function openers(url, platform = process.platform, wsl = isWsl(), env = process.env) {
   if (platform === 'darwin') return [['open', [url]]];
-  if (platform === 'win32') return [['cmd', ['/c', 'start', '""', url.replace(/&/g, '^&')]]];
+  const named = BROWSERS[chosenBrowser(env)];
+  const start = (...app) => ['/c', 'start', '""', ...app, url.replace(/&/g, '^&')];
+  if (platform === 'win32') return [named && ['cmd', start(named.win)], ['cmd', start()]].filter(Boolean);
   if (wsl) {
-    const start = ['/c', 'start', '""', url.replace(/&/g, '^&')];
-    return [browserFromEnv(url, env), ['wslview', [url]], ['cmd.exe', start], [WIN_CMD, start]].filter(Boolean);
+    // A path in $BROWSER is run as it stands; a bare name is the Windows browser.
+    const own = named && !/[\\/]/.test(env.BROWSER) ? [['cmd.exe', start(named.win)], [WIN_CMD, start(named.win)]] : [browserFromEnv(url, env)];
+    return [...own, ['wslview', [url]], ['cmd.exe', start()], [WIN_CMD, start()]].filter(Boolean);
   }
-  return [['xdg-open', [url]], ['gio', ['open', url]], ['sensible-browser', [url]], ['x-www-browser', [url]]];
+  return [...(named ? named.linux.map((cmd) => [cmd, [url]]) : []),
+    ['xdg-open', [url]], ['gio', ['open', url]], ['sensible-browser', [url]], ['x-www-browser', [url]]];
 }
 
 function tryOne(cmd, args) {
