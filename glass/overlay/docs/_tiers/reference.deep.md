@@ -4,6 +4,7 @@
 |---|---|
 | `glass <agent> [--no-intercept] [--no-tmux] [args…]` | Run `claude`, `copilot`, `opencode` or `pi`, measured. All other arguments go to the agent unchanged. Returns the agent's exit code. |
 | `glass ui` | Open the UI (Token Usage, Sessions) in the browser |
+| `glass browser [edge\|chrome\|default]` | The browser glass opens pages in; no argument shows it ([status line](status-line.md)) |
 | `glass status` | Daemon state, live sessions, the latest recorded calls |
 | `glass doctor` | Node version, data home, CA, egress proxy, each agent's path and version, daemon state, and warnings when another local LLM proxy or tmux session overlaps with glass. Exit code 1 when something needs fixing |
 | `glass watch [--task <id>]` | A live one-line status bar for the newest session, or the given one |
@@ -32,7 +33,7 @@
 | `GLASS_NO_STATUSLINE` | — | `1`: Claude Code does not get glass's status line |
 | `GLASS_<AGENT>_BIN` | the agent name on `PATH` | Path of an agent binary, e.g. `GLASS_COPILOT_BIN=/opt/homebrew/bin/copilot` |
 | `GLASS_VERBOSE` | — | `1`: print the session id and wiring at start |
-| `BROWSER` | Chrome on macOS, the system default elsewhere | `edge` or `chrome`: the browser status-line clicks and `glass ui` open. On macOS tabs are re-used in it ([status line](status-line.md)); on WSL a path to a browser `.exe` also works |
+| `BROWSER` | Chrome on macOS, the system default elsewhere | `edge` or `chrome`: the browser status-line clicks and `glass ui` open, unless `glass browser` set one. On macOS tabs are re-used in it ([status line](status-line.md)); on WSL a path to a browser `.exe` also works |
 | `HTTPS_PROXY`, `NO_PROXY` | your environment | The daemon's route to the model hosts (corporate proxy) |
 | `NODE_EXTRA_CA_CERTS` | your environment | Kept: glass adds its CA to yours for the run |
 
@@ -45,7 +46,8 @@
   "interceptHosts": ["copilot-api.*.ghe.com", "api.githubcopilot.com", "api.openai.com"],
   "githubHost": "github.example.com",
   "copilotQuota": true,
-  "updateCheck": true
+  "updateCheck": true,
+  "browser": "edge"
 }
 ```
 
@@ -56,6 +58,9 @@
   glass uses `GH_HOST`, then the host of the Copilot traffic it measured, then every host `gh` is logged in to (enterprise hosts before github.com), keeping the first with a metered Copilot account.
 - `copilotQuota: false` stops the read of GitHub's own figure
   ([What the Copilot figure covers](token-usage.md#what-the-copilot-figure-covers)).
+- `browser` is the browser status-line clicks and `glass ui` open: `edge` or `chrome`.
+  `glass browser edge` writes it, `glass browser default` removes it. It wins over
+  `BROWSER`.
 - `updateCheck: false` stops the daemon asking for the latest release, and with it the
   update offer on the status line and in the UI ([Update](getting-started.md#update)).
 

@@ -18,7 +18,8 @@ import { ghDoctorLines, ghEnvIn, runGh } from './copilot-quota.mjs';
 import { runAgent, cmdQuote } from './spawn.mjs';
 import { upstreamProxy, proxyEnvOf } from './egress.mjs';
 import { coexistWarnings, opencodeCopilotUpstream, opencodeHttpProviders, piHttpProviders } from './coexist.mjs';
-import { openUrl } from './open-url.mjs';
+import { configuredBrowser, openUrl } from './open-url.mjs';
+import { chosenBrowser } from '../statusline/browser-tab.mjs';
 import { renderStatusline, renderReport, uiLinks, TAGS } from './statusline.mjs';
 import { tmuxWanted, launchInTmux, configureStatus, popup, message, selfCommand, agentMouseEnv } from './tmux.mjs';
 import { update, RELEASE_REPO } from './update.mjs';
@@ -37,6 +38,7 @@ const HELP = `glass ${VERSION} — token measurement and context insight for cod
 
   glass claude|copilot|opencode|pi [--no-intercept] [--no-tmux] [args…]   run an agent, measured
   glass ui           open the UI (Token Usage, Sessions + context) in the browser
+  glass browser      the browser glass opens: edge, chrome or default (no argument: show it)
   glass status       daemon, live sessions, latest rows
   glass doctor       agent binaries, CA, egress, daemon, other local proxies
   glass stop         stop the daemon; running sessions carry on with the next one
@@ -298,7 +300,7 @@ export function clickTarget(tag, links) {
 async function click(argv) {
   const client = opt(argv, '--client');
   const open = async (url, origin) => {
-    if (!(await openUrl(url, origin))) message({ client, text: `glass: no browser to open ${url} — set BROWSER (or install wslu on WSL)` });
+    if (!(await openUrl(url, origin))) message({ client, text: `glass: no browser to open ${url} — glass browser edge|chrome (or install wslu on WSL)` });
     return 0;
   };
   const tag = argv[0];
@@ -337,6 +339,32 @@ async function watch(argv) {
     for (let i = 0; i < 10 && !stop; i++) await new Promise((res) => setTimeout(res, 200));
   }
   if (process.stdout.isTTY) process.stdout.write('\n');
+  return 0;
+}
+
+/** `glass browser [edge|chrome|default]`: show or set config.json's `browser`. */
+function browserCmd(argv) {
+  const file = glassPaths(glassHome()).config;
+  let config = {};
+  if (fs.existsSync(file)) {
+    try { config = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) {
+      err(`glass: ${file} is not valid JSON (${e.message}) — fix it first`);
+      return 1;
+    }
+  }
+  const want = argv[0];
+  if (!want) {
+    const set = configuredBrowser(file);
+    const env = process.env.BROWSER;
+    out(`browser: ${set ? `${set} (glass browser)` : env ? `${env} (BROWSER)` : 'default — Chrome on macOS, the system default elsewhere'}`);
+    return 0;
+  }
+  if (want === 'default') delete config.browser;
+  else if (chosenBrowser({ BROWSER: want })) config.browser = chosenBrowser({ BROWSER: want });
+  else { err(`glass: unknown browser '${want}' — edge, chrome or default`); return 1; }
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, `${JSON.stringify(config, null, 2)}\n`);
+  out(`browser: ${config.browser || 'default'} — status-line clicks and glass ui open there from now on`);
   return 0;
 }
 
@@ -467,6 +495,7 @@ export async function main(argv) {
   if (AGENTS.includes(cmd)) return runMeasured(cmd, rest);
   switch (cmd) {
     case 'ui': return ui();
+    case 'browser': return browserCmd(rest);
     case 'statusline': return statuslineCmd(rest);
     case 'report': return report(rest);
     case 'click': return click(rest);
