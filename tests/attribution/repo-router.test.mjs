@@ -21,6 +21,7 @@ import {
   buildDistinctiveIndex,
   routeFromCitations,
   namesTeam,
+  inAgentState,
   _clearCache,
 } from '../../lib/attribution/repo-router.mjs';
 
@@ -175,6 +176,31 @@ describe('routeFromArtifacts', () => {
     } finally {
       rmSync(base, { recursive: true, force: true });
     }
+  });
+
+  test('an agent memory directory (its own git repo) is not evidence', () => {
+    // ~/.claude/projects/<cwd>/memory is a git repository, so a turn that only
+    // wrote memory notes was re-filed to a project called 'memory'.
+    const base = fixture();
+    try {
+      const mem = join(base, '.claude', 'projects', '-x-coding', 'memory');
+      mkdirSync(join(mem, '.git'), { recursive: true });
+      _clearCache();
+      assert.equal(routeFromArtifacts([join(mem, 'feedback_x.md')]), null);
+      const r = routeFromArtifacts([join(mem, 'MEMORY.md'), join(base, 'coding', 'scripts', 'x.mjs')]);
+      assert.equal(r.team, 'coding');
+    } finally {
+      rmSync(base, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('inAgentState', () => {
+  test('matches only the .claude/projects pair, not a repo\'s own .claude/', () => {
+    assert.equal(inAgentState('/Users/u/.claude/projects/-Users-u-coding/memory/a.md'), true);
+    assert.equal(inAgentState('/Users/u/Agentic/coding/.claude/commands/sl.md'), false);
+    assert.equal(inAgentState('/Users/u/Agentic/coding/projects/a.md'), false);
+    assert.equal(inAgentState(null), false);
   });
 });
 
