@@ -34,6 +34,9 @@
  *   node scripts/repair-team-attribution.mjs --team=a2a-xpr  # narrow the scan
  *   node scripts/repair-team-attribution.mjs --refile=<entityId>=<team>   # a decision
  *     made by hand where there is no evidence (repeatable; recorded as 'manual')
+ *   node scripts/repair-team-attribution.mjs --drop-anchor=<team>  # also delete that
+ *     team's Project anchor once the run leaves it without children (repeatable;
+ *     '.coding' is always dropped this way)
  *   node scripts/repair-team-attribution.mjs --anchors-only  # no evidence re-files:
  *     only --refile decisions, then parent edges follow the (corrected) labels
  *
@@ -61,13 +64,14 @@ import {
   routeFromArtifacts,
   routeFromCitations,
   buildDistinctiveIndex,
-  inLearningCheckout,
+  inLearningCheckout, inAgentState,
 } from '../lib/attribution/repo-router.mjs';
 
 const { CODING_DIR } = createRequire(import.meta.url)('../lib/history/paths.cjs');
 
 const KM = process.env.OBS_API_BASE || 'http://localhost:12436';
 const APPLY = process.argv.includes('--apply');
+const DROP_TEAMS = new Set(['.coding', ...process.argv.filter((a) => a.startsWith('--drop-anchor=')).map((a) => a.split('=')[1]).filter(Boolean)]);
 const ANCHORS_ONLY = process.argv.includes('--anchors-only');
 const TEAM_FILTER = (process.argv.find((a) => a.startsWith('--team=')) || '').split('=')[1] || null;
 const MANUAL = process.argv.filter((a) => a.startsWith('--refile=')).map((a) => {
@@ -167,7 +171,7 @@ async function main() {
     const attr = (e.metadata ?? {}).attribution;
     const evidence = Array.isArray(attr?.evidence) ? attr.evidence : [];
     if (attr?.stampedFrom === 'artifacts' && attr.previousTeam && attr.previousTeam !== current
-      && evidence.length > 0 && evidence.every(inLearningCheckout)) {
+      && evidence.length > 0 && evidence.every((a) => inLearningCheckout(a) || inAgentState(a))) {
       decided.push({ e, from: current, to: attr.previousTeam, via: 'revert', evidence });
       reverted.set(e.id, attr.previousTeam);
       continue;
@@ -250,7 +254,7 @@ async function main() {
     }
     remaining.set(a.id, left);
   }
-  const drops = anchors.filter((a) => a.metadata.team === CODING_DIR && remaining.get(a.id) === 0);
+  const drops = anchors.filter((a) => (a.metadata.team === CODING_DIR || DROP_TEAMS.has(a.metadata.team)) && remaining.get(a.id) === 0);
 
   log('');
   log(`RE-FILE: ${decided.length}`);
