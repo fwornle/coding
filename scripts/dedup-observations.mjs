@@ -48,7 +48,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * a bare fetch then waits out undici's 300s header timeout and dies with
  * 'fetch failed'.
  */
-async function fetchRetry(url, init = {}, { attempts = 6, timeoutMs = 60_000 } = {}) {
+export async function fetchRetry(url, init = {}, { attempts = 6, timeoutMs = 60_000 } = {}) {
   let lastErr;
   for (let i = 1; i <= attempts; i++) {
     try {
@@ -66,7 +66,7 @@ async function fetchRetry(url, init = {}, { attempts = 6, timeoutMs = 60_000 } =
  * Wait while a consolidation is running: it blocks obs-api, and a digest it
  * writes could cite a row this run is about to delete.
  */
-async function waitForConsolidation(base, { maxWaitMs = 30 * 60_000 } = {}) {
+export async function waitForConsolidation(base, { maxWaitMs = 30 * 60_000 } = {}) {
   const until = Date.now() + maxWaitMs;
   for (;;) {
     const res = await fetchRetry(`${base}/api/consolidation/status`);
@@ -79,7 +79,7 @@ async function waitForConsolidation(base, { maxWaitMs = 30 * 60_000 } = {}) {
   }
 }
 
-async function getAll(base, route) {
+export async function getAll(base, route) {
   const rows = [];
   const limit = 200;
   for (let offset = 0; ; offset += limit) {
