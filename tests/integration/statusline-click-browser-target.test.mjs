@@ -29,10 +29,10 @@ import { fileURLToPath } from 'node:url';
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const CLICK = path.join(REPO, 'bin/statusline-click');
 const src = fs.readFileSync(CLICK, 'utf-8');
-const { AUTOMATION_CHROME_PATTERN, openOrFocusTab } = await import('../../lib/statusline/browser-tab.mjs');
+const { automationPattern, chosenBrowser, openOrFocusTab } = await import('../../lib/statusline/browser-tab.mjs');
 
 /** The pattern the module hands pgrep. */
-const detectionPattern = () => AUTOMATION_CHROME_PATTERN;
+const detectionPattern = (app = 'Google Chrome') => automationPattern(app);
 
 const USER_CHROME =
   '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome --site-per-process --restart';
@@ -66,22 +66,41 @@ test('a Chrome helper/renderer process is not mistaken for a browser instance', 
   assert.equal(matches(detectionPattern(), RENDERER), false);
 });
 
+test('Edge: a Playwright msedge profile is detected, the user\'s Edge and Chrome are not', () => {
+  const p = detectionPattern('Microsoft Edge');
+  const edge = '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge';
+  assert.equal(matches(p, `${edge} --restart`), false);
+  assert.equal(matches(p, `${edge} --remote-debugging-port=0 --user-data-dir=/var/folders/xy/T/playwright_msedge-abc`), true);
+  assert.equal(matches(p, GSD_BROWSER), false, 'an automation Chrome must not stop tab reuse in Edge');
+});
+
+test('$BROWSER names the browser by any of its usual spellings', () => {
+  for (const v of ['edge', 'Edge', 'msedge', 'Microsoft Edge', '/Applications/Microsoft Edge.app', 'microsoft-edge-stable',
+    '/mnt/c/Program\\ Files (x86)/Microsoft/Edge/Application/msedge.exe:/usr/bin/firefox']) {
+    assert.equal(chosenBrowser({ BROWSER: v }), 'edge', v);
+  }
+  for (const v of ['chrome', 'Google Chrome', 'google-chrome-stable', 'chrome.exe']) assert.equal(chosenBrowser({ BROWSER: v }), 'chrome', v);
+  for (const v of [undefined, '', 'firefox', 'open', 'edgy']) assert.equal(chosenBrowser({ BROWSER: v }), null, String(v));
+});
+
 // The macOS paths, against recorded commands (no browser opens).
-function recordMac({ automation = false, chrome = true, osaStatus = 0, osaOut = 'reused idx=2 active=2 wins=1' } = {}) {
+function recordMac({ automation = false, chrome = true, osaStatus = 0, osaOut = 'reused idx=2 active=2 wins=1', env = {} } = {}) {
   const calls = [];
-  const spawnSync = (cmd, args) => {
+  const scripts = [];
+  const spawnSync = (cmd, args, opts) => {
     calls.push([cmd, ...args]);
     if (cmd === 'pgrep') return { status: automation ? 0 : 1 };
-    if (cmd === 'osascript') return { status: osaStatus, stdout: osaOut, stderr: '' };
+    if (cmd === 'osascript') { scripts.push(opts.input); return { status: osaStatus, stdout: osaOut, stderr: '' }; }
     return { status: 0 };
   };
-  const verdict = openOrFocusTab('http://localhost:3032/#llm', 'http://localhost:3032/', { spawnSync, exists: () => chrome });
-  return { calls, verdict };
+  const exists = (p) => { calls.push(['exists', p]); return chrome; };
+  const verdict = openOrFocusTab('http://localhost:3032/#llm', 'http://localhost:3032/', { spawnSync, exists, env });
+  return { calls, verdict, scripts };
 }
 
 test('when an automation browser is up the click goes through LaunchServices, not AppleScript', () => {
   const { calls, verdict } = recordMac({ automation: true });
-  assert.equal(verdict, 'launchservices (automation chrome up)');
+  assert.equal(verdict, 'launchservices (automation Google Chrome up)');
   assert.deepEqual(calls.at(-1), ['open', 'http://localhost:3032/#llm']);
   assert.ok(!calls.some(([c]) => c === 'osascript'), 'osascript ran with an automation browser up — wrong browser again');
 });
@@ -97,6 +116,21 @@ test('a refused or failing AppleScript still gets the user their page', () => {
   const { calls, verdict } = recordMac({ osaStatus: 1, osaOut: 'not authorized' });
   assert.match(verdict, /^osascript failed: not authorized/);
   assert.deepEqual(calls.at(-1), ['open', '-a', 'Google Chrome', 'http://localhost:3032/#llm']);
+});
+
+test('BROWSER=edge: the same tab reuse, addressed to Microsoft Edge throughout', () => {
+  const { calls, scripts } = recordMac({ env: { BROWSER: 'edge' } });
+  assert.deepEqual(calls[0], ['exists', '/Applications/Microsoft Edge.app']);
+  assert.deepEqual(calls.find(([c]) => c === 'pgrep'), ['pgrep', '-f', detectionPattern('Microsoft Edge')]);
+  assert.match(scripts[0], /tell application "Microsoft Edge"/);
+  assert.doesNotMatch(scripts[0], /Google Chrome/);
+  assert.deepEqual(calls.at(-1), ['open', '-a', 'Microsoft Edge']);
+});
+
+test('BROWSER=edge without Edge installed still opens the page', () => {
+  const { calls, verdict } = recordMac({ env: { BROWSER: 'edge' }, chrome: false });
+  assert.equal(verdict, 'open (no Microsoft Edge)');
+  assert.deepEqual(calls.at(-1), ['open', 'http://localhost:3032/#llm']);
 });
 
 test('the click script hands macOS to the shared module', () => {

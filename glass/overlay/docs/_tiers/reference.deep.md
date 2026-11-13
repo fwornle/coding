@@ -32,6 +32,7 @@
 | `GLASS_NO_STATUSLINE` | — | `1`: Claude Code does not get glass's status line |
 | `GLASS_<AGENT>_BIN` | the agent name on `PATH` | Path of an agent binary, e.g. `GLASS_COPILOT_BIN=/opt/homebrew/bin/copilot` |
 | `GLASS_VERBOSE` | — | `1`: print the session id and wiring at start |
+| `BROWSER` | Chrome on macOS, the system default elsewhere | `edge` or `chrome`: the browser status-line clicks and `glass ui` open. On macOS tabs are re-used in it ([status line](status-line.md)); on WSL a path to a browser `.exe` also works |
 | `HTTPS_PROXY`, `NO_PROXY` | your environment | The daemon's route to the model hosts (corporate proxy) |
 | `NODE_EXTRA_CA_CERTS` | your environment | Kept: glass adds its CA to yours for the run |
 
