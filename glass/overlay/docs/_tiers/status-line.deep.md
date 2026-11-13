@@ -51,15 +51,23 @@ the context explainer in the UI stands in for the context popup, and the daemon'
 
 **Which browser tab opens.** On macOS a click goes to Chrome and re-uses an open
 glass tab: it is focused, and navigated only when it shows another page. To use
-Microsoft Edge instead, set `BROWSER=edge` — tabs are re-used there the same way.
-Linux and Windows open a new tab on every click, in the browser `BROWSER` names
-(`edge`, `chrome`) or else the system default. Without tmux the links are plain
-terminal hyperlinks the terminal hands to the default browser, and glass has no way
-to reach a tab that is already open.
+Microsoft Edge instead, run once:
 
-tmux hands a click the environment its server started with. When you set `BROWSER`
-in your shell profile while tmux is already running, also run
-`tmux set-environment -g BROWSER edge`, or start tmux again.
+```bash
+glass browser edge
+```
+
+Tabs are re-used in Edge the same way, from the next click on. `glass browser` shows
+the choice, `glass browser default` goes back to Chrome. Linux and Windows open a new
+tab on every click, in the browser you chose or else the system default. Without tmux
+the links are plain terminal hyperlinks the terminal hands to the default browser,
+and glass has no way to reach a tab that is already open.
+
+The `BROWSER` environment variable (`edge`, `chrome`) works too, when `glass browser`
+is not set. A click runs in tmux's environment, though, which is the one tmux started
+with: a `BROWSER` added to your shell profile later reaches clicks only after
+`tmux set-environment -g BROWSER edge` or a tmux restart. `glass browser` has no such
+catch.
 
 The context report as it appears in the popup:
 

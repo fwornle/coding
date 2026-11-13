@@ -846,6 +846,48 @@ test('glass ui: one opener chain per platform, no shell', async () => {
   assert.deepEqual(seen, [['http://127.0.0.1:12445/#/sessions?task=t', 'http://127.0.0.1:12445/']]);
 });
 
+test('glass ui: config.json\'s browser wins over BROWSER, and reaches the tab reuse', async () => {
+  const { browserEnv, configuredBrowser, openUrl } = await import('../lib/glass/open-url.mjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-browser-'));
+  const file = path.join(dir, 'config.json');
+  assert.equal(configuredBrowser(file), undefined, 'no file');
+  fs.writeFileSync(file, '{"updateCheck":false}');
+  assert.equal(configuredBrowser(file), undefined);
+  fs.writeFileSync(file, '{"browser":"edge"}');
+  assert.equal(configuredBrowser(file), 'edge');
+  assert.equal(browserEnv({ BROWSER: 'chrome', X: '1' }, configuredBrowser(file)).BROWSER, 'edge');
+  assert.equal(browserEnv({ BROWSER: 'chrome' }, undefined).BROWSER, 'chrome');
+  const seen = [];
+  await openUrl('http://127.0.0.1:12445/', 'http://127.0.0.1:12445/', {
+    platform: 'darwin', env: { BROWSER: 'edge' }, focusTab: (url, prefix, o) => { seen.push(o.env.BROWSER); return 'reused'; },
+  });
+  assert.deepEqual(seen, ['edge']);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('CLI: glass browser shows, sets and clears the choice, keeping the other keys', async () => {
+  const cliHome = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-cli-browser-'));
+  const file = path.join(cliHome, 'config.json');
+  const env = { GLASS_HOME: cliHome, BROWSER: '' };
+  assert.match((await runCli(['browser'], env)).stdout, /browser: default/);
+  fs.writeFileSync(file, '{"updateCheck":false}');
+  const set = await runCli(['browser', 'Edge'], env);
+  assert.equal(set.code, 0, set.stderr);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { updateCheck: false, browser: 'edge' });
+  assert.match((await runCli(['browser'], { ...env, BROWSER: 'chrome' })).stdout, /browser: edge \(glass browser\)/);
+  const bad = await runCli(['browser', 'firefox'], env);
+  assert.equal(bad.code, 1);
+  assert.match(bad.stderr, /edge, chrome or default/);
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).browser, 'edge', 'a refused value changes nothing');
+  await runCli(['browser', 'default'], env);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { updateCheck: false });
+  fs.writeFileSync(file, '{oops');
+  const broken = await runCli(['browser', 'edge'], env);
+  assert.equal(broken.code, 1);
+  assert.equal(fs.readFileSync(file, 'utf8'), '{oops', 'a broken config is not overwritten');
+  fs.rmSync(cliHome, { recursive: true, force: true });
+});
+
 test('an idle daemon exits by itself', async () => {
   const idleHome = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-idle-'));
   const d = await startDaemon({ home: idleHome, port: 0, fetch: stubFetch, idleMs: 100, tickMs: 25, log: () => {}, network: stubNetwork, gh: stubGh, vscodeUserDirs: [] });
