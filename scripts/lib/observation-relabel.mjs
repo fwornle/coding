@@ -78,3 +78,36 @@ export function relabelColdStore({ exportDir, slices = [], ids, project, dryRun 
   }
   return { relabelled, previous, slicePruned, ids: found };
 }
+
+/**
+ * Delete rows by id from the cold store: the combined files AND every writable
+ * slice — the delete half of the same problem. The exporter preserves rows
+ * km-core no longer holds, so a km-core delete alone never reaches a digest or
+ * an older observation, and a slice keeps whatever it once held.
+ *
+ * @returns {{pruned: number, slicePruned: number, ids: Set<string>}} ids: found anywhere
+ */
+export function pruneColdStore({ exportDir, slices = [], ids }) {
+  let pruned = 0;
+  let slicePruned = 0;
+  const found = new Set();
+  const dirs = [{ dir: exportDir, combined: true }, ...slices.map((s) => ({ dir: s.dir, combined: false }))];
+  for (const { dir, combined } of dirs) {
+    if (!dir) continue;
+    for (const name of RELABEL_FILES) {
+      const file = path.join(dir, name);
+      const rows = readArray(file);
+      if (!rows) continue;
+      const kept = rows.filter((r) => {
+        if (!(r && ids.has(r.id))) return true;
+        found.add(r.id);
+        return false;
+      });
+      const n = rows.length - kept.length;
+      if (n === 0) continue;
+      if (combined) pruned += n; else slicePruned += n;
+      fs.writeFileSync(file, JSON.stringify(kept, null, 2) + '\n');
+    }
+  }
+  return { pruned, slicePruned, ids: found };
+}

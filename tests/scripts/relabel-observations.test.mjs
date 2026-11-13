@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { relabelColdStore, validRelabelProject } from '../../scripts/lib/observation-relabel.mjs';
+import { relabelColdStore, pruneColdStore, validRelabelProject } from '../../scripts/lib/observation-relabel.mjs';
 import { planRelabel } from '../../scripts/relabel-observations.mjs';
 
 function tmp() { return fs.mkdtempSync(path.join(os.tmpdir(), 'relabel-')); }
@@ -73,5 +73,29 @@ describe('planRelabel', () => {
     ];
     const plan = planRelabel(rows, new Map([['memory', 'coding']]), new Map([['b', 'glass'], ['c', 'coding']]));
     assert.deepEqual(plan.map((p) => `${p.id}:${p.to}`), ['a:coding', 'b:glass']);
+  });
+});
+
+describe('pruneColdStore', () => {
+  test('deletes a digest id too, from the combined files and every slice; reports what it found', () => {
+    const d = tmp();
+    const s = tmp();
+    write(d, 'observations.json', [{ id: 'o1' }, { id: 'o2' }]);
+    write(d, 'digests.json', [{ id: 'g1', observationIds: ['gone'] }, { id: 'g2' }]);
+    write(s, 'digests.json', [{ id: 'g1' }]);
+    const r = pruneColdStore({ exportDir: d, slices: [{ project: 'coding', dir: s }], ids: new Set(['o1', 'g1', 'nope']) });
+    assert.equal(r.pruned, 2);
+    assert.equal(r.slicePruned, 1);
+    assert.deepEqual([...r.ids].sort(), ['g1', 'o1']);
+    assert.deepEqual(read(d, 'observations.json').map((x) => x.id), ['o2']);
+    assert.deepEqual(read(d, 'digests.json').map((x) => x.id), ['g2']);
+    assert.deepEqual(read(s, 'digests.json'), []);
+  });
+
+  test('a missing or unreadable file is skipped, not an error', () => {
+    const d = tmp();
+    fs.writeFileSync(path.join(d, 'insights.json'), '{not json');
+    const r = pruneColdStore({ exportDir: d, slices: [{ project: 'x', dir: path.join(d, 'absent') }], ids: new Set(['a']) });
+    assert.deepEqual({ pruned: r.pruned, slicePruned: r.slicePruned, n: r.ids.size }, { pruned: 0, slicePruned: 0, n: 0 });
   });
 });
