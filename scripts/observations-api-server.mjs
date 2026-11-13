@@ -80,6 +80,7 @@ import { Router } from 'express';
 // `/patch-artifacts/recent` and `/patch-artifacts/historical`. Single
 // source of truth for the regex + meta merge.
 import { patchArtifactsInPlace, setArtifactsInPlace } from './lib/artifacts-patch-util.mjs';
+import { relabelColdStore, validRelabelProject } from './lib/observation-relabel.mjs';
 // Experiment API (27 endpoints) — re-homed here from vkb-server so retiring
 // VKB does not take the Experiments feature with it. These handlers use the
 // DEDICATED experiment LevelDB via openExperimentStore(), not the knowledge
@@ -1357,6 +1358,77 @@ app.post('/api/observations/delete', async (req, res) => {
   } catch (err) {
     process.stderr.write(`[obs-api] /observations/delete error: ${err.message}\n`);
     res.status(500).json({ error: err.message || 'Failed to delete observations' });
+  }
+});
+
+/**
+ * POST /api/observations/relabel — move observations (and digests/insights) to
+ * another project.
+ *
+ * Body: { ids: string[], project: string, reason?: string, dryRun?: boolean }.
+ * ids are km-core / cold-store ids (v7). The km-core entity, when the working
+ * set still holds it, gets metadata.project = metadata.team = project plus an
+ * auditable `attribution` record (previousTeam, reason); the combined cold
+ * store is re-labelled in place, and the row leaves any other project's
+ * per-repo slice (scripts/lib/observation-relabel.mjs explains why both are
+ * needed). Returns { km, cold: {relabelled, previous, slicePruned}, notFound }.
+ */
+app.post('/api/observations/relabel', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const ids = Array.isArray(body.ids) ? body.ids.filter((x) => typeof x === 'string' && x.length > 0) : [];
+    const project = body.project;
+    const dryRun = body.dryRun === true;
+    if (ids.length === 0) return res.status(400).json({ error: 'ids[] required' });
+    if (!validRelabelProject(project)) return res.status(400).json({ error: `invalid project: ${JSON.stringify(project)}` });
+    const reason = typeof body.reason === 'string' && body.reason ? body.reason.slice(0, 200) : 'relabel';
+    const store = await ensureKMStore();
+    if (!store) return res.status(503).json({ error: 'Knowledge graph store not ready' });
+
+    let km = 0;
+    const inKm = new Set();
+    for (const id of ids) {
+      let e = null;
+      try { e = await store.getEntity(id); } catch { e = null; }
+      if (!e) continue;
+      inKm.add(id);
+      const md = e.metadata || {};
+      if (md.project === project && md.team === project) continue;
+      if (!dryRun) {
+        e.metadata = {
+          ...md,
+          project,
+          team: project,
+          attribution: {
+            stampedFrom: 'manual',
+            previousTeam: md.team ?? md.project ?? null,
+            evidence: [reason],
+            repairedBy: 'obs-api relabel',
+            repairedAt: new Date().toISOString(),
+          },
+        };
+        await store.putEntity(e, { skipOntologyCheck: true });
+      }
+      km++;
+    }
+
+    let slices = [];
+    try {
+      slices = Object.entries(KG_LAYOUT.describe())
+        .filter(([, d]) => d && d.kbDir && d.kind !== 'shared')
+        .map(([p, d]) => ({ project: p, dir: path.join(d.kbDir, 'observation-export') }));
+    } catch { slices = []; }
+    const cold = relabelColdStore({ exportDir: observationExportDir(), slices, ids: new Set(ids), project, dryRun });
+    const coldIds = cold.ids;
+    const notFound = ids.filter((id) => !inKm.has(id) && !(coldIds && coldIds.has(id)));
+    if (!dryRun && (km > 0 || cold.relabelled > 0 || cold.slicePruned > 0)) {
+      scheduleExport();
+      _stalenessCache.invalidate();
+    }
+    res.json({ dryRun, project, km, cold: { relabelled: cold.relabelled, previous: cold.previous, slicePruned: cold.slicePruned }, notFound, requested: ids.length });
+  } catch (err) {
+    process.stderr.write(`[obs-api] /observations/relabel error: ${err.message}\n`);
+    res.status(500).json({ error: err.message || 'Failed to relabel observations' });
   }
 });
 
