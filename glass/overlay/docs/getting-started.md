@@ -20,6 +20,9 @@ Install glass from the release tarball, check the setup, run your first measured
     Then run an agent through glass — `glass claude`, `glass copilot`, `glass opencode`,
     `glass pi` — and open `glass ui`.
 
+    **Browser:** pages open in Chrome on macOS, the system default elsewhere. For Edge:
+    `glass browser edge`, once.
+
     **Update:** `glass update` (`--check` only reports a newer release). When a release is
     out, the status line shows `[⬆ <version>]` and the UI an **Update** button: one click
     installs it.

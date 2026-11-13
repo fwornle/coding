@@ -61,6 +61,17 @@ When you are done, open the dashboards:
 glass ui
 ```
 
+Pages open in Chrome on macOS and in the system default browser elsewhere. To use
+Microsoft Edge, run once:
+
+```sh
+glass browser edge
+```
+
+The UI and every status-line click open in Edge from then on; on macOS a click re-uses
+the glass tab that is already open. `glass browser` shows the choice, `glass browser
+default` undoes it.
+
 `glass status` shows the daemon, live sessions and the latest recorded calls in the
 terminal:
 
