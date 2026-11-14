@@ -202,9 +202,11 @@ jobs:
       # hardening Phase 2): the same check the agent box runs on the files a
       # tool call leaves, here off-machine, where `--no-verify` and anything an
       # agent does in the box cannot reach. Only matches the push ADDED count.
-      # History: commits only (--filter=tree:0, a few MB instead of the ~450MB
-      # pack); git fetches the two trees and the changed blobs on demand. The
-      # commits are needed for the `Constraint-Override:` trailers in the range.
+      # History: commits and trees, no blobs (--filter=blob:none, seconds instead
+      # of the ~450MB pack); git fetches the changed blobs on demand. The commits
+      # are needed for the `Constraint-Override:` trailers in the range. Not
+      # tree:0: on a pull_request checkout (a merge commit) the unshallow then
+      # fetches every missing tree one request at a time, for many minutes.
       - name: constraint gate (rules on the files this push changed)
         if: ${{ !cancelled() && steps.constraints-setup.outcome == 'success' }}
         env:
@@ -212,11 +214,11 @@ jobs:
           HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          git fetch --no-tags --filter=tree:0 --unshallow origin "$HEAD_SHA"
+          git fetch --no-tags --filter=blob:none --unshallow origin "$HEAD_SHA"
           if [ -z "${BASE:-}" ] || [[ "$BASE" =~ ^0+$ ]]; then
             BASE=$(git rev-parse "$HEAD_SHA~1")   # new branch / manual run: the last commit
           elif ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
-            git fetch --no-tags --filter=tree:0 origin "$BASE"   # force push: old tip not an ancestor
+            git fetch --no-tags --filter=blob:none origin "$BASE"   # force push: old tip not an ancestor
           fi
           node scripts/guard-check-diff.mjs "$BASE" "$HEAD_SHA"
 

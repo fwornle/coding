@@ -431,6 +431,10 @@ describe('claude reader', () => {
     expect(gauge.readContextUsage({ agent: 'claude', sessionId: '../../etc/passwd' })).toBeNull();
   });
 
+  test('an agent name that is an Object.prototype key has no reader', () => {
+    for (const agent of ['constructor', 'toString', '__proto__']) expect(gauge.readContextUsage({ agent })).toBeNull();
+  });
+
   test('missing bridge file yields null, not a zero reading', () => {
     expect(gauge.readContextUsage({ agent: 'claude', sessionId: 'no-such-session' })).toBeNull();
   });

@@ -8,10 +8,17 @@
 // `appendWindowsPath=false` takes it off PATH), Windows `cmd /c start`: no
 // scripting bridge there, so a new tab. The first opener that starts wins;
 // none → false.
+//
+// BROWSER=edge or BROWSER=chrome (chosenBrowser) names the browser on every
+// platform: macOS reuses tabs in it, the others start it by name ahead of the
+// system default. `glass browser edge` stores the same choice in config.json,
+// which wins: a click runs in tmux's environment, not the shell's, so a file
+// read at click time is the setting that cannot go stale.
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 
-import { openOrFocusTab } from '../statusline/browser-tab.mjs';
+import { BROWSERS, chosenBrowser, openOrFocusTab } from '../statusline/browser-tab.mjs';
+import { glassHome, glassPaths } from './home.mjs';
 
 export function isWsl(env = process.env) {
   if (process.platform !== 'linux') return false;
@@ -20,6 +27,19 @@ export function isWsl(env = process.env) {
 }
 
 const WIN_CMD = '/mnt/c/Windows/System32/cmd.exe';
+
+/** The `browser` key of config.json (`glass browser`), or undefined. */
+export function configuredBrowser(file = glassPaths(glassHome()).config) {
+  try {
+    const { browser } = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return typeof browser === 'string' && browser.trim() ? browser.trim() : undefined;
+  } catch { return undefined; }
+}
+
+/** The environment a URL is opened with: config.json's browser as BROWSER, if set. */
+export function browserEnv(env = process.env, browser = configuredBrowser()) {
+  return browser ? { ...env, BROWSER: browser } : env;
+}
 
 /**
  * The first entry of $BROWSER as [cmd, args] (`%s` = the URL, else appended), or
@@ -35,12 +55,16 @@ export function browserFromEnv(url, env = process.env) {
 /** The opener commands to try for `url`, in order. */
 export function openers(url, platform = process.platform, wsl = isWsl(), env = process.env) {
   if (platform === 'darwin') return [['open', [url]]];
-  if (platform === 'win32') return [['cmd', ['/c', 'start', '""', url.replace(/&/g, '^&')]]];
+  const named = BROWSERS[chosenBrowser(env)];
+  const start = (...app) => ['/c', 'start', '""', ...app, url.replace(/&/g, '^&')];
+  if (platform === 'win32') return [named && ['cmd', start(named.win)], ['cmd', start()]].filter(Boolean);
   if (wsl) {
-    const start = ['/c', 'start', '""', url.replace(/&/g, '^&')];
-    return [browserFromEnv(url, env), ['wslview', [url]], ['cmd.exe', start], [WIN_CMD, start]].filter(Boolean);
+    // A path in $BROWSER is run as it stands; a bare name is the Windows browser.
+    const own = named && !/[\\/]/.test(env.BROWSER) ? [['cmd.exe', start(named.win)], [WIN_CMD, start(named.win)]] : [browserFromEnv(url, env)];
+    return [...own, ['wslview', [url]], ['cmd.exe', start()], [WIN_CMD, start()]].filter(Boolean);
   }
-  return [['xdg-open', [url]], ['gio', ['open', url]], ['sensible-browser', [url]], ['x-www-browser', [url]]];
+  return [...(named ? named.linux.map((cmd) => [cmd, [url]]) : []),
+    ['xdg-open', [url]], ['gio', ['open', url]], ['sensible-browser', [url]], ['x-www-browser', [url]]];
 }
 
 function tryOne(cmd, args) {
@@ -61,13 +85,13 @@ function tryOne(cmd, args) {
  * @param {string} [prefix]  macOS: a tab whose URL starts with this is re-used
  * @returns {Promise<boolean>} whether an opener started
  */
-export async function openUrl(url, prefix = url, { platform = process.platform, focusTab = openOrFocusTab } = {}) {
+export async function openUrl(url, prefix = url, { platform = process.platform, focusTab = openOrFocusTab, env = browserEnv() } = {}) {
   if (platform === 'darwin') {
-    const verdict = focusTab(url, prefix);
+    const verdict = focusTab(url, prefix, { env });
     if (process.env.GLASS_VERBOSE) process.stderr.write(`glass: open ${url} — ${verdict}\n`);
     return true; // every path ends in the page: a failed AppleScript falls back to open
   }
-  for (const [cmd, args] of openers(url, platform)) {
+  for (const [cmd, args] of openers(url, platform, isWsl(env), env)) {
     if (await tryOne(cmd, args)) return true;
   }
   return false;

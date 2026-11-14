@@ -25,7 +25,7 @@ for (const k of ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy']) dele
 process.env.GLASS_CODING_TOKEN_DB = path.join(home, 'no-coding', 'token-usage.db');
 const { startDaemon } = await import('../lib/glass/daemon.mjs');
 const { sessionEnv, withHeaders, opencodeRelayContent } = await import('../lib/glass/wiring.mjs');
-const { cmdQuote } = await import('../lib/glass/spawn.mjs');
+const { cmdArg, cmdLine, isBatchFile } = await import('../lib/glass/spawn.mjs');
 
 const sse = (events, named) => events.map((e) => (named ? `event: ${e.type}\n` : '') + `data: ${typeof e === 'string' ? e : JSON.stringify(e)}\n\n`).join('');
 const ANTHROPIC_SSE = sse([
@@ -828,7 +828,15 @@ test('glass ui: one opener chain per platform, no shell', async () => {
   const wsl = openers(u, 'linux', true, { BROWSER: '/mnt/c/Program\\ Files/Google/Chrome/Application/chrome.exe' });
   assert.deepEqual(wsl[0], [chrome, [u]]);
   assert.deepEqual(wsl.map(([c]) => c).slice(1), ['wslview', 'cmd.exe', '/mnt/c/Windows/System32/cmd.exe']);
-  assert.equal(openers(u, 'linux', false)[0][0], 'xdg-open');
+  assert.equal(openers(u, 'linux', false, {})[0][0], 'xdg-open');
+  // BROWSER=edge names the browser everywhere: Windows `start msedge`, WSL the same
+  // through cmd.exe (a path in BROWSER is still run as given), Linux its launcher.
+  assert.deepEqual(openers(u, 'win32', false, { BROWSER: 'edge' }).map(([, a]) => a[3]), ['msedge', 'http://127.0.0.1:12445/?a=1^&b=2']);
+  assert.deepEqual(openers(u, 'linux', true, { BROWSER: 'Edge' }).slice(0, 2),
+    [['cmd.exe', ['/c', 'start', '""', 'msedge', 'http://127.0.0.1:12445/?a=1^&b=2']], ['/mnt/c/Windows/System32/cmd.exe', ['/c', 'start', '""', 'msedge', 'http://127.0.0.1:12445/?a=1^&b=2']]]);
+  assert.deepEqual(openers(u, 'linux', true, { BROWSER: '/mnt/c/x/msedge.exe' })[0], ['/mnt/c/x/msedge.exe', [u]]);
+  assert.deepEqual(openers(u, 'linux', false, { BROWSER: 'edge' }).map(([c]) => c).slice(0, 3), ['microsoft-edge', 'microsoft-edge-stable', 'xdg-open']);
+  assert.equal(openers(u, 'win32', false, { BROWSER: 'firefox' }).length, 1, 'an unknown name leaves the system default');
   // macOS: coding's tab reuse (lib/statusline/browser-tab.mjs), keyed on the given prefix.
   const { openUrl } = await import('../lib/glass/open-url.mjs');
   const seen = [];
@@ -836,6 +844,48 @@ test('glass ui: one opener chain per platform, no shell', async () => {
     platform: 'darwin', focusTab: (url, prefix) => { seen.push([url, prefix]); return 'reused idx=1 active=1 wins=1'; },
   }), true);
   assert.deepEqual(seen, [['http://127.0.0.1:12445/#/sessions?task=t', 'http://127.0.0.1:12445/']]);
+});
+
+test('glass ui: config.json\'s browser wins over BROWSER, and reaches the tab reuse', async () => {
+  const { browserEnv, configuredBrowser, openUrl } = await import('../lib/glass/open-url.mjs');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-browser-'));
+  const file = path.join(dir, 'config.json');
+  assert.equal(configuredBrowser(file), undefined, 'no file');
+  fs.writeFileSync(file, '{"updateCheck":false}');
+  assert.equal(configuredBrowser(file), undefined);
+  fs.writeFileSync(file, '{"browser":"edge"}');
+  assert.equal(configuredBrowser(file), 'edge');
+  assert.equal(browserEnv({ BROWSER: 'chrome', X: '1' }, configuredBrowser(file)).BROWSER, 'edge');
+  assert.equal(browserEnv({ BROWSER: 'chrome' }, undefined).BROWSER, 'chrome');
+  const seen = [];
+  await openUrl('http://127.0.0.1:12445/', 'http://127.0.0.1:12445/', {
+    platform: 'darwin', env: { BROWSER: 'edge' }, focusTab: (url, prefix, o) => { seen.push(o.env.BROWSER); return 'reused'; },
+  });
+  assert.deepEqual(seen, ['edge']);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('CLI: glass browser shows, sets and clears the choice, keeping the other keys', async () => {
+  const cliHome = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-cli-browser-'));
+  const file = path.join(cliHome, 'config.json');
+  const env = { GLASS_HOME: cliHome, BROWSER: '' };
+  assert.match((await runCli(['browser'], env)).stdout, /browser: default/);
+  fs.writeFileSync(file, '{"updateCheck":false}');
+  const set = await runCli(['browser', 'Edge'], env);
+  assert.equal(set.code, 0, set.stderr);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { updateCheck: false, browser: 'edge' });
+  assert.match((await runCli(['browser'], { ...env, BROWSER: 'chrome' })).stdout, /browser: edge \(glass browser\)/);
+  const bad = await runCli(['browser', 'firefox'], env);
+  assert.equal(bad.code, 1);
+  assert.match(bad.stderr, /edge, chrome or default/);
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).browser, 'edge', 'a refused value changes nothing');
+  await runCli(['browser', 'default'], env);
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { updateCheck: false });
+  fs.writeFileSync(file, '{oops');
+  const broken = await runCli(['browser', 'edge'], env);
+  assert.equal(broken.code, 1);
+  assert.equal(fs.readFileSync(file, 'utf8'), '{oops', 'a broken config is not overwritten');
+  fs.rmSync(cliHome, { recursive: true, force: true });
 });
 
 test('an idle daemon exits by itself', async () => {
@@ -904,8 +954,102 @@ test('wiring: claude keeps the user\'s keys and gateway; intercepted agents get 
   assert.equal(JSON.parse(ocOff.env.OPENCODE_CONFIG_CONTENT).provider['github-copilot'].options.baseURL, 'http://127.0.0.1:12445/relay/t/github-copilot');
   assert.equal(sessionEnv('opencode', {}, { port: 12445, taskId: 'T6', token: 't', caPath: ca, project: 'p', intercept: false }).wired, false);
   assert.equal(withHeaders('', { a: '1', b: '' }), 'a: 1');
-  assert.equal(cmdQuote('two words'), '"two words"');
-  assert.equal(cmdQuote('plain'), 'plain');
+});
+
+// A model of how Windows reads a command line built by cmdLine (https://qntm.org/cmd), so
+// the escaping is checked on every platform. It does not replace a run on Windows.
+// cmd.exe: %NAME% expands when NAME is set (on the command line, not in a batch file's
+// re-read of %*); outside quotes ^ escapes the next character and & | < > end the
+// command; every unescaped " toggles quoting. The program then splits its command line
+// with the C runtime's rules: 2n backslashes + " → n backslashes and a toggle,
+// 2n+1 → n backslashes and a literal ".
+const WIN_ENV = { PATH: 'C:\\Windows' };
+function cmdExe(line, { expand = true } = {}) {
+  if (expand) line = line.replace(/%([^%]+)%/g, (m, name) => (name in WIN_ENV ? WIN_ENV[name] : m));
+  let out = '';
+  let quoted = false;
+  const operators = [];
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { quoted = !quoted; out += c; continue; }
+    if (!quoted && c === '^') { i++; if (i < line.length) out += line[i]; continue; }
+    if (!quoted && '&|<>'.includes(c)) operators.push(c);
+    out += c;
+  }
+  return { out, operators };
+}
+function crtArgv(line) {
+  const argv = [];
+  let cur = '';
+  let inArg = false;
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === '\\') {
+      let n = 0;
+      while (line[i] === '\\') { n++; i++; }
+      if (line[i] === '"') { cur += '\\'.repeat(n >> 1); if (n % 2) cur += '"'; else quoted = !quoted; }
+      else { cur += '\\'.repeat(n); i--; }
+      inArg = true;
+    } else if (line[i] === '"') { quoted = !quoted; inArg = true; }
+    else if (!quoted && (line[i] === ' ' || line[i] === '\t')) { if (inArg) argv.push(cur); cur = ''; inArg = false; }
+    else { cur += line[i]; inArg = true; }
+  }
+  if (inArg) argv.push(cur);
+  return argv;
+}
+function windowsArgv(line, { batch }) {
+  const first = cmdExe(line); // cmd.exe /d /s /c "<line>"
+  const second = batch ? cmdExe(first.out, { expand: false }) : { out: first.out, operators: [] }; // the .cmd re-reads %*
+  return { argv: crtArgv(second.out).slice(1), operators: [...first.operators, ...second.operators] };
+}
+
+const AWKWARD = ['plain', '', 'two words', 'a&b', 'a|b', 'a<b>c', '(x)', '50%', '%PATH%', 'say "hi"',
+  'a "&calc&" b', 'C:\\dir\\', 'C:\\Users\\Jane Doe\\x', 'a\\"b', '^', '!x!', 'a;b,c', 'ü ä', '"', '\\\\server\\share'];
+
+test('cmdLine: each argument reaches the Windows program unchanged and cmd.exe runs nothing else', () => {
+  for (const [bin, batch] of [['agent.exe', false], ['agent.cmd', true]]) {
+    for (const arg of AWKWARD) {
+      const { argv, operators } = windowsArgv(cmdLine(bin, [arg]), { batch });
+      assert.deepEqual(operators, [], `${bin} ${JSON.stringify(arg)}: cmd.exe saw an operator`);
+      assert.deepEqual(argv, [arg], `${bin} ${JSON.stringify(arg)}`);
+    }
+    assert.deepEqual(windowsArgv(cmdLine(bin, AWKWARD), { batch }).argv, AWKWARD, `${bin}: argument boundaries`);
+  }
+  // a .cmd target gets a second level of ^, an .exe does not
+  assert.equal(cmdArg('a&b'), '^"a^&b^"');
+  assert.equal(cmdArg('a&b', { batch: true }), '^^^"a^^^&b^^^"');
+  // the program path is escaped too: a space must not split it, & must not end it
+  assert.equal(cmdLine('C:\\Program Files\\x&y\\agent.exe', []), 'C:\\Program^ Files\\x^&y\\agent.exe');
+});
+
+test('cmdLine on the real cmd.exe: node gets every argument unchanged, directly and through a .cmd shim', {
+  skip: process.platform !== 'win32' && 'needs cmd.exe (runs in the Windows CI job)',
+}, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-cmdline-'));
+  const echo = path.join(dir, 'echo-args.js');
+  fs.writeFileSync(echo, 'process.stdout.write(JSON.stringify(process.argv.slice(2)))');
+  const shim = path.join(dir, 'echo-args.cmd'); // the shape of an npm shim: node <script> %*
+  fs.writeFileSync(shim, `@"${process.execPath}" "${echo}" %*\r\n`);
+  for (const [bin, args] of [[process.execPath, [echo, ...AWKWARD]], [shim, AWKWARD]]) {
+    const r = spawnSync(cmdLine(bin, args), { encoding: 'utf8', shell: true });
+    assert.equal(r.status, 0, `${bin}: ${r.stderr}`);
+    assert.deepEqual(JSON.parse(r.stdout), AWKWARD, bin);
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('isBatchFile resolves the program through PATH and PATHEXT like cmd.exe', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-pathext-'));
+  fs.writeFileSync(path.join(dir, 'shim.cmd'), '');
+  fs.writeFileSync(path.join(dir, 'native.exe'), '');
+  // lower case: Windows matches PATHEXT case-insensitively, Linux's file system does not
+  const env = { PATH: dir, PATHEXT: '.exe;.cmd' };
+  assert.equal(isBatchFile('shim', env), true);
+  assert.equal(isBatchFile('native', env), false);
+  assert.equal(isBatchFile('npm.cmd', env), true, 'an explicit extension decides');
+  assert.equal(isBatchFile('C:\\tools\\claude.exe', env), false);
+  assert.equal(isBatchFile('missing', env), true, 'not found: treated as an npm shim');
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 // ── the CLI, out of process ──────────────────────────────────────────────────

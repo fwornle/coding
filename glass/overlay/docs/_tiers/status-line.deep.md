@@ -49,11 +49,25 @@ A terminal hyperlink can only open a URL, so without tmux each field opens a pag
 the context explainer in the UI stands in for the context popup, and the daemon's
 `/report/net` page for the network popup.
 
-**Which browser tab opens.** On macOS with Chrome, a click re-uses an open glass tab:
-it is focused, and navigated only when it shows another page. Everywhere else —
-other browsers, Linux, Windows (Edge included) — every click opens a new tab. Without
-tmux the links are plain terminal hyperlinks the terminal hands to the default
-browser, and glass has no way to reach a tab that is already open.
+**Which browser tab opens.** On macOS a click goes to Chrome and re-uses an open
+glass tab: it is focused, and navigated only when it shows another page. To use
+Microsoft Edge instead, run once:
+
+```bash
+glass browser edge
+```
+
+Tabs are re-used in Edge the same way, from the next click on. `glass browser` shows
+the choice, `glass browser default` goes back to Chrome. Linux and Windows open a new
+tab on every click, in the browser you chose or else the system default. Without tmux
+the links are plain terminal hyperlinks the terminal hands to the default browser,
+and glass has no way to reach a tab that is already open.
+
+The `BROWSER` environment variable (`edge`, `chrome`) works too, when `glass browser`
+is not set. A click runs in tmux's environment, though, which is the one tmux started
+with: a `BROWSER` added to your shell profile later reaches clicks only after
+`tmux set-environment -g BROWSER edge` or a tmux restart. `glass browser` has no such
+catch.
 
 The context report as it appears in the popup:
 

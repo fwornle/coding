@@ -28,6 +28,7 @@ select:
       - lib/lsl/adapters/index.mjs
       # project id of a cwd (project-of → repo-router → teams config; later seam cut)
       - lib/attribution/repo-router.mjs
+      - lib/history/paths.cjs
       - lib/teams/config.cjs
       - lib/features/vendor/js-yaml.cjs
       # task binding for interactive sessions + capture retention

@@ -22,6 +22,9 @@ Context gauge and session tokens, live, in the terminal you work in.
     With tmux it is the bar at the bottom; without tmux Claude Code shows it as its own
     status line, and `glass watch` shows it for any agent.
 
+    Clicks open Chrome on macOS (re-using the glass tab), the system default elsewhere.
+    For Edge: `glass browser edge`, once.
+
 === "📚 Deep Dive (full)"
 
     --8<-- "_tiers/status-line.deep.md"
