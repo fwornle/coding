@@ -25,7 +25,7 @@ for (const k of ['HTTPS_PROXY', 'https_proxy', 'HTTP_PROXY', 'http_proxy']) dele
 process.env.GLASS_CODING_TOKEN_DB = path.join(home, 'no-coding', 'token-usage.db');
 const { startDaemon } = await import('../lib/glass/daemon.mjs');
 const { sessionEnv, withHeaders, opencodeRelayContent } = await import('../lib/glass/wiring.mjs');
-const { cmdQuote } = await import('../lib/glass/spawn.mjs');
+const { cmdArg, cmdLine, isBatchFile } = await import('../lib/glass/spawn.mjs');
 
 const sse = (events, named) => events.map((e) => (named ? `event: ${e.type}\n` : '') + `data: ${typeof e === 'string' ? e : JSON.stringify(e)}\n\n`).join('');
 const ANTHROPIC_SSE = sse([
@@ -954,8 +954,101 @@ test('wiring: claude keeps the user\'s keys and gateway; intercepted agents get 
   assert.equal(JSON.parse(ocOff.env.OPENCODE_CONFIG_CONTENT).provider['github-copilot'].options.baseURL, 'http://127.0.0.1:12445/relay/t/github-copilot');
   assert.equal(sessionEnv('opencode', {}, { port: 12445, taskId: 'T6', token: 't', caPath: ca, project: 'p', intercept: false }).wired, false);
   assert.equal(withHeaders('', { a: '1', b: '' }), 'a: 1');
-  assert.equal(cmdQuote('two words'), '"two words"');
-  assert.equal(cmdQuote('plain'), 'plain');
+});
+
+// A model of how Windows reads a command line built by cmdLine (https://qntm.org/cmd), so
+// the escaping is checked on every platform. It does not replace a run on Windows.
+// cmd.exe: %NAME% expands when NAME is set (on the command line, not in a batch file's
+// re-read of %*); outside quotes ^ escapes the next character and & | < > end the
+// command; every unescaped " toggles quoting. The program then splits its command line
+// with the C runtime's rules: 2n backslashes + " → n backslashes and a toggle,
+// 2n+1 → n backslashes and a literal ".
+const WIN_ENV = { PATH: 'C:\\Windows' };
+function cmdExe(line, { expand = true } = {}) {
+  if (expand) line = line.replace(/%([^%]+)%/g, (m, name) => (name in WIN_ENV ? WIN_ENV[name] : m));
+  let out = '';
+  let quoted = false;
+  const operators = [];
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { quoted = !quoted; out += c; continue; }
+    if (!quoted && c === '^') { i++; if (i < line.length) out += line[i]; continue; }
+    if (!quoted && '&|<>'.includes(c)) operators.push(c);
+    out += c;
+  }
+  return { out, operators };
+}
+function crtArgv(line) {
+  const argv = [];
+  let cur = '';
+  let inArg = false;
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === '\\') {
+      let n = 0;
+      while (line[i] === '\\') { n++; i++; }
+      if (line[i] === '"') { cur += '\\'.repeat(n >> 1); if (n % 2) cur += '"'; else quoted = !quoted; }
+      else { cur += '\\'.repeat(n); i--; }
+      inArg = true;
+    } else if (line[i] === '"') { quoted = !quoted; inArg = true; }
+    else if (!quoted && (line[i] === ' ' || line[i] === '\t')) { if (inArg) argv.push(cur); cur = ''; inArg = false; }
+    else { cur += line[i]; inArg = true; }
+  }
+  if (inArg) argv.push(cur);
+  return argv;
+}
+function windowsArgv(line, { batch }) {
+  const first = cmdExe(line); // cmd.exe /d /s /c "<line>"
+  const second = batch ? cmdExe(first.out, { expand: false }) : { out: first.out, operators: [] }; // the .cmd re-reads %*
+  return { argv: crtArgv(second.out).slice(1), operators: [...first.operators, ...second.operators] };
+}
+
+const AWKWARD = ['plain', '', 'two words', 'a&b', 'a|b', 'a<b>c', '(x)', '50%', '%PATH%', 'say "hi"',
+  'a "&calc&" b', 'C:\\dir\\', 'C:\\Users\\Jane Doe\\x', 'a\\"b', '^', '!x!', 'a;b,c', 'ü ä', '"', '\\\\server\\share'];
+
+test('cmdLine: each argument reaches the Windows program unchanged and cmd.exe runs nothing else', () => {
+  for (const [bin, batch] of [['agent.exe', false], ['agent.cmd', true]]) {
+    for (const arg of AWKWARD) {
+      const { argv, operators } = windowsArgv(cmdLine(bin, [arg]), { batch });
+      assert.deepEqual(operators, [], `${bin} ${JSON.stringify(arg)}: cmd.exe saw an operator`);
+      assert.deepEqual(argv, [arg], `${bin} ${JSON.stringify(arg)}`);
+    }
+    assert.deepEqual(windowsArgv(cmdLine(bin, AWKWARD), { batch }).argv, AWKWARD, `${bin}: argument boundaries`);
+  }
+  // a .cmd target gets a second level of ^, an .exe does not
+  assert.equal(cmdArg('a&b'), '^"a^&b^"');
+  assert.equal(cmdArg('a&b', { batch: true }), '^^^"a^^^&b^^^"');
+  // the program path is escaped too: a space must not split it, & must not end it
+  assert.equal(cmdLine('C:\\Program Files\\x&y\\agent.exe', []), 'C:\\Program^ Files\\x^&y\\agent.exe');
+});
+
+test('cmdLine on the real cmd.exe: node gets every argument unchanged, directly and through a .cmd shim', {
+  skip: process.platform !== 'win32' && 'needs cmd.exe (runs in the Windows CI job)',
+}, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-cmdline-'));
+  const echo = path.join(dir, 'echo-args.js');
+  fs.writeFileSync(echo, 'process.stdout.write(JSON.stringify(process.argv.slice(2)))');
+  const shim = path.join(dir, 'echo-args.cmd'); // the shape of an npm shim: node <script> %*
+  fs.writeFileSync(shim, `@"${process.execPath}" "${echo}" %*\r\n`);
+  for (const [bin, args] of [[process.execPath, [echo, ...AWKWARD]], [shim, AWKWARD]]) {
+    const r = spawnSync(cmdLine(bin, args), { encoding: 'utf8', shell: true });
+    assert.equal(r.status, 0, `${bin}: ${r.stderr}`);
+    assert.deepEqual(JSON.parse(r.stdout), AWKWARD, bin);
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('isBatchFile resolves the program through PATH and PATHEXT like cmd.exe', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-pathext-'));
+  fs.writeFileSync(path.join(dir, 'shim.cmd'), '');
+  fs.writeFileSync(path.join(dir, 'native.exe'), '');
+  const env = { PATH: dir, PATHEXT: '.EXE;.CMD' };
+  assert.equal(isBatchFile('shim', env), true);
+  assert.equal(isBatchFile('native', env), false);
+  assert.equal(isBatchFile('npm.cmd', env), true, 'an explicit extension decides');
+  assert.equal(isBatchFile('C:\\tools\\claude.exe', env), false);
+  assert.equal(isBatchFile('missing', env), true, 'not found: treated as an npm shim');
+  fs.rmSync(dir, { recursive: true, force: true });
 });
 
 // ── the CLI, out of process ──────────────────────────────────────────────────

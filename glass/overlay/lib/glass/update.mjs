@@ -11,7 +11,7 @@ import { spawn, spawnSync } from 'node:child_process';
 
 import { runGh, ghEnvIn } from './copilot-quota.mjs';
 import { PKG_ROOT } from './home.mjs';
-import { cmdQuote } from './spawn.mjs';
+import { cmdLine } from './spawn.mjs';
 
 export const RELEASE_REPO = 'bmw.ghe.com/AIMAAD/glass';
 
@@ -27,7 +27,7 @@ export function newer(a, b) {
 /** spawnSync with output captured; npm is a .cmd on Windows, which needs a shell. */
 export function run(cmd, args) {
   const win = process.platform === 'win32';
-  if (win && cmd === 'npm') return spawnSync(['npm.cmd', ...args].map(cmdQuote).join(' '), { encoding: 'utf8', shell: true });
+  if (win && cmd === 'npm') return spawnSync(cmdLine('npm.cmd', args), { encoding: 'utf8', shell: true });
   return spawnSync(cmd, args, { encoding: 'utf8' });
 }
 
