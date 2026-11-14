@@ -1042,7 +1042,8 @@ test('isBatchFile resolves the program through PATH and PATHEXT like cmd.exe', (
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-pathext-'));
   fs.writeFileSync(path.join(dir, 'shim.cmd'), '');
   fs.writeFileSync(path.join(dir, 'native.exe'), '');
-  const env = { PATH: dir, PATHEXT: '.EXE;.CMD' };
+  // lower case: Windows matches PATHEXT case-insensitively, Linux's file system does not
+  const env = { PATH: dir, PATHEXT: '.exe;.cmd' };
   assert.equal(isBatchFile('shim', env), true);
   assert.equal(isBatchFile('native', env), false);
   assert.equal(isBatchFile('npm.cmd', env), true, 'an explicit extension decides');
