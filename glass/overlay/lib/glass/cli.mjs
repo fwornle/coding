@@ -15,7 +15,7 @@ import {
   copilotQuotaView,
 } from './client.mjs';
 import { ghDoctorLines, ghEnvIn, runGh } from './copilot-quota.mjs';
-import { runAgent, cmdQuote } from './spawn.mjs';
+import { runAgent, cmdLine } from './spawn.mjs';
 import { upstreamProxy, proxyEnvOf } from './egress.mjs';
 import { coexistWarnings, opencodeCopilotUpstream, opencodeHttpProviders, piHttpProviders } from './coexist.mjs';
 import { configuredBrowser, openUrl } from './open-url.mjs';
@@ -85,11 +85,11 @@ export function whichBin(bin, env = process.env) {
 }
 
 function versionOf(bin) {
-  // A .cmd shim runs only through cmd.exe (spawn.mjs); there the path is quoted, or a
+  // A .cmd shim runs only through cmd.exe (spawn.mjs); there the path is escaped, or a
   // space in it (C:\Users\Jane Doe\…) splits the command.
   const win = process.platform === 'win32';
   const r = win
-    ? spawnSync(`${cmdQuote(bin)} --version`, { encoding: 'utf8', timeout: 15_000, shell: true })
+    ? spawnSync(cmdLine(bin, ['--version']), { encoding: 'utf8', timeout: 15_000, shell: true })
     : spawnSync(bin, ['--version'], { encoding: 'utf8', timeout: 15_000 });
   const m = /(\d+)\.(\d+)\.(\d+)/.exec(`${r.stdout || ''}${r.stderr || ''}`);
   return m ? m.slice(1, 4).map(Number) : null;
