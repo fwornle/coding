@@ -1022,6 +1022,22 @@ test('cmdLine: each argument reaches the Windows program unchanged and cmd.exe r
   assert.equal(cmdLine('C:\\Program Files\\x&y\\agent.exe', []), 'C:\\Program^ Files\\x^&y\\agent.exe');
 });
 
+test('cmdLine on the real cmd.exe: node gets every argument unchanged, directly and through a .cmd shim', {
+  skip: process.platform !== 'win32' && 'needs cmd.exe (runs in the Windows CI job)',
+}, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-cmdline-'));
+  const echo = path.join(dir, 'echo-args.js');
+  fs.writeFileSync(echo, 'process.stdout.write(JSON.stringify(process.argv.slice(2)))');
+  const shim = path.join(dir, 'echo-args.cmd'); // the shape of an npm shim: node <script> %*
+  fs.writeFileSync(shim, `@"${process.execPath}" "${echo}" %*\r\n`);
+  for (const [bin, args] of [[process.execPath, [echo, ...AWKWARD]], [shim, AWKWARD]]) {
+    const r = spawnSync(cmdLine(bin, args), { encoding: 'utf8', shell: true });
+    assert.equal(r.status, 0, `${bin}: ${r.stderr}`);
+    assert.deepEqual(JSON.parse(r.stdout), AWKWARD, bin);
+  }
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
 test('isBatchFile resolves the program through PATH and PATHEXT like cmd.exe', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'glass-pathext-'));
   fs.writeFileSync(path.join(dir, 'shim.cmd'), '');
