@@ -63,6 +63,14 @@ RUN apt-get update \
  && /opt/mkdocs/bin/pip install --no-cache-dir mkdocs-material mkdocs-minify-plugin \
  && ln -s /opt/mkdocs/bin/mkdocs /usr/local/bin/mkdocs
 
+# PlantUML, so an agent that edits docs/puml/*.puml can render the PNG the
+# docs reference (CLAUDE.md: the `plantuml` CLI, never `java -jar`). Without
+# it a diagram change ships with a stale image. Graphviz is required for
+# component/class layouts; same packages as Dockerfile.coding-services.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends default-jre-headless graphviz plantuml \
+ && rm -rf /var/lib/apt/lists/*
+
 # The guard: root-owned, not writable by the agent user. The hook finds its
 # rules through CONSTRAINT_CONFIG_PATH set in the managed hook command, so a
 # CODING_REPO pointing at the (writable) workspace never reaches them.

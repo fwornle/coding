@@ -125,6 +125,10 @@ services:
       # Knowledge-export layout (T4): the container's stores read every
       # project's export through it (lib/kb/layout.mjs, 'local' mode).
       - ${CODING_REPO:-.}/lib/kb:/coding/lib/kb:ro
+      # Health violation rules (lib/health/violations.mjs), shared by the
+      # dashboard's /status count and /report list, the status line and the
+      # prompt hook — so all four agree on what a violation is.
+      - ${CODING_REPO:-.}/lib/health:/coding/lib/health:ro
       - ${CODING_REPO:-.}/lib/features/vendor:/coding/lib/features/vendor:ro
       # NOTE: .observations is intentionally NOT bind-mounted. Phase 5 of the
       # observations-api migration: the host obs-api service is the single
