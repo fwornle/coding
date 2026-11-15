@@ -31,19 +31,25 @@ follow every call the offload router sent there, kept back, or let fall back.
 
     ## Set it up
 
-    Whoever has the cluster's credentials writes two files into `~/.glass` (a devcontainer does
-    it from its `.env`):
+    Whoever has the cluster's credentials writes up to three files into `~/.glass` (a
+    devcontainer does it from its `.env`):
 
     ```json title="~/.glass/cluster.json"
     { "nodes": [{ "name": "node1", "host": "192.0.2.10" }, { "name": "node2", "host": "192.0.2.11" }],
       "gatewayPort": 8000, "statusPort": 8099 }
     ```
 
+    Two keys, two secrets — each optional, each owner-only:
+
     ```bash
+    # the gateways' key: lets glass list the models each gateway serves
     printf '%s\n' "$CLUSTER_API_KEY" > ~/.glass/cluster.key && chmod 600 ~/.glass/cluster.key
+    # the status services' key: lets glass read GPUs, jobs and endpoints
+    printf '%s\n' "$CLUSTER_STATUS_KEY" > ~/.glass/cluster-status.key && chmod 600 ~/.glass/cluster-status.key
     ```
 
-    Open `glass ui` → **Cluster**. No restart: the files are re-read when they change.
+    With neither, the page still shows each gateway's health. Open `glass ui` → **Cluster**.
+    No restart: the files are re-read when they change.
 
     ## The Routing tab
 

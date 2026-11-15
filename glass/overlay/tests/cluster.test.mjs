@@ -9,14 +9,19 @@ import path from 'node:path';
 
 const { createCluster, createClusterStore, normalizeClusterConfig, normalizeStatus, probeNode } = await import('../lib/glass/cluster.mjs');
 
+// Two separate secrets: the gateways' key and the status services' key.
 const KEY = 'unit-fixture-token';
+const STATUS_KEY = 'unit-fixture-status-token';
 const tmpHome = () => fs.mkdtempSync(path.join(os.tmpdir(), 'glass-cluster-'));
 const writeCfg = (home, cfg) => fs.writeFileSync(path.join(home, 'cluster.json'), JSON.stringify(cfg));
-const writeKey = (home, mode = 0o600) => {
-  const f = path.join(home, 'cluster.key');
-  fs.writeFileSync(f, `${KEY}\n`, { mode });
+const writeSecret = (home, name, value, mode) => {
+  const f = path.join(home, name);
+  fs.writeFileSync(f, `${value}\n`, { mode });
   fs.chmodSync(f, mode);
 };
+const writeKey = (home, mode = 0o600) => writeSecret(home, 'cluster.key', KEY, mode);
+const writeStatusKey = (home, mode = 0o600) => writeSecret(home, 'cluster-status.key', STATUS_KEY, mode);
+const writeKeys = (home) => { writeKey(home); writeStatusKey(home); };
 
 const res = (status, body) => ({ status, json: async () => body });
 const refused = () => { const e = new TypeError('fetch failed'); e.cause = { code: 'ECONNREFUSED' }; throw e; };
@@ -30,10 +35,11 @@ function stubFetch(calls = []) {
     const auth = init?.headers?.authorization || '';
     calls.push({ url, auth });
     const authed = auth === `Bearer ${KEY}`;
+    const statusAuthed = auth === `Bearer ${STATUS_KEY}`;
     if (url === 'http://192.0.2.1:8000/health') return res(200, { status: 'ok', backends: { 'http://127.0.0.1:8001': true } });
     if (url === 'http://192.0.2.1:8000/v1/models') return authed ? res(200, { data: [{ id: 'm-small' }, { id: 'm-large' }] }) : res(401, { error: 'invalid API key' });
     if (url === 'http://192.0.2.1:8099/status') {
-      return authed ? res(200, {
+      return statusAuthed ? res(200, {
         node: 'a', ts: '2026-11-15T10:00:00Z',
         gpus: [{ index: 0, name: 'GPU', util_pct: 64, mem_used_mib: 12000, mem_total_mib: 16000, temp_c: 61 }],
         jobs: [{ id: 'j1', name: 'train', image: 'img:1', status: 'running', started: '2026-11-15T09:00:00Z', gpu: '0' }],
@@ -76,27 +82,31 @@ test('normalizeClusterConfig keeps valid nodes, names the bad ones, defaults the
   assert.equal(normalizeClusterConfig({}).configured, false);
 });
 
-test('the key is sent as a bearer token to models and status, never to /health, never in the view', async () => {
+test('each key goes only to its own service — gateway key to /v1/models, status key to /status — never to /health, never in the view', async () => {
   const home = tmpHome();
   writeCfg(home, CFG);
-  writeKey(home);
+  writeKeys(home);
   const calls = [];
   const c = createCluster({ home, fetch: stubFetch(calls), timeoutMs: 500 });
   const v = await c.read();
   c.stop();
   assert.equal(v.configured, true);
   assert.equal(v.keySet, true);
+  assert.equal(v.statusKeySet, true);
   for (const call of calls) {
     if (call.url.endsWith('/health')) assert.equal(call.auth, '', `${call.url} carries no key`);
-    else assert.equal(call.auth, `Bearer ${KEY}`);
+    else if (call.url.endsWith('/v1/models')) assert.equal(call.auth, `Bearer ${KEY}`);
+    else if (call.url.endsWith('/status')) assert.equal(call.auth, `Bearer ${STATUS_KEY}`);
+    else assert.fail(`unexpected request ${call.url}`);
   }
-  assert.ok(!JSON.stringify(v).includes(KEY), 'the key is nowhere in the view');
+  const text = JSON.stringify(v);
+  assert.ok(!text.includes(KEY) && !text.includes(STATUS_KEY), 'neither key is anywhere in the view');
 });
 
 test('aggregation: up/down, gateway health, models, GPUs, jobs, an absent status service', async () => {
   const home = tmpHome();
   writeCfg(home, CFG);
-  writeKey(home);
+  writeKeys(home);
   const c = createCluster({ home, fetch: stubFetch(), timeoutMs: 500 });
   const v = await c.read();
   c.stop();
@@ -126,15 +136,43 @@ test('aggregation: up/down, gateway health, models, GPUs, jobs, an absent status
   assert.deepEqual(v.summary, { nodes: 3, up: 2, down: 1, gatewaysHealthy: 1, gpus: 1, gpusBusy: 1, jobs: 1, statusServices: 1 });
 });
 
-test('without a key only /health is read, and the view says so', async () => {
+test('without either key only /health is read, and the view says so', async () => {
   const home = tmpHome();
   writeCfg(home, { nodes: [CFG.nodes[0]] });
   const calls = [];
   const v = await createCluster({ home, fetch: stubFetch(calls) }).read();
   assert.deepEqual(calls.map((x) => x.url), ['http://192.0.2.1:8000/health']);
   assert.equal(v.keySet, false);
+  assert.equal(v.statusKeySet, false);
   assert.equal(v.nodes[0].status.state, 'no-key');
-  assert.match(v.nodes[0].models.error, /no cluster\.key/);
+  assert.equal(v.nodes[0].status.error, 'no status key');
+  assert.equal(v.nodes[0].models.error, 'no gateway key');
+});
+
+test('only the gateway key: /v1/models is read, /status is skipped ("no status key")', async () => {
+  const home = tmpHome();
+  writeCfg(home, { nodes: [CFG.nodes[0]] });
+  writeKey(home);
+  const calls = [];
+  const v = await createCluster({ home, fetch: stubFetch(calls) }).read();
+  assert.deepEqual(calls.map((x) => x.url).sort(), ['http://192.0.2.1:8000/health', 'http://192.0.2.1:8000/v1/models']);
+  assert.deepEqual(v.nodes[0].models.ids, ['m-small', 'm-large']);
+  assert.equal(v.nodes[0].status.state, 'no-key');
+  assert.equal(v.nodes[0].status.error, 'no status key');
+});
+
+test('only the status key: /status is read, /v1/models is skipped ("no gateway key")', async () => {
+  const home = tmpHome();
+  writeCfg(home, { nodes: [CFG.nodes[0]] });
+  writeStatusKey(home);
+  const calls = [];
+  const v = await createCluster({ home, fetch: stubFetch(calls) }).read();
+  assert.deepEqual(calls.map((x) => x.url).sort(), ['http://192.0.2.1:8000/health', 'http://192.0.2.1:8099/status']);
+  assert.equal(calls.find((x) => x.url.endsWith('/status')).auth, `Bearer ${STATUS_KEY}`);
+  assert.equal(v.keySet, false);
+  assert.equal(v.statusKeySet, true);
+  assert.equal(v.nodes[0].status.state, 'ok');
+  assert.equal(v.nodes[0].models.error, 'no gateway key');
 });
 
 test('a key file other users can read is refused (POSIX)', { skip: process.platform === 'win32' }, async () => {
@@ -146,22 +184,37 @@ test('a key file other users can read is refused (POSIX)', { skip: process.platf
   assert.equal(v.keySet, false);
   assert.match(v.keyProblem, /owner-only/);
   assert.ok(calls.every((x) => x.auth === ''), 'the refused key is sent nowhere');
-  assert.match(createClusterStore(home).readKey().problem, /chmod 600/);
+  assert.match(createClusterStore(home).readKey('gateway').problem, /chmod 600/);
+});
+
+test('a status key file other users can read is refused on its own; the gateway key still works (POSIX)', { skip: process.platform === 'win32' }, async () => {
+  const home = tmpHome();
+  writeCfg(home, { nodes: [CFG.nodes[0]] });
+  writeKey(home);
+  writeStatusKey(home, 0o640);
+  const calls = [];
+  const v = await createCluster({ home, fetch: stubFetch(calls) }).read();
+  assert.equal(v.keySet, true);
+  assert.equal(v.statusKeySet, false);
+  assert.match(v.statusKeyProblem, /cluster-status\.key is readable by other users/);
+  assert.equal(v.keyProblem, '');
+  assert.ok(!calls.some((x) => x.url.endsWith('/status')), 'the refused status key is sent nowhere');
+  assert.match(v.nodes[0].status.error, /owner-only/);
 });
 
 test('a refused key reads as such, not as an outage', async () => {
   const p = await probeNode({ name: 'a', host: '192.0.2.1' }, {
-    fetch: stubFetch(), key: 'wrong', gatewayPort: 8000, statusPort: 8099, timeoutMs: 500,
+    fetch: stubFetch(), key: 'wrong', statusKey: KEY, gatewayPort: 8000, statusPort: 8099, timeoutMs: 500,
   });
   assert.equal(p.up, true);
-  assert.equal(p.models.error, 'the gateway refused the key');
+  assert.equal(p.models.error, 'the gateway refused cluster.key');
   assert.equal(p.status.state, 'unauthorized');
 });
 
 test('a node that never answers times out instead of hanging the read', async () => {
   const hang = (url, init) => new Promise((_, reject) => init.signal.addEventListener('abort', () => reject(init.signal.reason)));
   const t0 = Date.now();
-  const p = await probeNode({ name: 'a', host: '192.0.2.1' }, { fetch: hang, key: KEY, gatewayPort: 8000, statusPort: 8099, timeoutMs: 100 });
+  const p = await probeNode({ name: 'a', host: '192.0.2.1' }, { fetch: hang, key: KEY, statusKey: STATUS_KEY, gatewayPort: 8000, statusPort: 8099, timeoutMs: 100 });
   assert.ok(Date.now() - t0 < 2000);
   assert.equal(p.up, false);
   assert.match(p.gateway.error, /no answer within 100 ms/);

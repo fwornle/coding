@@ -594,7 +594,7 @@ test('routing history: the offloaded call above is a decision on /api/routing, w
   assert.ok(h.counts.offloaded >= 1);
 });
 
-test('cluster: hidden without cluster.json; with it, nodes read over HTTP, the key never in the answer', async () => {
+test('cluster: hidden without cluster.json; with it, nodes read over HTTP, each key only to its own service and never in the answer', async () => {
   assert.deepEqual((await api('GET', '/api/cluster')).body, { configured: false });
   assert.deepEqual((await api('GET', '/api/cluster?peek=1')).body, { configured: false });
   const seen = [];
@@ -606,14 +606,20 @@ test('cluster: hidden without cluster.json; with it, nodes read over HTTP, the k
     return res.end('{}');
   });
   await new Promise((r) => gw.listen(0, '127.0.0.1', r));
-  const free = http.createServer();
-  await new Promise((r) => free.listen(0, '127.0.0.1', r));
-  const statusPort = free.address().port; // nothing listens there once closed: no status service
-  await new Promise((r) => free.close(r));
+  // The node's status service, on its own port with its own key.
+  const st = http.createServer((req, res) => {
+    seen.push({ url: req.url, auth: req.headers.authorization || '' });
+    res.writeHead(200, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ node: 'node1', gpus: [{ index: 0, util_pct: 40, mem_used_mib: 1, mem_total_mib: 2 }], jobs: [], endpoints: [] }));
+  });
+  await new Promise((r) => st.listen(0, '127.0.0.1', r));
+  const statusPort = st.address().port;
   try {
     fs.writeFileSync(path.join(home, 'cluster.json'), JSON.stringify({ nodes: [{ name: 'node1', host: '127.0.0.1' }], gatewayPort: gw.address().port, statusPort }));
     fs.writeFileSync(path.join(home, 'cluster.key'), 'cluster-fixture-token\n', { mode: 0o600 });
     fs.chmodSync(path.join(home, 'cluster.key'), 0o600);
+    fs.writeFileSync(path.join(home, 'cluster-status.key'), 'status-fixture-token\n', { mode: 0o600 });
+    fs.chmodSync(path.join(home, 'cluster-status.key'), 0o600);
     assert.deepEqual((await api('GET', '/api/cluster?peek=1')).body, { configured: true });
     assert.equal(seen.length, 0, 'peek polls nothing');
     const { status, body } = await api('GET', '/api/cluster');
@@ -623,15 +629,20 @@ test('cluster: hidden without cluster.json; with it, nodes read over HTTP, the k
     const [n] = body.nodes;
     assert.equal(n.gateway.healthy, true);
     assert.deepEqual(n.models.ids, ['m-small']);
-    assert.equal(n.status.state, 'absent');
+    assert.equal(n.status.state, 'ok');
+    assert.equal(n.status.gpus[0].utilPct, 40);
     assert.equal(seen.find((x) => x.url === '/health').auth, '');
     assert.equal(seen.find((x) => x.url === '/v1/models').auth, 'Bearer cluster-fixture-token');
+    assert.equal(seen.find((x) => x.url === '/status').auth, 'Bearer status-fixture-token');
     assert.equal(JSON.stringify(body).includes('cluster-fixture-token'), false);
+    assert.equal(JSON.stringify(body).includes('status-fixture-token'), false);
     assert.equal((await api('POST', '/api/cluster', {})).status, 405);
   } finally {
     fs.rmSync(path.join(home, 'cluster.json'), { force: true });
     fs.rmSync(path.join(home, 'cluster.key'), { force: true });
+    fs.rmSync(path.join(home, 'cluster-status.key'), { force: true });
     await new Promise((r) => gw.close(r));
+    await new Promise((r) => st.close(r));
   }
   assert.deepEqual((await api('GET', '/api/cluster')).body, { configured: false }, 'removing the file hides it again');
 });

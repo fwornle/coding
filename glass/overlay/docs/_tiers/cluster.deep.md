@@ -6,8 +6,12 @@ nodes in parallel:
 | Request | Key | Gives |
 |---|---|---|
 | `GET http://<host>:<gatewayPort>/health` | none | `{ status, backends: { url: bool } }` — 200 healthy, 503 no live backend |
-| `GET http://<host>:<gatewayPort>/v1/models` | bearer | the model ids the gateway serves |
-| `GET http://<host>:<statusPort>/status` | bearer | GPUs (utilisation, memory, temperature), jobs, listening endpoints |
+| `GET http://<host>:<gatewayPort>/v1/models` | `cluster.key` | the model ids the gateway serves |
+| `GET http://<host>:<statusPort>/status` | `cluster-status.key` | GPUs (utilisation, memory, temperature), jobs, listening endpoints |
+
+Each key goes to its own service only: the gateway key never reaches a status service, and
+the status key never reaches a gateway. A request whose key is absent is not made — the tile
+says *no gateway key* or *no status key* — so either secret can be handed out alone.
 
 A node is **up** when any of the three answers. The status service is optional per node: a
 node without it shows *no status service*, and its tile keeps gateway health and models.
@@ -37,9 +41,13 @@ nothing about the cluster is written to disk.
 | File | Holds | Rules |
 |---|---|---|
 | `~/.glass/cluster.json` | `nodes` (`name`, `host`), `gatewayPort` (default 8000), `statusPort` (default 8099) | invalid nodes are skipped and named on the page; at most 256 nodes |
-| `~/.glass/cluster.key` | the cluster's API key, alone | owner-only: a key file other users can read is **refused** (`chmod 600`); never logged, never returned by any route |
+| `~/.glass/cluster.key` | the gateways' API key, alone | sent only to `/v1/models` |
+| `~/.glass/cluster-status.key` | the status services' key, alone — a separate secret | sent only to `/status` |
 
-Without `cluster.key` only `/health` is asked, and the page says so. Private addresses are
+Both key files are optional and owner-only: one other users can read is **refused**
+(`chmod 600`) and the page names it, while the other key keeps working. Neither is ever
+logged or returned by any route; the view only says whether each is set
+(`keySet`, `statusKeySet`). With neither, only `/health` is asked. Private addresses are
 reached directly, never through a corporate proxy (as the offload endpoint is).
 
 ## How a call becomes a routing row

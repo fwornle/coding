@@ -10,13 +10,16 @@
 //
 //   cluster.json   { "nodes": [{ "name": "node1", "host": "192.0.2.10" }, …],
 //                    "gatewayPort": 8000, "statusPort": 8099 }
-//   cluster.key    the cluster's API key, alone and owner-only (as offload.key):
-//                  sent as a bearer token to the nodes, never logged, never returned
+//   cluster.key          the gateways' API key, alone and owner-only (as offload.key):
+//                        sent only to /v1/models
+//   cluster-status.key   the status services' key, a separate secret, alone and
+//                        owner-only: sent only to /status
+//   Either may be absent (that request is skipped); neither is ever logged or returned.
 //
 // Per node, in parallel, each with a short timeout:
 //   GET http://<host>:<gatewayPort>/health       no key: { status, backends: { url: bool } } (503 = no live backend)
-//   GET http://<host>:<gatewayPort>/v1/models    key: the model ids the gateway serves
-//   GET http://<host>:<statusPort>/status        key: GPUs, jobs, endpoints (optional — a
+//   GET http://<host>:<gatewayPort>/v1/models    cluster.key: the model ids the gateway serves
+//   GET http://<host>:<statusPort>/status        cluster-status.key: GPUs, jobs, endpoints (optional — a
 //                                                node without the service says so)
 //
 // Polled only while someone looks: the first /api/cluster read starts the poller,
@@ -60,10 +63,10 @@ export function normalizeClusterConfig(raw) {
   };
 }
 
-/** cluster.json and cluster.key in `home`, re-read when either file changes. */
+/** cluster.json and the two key files in `home`, each re-read on every poll. */
 export function createClusterStore(home, { platform = process.platform } = {}) {
   const file = path.join(home, 'cluster.json');
-  const keyFile = path.join(home, 'cluster.key');
+  const keyFiles = { gateway: path.join(home, 'cluster.key'), status: path.join(home, 'cluster-status.key') };
   const stat = (f) => { try { return fs.statSync(f); } catch { return null; } };
   let cached = null;
   let cachedMtime = -1;
@@ -86,14 +89,16 @@ export function createClusterStore(home, { platform = process.platform } = {}) {
    * other users can read is refused (POSIX only; Windows has no such mode bits):
    * the devcontainer and `chmod 600` both make it owner-only.
    */
-  function readKey() {
-    const s = stat(keyFile);
+  function readKey(which = 'gateway') {
+    const f = keyFiles[which];
+    const name = path.basename(f);
+    const s = stat(f);
     if (!s) return { key: '', problem: '' };
-    if (platform !== 'win32' && (s.mode & 0o077)) return { key: '', problem: 'cluster.key is readable by other users — make it owner-only (chmod 600)' };
-    try { return { key: fs.readFileSync(keyFile, 'utf8').trim(), problem: '' }; } catch { return { key: '', problem: 'cluster.key cannot be read' }; }
+    if (platform !== 'win32' && (s.mode & 0o077)) return { key: '', problem: `${name} is readable by other users — make it owner-only (chmod 600)` };
+    try { return { key: fs.readFileSync(f, 'utf8').trim(), problem: '' }; } catch { return { key: '', problem: `${name} cannot be read` }; }
   }
 
-  return { getConfig, readKey, file, keyFile };
+  return { getConfig, readKey, file, keyFiles };
 }
 
 /** GET `url` with a timeout; { status, body } (body parsed JSON or null) or { error }. */
@@ -145,14 +150,15 @@ const backendsOf = (b) => (b && typeof b.backends === 'object' && b.backends
   : {});
 
 /** One node, probed: gateway health, its models, its status service. */
-export async function probeNode(node, { fetch, key, gatewayPort, statusPort, timeoutMs, keyProblem = '' }) {
+export async function probeNode(node, { fetch, key = '', statusKey = '', gatewayPort, statusPort, timeoutMs, keyProblem = '', statusKeyProblem = '' }) {
   const gw = `http://${node.host}:${gatewayPort}`;
   const [health, models, status] = await Promise.all([
     getJson(fetch, `${gw}/health`, { timeoutMs }),
     key ? getJson(fetch, `${gw}/v1/models`, { key, timeoutMs }) : Promise.resolve(null),
-    key ? getJson(fetch, `http://${node.host}:${statusPort}/status`, { key, timeoutMs }) : Promise.resolve(null),
+    statusKey ? getJson(fetch, `http://${node.host}:${statusPort}/status`, { key: statusKey, timeoutMs }) : Promise.resolve(null),
   ]);
-  const noKey = keyProblem || 'no cluster.key — only gateway health is read';
+  const noKey = keyProblem || 'no gateway key';
+  const noStatusKey = statusKeyProblem || 'no status key';
 
   const gateway = health.error
     ? { endpoint: `${node.host}:${gatewayPort}`, reachable: false, healthy: false, status: '', backends: {}, latencyMs: null, error: health.error }
@@ -168,7 +174,7 @@ export async function probeNode(node, { fetch, key, gatewayPort, statusPort, tim
   let modelView = { ids: [], error: noKey };
   if (models) {
     if (models.error) modelView = { ids: [], error: models.error };
-    else if (models.status === 401 || models.status === 403) modelView = { ids: [], error: 'the gateway refused the key' };
+    else if (models.status === 401 || models.status === 403) modelView = { ids: [], error: 'the gateway refused cluster.key' };
     else if (models.status !== 200) modelView = { ids: [], error: `HTTP ${models.status}` };
     else {
       const data = Array.isArray(models.body?.data) ? models.body.data : [];
@@ -177,10 +183,10 @@ export async function probeNode(node, { fetch, key, gatewayPort, statusPort, tim
   }
 
   // 'absent' — nothing listens on the status port (not deployed on this node yet).
-  let statusView = { state: 'no-key', error: noKey, ts: null, gpus: [], jobs: [], endpoints: [], gateway: null };
+  let statusView = { state: 'no-key', error: noStatusKey, ts: null, gpus: [], jobs: [], endpoints: [], gateway: null };
   if (status) {
     if (status.error) statusView = { ...statusView, state: 'absent', error: status.error };
-    else if (status.status === 401 || status.status === 403) statusView = { ...statusView, state: 'unauthorized', error: 'the status service refused the key' };
+    else if (status.status === 401 || status.status === 403) statusView = { ...statusView, state: 'unauthorized', error: 'the status service refused cluster-status.key' };
     else if (status.status !== 200) statusView = { ...statusView, state: 'error', error: `HTTP ${status.status}` };
     else statusView = { state: 'ok', error: '', ...normalizeStatus(status.body) };
   }
@@ -235,10 +241,12 @@ export function createCluster({
       if (signature) log(`cluster: ${cfg.nodes.length} node(s) configured`);
       signature = sig;
     }
-    const { key, problem } = store.readKey();
+    const { key, problem } = store.readKey('gateway');
+    const status = store.readKey('status');
     polling = (async () => {
       const probes = await Promise.all(cfg.nodes.map((n) => probeNode(n, {
-        fetch, key, gatewayPort: cfg.gatewayPort, statusPort: cfg.statusPort, timeoutMs, keyProblem: problem,
+        fetch, key, statusKey: status.key, gatewayPort: cfg.gatewayPort, statusPort: cfg.statusPort, timeoutMs,
+        keyProblem: problem, statusKeyProblem: status.problem,
       }).catch((err) => ({ up: false, error: String(err?.message || err) }))));
       const ts = new Date(now()).toISOString();
       cfg.nodes.forEach((n, i) => {
@@ -267,7 +275,8 @@ export function createCluster({
   function view() {
     const cfg = store.getConfig();
     if (!cfg.configured) return { configured: false, ...(cfg.problems?.length ? { problems: cfg.problems } : {}) };
-    const { key, problem } = store.readKey();
+    const { key, problem } = store.readKey('gateway');
+    const status = store.readKey('status');
     const list = cfg.nodes.map((n) => {
       const s = nodes.get(n.name);
       const p = s?.probe;
@@ -286,6 +295,7 @@ export function createCluster({
       configured: true,
       gatewayPort: cfg.gatewayPort, statusPort: cfg.statusPort,
       keySet: Boolean(key), keyProblem: problem,
+      statusKeySet: Boolean(status.key), statusKeyProblem: status.problem,
       problems: cfg.problems,
       polledAt, intervalMs,
       summary: {

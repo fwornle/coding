@@ -31,6 +31,8 @@ export interface ClusterView {
   statusPort?: number
   keySet?: boolean
   keyProblem?: string
+  statusKeySet?: boolean
+  statusKeyProblem?: string
   polledAt?: string | null
   intervalMs?: number
   summary?: { nodes: number; up: number; down: number; gatewaysHealthy: number; gpus: number; gpusBusy: number; jobs: number; statusServices: number }
@@ -127,9 +129,9 @@ function Bar({ pct, label, tone }: { pct: number | null; label: string; tone: st
 
 const STATUS_NOTE: Record<string, string> = {
   absent: 'no status service',
-  unauthorized: 'status service refused the key',
+  unauthorized: 'status service refused its key',
   error: 'status service error',
-  'no-key': 'no key — health only',
+  'no-key': 'no status key',
 }
 
 function NodeTile({ n, served, lit, selected, onSelect }: { n: NodeView; served: number; lit: boolean; selected: boolean; onSelect: () => void }) {
@@ -194,8 +196,8 @@ function NodeTile({ n, served, lit, selected, onSelect }: { n: NodeView; served:
         {(n.models?.ids ?? []).map((m) => (
           <span key={m} className="max-w-full truncate rounded border px-1 font-mono text-[10px]">{m}</span>
         ))}
-        {/* Without a key the page's banner says it once; a tile names only its own trouble. */}
-        {n.models && n.models.ids.length === 0 && n.up && n.status?.state !== 'no-key' && <span className="text-[10px] text-muted-foreground">{n.models.error || 'no models'}</span>}
+        {/* Without the gateway key the page's banner says it once; a tile names only its own trouble. */}
+        {n.models && n.models.ids.length === 0 && n.up && n.models.error !== 'no gateway key' && <span className="text-[10px] text-muted-foreground">{n.models.error || 'no models'}</span>}
       </div>
 
       {jobs.length > 0 && (
@@ -266,7 +268,7 @@ export function ClusterPage() {
     return (
       <div className="p-6 space-y-2" data-testid="cluster-tab">
         <h1 className="text-2xl font-bold">Cluster</h1>
-        <p className="text-sm text-muted-foreground">No cluster is configured: glass reads <code>~/.glass/cluster.json</code> and <code>~/.glass/cluster.key</code>.</p>
+        <p className="text-sm text-muted-foreground">No cluster is configured: glass reads <code>~/.glass/cluster.json</code> (and, optionally, <code>cluster.key</code> and <code>cluster-status.key</code>).</p>
         {view.problems?.map((p) => <p key={p} className="text-sm text-destructive">{p}</p>)}
       </div>
     )
@@ -289,9 +291,14 @@ export function ClusterPage() {
       </div>
 
       {error && <div className="text-sm text-destructive">The cluster view is unavailable: {error}</div>}
-      {view?.keyProblem && <div className="rounded-md border border-status-warning-line bg-status-warning-subtle px-3 py-2 text-xs text-status-warning">{view.keyProblem}</div>}
-      {view && !view.keySet && !view.keyProblem && (
-        <div className="rounded-md border px-3 py-2 text-xs text-muted-foreground">No <code>cluster.key</code>: only gateway health is shown — models, GPUs and jobs need the cluster&apos;s key.</div>
+      {[view?.keyProblem, view?.statusKeyProblem].filter(Boolean).map((p) => (
+        <div key={p} className="rounded-md border border-status-warning-line bg-status-warning-subtle px-3 py-2 text-xs text-status-warning">{p}</div>
+      ))}
+      {view?.configured && ((!view.keySet && !view.keyProblem) || (!view.statusKeySet && !view.statusKeyProblem)) && (
+        <div className="rounded-md border px-3 py-2 text-xs text-muted-foreground">
+          {!view.keySet && !view.keyProblem && <div>No <code>cluster.key</code>: the gateways&apos; models are not read.</div>}
+          {!view.statusKeySet && !view.statusKeyProblem && <div>No <code>cluster-status.key</code>: GPUs, jobs and endpoints are not read.</div>}
+        </div>
       )}
       {view?.problems?.map((p) => <div key={p} className="text-xs text-status-warning">cluster.json: {p}</div>)}
 
