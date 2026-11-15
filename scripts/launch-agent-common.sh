@@ -772,12 +772,36 @@ launch_agent() {
   #     under the guard baked into the image.
   source "$SCRIPT_DIR/tmux-session-wrapper.sh"
   if [ "${CODING_BOX:-}" = "true" ]; then
-    # status: 0 up to date, 2 stale (warn, still run), 1 no image (stop).
+    # status: 0 up to date, 2 stale, 1 no image (stop). A stale image is never
+    # rebuilt silently: the box mounts the repo, so an agent in it can commit
+    # guard or box changes, and an automatic build would bake them in. In a
+    # terminal YOU decide (status has just listed what changed and the commits);
+    # without one, warn and run the old image.
     local box_status=0
     node "$CODING_REPO/scripts/agent-box.mjs" status >&2 || box_status=$?
     if [ "$box_status" = "1" ]; then
       _agent_log "❌ No agent box image. Build it first: coding box build"
       exit 1
+    fi
+    if [ "$box_status" = "2" ]; then
+      local box_rebuild=""
+      if [ -t 0 ] && [ -t 2 ]; then
+        printf '📦 The agent box image is older than the committed box/guard (see above). Rebuild now? [Y/n] ' >&2
+        read -r box_rebuild || box_rebuild="n"
+        case "$box_rebuild" in
+          ""|y|Y|yes|YES) box_rebuild="y" ;;
+          *) box_rebuild="n" ;;
+        esac
+      fi
+      if [ "$box_rebuild" = "y" ]; then
+        if node "$CODING_REPO/scripts/agent-box.mjs" build >&2; then
+          _agent_log "📦 Agent box image rebuilt"
+        else
+          _agent_log "⚠️  Agent box build FAILED — launching the OLD image (retry: coding box build)"
+        fi
+      else
+        _agent_log "⚠️  Launching the STALE agent box image — committed box/guard changes are not in it (run: coding box build)"
+      fi
     fi
     if ! node "$CODING_REPO/scripts/coding-guard.mjs" status >/dev/null 2>&1; then
       _agent_log "⚠️  Host guard daemon not reachable — the box runs, but cannot request overrides or use 'coding svc'"

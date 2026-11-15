@@ -394,7 +394,65 @@ export function guardSource(repo = REPO) {
   const box = git(['rev-parse', `HEAD:${BOX_DIR}`], repo);
   const grants = git(['rev-parse', `HEAD:${GRANTS_LIB}`], repo);
   const digest = createHash('sha256').update(`${submodule}|${rules}|${box}|${grants}`).digest('hex').slice(0, 16);
-  return { submodule, rules, box, grants, digest };
+  // The commit the build is taken from: NOT part of the digest (a commit that
+  // touches none of the four parts leaves the image current); recorded as a
+  // label so a stale image can say which commits it is missing.
+  const head = git(['rev-parse', 'HEAD'], repo);
+  return { submodule, rules, box, grants, digest, head };
+}
+
+/** The four parts of the digest: label name, repo path, whether it is the guard itself. */
+const DIGEST_PARTS = [
+  { key: 'submodule', path: GUARD_SUBMODULE, guard: true },
+  { key: 'rules', path: RULES, guard: true },
+  { key: 'grants', path: GRANTS_LIB, guard: true },
+  { key: 'box', path: BOX_DIR, guard: false },
+];
+
+/**
+ * Why an image is stale, as lines for a person deciding whether to rebuild:
+ * which digest parts changed (guard parts flagged, since an agent in the box
+ * can commit to the mounted repo) and the commits since the build that touch
+ * them. Pure: `log(range, paths)` returns `git log --oneline` lines.
+ * An image built before these labels existed has no box/grants/head label —
+ * those parts are reported as unknown rather than guessed.
+ */
+export function staleReport(labels, src, log = () => []) {
+  const lines = [];
+  const changed = [];
+  for (const part of DIGEST_PARTS) {
+    const built = labels[`coding.guard.${part.key}`];
+    if (!built) { lines.push(`  ? ${part.path} (image predates this label)`); changed.push(part.path); continue; }
+    if (built === src[part.key]) continue;
+    lines.push(`  ${part.guard ? '! GUARD ' : '~ '}${part.path} changed`);
+    changed.push(part.path);
+  }
+  const from = labels['coding.guard.head'];
+  if (from && changed.length) {
+    const commits = log(`${from}..${src.head}`, changed);
+    if (commits.length) {
+      lines.push(`  commits since the image was built (${from.slice(0, 9)}):`);
+      for (const c of commits.slice(0, 15)) lines.push(`    ${c}`);
+      if (commits.length > 15) lines.push(`    … ${commits.length - 15} more`);
+    }
+  }
+  return lines;
+}
+
+/** The coding.guard.* labels of the built image ({} when there is none). */
+export function imageLabels(image = IMAGE) {
+  const res = spawnSync('docker', ['image', 'inspect', image, '--format', '{{json .Config.Labels}}'], { encoding: 'utf8' });
+  if (res.status !== 0) return {};
+  try { return JSON.parse(res.stdout) || {}; } catch { return {}; }
+}
+
+function gitLogOneline(range, paths, repo = REPO) {
+  try {
+    const out = git(['log', '--oneline', '--no-decorate', range, '--', ...paths], repo);
+    return out ? out.split('\n') : [];
+  } catch {
+    return []; // the build commit is not in this clone (rebased away, other machine)
+  }
 }
 
 /** Uncommitted guard changes — they are NOT in the image, so say so. */
@@ -845,6 +903,9 @@ function build() {
       '--label', `coding.guard.digest=${src.digest}`,
       '--label', `coding.guard.submodule=${src.submodule}`,
       '--label', `coding.guard.rules=${src.rules}`,
+      '--label', `coding.guard.grants=${src.grants}`,
+      '--label', `coding.guard.box=${src.box}`,
+      '--label', `coding.guard.head=${src.head}`,
       dir], { stdio: 'inherit' });
     return res.status ?? 1;
   } finally {
@@ -854,15 +915,19 @@ function build() {
 
 function status() {
   const built = imageDigest();
-  const current = guardSource().digest;
+  const src = guardSource();
+  const current = src.digest;
   if (!built) {
     process.stdout.write(`no image — run: coding box build\n`);
     return 1;
   }
-  process.stdout.write(built === current
-    ? `${IMAGE} up to date (guard ${built})\n`
-    : `${IMAGE} STALE: built from guard ${built}, committed guard is ${current} — run: coding box build\n`);
-  return built === current ? 0 : 2;
+  if (built === current) {
+    process.stdout.write(`${IMAGE} up to date (guard ${built})\n`);
+    return 0;
+  }
+  process.stdout.write(`${IMAGE} STALE: built from guard ${built}, committed guard is ${current} — run: coding box build\n`);
+  for (const line of staleReport(imageLabels(), src, gitLogOneline)) process.stdout.write(`${line}\n`);
+  return 2;
 }
 
 /**

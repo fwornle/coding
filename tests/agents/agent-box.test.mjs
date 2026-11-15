@@ -9,7 +9,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, createHash } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
@@ -17,11 +17,14 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
-  boxRunArgs, boxPath, toBoxUrl, guardSource, configRoots, prepareCopilotConfig, stageBoxPiDir, boxOpencodeConfig, opencodeConfigFile, PROXY_NO_AUTH,
+  boxRunArgs, boxPath, toBoxUrl, guardSource, staleReport, configRoots, prepareCopilotConfig, stageBoxPiDir, boxOpencodeConfig, opencodeConfigFile, PROXY_NO_AUTH,
   boxClaudeSettings, claudeMcpConfigPath, stageClaudeSession, hostGitIdentity, gitIdentityEnv, boxCodingHooks, BOX_CODING_HOOKS,
   IMAGE, HOME_VOLUME, BOX_HOME, BOX_GUARD_KEYS, BOX_PI_DIR, BOX_CLAUDE_SESSION, HOST_COMMAND_SETTINGS,
 } from '../../scripts/agent-box.mjs';
 import { hookScript, HOOK_SCRIPTS } from '../../docker/agent-box/coding-hook.mjs';
+
+/** guardSource's digest, recomputed: `head` must stay out of it. */
+const createHashDigest = (g) => createHash('sha256').update(`${g.submodule}|${g.rules}|${g.box}|${g.grants}`).digest('hex').slice(0, 16);
 
 const base = {
   agent: 'claude', cwd: '/Users/u/proj', codingRepo: '/Users/u/coding', home: '/Users/u',
@@ -189,6 +192,38 @@ describe('the in-box guard (Phase 1 item 4)', () => {
 
   test('the grant verifier is part of what the image digest covers', () => {
     assert.match(guardSource().grants, /^[0-9a-f]{40}$/);
+  });
+
+  describe('staleReport — what a stale image is missing', () => {
+    const src = { submodule: 'S2', rules: 'R1', grants: 'G1', box: 'B2', head: 'h2' };
+    const labels = {
+      'coding.guard.submodule': 'S1', 'coding.guard.rules': 'R1', 'coding.guard.grants': 'G1',
+      'coding.guard.box': 'B1', 'coding.guard.head': 'h1',
+    };
+
+    test('names each changed part, flags guard parts, lists the commits that touch them', () => {
+      const calls = [];
+      const lines = staleReport(labels, src, (range, paths) => { calls.push([range, paths]); return ['abc feat(box): plantuml']; });
+      assert.deepStrictEqual(calls, [['h1..h2', ['integrations/constraint-monitor', 'docker/agent-box']]]);
+      assert.ok(lines.includes('  ! GUARD integrations/constraint-monitor changed'));
+      assert.ok(lines.includes('  ~ docker/agent-box changed'));
+      assert.ok(!lines.some((l) => l.includes('constraint-monitor.yaml') || l.includes('grants.mjs')));
+      assert.ok(lines.includes('    abc feat(box): plantuml'));
+    });
+
+    test('an image from before the labels says unknown, never guesses, and skips the commit list', () => {
+      const old = { 'coding.guard.submodule': 'S2', 'coding.guard.rules': 'R1' };
+      let logged = false;
+      const lines = staleReport(old, src, () => { logged = true; return []; });
+      assert.deepStrictEqual(lines, ['  ? lib/guard/grants.mjs (image predates this label)', '  ? docker/agent-box (image predates this label)']);
+      assert.strictEqual(logged, false);
+    });
+
+    test('guardSource carries the build commit, outside the digest', () => {
+      const g = guardSource();
+      assert.match(g.head, /^[0-9a-f]{40}$/);
+      assert.strictEqual(createHashDigest(g), g.digest);
+    });
   });
 });
 

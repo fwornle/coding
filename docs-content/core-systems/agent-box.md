@@ -184,8 +184,15 @@ coding box status     # current / stale / missing
 ```
 
 The image contains only what is committed. If an agent edits the guard inside
-the mounted repo, nothing reaches the box. When the image is older than the
-committed guard, the launcher warns, but it never rebuilds on its own.
+the mounted repo, nothing reaches the box. Committed changes are also not in
+the box until you rebuild the image. That includes Dockerfile changes such as a
+new tool. When the image is older than the committed guard or box files, the
+launcher lists what changed. Changes to the guard itself are marked
+`! GUARD`. The list also shows the commits since the image was built. In a
+terminal, the launcher then asks `Rebuild now? [Y/n]`. It never rebuilds
+without asking: an agent in the box can commit to the mounted repo, so an
+automatic build could bake its changes into the guard. Without a terminal, it
+warns and runs the old image.
 
 ## Looking at pages from the box
 
