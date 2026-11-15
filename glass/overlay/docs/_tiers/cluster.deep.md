@@ -7,7 +7,7 @@ nodes in parallel:
 |---|---|---|
 | `GET http://<host>:<gatewayPort>/health` | none | `{ status, backends: { url: bool } }` — 200 healthy, 503 no live backend |
 | `GET http://<host>:<gatewayPort>/v1/models` | `cluster.key` | the model ids the gateway serves |
-| `GET http://<host>:<statusPort>/status` | `cluster-status.key` | GPUs (utilisation, memory, temperature), jobs, listening endpoints |
+| `GET http://<host>:<statusPort>/status` | `cluster-status.key` | GPUs (utilisation, memory, temperature), the host's CPU and RAM, jobs, listening endpoints |
 
 Each key goes to its own service only: the gateway key never reaches a status service, and
 the status key never reaches a gateway. A request whose key is absent is not made — the tile
@@ -22,6 +22,7 @@ The status service answers in this shape (fields beyond it are dropped):
 ```json
 { "node": "node1", "ts": "2026-11-15T10:00:00Z",
   "gpus": [{ "index": 0, "name": "…", "util_pct": 64, "mem_used_mib": 12000, "mem_total_mib": 16000, "temp_c": 61 }],
+  "host": { "cpu_count": 32, "cpu_pct": 41.5, "load": [3.5, 2.1, 1.8], "mem_total_mib": 128799, "mem_used_mib": 32543, "mem_available_mib": 96256 },
   "jobs": [{ "id": "…", "name": "train", "image": "…", "status": "running", "started": "…", "gpu": "0" }],
   "endpoints": [{ "port": 8000, "process": "gateway" }],
   "gateway": { "port": 8000, "healthy": true, "backends": {} } }
@@ -32,6 +33,10 @@ The status service answers in this shape (fields beyond it are dropped):
 Only while someone looks. The page's first read starts the poller; it polls every 15 s
 and stops by itself two minutes after the last read. A closed page means no traffic to the
 cluster. The tab's own check (`/api/cluster?peek=1`) reads `cluster.json` and nothing else.
+
+`host` is optional: a status service from before it was added sends none, and the tile then
+shows the GPUs only. RAM used is total minus available, so page cache the kernel can drop
+counts as free.
 
 The daemon keeps the last 40 samples per node (10 minutes) in memory for the sparklines —
 nothing about the cluster is written to disk.

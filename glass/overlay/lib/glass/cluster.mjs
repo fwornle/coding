@@ -19,7 +19,7 @@
 // Per node, in parallel, each with a short timeout:
 //   GET http://<host>:<gatewayPort>/health       no key: { status, backends: { url: bool } } (503 = no live backend)
 //   GET http://<host>:<gatewayPort>/v1/models    cluster.key: the model ids the gateway serves
-//   GET http://<host>:<statusPort>/status        cluster-status.key: GPUs, jobs, endpoints (optional — a
+//   GET http://<host>:<statusPort>/status        cluster-status.key: GPUs, CPU and RAM, jobs, endpoints (optional — a
 //                                                node without the service says so)
 //
 // Polled only while someone looks: the first /api/cluster read starts the poller,
@@ -149,9 +149,16 @@ export function normalizeStatus(body) {
     .map((e) => ({ port: finite(e?.port), process: str(e?.process, 80) }))
     .filter((e) => e.port != null);
   const gw = b.gateway && typeof b.gateway === 'object' ? b.gateway : null;
+  // The node itself: CPU busy share and load, RAM (used = total − available). null when not sent.
+  const h = b.host && typeof b.host === 'object' ? b.host : null;
+  const host = h ? {
+    cpuCount: finite(h.cpu_count), cpuPct: finite(h.cpu_pct),
+    load: Array.isArray(h.load) ? h.load.slice(0, 3).map(finite) : null,
+    memTotalMib: finite(h.mem_total_mib), memUsedMib: finite(h.mem_used_mib), memAvailableMib: finite(h.mem_available_mib),
+  } : null;
   return {
     ts: b.ts ? str(b.ts, 40) : null,
-    gpus, jobs, endpoints,
+    gpus, host, jobs, endpoints,
     gateway: gw ? { port: finite(gw.port), healthy: typeof gw.healthy === 'boolean' ? gw.healthy : null } : null,
   };
 }
@@ -194,7 +201,7 @@ export async function probeNode(node, { fetch, key = '', statusKey = '', gateway
   }
 
   // 'absent' — nothing listens on the status port (not deployed on this node yet).
-  let statusView = { state: 'no-key', error: noStatusKey, ts: null, gpus: [], jobs: [], endpoints: [], gateway: null };
+  let statusView = { state: 'no-key', error: noStatusKey, ts: null, gpus: [], host: null, jobs: [], endpoints: [], gateway: null };
   if (status) {
     if (status.error) statusView = { ...statusView, state: 'absent', error: status.error };
     else if (status.status === 401 || status.status === 403) statusView = { ...statusView, state: 'unauthorized', error: 'the status service refused cluster-status.key' };
@@ -208,12 +215,18 @@ export async function probeNode(node, { fetch, key = '', statusKey = '', gateway
 
 const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 
-/** One history point: up, the GPUs' mean utilisation and memory share, gateway latency. */
+/** One history point: up, the GPUs' mean utilisation and memory share, the host's CPU and RAM share, gateway latency. */
 export function sampleOf(ts, probe) {
   const gpus = probe.status.gpus || [];
   const util = mean(gpus.map((g) => g.utilPct).filter((v) => v != null));
   const mem = mean(gpus.filter((g) => g.memUsedMib != null && g.memTotalMib).map((g) => (100 * g.memUsedMib) / g.memTotalMib));
-  return { ts, up: probe.up, utilPct: util == null ? null : Math.round(util), memPct: mem == null ? null : Math.round(mem), latencyMs: probe.gateway.latencyMs };
+  const host = probe.status.host;
+  const ram = host?.memUsedMib != null && host?.memTotalMib ? (100 * host.memUsedMib) / host.memTotalMib : null;
+  const pct = (v) => (v == null ? null : Math.round(v));
+  return {
+    ts, up: probe.up, utilPct: pct(util), memPct: pct(mem),
+    cpuPct: pct(host?.cpuPct ?? null), ramPct: pct(ram), latencyMs: probe.gateway.latencyMs,
+  };
 }
 
 /** A GPU counts as busy at this utilisation or above. */
