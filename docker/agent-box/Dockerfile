@@ -81,11 +81,28 @@ RUN apt-get update \
 # tested with the colour font hidden from Java: byte-identical output. Render
 # emoji-heavy diagrams on the host. Noto Color Emoji is installed for the
 # browser (Playwright screenshots, mkdocs serve).
+#
+# Text font: PlantUML draws in Java's logical "SansSerif", which OpenJDK
+# resolves through fontconfig's `sans-serif`. Unpinned, that resolved to
+# WenQuanYi Zen Hei (pulled in by the browser deps), so every label came out
+# in a CJK font's thin Latin glyphs. local.conf pins the generic families to
+# Liberation (metric-compatible with Arial/Times/Courier), which makes box
+# render geometry match the Mac's. OpenJDK caches the lookup per user in
+# ~/.java/fonts; a box that rendered before this change must delete it.
 ARG PLANTUML_VERSION=1.2025.2
 RUN apt-get update \
  && apt-get install -y --no-install-recommends default-jre-headless graphviz \
-      fontconfig fonts-noto-color-emoji \
+      fontconfig fonts-liberation fonts-noto-color-emoji \
  && rm -rf /var/lib/apt/lists/* \
+ && printf '%s\n' '<?xml version="1.0"?>' \
+      '<!DOCTYPE fontconfig SYSTEM "fonts.dtd">' \
+      '<fontconfig>' \
+      '  <alias binding="strong"><family>sans-serif</family><prefer><family>Liberation Sans</family></prefer></alias>' \
+      '  <alias binding="strong"><family>serif</family><prefer><family>Liberation Serif</family></prefer></alias>' \
+      '  <alias binding="strong"><family>monospace</family><prefer><family>Liberation Mono</family></prefer></alias>' \
+      '</fontconfig>' > /etc/fonts/local.conf \
+ && fc-cache -f \
+ && fc-match sans-serif | grep -F "Liberation Sans" \
  && base="https://repo1.maven.org/maven2/net/sourceforge/plantuml/plantuml/${PLANTUML_VERSION}/plantuml-${PLANTUML_VERSION}.jar" \
  && install -d -m 755 /opt/plantuml \
  && curl -fsSL --retry 3 -o /opt/plantuml/plantuml.jar "$base" \
