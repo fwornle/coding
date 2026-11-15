@@ -22,6 +22,7 @@ interface Summary {
   finished_at: string | null
   repeats: number
   check: boolean
+  before_trial?: boolean
   variants: VariantSpec[]
   trials: number
   planned: number
@@ -53,6 +54,7 @@ interface Trial {
   timed_out: boolean
   error: string | null
   agent_failed: boolean
+  before_trial?: { exit: number | null; wall_ms: number | null; timed_out: boolean; passed: boolean } | null
   check: { exit: number | null; passed: boolean; timed_out: boolean } | null
   calls: number
   models: string[]
@@ -70,6 +72,7 @@ interface Report {
   agent: string
   prompt: string
   check: string | null
+  before_trial?: string | null
   repo: string
   repeats: number
   seed: number
@@ -169,6 +172,7 @@ function Comparison({ report }: { report: Report }) {
 }
 
 function agentCell(t: Trial) {
+  if (t.before_trial && !t.before_trial.passed) return <span className="text-destructive" title={t.error ?? 'before-trial failed'}>skipped</span>
   if (t.error) return <span className="text-destructive" title={t.error}>error</span>
   if (t.timed_out) return <span className="text-destructive">timeout</span>
   if (t.agent_exit === null) return dash
@@ -266,6 +270,9 @@ function Experiment({ id }: { id: string }) {
             </span>
             <span className="block text-xs">prompt: <span className="font-mono">{report.prompt}</span></span>
             <span className="block text-xs">check: <span className="font-mono">{report.check || 'none — no pass rate'}</span></span>
+            {report.before_trial ? (
+              <span className="block text-xs" data-testid="ab-before-trial">before each trial: <span className="font-mono">{report.before_trial}</span></span>
+            ) : null}
           </CardDescription>
         </CardHeader>
         <CardContent>

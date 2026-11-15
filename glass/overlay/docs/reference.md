@@ -14,7 +14,7 @@ Every command, environment variable and setting.
     | `glass doctor` | check the setup |
     | `glass watch` | live status line for the newest session |
     | `glass job-classes [on\|off\|measure\|join <url>]` | [job classes](job-classes.md), opt-in |
-    | `glass ab run\|list\|report` | [A/B experiments](comparing-runs.md): one agent, several models |
+    | `glass ab run\|list\|report` | [A/B experiments](comparing-runs.md): one agent, several models; `--before-trial "<cmd>"` prepares each trial |
     | `glass stop` | stop the daemon |
     | `glass update [--check]` | install the latest release |
     | `glass uninstall [--yes]` | stop the daemon, delete `~/.glass` |
