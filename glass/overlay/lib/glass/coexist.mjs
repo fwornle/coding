@@ -100,6 +100,22 @@ export function piHttpProviders(env = process.env, home = os.homedir()) {
 }
 
 /**
+ * The providers a `glass <agent>` session relays through the daemon: the agent's
+ * plain-HTTP providers (one already on this daemon — a nested glass run — is left
+ * as it is), and opencode's github-copilot login, relayed to its Copilot API host
+ * (that relay needs no interception, so it stays on under --no-intercept).
+ */
+export function sessionRelays(agent, { env = process.env, home = os.homedir(), port, intercept = true }) {
+  const plainHttp = agent === 'opencode' ? opencodeHttpProviders(env, home) : agent === 'pi' ? piHttpProviders(env, home) : {};
+  const relays = intercept
+    ? Object.fromEntries(Object.entries(plainHttp).filter(([, url]) => !url.startsWith(`http://127.0.0.1:${port}/relay/`)))
+    : {};
+  const copilot = agent === 'opencode' && !relays['github-copilot'] ? opencodeCopilotUpstream(env, home) : null;
+  if (copilot) relays['github-copilot'] = copilot;
+  return relays;
+}
+
+/**
  * What `glass doctor` warns about when glass shares the machine with another proxy.
  * @returns {string[]} one line per finding, empty when there is nothing to say
  */
