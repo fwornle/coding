@@ -112,7 +112,7 @@ test('before-trial: runs in the trial copy with the experiment, variant, trial a
   const dir = path.join(tmp, 'hook-env');
   const cwd = path.join(dir, 'work');
   fs.mkdirSync(cwd, { recursive: true });
-  const script = "const e=process.env;require('fs').writeFileSync('hook.json',JSON.stringify({cwd:process.cwd(),x:e.GLASS_AB_EXPERIMENT,v:e.GLASS_AB_VARIANT,t:e.GLASS_AB_TRIAL,m:e.GLASS_AB_MODEL,keep:e.AB_KEEP}));console.log('scaled')";
+  const script = "const e=process.env;require('fs').writeFileSync('hook.json',JSON.stringify({cwd:process.cwd(),x:e.GLASS_AB_EXPERIMENT,v:e.GLASS_AB_VARIANT,t:e.GLASS_AB_TRIAL,m:e.GLASS_AB_MODEL,keep:e.AB_KEEP}));process.stdout.write('scaled')";
   const h = await runBeforeTrial(hookExp(`node -e "${script}"`), hookTrial, hookVariant, { cwd, dir, baseEnv: { ...process.env, AB_KEEP: 'yes' } });
   assert.equal(h.failure, null);
   assert.equal(h.record.exit, 0);
