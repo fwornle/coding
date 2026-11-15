@@ -55,6 +55,11 @@ constraints:
   # The constraint monitor's own tests must contain violations as fixtures
   # (user decision 2026-11-07). Write/Edit only; Bash has no file path.
   - '**/integrations/constraint-monitor/test/**'
+  # glass's tests write stand-in agents and hooks as script source and run them as
+  # separate processes; the test asserts on their raw stdout, and they cannot import
+  # Logger (glass ships standalone). Whitelists are per file, so this covers the whole
+  # test folder, not only the generated scripts (user decision 2026-11-15).
+  - '**/glass/overlay/tests/**'
 - id: no-var-declarations
   group: code_quality
   pattern: \bvar\s+

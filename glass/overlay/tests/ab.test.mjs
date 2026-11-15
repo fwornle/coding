@@ -13,9 +13,9 @@ import { fileURLToPath } from 'node:url';
 
 import {
   agentArgs, callsByTask, effectiveStatus, experimentId, experimentReport, formatReport, isExperimentId, listExperiments,
-  mean, parseVariant, percentile, readExperiment, reportCsv, runExperiment, saveExperiment, schedule, seededRandom, stddev,
+  mean, parseVariant, percentile, readExperiment, reportCsv, runExperiment, saveExperiment, schedule, seededRandom, stddev, trialDir,
 } from '../lib/glass/ab.mjs';
-import { experimentFromArgs, prepareWorkspace } from '../lib/glass/ab-cli.mjs';
+import { createTrialRunner, experimentFromArgs, prepareWorkspace, runBeforeTrial } from '../lib/glass/ab-cli.mjs';
 import { abTagOf } from '../lib/glass/ui-api.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -85,7 +85,91 @@ test('the command line: validated, the plan drawn from the recorded seed', () =>
   assert.throws(() => experimentFromArgs(['--agent', 'pi', '--variant', 'a=p/m', '--prompt', 'x'], { cwd: tmp }), /at least twice/);
   assert.throws(() => experimentFromArgs(['--agent', 'pi', '--variant', 'a=p/m', '--variant', 'a=p/n', '--prompt', 'x'], { cwd: tmp }), /own label/);
   assert.throws(() => experimentFromArgs(['--agent', 'pi', '--variant', 'a=p/m', '--variant', 'b=p/n'], { cwd: tmp }), /--prompt/);
+  assert.equal(exp.before_trial, null);
+  assert.equal(exp.before_trial_timeout_s, 60);
   assert.throws(() => experimentFromArgs(['--agent', 'nano', '--variant', 'a=p/m', '--variant', 'b=p/n', '--prompt', 'x'], { cwd: tmp }), /--agent/);
+});
+
+test('the command line: two variants on the same provider/model, told apart by their labels, with a before-trial hook', () => {
+  const exp = experimentFromArgs([
+    '--agent', 'pi', '--variant', 'base=local-llama/qwen', '--variant', 'tuned=local-llama/qwen',
+    '--prompt', 'fix it', '--before-trial', 'node scale.mjs', '--before-trial-timeout', '30',
+  ], { cwd: tmp });
+  assert.deepEqual(exp.variants, [{ label: 'base', provider: 'local-llama', model: 'qwen' }, { label: 'tuned', provider: 'local-llama', model: 'qwen' }]);
+  assert.equal(exp.before_trial, 'node scale.mjs');
+  assert.equal(exp.before_trial_timeout_s, 30);
+  const claude = experimentFromArgs(['--agent', 'claude', '--variant', 'a=m', '--variant', 'b=m', '--prompt', 'x'], { cwd: tmp });
+  assert.deepEqual(claude.variants.map((v) => v.model), ['m', 'm']);
+  assert.throws(() => experimentFromArgs(['--agent', 'pi', '--variant', 'a=p/m', '--variant', 'b=p/m', '--prompt', 'x', '--before-trial-timeout', '0'], { cwd: tmp }), /--before-trial-timeout/);
+});
+
+// The hook through the system shell, as the check runs: `node -e "…"` reads the same in sh and cmd.exe.
+const hookExp = (cmd, extra = {}) => ({ id: 'ab-20261115-110000-0000b0', agent: 'pi', before_trial: cmd, before_trial_timeout_s: 60, ...extra });
+const hookTrial = { n: 7, round: 4, variant: 'tuned' };
+const hookVariant = { label: 'tuned', provider: 'local-llama', model: 'Qwen/Qwen3.5-4B' };
+
+test('before-trial: runs in the trial copy with the experiment, variant, trial and model in its env; output in before.log', async () => {
+  const dir = path.join(tmp, 'hook-env');
+  const cwd = path.join(dir, 'work');
+  fs.mkdirSync(cwd, { recursive: true });
+  const script = "const e=process.env;require('fs').writeFileSync('hook.json',JSON.stringify({cwd:process.cwd(),x:e.GLASS_AB_EXPERIMENT,v:e.GLASS_AB_VARIANT,t:e.GLASS_AB_TRIAL,m:e.GLASS_AB_MODEL,keep:e.AB_KEEP}));process.stdout.write('scaled')";
+  const h = await runBeforeTrial(hookExp(`node -e "${script}"`), hookTrial, hookVariant, { cwd, dir, baseEnv: { ...process.env, AB_KEEP: 'yes' } });
+  assert.equal(h.failure, null);
+  assert.equal(h.record.exit, 0);
+  assert.equal(h.record.timed_out, false);
+  const seen = JSON.parse(fs.readFileSync(path.join(cwd, 'hook.json'), 'utf8'));
+  assert.equal(fs.realpathSync.native(seen.cwd), fs.realpathSync.native(cwd));
+  assert.deepEqual({ ...seen, cwd: undefined }, { cwd: undefined, x: 'ab-20261115-110000-0000b0', v: 'tuned', t: '7', m: 'local-llama/Qwen/Qwen3.5-4B', keep: 'yes' });
+  assert.match(fs.readFileSync(path.join(dir, 'before.log'), 'utf8'), /scaled/);
+  assert.equal(await runBeforeTrial(hookExp(null), hookTrial, hookVariant, { cwd, dir, baseEnv: process.env }), null, 'no hook, nothing run');
+});
+
+test('before-trial: a non-zero exit, a timeout fail with a reason', async () => {
+  const dir = path.join(tmp, 'hook-fail');
+  fs.mkdirSync(dir, { recursive: true });
+  const failed = await runBeforeTrial(hookExp('node -e "process.exit(3)"'), hookTrial, hookVariant, { cwd: dir, dir, baseEnv: process.env });
+  assert.equal(failed.failure, 'before-trial failed (exit 3)');
+  assert.equal(failed.record.exit, 3);
+  const slow = await runBeforeTrial(hookExp('node -e "setTimeout(() => {}, 30000)"', { before_trial_timeout_s: 1 }), hookTrial, hookVariant, { cwd: dir, dir, baseEnv: process.env });
+  assert.equal(slow.failure, 'before-trial timed out after 1 s');
+  assert.equal(slow.record.timed_out, true);
+  assert.ok(slow.record.wall_ms < 20_000, 'stopped at its timeout, not when it finished');
+});
+
+test('before-trial: a failing hook fails the trial — no session, no agent, no check — and the report says why', async () => {
+  const home = path.join(tmp, 'hook-runner');
+  const repo = path.join(tmp, 'hook-repo');
+  fs.mkdirSync(repo, { recursive: true });
+  fs.writeFileSync(path.join(repo, 'f.txt'), 'x');
+  const calls = [];
+  const run = async (bin, args, opts) => {
+    calls.push({ bin, shell: Boolean(opts.shell), log: path.basename(opts.logFile), variant: opts.env.GLASS_AB_VARIANT });
+    return { exit: 5, wall_ms: 12, timed_out: false, aborted: false };
+  };
+  // No daemon on port 9: reaching the session would throw, so the result proves the agent never started.
+  const runTrial = createTrialRunner({ port: 9, home, bin: 'pi', baseEnv: { ...process.env }, project: 'p', run });
+  const exp = {
+    ...hookExp('scale-lora'), prompt: 'fix it', repo, check: 'node -e 0', timeout_s: 5, check_timeout_s: 5, keep: false, agent_args: [], repeats: 1,
+    variants: [hookVariant], plan: [hookTrial], trials: [],
+  };
+  const result = await runTrial(hookTrial, hookVariant, exp);
+  assert.deepEqual(calls, [{ bin: 'scale-lora', shell: true, log: 'before.log', variant: 'tuned' }], 'only the hook ran');
+  assert.equal(result.error, 'before-trial failed (exit 5)');
+  assert.equal(result.check, null);
+  assert.equal(result.agent_exit, null);
+  assert.deepEqual(result.before_trial, { exit: 5, wall_ms: 12, timed_out: false });
+  assert.equal(fs.existsSync(path.join(trialDir(path.join(home, 'data'), exp.id, hookTrial), 'work')), false, 'the copy is removed');
+
+  const r = experimentReport({ ...exp, trials: [{ ...hookTrial, ...result }] });
+  assert.equal(r.before_trial, 'scale-lora');
+  assert.equal(r.variants[0].agent_failures, 1);
+  assert.equal(r.variants[0].checked, 0, 'a skipped trial is not a failed check');
+  assert.deepEqual(r.trials[0].before_trial, { exit: 5, wall_ms: 12, timed_out: false, passed: false });
+  const text = formatReport(r);
+  assert.match(text, /^before: scale-lora$/m);
+  assert.match(text, /^7\s+4\s+tuned\s+skipped\s+—/m);
+  assert.match(text, /trial 7: before-trial failed \(exit 5\)/);
+  assert.match(reportCsv(r).split('\n')[1], /,5$/);
 });
 
 test('orchestration: trials in plan order, saved after each; a failing trial is recorded, not dropped; abort stops between trials', async () => {
@@ -173,7 +257,7 @@ test('the report: per variant pass rate, wall mean ± sd, latency p50/p95, TTFT 
   const csv = reportCsv(r).split('\n');
   assert.equal(csv.length, 5);
   assert.match(csv[0], /^experiment,trial,round,variant,provider,model,/);
-  assert.match(csv[1], /^ab-20261115-100000-00000a,1,1,base,local-llama,qwen-base,qwen-base,t1,10000,0,false,,0,true,2,220,30,5,110,3,2,500,100$/);
+  assert.match(csv[1], /^ab-20261115-100000-00000a,1,1,base,local-llama,qwen-base,qwen-base,t1,10000,0,false,,0,true,2,220,30,5,110,3,2,500,100,$/);
 });
 
 test('the report on a token DB from before ttft_ms / tool_calls: those read as not measured', () => {
@@ -328,6 +412,63 @@ test('CLI: glass ab run → interleaved measured trials, checked; report and lis
     const api = await (await fetch(`http://127.0.0.1:${port}/api/ab/${report.id}`)).json();
     assert.equal(api.report.id, report.id);
     assert.equal((await fetch(`http://127.0.0.1:${port}/api/ab/ab-20200101-000000-ffffff`)).status, 404);
+  } finally {
+    await runCli(['stop'], env, work);
+    await new Promise((r) => upstream.close(r));
+  }
+});
+
+test('CLI: same model under two labels, a before-trial hook per trial; the one it fails runs no agent and no check', { skip: process.platform === 'win32' && 'POSIX stand-in agent' }, async () => {
+  const upstream = fakeAnthropic();
+  await new Promise((r) => upstream.listen(0, '127.0.0.1', r));
+  const home = path.join(tmp, 'cli-hook-home');
+  const work = path.join(tmp, 'cli-hook-repo');
+  fs.mkdirSync(work, { recursive: true });
+  fs.writeFileSync(path.join(work, 'task.txt'), 'the task');
+  const hookLog = path.join(tmp, 'cli-hook.log');
+  const port = await freePort();
+  const env = {
+    GLASS_HOME: home, GLASS_PORT: String(port), GLASS_CLAUDE_BIN: standInAgent(tmp), AB_HOOK_LOG: hookLog,
+    ANTHROPIC_BASE_URL: `http://127.0.0.1:${upstream.address().port}`,
+  };
+  const hook = "const e=process.env;require('fs').appendFileSync(e.AB_HOOK_LOG,[e.GLASS_AB_TRIAL,e.GLASS_AB_VARIANT,e.GLASS_AB_MODEL].join(' ')+String.fromCharCode(10));process.exit(e.GLASS_AB_VARIANT==='tuned'?7:0)";
+  try {
+    const run = await runCli([
+      'ab', 'run', '--agent', 'claude', '--variant', 'base=model-tools', '--variant', 'tuned=model-tools',
+      '--prompt', 'do the task', '--repeats', '2', '--seed', '5', '--before-trial', `node -e "${hook}"`,
+      '--check', `node -e "process.exit(require('fs').existsSync('done.txt') ? 0 : 1)"`,
+    ], env, work);
+    assert.equal(run.code, 0, run.stderr + run.stdout);
+    assert.match(run.stdout, /before-trial failed \(exit 7\)/);
+    assert.match(run.stdout, /^before: node -e /m);
+
+    const report = JSON.parse((await runCli(['ab', 'report', 'latest', '--json'], env, work)).stdout);
+    assert.match(report.before_trial, /^node -e /);
+    const [base, tuned] = report.variants;
+    assert.deepEqual([base.model, tuned.model], ['model-tools', 'model-tools']);
+    assert.deepEqual([base.trials, tuned.trials], [2, 2]);
+    assert.equal(base.pass_rate, 1);
+    assert.equal(base.totals.calls, 2);
+    assert.equal(tuned.agent_failures, 2);
+    assert.equal(tuned.checked, 0);
+    assert.equal(tuned.totals.calls, 0, 'no agent ran for tuned');
+    const hooked = fs.readFileSync(hookLog, 'utf8').trim().split('\n');
+    assert.deepEqual(hooked, report.trials.map((t) => `${t.n} ${t.variant} model-tools`), 'once per trial, before it, with its env');
+    for (const t of report.trials) {
+      const dir = path.join(home, 'data', 'ab', report.id, 'trials', `${String(t.n).padStart(3, '0')}-${t.variant}`);
+      assert.ok(fs.existsSync(path.join(dir, 'before.log')));
+      if (t.variant === 'tuned') {
+        assert.equal(t.error, 'before-trial failed (exit 7)');
+        assert.equal(t.task_id, null);
+        assert.equal(t.check, null);
+        assert.deepEqual(t.before_trial, { exit: 7, wall_ms: t.before_trial.wall_ms, timed_out: false, passed: false });
+        assert.equal(fs.existsSync(path.join(dir, 'agent.log')), false);
+        assert.equal(fs.existsSync(path.join(dir, 'check.log')), false);
+      } else {
+        assert.equal(t.before_trial.passed, true);
+        assert.equal(t.check.passed, true);
+      }
+    }
   } finally {
     await runCli(['stop'], env, work);
     await new Promise((r) => upstream.close(r));

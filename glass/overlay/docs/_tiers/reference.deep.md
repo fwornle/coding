@@ -9,7 +9,7 @@
 | `glass doctor` | Node version, data home, CA, egress proxy, each agent's path and version, daemon state, and warnings when another local LLM proxy or tmux session overlaps with glass. Exit code 1 when something needs fixing |
 | `glass watch [--task <id>]` | A live one-line status bar for the newest session, or the given one |
 | `glass job-classes [on\|off\|measure\|join <url>\|pull\|leave]` | [Job classes](job-classes.md): switch labelling, measure your recent prompts, use a team's taxonomy. Without an argument: the current state |
-| `glass ab run\|list\|report` | [A/B experiments](comparing-runs.md): the same agent and prompt on two or more models, interleaved and repeated, checked by your command; `glass ab help` for the options |
+| `glass ab run\|list\|report` | [A/B experiments](comparing-runs.md): the same agent and prompt on two or more models, interleaved and repeated, checked by your command. `--before-trial "<cmd>"` runs before every trial in its copy (system shell, `GLASS_AB_EXPERIMENT`, `GLASS_AB_VARIANT`, `GLASS_AB_TRIAL`, `GLASS_AB_MODEL` set, output in `before.log`, `--before-trial-timeout` default 60 s); a non-zero exit fails the trial without running the agent or the check ([one server, two weights](comparing-runs.md#one-server-two-weights)). `glass ab help` for the options |
 | `glass statusline [--format plain\|ansi\|tmux] [--task <id>]` | Print the status line once |
 | `glass report ctx\|net [--task <id>]` | The context or network report (what a status-line click shows) |
 | `glass stop` | Stop the daemon; open agent tunnels are closed, so it exits at once |

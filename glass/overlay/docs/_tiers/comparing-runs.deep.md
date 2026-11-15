@@ -14,7 +14,8 @@ glass ab run --agent pi|opencode|claude|copilot \
   --variant <label>=<provider>/<model> --variant <label>=<provider>/<model> [more variants] \
   --prompt "…" | --prompt-file task.md \
   [--repeats N] [--check "<command>"] [--repo <dir>] [--label <name>] \
-  [--timeout <s>] [--check-timeout <s>] [--seed N] [--keep] [--agent-arg <arg>]…
+  [--timeout <s>] [--check-timeout <s>] [--seed N] [--keep] [--agent-arg <arg>]… \
+  [--before-trial "<command>"] [--before-trial-timeout <s>]
 glass ab list [--json]
 glass ab report [<id>|latest] [--json|--csv]
 ```
@@ -27,11 +28,27 @@ glass ab report [<id>|latest] [--json|--csv]
    ignored. Ignored files (`node_modules`, `.venv`, build output) are **not** copied: a
    `--check` that needs installed dependencies must find them outside the repository.
    Not a git checkout: a plain copy. The agent starts where `--repo` points inside it.
-2. **A glass session of its own**, tagged with the experiment id, the variant and the
+2. **The `--before-trial` hook**, when given: run in the copy through the system shell
+   (as the check is), its output in `before.log`, with these set:
+
+    | Variable | Value |
+    |---|---|
+    | `GLASS_AB_EXPERIMENT` | the experiment id |
+    | `GLASS_AB_VARIANT` | the variant's label |
+    | `GLASS_AB_TRIAL` | the trial number (1, 2, …, in the order trials run) |
+    | `GLASS_AB_MODEL` | the variant's `provider/model` (claude, copilot: the model) |
+
+    A non-zero exit, or running longer than `--before-trial-timeout` (default 60 s),
+    fails the trial: it is recorded with the reason (`before-trial failed (exit 3)`,
+    `before-trial timed out after 60 s`), counted among the variant's agent failures,
+    and neither the agent nor the check runs. The experiment goes on with the next
+    trial. The hook runs before the trial's session opens, so a failed one has no
+    session.
+3. **A glass session of its own**, tagged with the experiment id, the variant and the
    trial number (the tag is on the session record in `data/measurements/`). Every call
    of the trial is a row under the session's task id; the experiment file records which
    task id each trial had. That is the join.
-3. **The agent, non-interactively**, with stdout and stderr kept in the trial's
+4. **The agent, non-interactively**, with stdout and stderr kept in the trial's
    `agent.log`. Each agent gets the flag it needs to act without asking, because a
    question nobody can answer would hang the run:
 
@@ -46,15 +63,72 @@ glass ab report [<id>|latest] [--json|--csv]
     with your rights. `--agent-arg` adds arguments (repeatable). The prompt is passed
     exactly as given: single-turn modes (`opencode run`, `copilot -p`) may stop after a
     plan without editing anything — ask for the change explicitly in the prompt.
-4. **The check**, in the same copy, through the system shell: exit code 0 = pass. Its
+5. **The check**, in the same copy, through the system shell: exit code 0 = pass. Its
    output is in `check.log`. It runs even when the agent failed (an agent can exit
    non-zero after doing the work).
-5. The copy is removed (`--keep` keeps it, under the trial's directory).
+6. The copy is removed (`--keep` keeps it, under the trial's directory).
 
 A trial whose agent exits non-zero, times out (`--timeout`, default 1800 s) or cannot
 start is an **agent failure**: recorded on the trial, counted per variant, never left
 out. A trial with no measured call is counted as **unmeasured** — usually a provider
 that did not go through glass (an HTTPS host glass does not intercept).
+
+### One server, two weights
+
+Two variants may name the same `provider/model`; only their labels must differ. That is
+how a base model and its LoRA fine-tune are compared on **one** llama-server: start it
+with the adapter loaded but switched off, and let `--before-trial` switch it per trial.
+
+```sh
+llama-server -m base.gguf --lora tuned.gguf --lora-init-without-apply \
+  --slot-save-path ./slots --cache-ram 0 --port 8080
+```
+
+- `--lora-init-without-apply` loads the adapter at scale 0: the server starts as the
+  base model.
+- `--slot-save-path` is required for any `POST /slots/<id>?action=…`, erase included
+  (without it llama-server answers that it does not support slot actions).
+- `--cache-ram 0` switches off the host-memory prompt cache. It keeps prompts of idle
+  slots and loads the best-matching one back into a slot by tokens alone, whatever
+  adapter scale they were computed under, and erasing a slot does not clear it.
+
+`lora-scale.mjs`, the hook (Node, so it runs the same on Windows):
+
+```js
+// Put llama-server on this trial's weights, then start every slot cold.
+const server = process.env.LLAMA_URL || 'http://127.0.0.1:8080';
+const scale = process.env.GLASS_AB_VARIANT === 'tuned' ? 1 : 0;
+const call = async (method, route, body) => {
+  const r = await fetch(server + route, {
+    method, headers: { 'content-type': 'application/json' }, body: body && JSON.stringify(body),
+  });
+  if (!r.ok) throw new Error(`${method} ${route}: HTTP ${r.status} ${await r.text()}`);
+  return r.json();
+};
+await call('POST', '/lora-adapters', [{ id: 0, scale }]);
+for (const slot of await call('GET', '/slots')) await call('POST', `/slots/${slot.id}?action=erase`);
+console.log(`${process.env.GLASS_AB_TRIAL} ${process.env.GLASS_AB_VARIANT}: lora scale ${scale}, slots erased`);
+```
+
+```sh
+glass ab run --agent pi \
+  --variant base=local-llama/qwen --variant tuned=local-llama/qwen \
+  --before-trial "node lora-scale.mjs" --prompt-file task.md --check "python -m pytest -q" --repeats 5
+```
+
+Put the script where the trial's copy finds it — in the repository (it is copied with
+your uncommitted files) or by an absolute path. A failed call throws, the hook exits
+non-zero, and the trial is recorded as failed instead of running on the wrong weights.
+
+**Why the erase matters.** `POST /lora-adapters` only sets the server's global scale. A
+request that carries no `lora` field of its own — the agents' requests do not — runs on
+that global scale, but llama.cpp clears a slot's prompt cache only when a request's own
+`lora` field differs from the slot's. So after a switch the slot would reuse the
+key-value cache of the previous trial's prompt — the system prompt and tool definitions
+every trial shares — computed under the other weights: the tuned trial would partly run
+on the base model's activations, and the cache hit would also make it look faster. The
+erase makes every trial start cold on its own weights. "answered by" in the report does
+not catch this: both variants name the same model.
 
 ### Order
 
@@ -98,7 +172,7 @@ and every trial; `--csv` is one row per trial.
 ### Where it lives
 
 `~/.glass/data/ab/<id>/experiment.json` — the experiment, rewritten after every trial —
-and `trials/<n>-<variant>/agent.log`, `check.log`. The UI reads it through the daemon
+and `trials/<n>-<variant>/agent.log`, `check.log` (and `before.log` with `--before-trial`). The UI reads it through the daemon
 (`/api/ab`, `/api/ab/<id>`), so **A/B** updates while `glass ab run` is still going.
 Ctrl-C stops the running agent and ends the experiment as `aborted`; its trials so far
 stay in the report. An experiment whose `glass ab run` died shows as `interrupted`.

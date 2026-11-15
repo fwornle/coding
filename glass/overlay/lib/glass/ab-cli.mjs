@@ -3,14 +3,15 @@
 //   glass ab run --agent pi|opencode|claude|copilot --variant <label>=<provider>/<model> (twice or more)
 //                --prompt "…" | --prompt-file <f>  [--repeats N] [--check "<cmd>"] [--repo <dir>]
 //                [--label <name>] [--timeout <s>] [--check-timeout <s>] [--seed N] [--keep]
-//                [--agent-arg <arg>]…
+//                [--before-trial "<cmd>"] [--before-trial-timeout <s>] [--agent-arg <arg>]…
 //   glass ab list [--json]
 //   glass ab report [<id>|latest] [--json|--csv]
 //
 // A trial: a fresh copy of the repository (its uncommitted and untracked changes
 // included), a glass session of its own (tagged with the experiment, variant and
-// trial), the agent run non-interactively in that copy with its output kept,
-// then the check, also in the copy. Its exit code is the trial's pass or fail.
+// trial), the --before-trial hook if any (a failing one fails the trial before
+// the agent starts), the agent run non-interactively in that copy with its output
+// kept, then the check, also in the copy. Its exit code is the trial's pass or fail.
 // The copy is removed afterwards unless --keep.
 //
 // The daemon measures every call as for `glass <agent>`; the report joins the
@@ -50,12 +51,18 @@ run options
   --label <name>       a name for the experiment
   --timeout <s>        per agent run (default 1800); --check-timeout <s> per check (default 600)
   --seed <n>           the order's random seed (default: random, recorded)
+  --before-trial <cmd> run before every trial, in the trial's copy, through the system shell, with
+                       GLASS_AB_EXPERIMENT, GLASS_AB_VARIANT (label), GLASS_AB_TRIAL (number) and
+                       GLASS_AB_MODEL (provider/model) set — e.g. to put a server on the variant's
+                       weights. Non-zero exit or timeout fails the trial: no agent, no check
+  --before-trial-timeout <s>  per hook run (default 60)
   --keep               keep each trial's copy (default: removed after its check)
   --agent-arg <arg>    one more argument for the agent (repeatable)`;
 
 function parseArgs(argv) {
   const a = { variants: [], agentArgs: [], flags: new Set() };
-  const value = ['--agent', '--prompt', '--prompt-file', '--repeats', '--check', '--repo', '--label', '--timeout', '--check-timeout', '--seed'];
+  const value = ['--agent', '--prompt', '--prompt-file', '--repeats', '--check', '--repo', '--label', '--timeout', '--check-timeout', '--seed',
+    '--before-trial', '--before-trial-timeout'];
   for (let i = 0; i < argv.length; i++) {
     const k = argv[i];
     if (k === '--variant') a.variants.push(argv[++i]);
@@ -94,6 +101,7 @@ export function experimentFromArgs(argv, { cwd = process.cwd(), now = new Date()
   return {
     id: experimentId(now), label: a.label || '', agent: a.agent, prompt, check: a.check || null, repo,
     repeats, seed, timeout_s: positiveInt(a.timeout, '--timeout', 1800), check_timeout_s: positiveInt(a['check-timeout'], '--check-timeout', 600),
+    before_trial: a['before-trial'] || null, before_trial_timeout_s: positiveInt(a['before-trial-timeout'], '--before-trial-timeout', 60),
     keep: a.flags.has('--keep'), agent_args: a.agentArgs,
     variants, plan: schedule(variants, repeats, seededRandom(seed)), trials: [],
     status: 'planned', pid: process.pid, created_at: now.toISOString(), finished_at: null,
@@ -206,6 +214,40 @@ export function runCaptured(bin, args, { cwd, env, logFile, timeoutMs, signal = 
   });
 }
 
+// ── the per-trial hook ──
+
+/** What the --before-trial command sees: which experiment, variant and trial it prepares. */
+export function beforeTrialEnv(baseEnv, exp, trial, variant) {
+  return {
+    ...baseEnv,
+    GLASS_AB_EXPERIMENT: exp.id,
+    GLASS_AB_VARIANT: variant.label,
+    GLASS_AB_TRIAL: String(trial.n),
+    GLASS_AB_MODEL: `${variant.provider ? `${variant.provider}/` : ''}${variant.model}`,
+  };
+}
+
+/**
+ * Run the experiment's --before-trial command for one trial, like the check:
+ * through the system shell, in the trial's copy, its output in before.log.
+ * @returns {Promise<null | { record: object, failure: string|null }>} null without
+ *   a hook; else the record for the trial and, when it failed, the reason.
+ */
+export async function runBeforeTrial(exp, trial, variant, { cwd, dir, baseEnv, signal = null, run = runCaptured }) {
+  if (!exp.before_trial) return null;
+  const timeoutS = exp.before_trial_timeout_s || 60;
+  const h = await run(exp.before_trial, [], {
+    cwd, env: beforeTrialEnv(baseEnv, exp, trial, variant), logFile: path.join(dir, 'before.log'),
+    timeoutMs: timeoutS * 1000, signal, shell: true,
+  });
+  const record = { exit: h.exit, wall_ms: h.wall_ms, timed_out: h.timed_out, ...(h.error ? { error: h.error } : {}) };
+  const failure = h.aborted ? 'aborted'
+    : h.error ? `before-trial failed (${h.error})`
+      : h.timed_out ? `before-trial timed out after ${timeoutS} s`
+        : h.exit !== 0 ? `before-trial failed (exit ${h.exit})` : null;
+  return { record, failure };
+}
+
 // ── one trial, for real ──
 
 /**
@@ -226,6 +268,14 @@ export function createTrialRunner({ port, home, bin, baseEnv, project, piExtensi
   };
 
   async function runIn(cwd, dir, trial, variant, exp) {
+    // The hook before the session opens: a trial it fails has no agent run to measure.
+    const hook = await runBeforeTrial(exp, trial, variant, { cwd, dir, baseEnv, signal, run });
+    if (hook) {
+      log(`  before-trial ${hook.failure || 'ok'} in ${(hook.record.wall_ms / 1000).toFixed(1)} s`);
+      if (hook.failure) {
+        return { task_id: null, wall_ms: null, agent_exit: null, timed_out: false, error: hook.failure, before_trial: hook.record, check: null };
+      }
+    }
     const relays = sessionRelays(exp.agent, { env: baseEnv, port, intercept: true });
     const session = await openSession(port, {
       agent: exp.agent, intercept: true, cwd, project, pid: process.pid, relays, proxyEnv: proxyEnvOf(baseEnv),
@@ -247,6 +297,7 @@ export function createTrialRunner({ port, home, bin, baseEnv, project, piExtensi
       task_id: session.taskId, wall_ms: agent.wall_ms, agent_exit: agent.exit, timed_out: agent.timed_out,
       ...(agent.error ? { error: agent.error } : agent.aborted ? { error: 'aborted' } : {}),
       check: null,
+      ...(hook ? { before_trial: hook.record } : {}),
     };
     log(`  agent ${agent.error ? agent.error : agent.timed_out ? `timed out after ${exp.timeout_s} s` : `exit ${agent.exit}`} in ${(agent.wall_ms / 1000).toFixed(1)} s · ${session.taskId}`);
     if (exp.check && !agent.aborted) {
