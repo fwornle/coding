@@ -22,6 +22,7 @@ package "Consumers (read state)" {
   rectangle "combined-status-line.js\n(tmux status-right)" as STATUSLINE <<util>>
   rectangle "system-health-dashboard\n:3032 / :3033" as DASHBOARD <<api>>
   rectangle "health-prompt-hook.js" as HOOK <<util>>
+  rectangle "lib/health/violations.mjs\n(shared violation rules)" as RULES <<core>>
 }
 
 package "Healable host services" {
@@ -34,6 +35,10 @@ VERIFIER -[#green,dashed]-> COORD : POST /signals\nverify_run\n(one-shot)
 STATUSLINE -[#orange]-> COORD : GET /health/state\n(per render)
 DASHBOARD  -[#orange]-> COORD : GET /health/state\n(card refresh)
 HOOK       -[#orange]-> COORD : GET /health/state\n(per prompt)
+
+STATUSLINE -[#888,dotted]-> RULES : OK_SERVICE_STATUSES
+DASHBOARD  -[#888,dotted]-> RULES : buildViolations()\n(/status count AND\n/report list)
+HOOK       -[#888,dotted]-> RULES : OK_SERVICE_STATUSES
 
 DASHBOARD -[#red]-> COORD : POST /health/remediate\n{action, service}\n(Restart-button click)
 COORD -[#red]-> REMEDIATE : executeAction(...)
@@ -93,6 +98,18 @@ note left of REMEDIATE
   Honors per-action cooldown
   (5 min after failure) and
   hourly rate limit (10/h).
+end note
+
+note bottom of RULES
+  ONE answer to "is this a
+  violation?" for all three
+  consumers. 'busy' (obs_api
+  blocked by consolidation,
+  alive) is OK everywhere.
+  The dashboard's count is
+  the length of the list it
+  renders — never "1 violation"
+  over an empty table.
 end note
 
 note bottom of DASHBOARD

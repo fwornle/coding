@@ -146,7 +146,13 @@ Proxy state combines **daemon truth** with **user intent** (since 2026-07-26). T
 
 ### Violations
 
-The `/health/state` report endpoint includes `proxy` and `semantic_readiness` violations alongside other violation categories. This fixes a previous data inconsistency where the status endpoint counted violations that were not present in the report output.
+What counts as a violation is decided in **one place**, `lib/health/violations.mjs`, shared by every consumer:
+
+- `OK_SERVICE_STATUSES` = `running`, `busy`. `busy` means `obs_api` is alive but blocked by a consolidation run (the coordinator's `reclassifyBusyService`). It is not a violation anywhere.
+- `buildViolations(state)` builds the dashboard's violation rows: container, services (hard failure → `high`; `unknown`, deliberate restart, or any unrecognised status → `warning`), processes, LSL, databases, LLM-proxy semantic readiness, and network (internet unreachable / proxy inactive on VPN or corporate).
+- `summarizeViolations(rows)` derives `overallStatus`, `violationCount` and `criticalCount` from those rows.
+
+The dashboard's `/api/health-verifier/status` (the **Total Violations** count) and `/api/health-verifier/report` (the **Active Violations** table) both call `buildViolations()`, so the count is always the length of the list that is rendered. Before this, each endpoint and each consumer kept its own copy of the rule. When `busy` was introduced only the prompt hook learned it, so every consolidation run showed "1 Total Violations" over an empty (hidden) table and turned `[🏥]` red until it finished. `tests/health/violations.test.mjs` guards both the rules and the wiring.
 
 ## Consumers
 
@@ -156,11 +162,13 @@ The `/health/state` report endpoint includes `proxy` and `semantic_readiness` vi
 - Maps `lsl_by_project[*]` rollup → 3-state (healthy/degraded/stopped).
 - For each `healthy` project, reads the newest timestamped record in the corresponding `lsl[*].transcriptPath` (bounded tail read — NOT the file mtime, which timestamp-less bookkeeping records keep artificially fresh on any open session) to compute user-activity age and bucket into the lifecycle (bright green → mid green → dark green → very dark green → grey).
 - Synthesizes "verifier-shape" fields for the `[🏥...]` badge from coordinator services + databases + container healthcheck — no `.health/verification-status.json` read.
+- A service counts against `[🏥]` only if its status is outside `OK_SERVICE_STATUSES` (`lib/health/violations.mjs`) and not `unknown` — so `obs_api: busy` during consolidation keeps the badge green.
 
 ### Dashboard (`integrations/system-health-dashboard`)
 
 - Backend (`server.js`) at port 3033 reads coordinator state and exposes per-card APIs.
 - Frontend at port 3032 polls the API.
+- **Total Violations** (`/status`) and the **Active Violations** table (`/report`) are built by the same `buildViolations()` call (see [Violations](#violations)), so they cannot disagree.
 - Supervisord process panel reads supervisorctl directly inside the container (the coordinator does not surface raw supervisord state).
 - The `cgr_cache` tile reads `.data/graphify/metadata.json` (graphify's commit sidecar) via Node fs and computes commits-behind via `git rev-list` against the graph's `built_at_commit`.
 
@@ -169,6 +177,7 @@ The `/health/state` report endpoint includes `proxy` and `semantic_readiness` vi
 - Runs on every prompt submit.
 - Reads `/health/state` and surfaces a one-line health summary to the prompt.
 - Trusts the coordinator's `overallStatus` — does not re-classify based on accepted/non-critical violations.
+- Treats services in `OK_SERVICE_STATUSES` (incl. `busy`) and services the coordinator is deliberately restarting as healthy.
 
 ## Session activity lifecycle
 
@@ -235,8 +244,8 @@ When sizes diverge, the verifier raises a `bind_mount_freshness` violation. Reme
 |----------|-------------|
 | `/api/health` | Dashboard's own self-healthcheck (not the coordinator rollup) |
 | `/api/cgr/freshness` | Graph freshness; compares `graph.json` `built_at_commit` vs `HEAD` |
-| `/api/health-verifier/status` | Pass-through to coordinator `/health/state` |
-| `/api/health-verifier/report` | Same, verbose |
+| `/api/health-verifier/status` | Coordinator `/health/state` reshaped; `violationCount`/`criticalCount`/`overallStatus` from `buildViolations()` |
+| `/api/health-verifier/report` | Checks for every card + the `violations` rows, from the same `buildViolations()` |
 | `/api/ukb/*` | UKB workflow control + history |
 
 ## Observation cold storage (Phase 35)

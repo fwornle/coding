@@ -29,6 +29,7 @@ import { existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { restartingServices } from '../lib/health/deliberate-restart.mjs';
+import { OK_SERVICE_STATUSES } from '../lib/health/violations.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const codingRoot = process.env.CODING_TOOLS_PATH || join(__dirname, '..');
@@ -142,7 +143,7 @@ function deriveSummary(state) {
         // heavy work (see health-coordinator.js reclassifyBusyService). It is
         // not an issue, and reporting it as one told the operator
         // "service obs_api stopped" about a service that never stopped.
-        const OK_SERVICE_STATUSES = new Set(['running', 'busy']);
+        // (OK_SERVICE_STATUSES: shared with the dashboard + status line.)
         // Down because the coordinator is restarting it: its own remedy, not
         // an issue (lib/health/deliberate-restart.mjs).
         const restarting = restartingServices(state);

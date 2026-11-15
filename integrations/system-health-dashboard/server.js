@@ -22,6 +22,7 @@ import { createRequire } from 'node:module';
 import { UKBProcessManager } from '../../scripts/ukb-process-manager.js';
 import { resolveScope } from '../../lib/scope/index.mjs';
 import { discoveredProjects } from '../../lib/teams/discover.mjs';
+import { buildViolations, summarizeViolations } from '../../lib/health/violations.mjs';
 // RetrievalService now runs in the host Observations API service. The
 // dashboard's POST /api/retrieve handler is a thin HTTP forwarder (Phase 5).
 // observations.db is owned by the host Observations API service; the dashboard
@@ -746,39 +747,17 @@ class SystemHealthAPIServer {
             }
             const state = await upstream.json();
             // Reshape coordinator state into existing dashboard envelope (SPEC R8).
-            const violations = [];
-            if (state && state.container && state.container.healthcheck === 'unhealthy') {
-                violations.push({ kind: 'container', severity: 'critical' });
-            }
-            if (state && state.databases && state.databases.status && state.databases.status !== 'healthy') {
-                violations.push({ kind: `databases.${state.databases.status}`, severity: 'high' });
-            }
-            if (state && Array.isArray(state.services)) {
-                for (const svc of state.services) {
-                    if (svc && svc.status && svc.status !== 'running') {
-                        violations.push({ kind: `service.${svc.name}`, severity: 'high' });
-                    }
-                }
-            }
-            // Factor in LLM proxy / internet state: on corporate/VPN networks,
-            // internet unreachable or proxy not running is a degradation.
-            if (state && state.network) {
-                const loc = state.network.location;
-                if ((loc === 'corporate' || loc === 'vpn') && state.network.internet_reachable === false) {
-                    violations.push({ kind: 'network.internet_unreachable', severity: 'high' });
-                }
-                if (state && state.proxy && state.proxy.semantic_ok === false && state.proxy.auto_heal_status !== 'disabled') {
-                    violations.push({ kind: 'proxy.semantic_readiness', severity: 'high' });
-                }
-            }
-            const overallStatus = violations.length === 0 ? 'healthy' :
-                violations.some(v => v.severity === 'critical') ? 'unhealthy' : 'degraded';
+            // Count from the SAME builder /report renders its table from, so the
+            // badge can never say "1 violation" over an empty table
+            // (lib/health/violations.mjs).
+            const { overallStatus, violationCount, criticalCount } =
+                summarizeViolations(buildViolations(state, { autoHealMap: AUTO_HEAL_MAP }));
             res.json({
                 status: 'success',
                 data: {
                     overallStatus,
-                    violationCount: violations.length,
-                    criticalCount: violations.filter(v => v.severity === 'critical').length,
+                    violationCount,
+                    criticalCount,
                     lastUpdate: state && state.generated_at ? state.generated_at : new Date().toISOString(),
                     autoHealingActive: false,  // D-08: narrow heals; not "actively healing"
                     // Phase 34 (D-11): pass through the coordinator's proxy
@@ -834,7 +813,6 @@ class SystemHealthAPIServer {
             }
             const state = await upstream.json();
             const checks = [];
-            const violations = [];
             // SPEC R8 frontend-compat: violations-table.tsx & system-checks-table.tsx
             // pass row.timestamp to `new Date(...)` unconditionally; missing/invalid
             // values cause RangeError and crash the panel. Use coordinator's generated_at
@@ -853,12 +831,11 @@ class SystemHealthAPIServer {
             // healthy services render "operational", explicit failures render "error",
             // and unknown stays neutral.
             const toUiStatus = (raw) => {
-                if (raw === 'healthy' || raw === 'running' || raw === 'ok' || raw === 'present' || raw === 'passed') return 'passed';
+                if (raw === 'healthy' || raw === 'running' || raw === 'busy' || raw === 'ok' || raw === 'present' || raw === 'passed') return 'passed';
                 if (raw === 'stopped' || raw === 'unhealthy' || raw === 'failed' || raw === 'error') return 'failed';
                 if (raw === 'degraded' || raw === 'stale' || raw === 'warning') return 'warning';
                 return 'unknown';
             };
-            const isHardFailure = (raw) => raw === 'stopped' || raw === 'unhealthy' || raw === 'failed' || raw === 'error';
 
             // Container check
             // SPEC R8 frontend-compat: dist/ does:
@@ -871,23 +848,10 @@ class SystemHealthAPIServer {
                 const raw = state.container.healthcheck || 'unknown';
                 const ui = toUiStatus(raw);
                 checks.push({ check: 'container', name: 'container', category: 'services', status: ui, raw_status: raw, source: 'docker.healthcheck', timestamp: stamp, message: `docker healthcheck=${raw}` });
-                if (isHardFailure(raw)) violations.push({ check: 'container', kind: 'container', severity: 'critical', detail: raw, message: `Container reports ${raw}`, timestamp: stamp });
             }
 
-            // Services
-            // Coordinator's own violationCount (shown in dashboard badge) treats both
-            // hard failures AND unknown services as violations. Match that here so the
-            // Active Violations table agrees with the badge — otherwise users see
-            // "2 violations" but the table shows only 1 row, leaving them confused
-            // about which services the badge is counting.
-            //
-            // Auto-heal metadata: violations-table.tsx renders the "Enabled" badge +
-            // a Restart button when the row carries `auto_heal: true`, `category:
-            // 'services'`, `status: 'error'`, and `auto_heal_action`. The 33-05
-            // reshape dropped these fields, so every coordinator-derived violation
-            // showed "Manual" with no restart path. Re-attach them via a static
-            // service→action map (must match handlers in
-            // scripts/health-remediation-actions.js).
+            // Services — checks only. Violations (incl. auto-heal metadata from
+            // AUTO_HEAL_MAP) are built once, below, by buildViolations().
             if (state && Array.isArray(state.services)) {
                 for (const svc of state.services) {
                     if (!svc || !svc.name) continue;
@@ -895,32 +859,6 @@ class SystemHealthAPIServer {
                     const raw = svc.status || 'unknown';
                     const ui = toUiStatus(raw);
                     checks.push({ check: svc.name, name: `service.${svc.name}`, category: 'services', status: ui, raw_status: raw, last_seen: svc.last_seen, timestamp: ts, message: `${svc.name} ${raw}` });
-                    const heal = AUTO_HEAL_MAP[svc.name];
-                    if (isHardFailure(raw)) {
-                        violations.push({
-                            check: svc.name,
-                            kind: `service.${svc.name}`,
-                            category: 'services',
-                            status: 'error',
-                            severity: 'high',
-                            detail: raw,
-                            message: `${svc.name} ${raw}`,
-                            timestamp: ts,
-                            ...(heal ? { auto_heal: true, auto_heal_action: heal.action, recommendation: heal.recommendation } : {})
-                        });
-                    } else if (raw === 'unknown') {
-                        violations.push({
-                            check: svc.name,
-                            kind: `service.${svc.name}`,
-                            category: 'services',
-                            status: 'warning',
-                            severity: 'warning',
-                            detail: 'unknown',
-                            message: `${svc.name} has not reported (no probe data yet)`,
-                            timestamp: ts,
-                            ...(heal ? { auto_heal: true, auto_heal_action: heal.action, recommendation: heal.recommendation } : {})
-                        });
-                    }
                 }
             }
 
@@ -944,9 +882,6 @@ class SystemHealthAPIServer {
                         detail: p.detail || undefined,
                         message: p.detail ? `${p.name}: ${p.detail}` : `${p.name} ${raw}`,
                     });
-                    if (isHardFailure(raw)) {
-                        violations.push({ check: p.name, kind: `process.${p.name}`, severity: 'medium', detail: p.detail || raw, message: p.detail ? `${p.name}: ${p.detail}` : `${p.name} ${raw}`, timestamp: stamp });
-                    }
                 }
             }
 
@@ -1073,9 +1008,6 @@ class SystemHealthAPIServer {
                 for (const [project, status] of Object.entries(state.lsl_by_project)) {
                     const ui = toUiStatus(status);
                     checks.push({ check: `lsl.${project}`, name: `lsl.${project}`, category: 'services', status: ui, raw_status: status, timestamp: stamp, message: `LSL ${project} ${status}` });
-                    if (isHardFailure(status)) {
-                        violations.push({ check: `lsl.${project}`, kind: `lsl.${project}`, severity: 'medium', detail: status, message: `LSL ${project} ${status}`, timestamp: stamp });
-                    }
                 }
             }
 
@@ -1085,9 +1017,6 @@ class SystemHealthAPIServer {
                 const raw = state.databases.status;
                 const ui = toUiStatus(raw);
                 checks.push({ check: 'databases', name: 'databases', category: 'databases', status: ui, raw_status: raw, timestamp: stamp, message: `databases ${raw}` });
-                if (isHardFailure(raw)) {
-                    violations.push({ check: 'databases', kind: 'databases', severity: 'high', detail: raw, message: `databases ${raw}`, timestamp: stamp });
-                }
                 // Sub-checks: coordinator emits these alongside .status
                 for (const subKey of ['leveldb_lock_check', 'leveldb_accessibility', 'qdrant_availability', 'graph_integrity']) {
                     const sub = state.databases[subKey];
@@ -1101,7 +1030,6 @@ class SystemHealthAPIServer {
             // so violation count and violation list are always consistent.
             if (state && state.proxy && state.proxy.semantic_ok === false && state.proxy.auto_heal_status !== 'disabled') {
                 checks.push({ check: 'proxy.semantic_readiness', name: 'proxy.semantic_readiness', category: 'proxy', status: 'failed', raw_status: 'error', timestamp: stamp, message: `LLM proxy semantic probe failed (${state.proxy.reason || 'unknown'})` });
-                violations.push({ check: 'proxy.semantic_readiness', kind: 'proxy.semantic_readiness', severity: 'high', detail: state.proxy.reason || 'semantic probe failed', message: `LLM proxy not responding — ${state.proxy.consecutive_failures || '?'} consecutive failures`, timestamp: stamp });
             } else if (state && state.proxy && state.proxy.semantic_ok === true) {
                 checks.push({ check: 'proxy.semantic_readiness', name: 'proxy.semantic_readiness', category: 'proxy', status: 'passed', raw_status: 'ok', timestamp: stamp, message: `LLM proxy OK (${state.proxy.last_round_trip_ms || '?'}ms RTT)` });
             }
@@ -1109,15 +1037,15 @@ class SystemHealthAPIServer {
             if (state && state.network) {
                 const loc = state.network.location || 'unknown';
                 checks.push({ check: 'network.location', name: 'network.location', category: 'network', status: 'passed', raw_status: loc, timestamp: stamp, message: `Network: ${loc}` });
-                // Internet reachability on corporate/VPN without functional proxy is a violation
-                if ((loc === 'corporate' || loc === 'vpn') && state.network.proxy_running === false) {
-                    violations.push({ check: 'network.proxy_mismatch', kind: 'network.proxy_mismatch', severity: 'medium', detail: `On ${loc} but proxy not active`, message: `On ${loc} network but local proxy is inactive — internet access may fail`, timestamp: stamp });
-                }
             }
 
             // SPEC R8 frontend-compat: bundle gates dispatch on `n.data && n.data.summary`.
             // Without `summary`, the entire payload is silently dropped (UI shows "no check data yet").
             // Frontend reads `summary.passed` and `summary.total_checks`.
+            // Violations come from the one shared builder that /status counts
+            // with (lib/health/violations.mjs) — the count and this list are
+            // the same array, so they cannot disagree.
+            const violations = buildViolations(state, { autoHealMap: AUTO_HEAL_MAP });
             const passed = checks.filter(c => c.status === 'passed').length;
             const summary = { passed, total_checks: checks.length };
             res.json({

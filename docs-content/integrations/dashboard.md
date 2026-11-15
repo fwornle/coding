@@ -70,8 +70,8 @@ PORT=3030 npm run dashboard
 | Endpoint | Description |
 |----------|-------------|
 | `/api/health` | Dashboard's own self-healthcheck |
-| `/api/health-verifier/status` | Pass-through to coordinator `/health/state` (includes `network`, `databases` sub-checks) |
-| `/api/health-verifier/report` | Full health report with all checks (databases, services, processes, CGR cache) |
+| `/api/health-verifier/status` | Coordinator `/health/state` reshaped (includes `network`, `proxy`); the violation count comes from `lib/health/violations.mjs` `buildViolations()` |
+| `/api/health-verifier/report` | Full health report with all checks (databases, services, processes, CGR cache) and the violation rows — built by the same `buildViolations()`, so the count and the table always match |
 | `/api/cgr/freshness` | Graph freshness; compares `graph.json` `built_at_commit` vs `HEAD` |
 | `/api/services` | Individual service status |
 | `/api/metrics` | Health metrics history |

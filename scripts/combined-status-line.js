@@ -26,6 +26,7 @@ import { markClickable, buildProjectTag, decorate as decorateClickable } from '.
 import { loadFeatures } from '../lib/features/index.mjs';
 import { isToolsRepo } from '../lib/scope/index.mjs';
 import { restartingServices } from '../lib/health/deliberate-restart.mjs';
+import { OK_SERVICE_STATUSES } from '../lib/health/violations.mjs';
 import { repoHistoryDir } from '../lib/history/paths.cjs';
 
 const { statusLeftReserveCells } = paneCacheKey;
@@ -1224,8 +1225,11 @@ class CombinedStatusLine {
     // A service the coordinator is restarting on purpose is a transition, not
     // an outage (lib/health/deliberate-restart.mjs) — it shows as a warning.
     const restarting = restartingServices(state);
+    // 'busy' (obs_api blocked by consolidation, alive) is OK — the same set the
+    // dashboard and prompt hook use (lib/health/violations.mjs). Counting it
+    // here turned [🏥] red for every consolidation run.
     const notRunning = services.filter(s =>
-      s && s.status && s.status !== 'running' && s.status !== 'unknown'
+      s && s.status && !OK_SERVICE_STATUSES.has(s.status) && s.status !== 'unknown'
     );
     const downServices = notRunning.filter(s => !restarting.has(s.name));
     const restartingCount = notRunning.length - downServices.length;
