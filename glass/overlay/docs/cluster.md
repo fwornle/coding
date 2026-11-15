@@ -1,6 +1,6 @@
 # Cluster & Routing
 
-See a GPU cluster's nodes at a glance — gateway health, served models, GPUs and jobs — and
+See a GPU cluster's nodes at a glance — gateway health, served models, GPUs, CPU and RAM, and jobs — and
 follow every call the offload router sent there, kept back, or let fall back.
 
 === "⚡ Quick (~3 min)"
@@ -24,7 +24,8 @@ follow every call the offload router sent there, kept back, or let fall back.
       trace top right is the share of nodes up at each poll (the cluster's heartbeat).
     - **A node tile** — its name and gateway endpoint (`host:port`), a status dot (green:
       gateway healthy, amber: up but no live backend, red: not reachable), GPU utilisation and
-      memory bars with a sparkline, the models its gateway serves, the job on it, and when it
+      memory bars, the host's CPU load and RAM bars, a sparkline (GPU utilisation, or CPU load
+      on a node without a GPU driver), the models its gateway serves, the job on it, and when it
       was last seen.
     - **Routing panel** — the calls the offload router handled. Hover a row and the node that
       answered it lights up; click a tile to show only that node's calls.
@@ -44,7 +45,7 @@ follow every call the offload router sent there, kept back, or let fall back.
     ```bash
     # the gateways' key: lets glass list the models each gateway serves
     printf '%s\n' "$CLUSTER_API_KEY" > ~/.glass/cluster.key && chmod 600 ~/.glass/cluster.key
-    # the status services' key: lets glass read GPUs, jobs and endpoints
+    # the status services' key: lets glass read GPUs, CPU and RAM, jobs and endpoints
     printf '%s\n' "$CLUSTER_STATUS_KEY" > ~/.glass/cluster-status.key && chmod 600 ~/.glass/cluster-status.key
     ```
 

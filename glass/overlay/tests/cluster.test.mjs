@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const { createCluster, createClusterStore, normalizeClusterConfig, normalizeStatus, probeNode } = await import('../lib/glass/cluster.mjs');
+const { createCluster, createClusterStore, normalizeClusterConfig, normalizeStatus, probeNode, sampleOf } = await import('../lib/glass/cluster.mjs');
 
 // Two separate secrets: the gateways' key and the status services' key.
 const KEY = 'unit-fixture-token';
@@ -258,6 +258,21 @@ test('normalizeStatus keeps the contract fields only', () => {
   assert.equal(s.gpus[0].utilPct, 12);
   assert.ok(!('env' in s.jobs[0]));
   assert.equal(s.endpoints.length, 1);
+});
+
+test('normalizeStatus keeps the host block: CPU, load and RAM', () => {
+  const s = normalizeStatus({ host: { cpu_count: 32, cpu_pct: '41.5', load: [3.52, 2.1, 1.75, 9], mem_total_mib: 128799, mem_used_mib: 32543, mem_available_mib: 96256, cmdline: 'x' } });
+  assert.deepEqual(s.host, { cpuCount: 32, cpuPct: 41.5, load: [3.52, 2.1, 1.75], memTotalMib: 128799, memUsedMib: 32543, memAvailableMib: 96256 });
+  assert.equal(normalizeStatus({}).host, null);
+});
+
+test('a sample carries the host CPU and RAM share', () => {
+  const probe = { up: true, gateway: { latencyMs: 5 }, status: { gpus: [], host: { cpuPct: 41.5, memUsedMib: 32, memTotalMib: 128 } } };
+  const s = sampleOf('t', probe);
+  assert.equal(s.cpuPct, 42);
+  assert.equal(s.ramPct, 25);
+  assert.equal(s.utilPct, null);
+  assert.equal(sampleOf('t', { ...probe, status: { gpus: [], host: null } }).cpuPct, null);
 });
 
 test('peek answers whether a cluster is configured and polls nothing', async () => {

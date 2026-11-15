@@ -7,13 +7,14 @@ import { RoutingHistory, useRouting, type RoutingRow } from './routing'
  * The Cluster page: a GPU cluster's nodes at a glance — the daemon's /api/cluster
  * (lib/glass/cluster.mjs). Shown only when ~/.glass/cluster.json exists (the tab's
  * gate is useClusterConfigured). Each tile is one node: its gateway, the models it
- * serves, its GPUs and the job on them; the side panel is the routing history, and
+ * serves, its GPUs, its CPU and RAM, and the job on them; the side panel is the routing history, and
  * a call a node's gateway answered lights that node.
  */
 
 interface Gpu { index: number | null; name: string; utilPct: number | null; memUsedMib: number | null; memTotalMib: number | null; tempC: number | null }
+interface Host { cpuCount: number | null; cpuPct: number | null; load: (number | null)[] | null; memTotalMib: number | null; memUsedMib: number | null; memAvailableMib: number | null }
 interface Job { id: string; name: string; image: string; status: string; started: string | null; gpu: string | null }
-interface Sample { ts: string; up: boolean; utilPct: number | null; memPct: number | null; latencyMs: number | null }
+interface Sample { ts: string; up: boolean; utilPct: number | null; memPct: number | null; cpuPct?: number | null; ramPct?: number | null; latencyMs: number | null }
 interface NodeView {
   name: string
   host: string
@@ -21,7 +22,7 @@ interface NodeView {
   lastSeen: string | null
   gateway: { endpoint: string; reachable: boolean; healthy: boolean; status: string; backends: Record<string, boolean>; latencyMs: number | null; error: string } | null
   models: { ids: string[]; error: string } | null
-  status: { state: 'ok' | 'absent' | 'unauthorized' | 'error' | 'no-key'; error: string; ts: string | null; gpus: Gpu[]; jobs: Job[]; endpoints: { port: number; process: string }[] } | null
+  status: { state: 'ok' | 'absent' | 'unauthorized' | 'error' | 'no-key'; error: string; ts: string | null; gpus: Gpu[]; host?: Host | null; jobs: Job[]; endpoints: { port: number; process: string }[] } | null
   history: Sample[]
 }
 export interface ClusterView {
@@ -137,9 +138,14 @@ const STATUS_NOTE: Record<string, string> = {
 function NodeTile({ n, served, lit, selected, onSelect }: { n: NodeView; served: number; lit: boolean; selected: boolean; onSelect: () => void }) {
   const health = healthOf(n)
   const gpus = n.status?.state === 'ok' ? n.status.gpus : []
+  const host = n.status?.state === 'ok' ? n.status.host ?? null : null
   const jobs = n.status?.state === 'ok' ? n.status.jobs : []
-  const trace = n.history.map((s) => (s.up ? s.utilPct : null))
-  const hasUtil = trace.some((v) => v != null)
+  // The trace: GPU utilisation, else the host's CPU (a node without a driver), else gateway latency.
+  const gpuTrace = n.history.map((s) => (s.up ? s.utilPct : null))
+  const cpuTrace = n.history.map((s) => (s.up ? s.cpuPct ?? null : null))
+  const traceOf = gpuTrace.some((v) => v != null) ? 'GPU utilisation' : cpuTrace.some((v) => v != null) ? 'CPU load' : null
+  const trace = traceOf === 'GPU utilisation' ? gpuTrace : cpuTrace
+  const hasUtil = traceOf != null
   const latency = n.history.map((s) => (s.up ? s.latencyMs : null))
   const maxLatency = Math.max(50, ...latency.filter((v): v is number => v != null))
   return (
@@ -169,8 +175,8 @@ function NodeTile({ n, served, lit, selected, onSelect }: { n: NodeView; served:
         <div className="space-y-1">
           {gpus.map((g, i) => (
             <div key={i} className="space-y-0.5">
-              <Bar pct={g.utilPct} label="util" tone={(g.utilPct ?? 0) >= 10 ? 'bg-status-success' : 'bg-muted-foreground/60'} />
-              <Bar pct={g.memUsedMib != null && g.memTotalMib ? (100 * g.memUsedMib) / g.memTotalMib : null} label="mem" tone="bg-status-info" />
+              <Bar pct={g.utilPct} label="gpu" tone={(g.utilPct ?? 0) >= 10 ? 'bg-status-success' : 'bg-muted-foreground/60'} />
+              <Bar pct={g.memUsedMib != null && g.memTotalMib ? (100 * g.memUsedMib) / g.memTotalMib : null} label="vram" tone="bg-status-info" />
               <div className="flex justify-between text-[10px] text-muted-foreground">
                 <span className="truncate">{g.name || `GPU ${g.index ?? i}`}</span>
                 <span className="tabular-nums">{g.memTotalMib ? `${Math.round((g.memUsedMib ?? 0) / 1024)}/${Math.round(g.memTotalMib / 1024)} GiB` : ''}{g.tempC != null ? ` · ${Math.round(g.tempC)}°C` : ''}</span>
@@ -182,12 +188,25 @@ function NodeTile({ n, served, lit, selected, onSelect }: { n: NodeView; served:
         <div className="text-[10px] text-muted-foreground">{n.up && n.status ? STATUS_NOTE[n.status.state] ?? '' : ''}</div>
       )}
 
+      {host && (
+        <div className="space-y-0.5" data-testid={`cluster-host-${n.name}`}>
+          <Bar pct={host.cpuPct} label="cpu" tone="bg-status-success" />
+          <Bar pct={host.memUsedMib != null && host.memTotalMib ? (100 * host.memUsedMib) / host.memTotalMib : null} label="ram" tone="bg-status-info" />
+          <div className="flex justify-between gap-2 text-[10px] text-muted-foreground">
+            <span className="truncate">{host.cpuCount != null ? `${host.cpuCount} cores` : 'CPU'}{host.load?.[0] != null ? ` · load ${host.load[0].toFixed(1)}` : ''}</span>
+            <span className="shrink-0 tabular-nums" title={host.memAvailableMib != null ? `${Math.round(host.memAvailableMib / 1024)} GiB available` : undefined}>
+              {host.memTotalMib ? `${Math.round((host.memUsedMib ?? 0) / 1024)}/${Math.round(host.memTotalMib / 1024)} GiB` : ''}
+            </span>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-1.5">
         <Activity className="h-3 w-3 shrink-0 text-muted-foreground" />
         {hasUtil
           ? <Sparkline values={trace} className="h-5 flex-1 text-status-success" />
           : <Sparkline values={latency} max={maxLatency} className="h-5 flex-1 text-status-info" />}
-        <span className="w-12 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground" title={hasUtil ? 'GPU utilisation' : 'gateway latency'}>
+        <span className="w-12 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground" title={traceOf ?? 'gateway latency'}>
           {n.gateway?.latencyMs != null ? `${n.gateway.latencyMs} ms` : '—'}
         </span>
       </div>
@@ -280,7 +299,7 @@ export function ClusterPage() {
         <div>
           <h1 className="text-2xl font-bold">Cluster</h1>
           <p className="text-sm text-muted-foreground">
-            Every node&apos;s gateway, the models it serves, its GPUs and jobs — read over HTTP every {Math.round((view?.intervalMs ?? POLL_MS) / 1000)} s while this page is open.
+            Every node&apos;s gateway, the models it serves, its GPUs, CPU, RAM and jobs — read over HTTP every {Math.round((view?.intervalMs ?? POLL_MS) / 1000)} s while this page is open.
           </p>
         </div>
         <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2" title="Nodes up per poll">
@@ -297,7 +316,7 @@ export function ClusterPage() {
       {view?.configured && ((!view.keySet && !view.keyProblem) || (!view.statusKeySet && !view.statusKeyProblem)) && (
         <div className="rounded-md border px-3 py-2 text-xs text-muted-foreground">
           {!view.keySet && !view.keyProblem && <div>No <code>cluster.key</code>: the gateways&apos; models are not read.</div>}
-          {!view.statusKeySet && !view.statusKeyProblem && <div>No <code>cluster-status.key</code>: GPUs, jobs and endpoints are not read.</div>}
+          {!view.statusKeySet && !view.statusKeyProblem && <div>No <code>cluster-status.key</code>: GPUs, CPU, RAM, jobs and endpoints are not read.</div>}
         </div>
       )}
       {view?.problems?.map((p) => <div key={p} className="text-xs text-status-warning">cluster.json: {p}</div>)}
