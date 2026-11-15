@@ -101,14 +101,23 @@ export function createClusterStore(home, { platform = process.platform } = {}) {
   return { getConfig, readKey, file, keyFiles };
 }
 
-/** GET `url` with a timeout; { status, body } (body parsed JSON or null) or { error }. */
+/**
+ * GET `url` with a timeout; { status, body } (body parsed JSON or null) or { error }.
+ *
+ * The timeout is an ordinary timer, cleared once the body is read — not
+ * AbortSignal.timeout(), whose timer is unref'd: when nothing else holds the event
+ * loop (no socket yet), Node 22 exits with the request still pending instead of
+ * timing it out.
+ */
 async function getJson(fetch, url, { key = '', timeoutMs }) {
   const t0 = Date.now();
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(new DOMException('timed out', 'TimeoutError')), timeoutMs);
   try {
     const res = await fetch(url, {
       method: 'GET',
       headers: { accept: 'application/json', ...(key ? { authorization: `Bearer ${key}` } : {}) },
-      signal: AbortSignal.timeout(timeoutMs),
+      signal: abort.signal,
     });
     let body = null;
     try { body = await res.json(); } catch { body = null; }
@@ -117,6 +126,8 @@ async function getJson(fetch, url, { key = '', timeoutMs }) {
     const cause = err?.cause?.code || err?.code || '';
     const msg = err?.name === 'TimeoutError' || err?.name === 'AbortError' ? `no answer within ${timeoutMs} ms` : (cause || String(err?.message || err));
     return { error: msg.slice(0, 160), ms: Date.now() - t0 };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
