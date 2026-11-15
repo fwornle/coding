@@ -10,6 +10,7 @@ import { ModelsPage } from './models'
 import { OffloadPill, OffloadProvider, useOffload } from './offload'
 import { JobClassSettings } from './job-classes'
 import { UpdatePill } from './update'
+import { AbPage } from './ab'
 
 // glass records only the sessions it launched — plus, where coding is installed
 // and the Accounts dialog includes it, the calls coding's proxy records on this
@@ -136,6 +137,7 @@ export function GlassApp() {
               <NavLink to="/token-usage" className={tab}>Token Usage</NavLink>
               <NavLink to="/models" className={tab}>Models</NavLink>
               <NavLink to="/sessions" className={tab}>Sessions</NavLink>
+              <NavLink to="/ab" className={tab}>A/B</NavLink>
             </nav>
             <div className="ml-auto flex items-center gap-2"><UpdatePill /><OffloadPill /><ThemeToggle /></div>
           </header>
@@ -143,6 +145,7 @@ export function GlassApp() {
             <Route path="/token-usage" element={<TokenUsage />} />
             <Route path="/models" element={<ModelsPage />} />
             <Route path="/sessions" element={<SessionsPage />} />
+            <Route path="/ab" element={<AbPage />} />
             <Route path="*" element={<Navigate to="/token-usage" replace />} />
           </Routes>
         </div>

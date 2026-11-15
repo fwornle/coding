@@ -7,6 +7,8 @@
 //   GET /api/experiments/runs/<id>/models      one session's model mix + its newest calls
 //   GET /api/calls/unbound                     calls no session could be bound to
 //   GET /api/models?hours=N                    every session's calls by agent × model × account × host × kind
+//   GET /api/ab                                `glass ab` experiments, newest first
+//   GET /api/ab/<id>                           one experiment's report: per variant and per trial
 //
 // The UI is the dashboard's own components (token-usage page, timeline, context
 // explainer), so the reads answer in the shapes those components already fetch
@@ -15,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { readTimeline } from '../experiments/timeline-read.mjs';
+import { callsByTask, effectiveStatus, experimentReport, experimentSummary, isExperimentId, listExperiments, readExperiment } from './ab.mjs';
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json', '.woff2': 'font/woff2',
@@ -154,12 +157,13 @@ export function sessionRuns({ live, spans, db }) {
   for (const s of spans) {
     byId.set(s.task_id, {
       task_id: s.task_id, agent: s.agent, started_at: s.started_at, ended_at: s.ended_at,
-      project: s.meta?.project || '', intercept: s.meta?.intercept !== false,
+      project: s.meta?.project || '', intercept: s.meta?.intercept !== false, ab: s.meta?.ab || null,
     });
   }
   for (const s of live) {
     byId.set(s.taskId, {
       task_id: s.taskId, agent: s.agent, started_at: s.started_at, ended_at: null, project: s.project, intercept: s.intercept,
+      ab: s.ab || null,
     });
   }
   const totals = totalsByTask(db, [...byId.keys()]);
@@ -179,6 +183,18 @@ export function sessionRuns({ live, spans, db }) {
     };
   });
   return rows.sort((a, b) => String(b.started_at).localeCompare(String(a.started_at)));
+}
+
+/**
+ * The A/B tag a `glass ab` trial opens its session with — kept on the session and
+ * its archived span — or nothing. Only an experiment id, a variant label and a
+ * trial number: it names files nowhere, so anything else is dropped.
+ */
+export function abTagOf(raw) {
+  if (!raw || typeof raw !== 'object' || !isExperimentId(raw.experiment)) return {};
+  const variant = typeof raw.variant === 'string' && /^[A-Za-z0-9._-]{1,40}$/.test(raw.variant) ? raw.variant : '';
+  const trial = Number.isInteger(raw.trial) && raw.trial > 0 ? raw.trial : null;
+  return variant && trial ? { ab: { experiment: raw.experiment, variant, trial } } : {};
 }
 
 function serveStatic(uiDir, urlPath, res) {
@@ -228,6 +244,19 @@ export function createUiApi({ uiDir, dataDir, tokenDb, usageDb = tokenDb, dbPath
     if (p === '/api/models') {
       const h = Number(u.searchParams.get('hours') ?? 24);
       json(res, 200, modelMix(usageDb()?.db, { hours: Number.isFinite(h) && h >= 0 ? Math.min(h, 24 * 366) : 24, accounts: accountFilter() }));
+      return true;
+    }
+    if (p === '/api/ab') {
+      const experiments = listExperiments(dataDir).map((e) => experimentSummary({ ...e, status: effectiveStatus(e) }));
+      json(res, 200, { experiments });
+      return true;
+    }
+    const ab = /^\/api\/ab\/([^/]+)$/.exec(p);
+    if (ab) {
+      const exp = readExperiment(dataDir, decodeURIComponent(ab[1]));
+      if (!exp) { json(res, 404, { error: `no experiment ${decodeURIComponent(ab[1])}` }); return true; }
+      const calls = callsByTask(tokenDb()?.db, exp.trials.map((t) => t.task_id).filter(Boolean));
+      json(res, 200, { report: experimentReport({ ...exp, status: effectiveStatus(exp) }, calls) });
       return true;
     }
     if (p === '/api/calls/unbound') {
