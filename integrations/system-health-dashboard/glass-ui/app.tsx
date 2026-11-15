@@ -10,6 +10,8 @@ import { ModelsPage } from './models'
 import { OffloadPill, OffloadProvider, useOffload } from './offload'
 import { JobClassSettings } from './job-classes'
 import { UpdatePill } from './update'
+import { ClusterPage, useClusterConfigured } from './cluster'
+import { RoutingPage, useRoutingAvailable } from './routing'
 
 // glass records only the sessions it launched — plus, where coding is installed
 // and the Accounts dialog includes it, the calls coding's proxy records on this
@@ -125,6 +127,19 @@ function TokenUsage() {
   )
 }
 
+// Cluster and Routing are tabs only where they have something to show: a cluster.json,
+// an offload endpoint (the router runs then). Like useSources, absent means hidden.
+function OptionalTabs() {
+  const cluster = useClusterConfigured()
+  const routing = useRoutingAvailable(cluster)
+  return (
+    <>
+      {cluster && <NavLink to="/cluster" className={tab}>Cluster</NavLink>}
+      {routing && <NavLink to="/routing" className={tab}>Routing</NavLink>}
+    </>
+  )
+}
+
 export function GlassApp() {
   return (
     <OffloadProvider>
@@ -136,6 +151,7 @@ export function GlassApp() {
               <NavLink to="/token-usage" className={tab}>Token Usage</NavLink>
               <NavLink to="/models" className={tab}>Models</NavLink>
               <NavLink to="/sessions" className={tab}>Sessions</NavLink>
+              <OptionalTabs />
             </nav>
             <div className="ml-auto flex items-center gap-2"><UpdatePill /><OffloadPill /><ThemeToggle /></div>
           </header>
@@ -143,6 +159,8 @@ export function GlassApp() {
             <Route path="/token-usage" element={<TokenUsage />} />
             <Route path="/models" element={<ModelsPage />} />
             <Route path="/sessions" element={<SessionsPage />} />
+            <Route path="/cluster" element={<ClusterPage />} />
+            <Route path="/routing" element={<RoutingPage />} />
             <Route path="*" element={<Navigate to="/token-usage" replace />} />
           </Routes>
         </div>

@@ -583,6 +583,59 @@ test('offload: an easy intercepted copilot call is answered by the target; pi (l
   targetSrv.close();
 });
 
+test('routing history: the offloaded call above is a decision on /api/routing, with the provider it replaced', async () => {
+  const h = (await api('GET', '/api/routing?hours=1')).body;
+  assert.equal(h.available, true);
+  const off = h.rows.find((r) => r.outcome === 'offloaded' && r.provider === 'team-box');
+  assert.ok(off, 'the offloaded copilot call is listed');
+  assert.equal(off.from, 'github-copilot');
+  assert.equal(off.model, 'm-small');
+  assert.ok(off.upstream, 'names the endpoint it went to');
+  assert.ok(h.counts.offloaded >= 1);
+});
+
+test('cluster: hidden without cluster.json; with it, nodes read over HTTP, the key never in the answer', async () => {
+  assert.deepEqual((await api('GET', '/api/cluster')).body, { configured: false });
+  assert.deepEqual((await api('GET', '/api/cluster?peek=1')).body, { configured: false });
+  const seen = [];
+  const gw = http.createServer((req, res) => {
+    seen.push({ url: req.url, auth: req.headers.authorization || '' });
+    res.writeHead(200, { 'content-type': 'application/json' });
+    if (req.url === '/health') return res.end(JSON.stringify({ status: 'ok', backends: { 'http://127.0.0.1:1': true } }));
+    if (req.url === '/v1/models') return res.end(JSON.stringify({ data: [{ id: 'm-small' }] }));
+    return res.end('{}');
+  });
+  await new Promise((r) => gw.listen(0, '127.0.0.1', r));
+  const free = http.createServer();
+  await new Promise((r) => free.listen(0, '127.0.0.1', r));
+  const statusPort = free.address().port; // nothing listens there once closed: no status service
+  await new Promise((r) => free.close(r));
+  try {
+    fs.writeFileSync(path.join(home, 'cluster.json'), JSON.stringify({ nodes: [{ name: 'node1', host: '127.0.0.1' }], gatewayPort: gw.address().port, statusPort }));
+    fs.writeFileSync(path.join(home, 'cluster.key'), 'cluster-fixture-token\n', { mode: 0o600 });
+    fs.chmodSync(path.join(home, 'cluster.key'), 0o600);
+    assert.deepEqual((await api('GET', '/api/cluster?peek=1')).body, { configured: true });
+    assert.equal(seen.length, 0, 'peek polls nothing');
+    const { status, body } = await api('GET', '/api/cluster');
+    assert.equal(status, 200);
+    assert.equal(body.configured, true);
+    assert.equal(body.summary.up, 1);
+    const [n] = body.nodes;
+    assert.equal(n.gateway.healthy, true);
+    assert.deepEqual(n.models.ids, ['m-small']);
+    assert.equal(n.status.state, 'absent');
+    assert.equal(seen.find((x) => x.url === '/health').auth, '');
+    assert.equal(seen.find((x) => x.url === '/v1/models').auth, 'Bearer cluster-fixture-token');
+    assert.equal(JSON.stringify(body).includes('cluster-fixture-token'), false);
+    assert.equal((await api('POST', '/api/cluster', {})).status, 405);
+  } finally {
+    fs.rmSync(path.join(home, 'cluster.json'), { force: true });
+    fs.rmSync(path.join(home, 'cluster.key'), { force: true });
+    await new Promise((r) => gw.close(r));
+  }
+  assert.deepEqual((await api('GET', '/api/cluster')).body, { configured: false }, 'removing the file hides it again');
+});
+
 test('offload endpoint on a private address goes direct; a public one takes the egress proxy', async () => {
   const { isPrivateHost } = await import('../lib/glass/daemon.mjs');
   for (const h of ['localhost', '127.0.0.1', '10.1.2.3', '172.20.0.1', '192.168.1.5', 'gpu-box', 'box.local', '[::1]']) assert.equal(isPrivateHost(h), true, h);

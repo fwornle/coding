@@ -7,6 +7,7 @@
 //   GET /api/experiments/runs/<id>/models      one session's model mix + its newest calls
 //   GET /api/calls/unbound                     calls no session could be bound to
 //   GET /api/models?hours=N                    every session's calls by agent × model × account × host × kind
+//   GET /api/routing?hours=N&limit=M           the offload router's decisions, call by call (routing.mjs)
 //
 // The UI is the dashboard's own components (token-usage page, timeline, context
 // explainer), so the reads answer in the shapes those components already fetch
@@ -15,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { readTimeline } from '../experiments/timeline-read.mjs';
+import { routingHistory } from './routing.mjs';
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json', '.woff2': 'font/woff2',
@@ -228,6 +230,12 @@ export function createUiApi({ uiDir, dataDir, tokenDb, usageDb = tokenDb, dbPath
     if (p === '/api/models') {
       const h = Number(u.searchParams.get('hours') ?? 24);
       json(res, 200, modelMix(usageDb()?.db, { hours: Number.isFinite(h) && h >= 0 ? Math.min(h, 24 * 366) : 24, accounts: accountFilter() }));
+      return true;
+    }
+    if (p === '/api/routing') {
+      const h = Number(u.searchParams.get('hours') ?? 24);
+      const limit = Number(u.searchParams.get('limit') ?? 500);
+      json(res, 200, routingHistory(usageDb()?.db, { hours: Number.isFinite(h) && h >= 0 ? Math.min(h, 24 * 366) : 24, limit }));
       return true;
     }
     if (p === '/api/calls/unbound') {
