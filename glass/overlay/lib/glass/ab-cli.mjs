@@ -142,8 +142,11 @@ export function prepareWorkspace(repo, dest) {
       fs.rmSync(to, { force: true, recursive: true });
     }
   }
-  // git names the top by its real path (/private/var/… on macOS for /var/…).
-  return path.join(dest, path.relative(fs.realpathSync(top), fs.realpathSync(repo)));
+  // git names the top by its real path (/private/var/… on macOS for /var/…), and on
+  // Windows by its long name where the temp dir may arrive as 8.3 (RUNNER~1). Only the
+  // native realpath expands short names; the JS one leaves them, and the relative
+  // path then climbs out of the copy back into the original.
+  return path.join(dest, path.relative(fs.realpathSync.native(top), fs.realpathSync.native(repo)));
 }
 
 function isLink(p) {
