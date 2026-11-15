@@ -12,6 +12,7 @@
 //   POST /sessions, DELETE /sessions/<token>, GET /sessions                wrapper sessions
 //   GET  /health, POST /stop
 //   GET  /, /assets/*, /api/experiments/runs[/<id>/…]   the UI (ui-api.mjs)
+//   GET  /api/ab[/<id>]     A/B experiments of `glass ab` (ui-api.mjs, ab.mjs)
 //   GET  /api/statusline[?task_id=]   status-line facts of a live session (statusline.mjs)
 //   GET|PATCH /api/offload, PUT /api/offload/key, POST /api/offload/test
 //                           the opt-in offload (offload-store.mjs), from the UI
@@ -53,7 +54,7 @@ import { captureForegroundTokens } from '../lsl/token/stop-adapter-registry.mjs'
 import { sweepVscodeTokenRows } from '../lsl/token/vscode-token-rows.mjs';
 import { glassPaths, PKG_ROOT } from './home.mjs';
 import { createEgressFetch, upstreamProxy, proxyEnvOf, noProxyOf, egressEnvFor } from './egress.mjs';
-import { createUiApi } from './ui-api.mjs';
+import { createUiApi, abTagOf } from './ui-api.mjs';
 import { statuslineData, renderReport, TAGS } from './statusline.mjs';
 import { createUsageSource, codingTokenDb, VSCODE_AGENT } from './combined.mjs';
 import { loadCostDefaults, saveExcludedAccounts, saveSources } from './cost.mjs';
@@ -359,6 +360,7 @@ export async function startDaemon({
       token, taskId, agent, intercept: body.intercept !== false,
       cwd: typeof body.cwd === 'string' ? body.cwd : '', project: typeof body.project === 'string' ? body.project : '',
       pid: Number(body.pid) || null, started_at: new Date().toISOString(), relays: relaysOf(body.relays),
+      ...abTagOf(body.ab),
     };
     sessions.set(token, s);
     saveSessions();
@@ -374,7 +376,7 @@ export async function startDaemon({
     saveSessions();
     const span = {
       task_id: s.taskId, agent: s.agent, started_at: s.started_at, ended_at: new Date().toISOString(),
-      meta: { source: 'glass', cwd: s.cwd, project: s.project, intercept: s.intercept },
+      meta: { source: 'glass', cwd: s.cwd, project: s.project, intercept: s.intercept, ...(s.ab ? { ab: s.ab } : {}) },
     };
     try {
       const dir = path.join(p.data, 'measurements');
