@@ -29,6 +29,10 @@ import { SoftAuthenticator } from './helpers/soft-authenticator.mjs';
 
 const SESSION = 'coding-box-claude-42';
 const COMPOSE = ['compose', '-f', '/repo/docker/docker-compose.yml'];
+// What the compose file requires (`${CODING_SCOPE:?…}` etc.); the daemon must
+// hand it to compose steps, since it is not started by the launcher.
+const COMPOSE_ENV = { CODING_REPO: '/repo', CODING_DATA_HOME: '/data', CODING_SCOPE: 'acme' };
+const dockerEnvs = [];
 // Generated per run: a fixture, not a secret, and never the same twice.
 const PASSPHRASE = randomBytes(18).toString('base64url');
 const TOO_SHORT = randomBytes(4).toString('hex');
@@ -73,8 +77,10 @@ before(async () => {
     paths,
     port,
     codingRepo: '/repo',
-    runDocker: async (argv) => {
+    composeEnv: async () => COMPOSE_ENV,
+    runDocker: async (argv, opts = {}) => {
       dockerCalls.push(argv);
+      dockerEnvs.push(opts.env);
       if (argv.includes('status') && argv.includes('supervisorctl')) {
         return { code: 0, stdout: 'backend-services:graphify RUNNING pid 1\n', stderr: '' };
       }
@@ -252,6 +258,7 @@ describe('svc broker', () => {
     dockerCalls.length = 0;
     const { status, data } = await svc(box, { verb: 'restart', args: ['graphify'] });
     assert.equal(status, 200);
+    assert.equal(dockerEnvs.at(-1), undefined, 'non-compose steps keep the daemon env');
     assert.deepEqual(dockerCalls.at(-1), ['exec', 'coding-services', 'supervisorctl', 'restart', 'backend-services:graphify']);
     assert.equal(data.code, 0);
   });
@@ -275,6 +282,7 @@ describe('svc broker', () => {
     const second = await svc(box, { verb: 'rebuild' });
     assert.equal(second.status, 200);
     assert.deepEqual(dockerCalls, [[...COMPOSE, 'build', 'coding-services'], [...COMPOSE, 'up', '-d', 'coding-services']]);
+    assert.deepEqual(dockerEnvs.slice(-2), [COMPOSE_ENV, COMPOSE_ENV], 'compose steps get the launcher env');
 
     assert.equal((await svc(box, { verb: 'rebuild' })).status, 403);
   });

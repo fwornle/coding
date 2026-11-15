@@ -108,13 +108,36 @@ function clip(value, max) {
   return s.length > max ? `${s.slice(0, max)}…` : s;
 }
 
-/** Default docker runner: argv only, never a shell. */
-function dockerRunner(argv, { timeout = 60_000 } = {}) {
+/** Default docker runner: argv only, never a shell. `env` is merged over the daemon's own. */
+function dockerRunner(argv, { timeout = 60_000, env } = {}) {
   return new Promise((resolve) => {
-    execFile('docker', argv, { timeout, maxBuffer: 8 * 1024 * 1024, encoding: 'utf8' }, (err, stdout, stderr) => {
+    const opts = { timeout, maxBuffer: 8 * 1024 * 1024, encoding: 'utf8', ...(env ? { env: { ...process.env, ...env } } : {}) };
+    execFile('docker', argv, opts, (err, stdout, stderr) => {
       resolve({ code: err ? (typeof err.code === 'number' ? err.code : 1) : 0, stdout, stderr });
     });
   });
+}
+
+/**
+ * The variables docker-compose.yml REQUIRES (`${CODING_DATA_HOME:?…}`,
+ * `${CODING_SCOPE:?…}`, bare `${CODING_REPO}`), resolved exactly as the
+ * launcher does (scripts/launch-agent-common.sh _export_data_home): from
+ * bin/coding-data-home. The daemon is not started by the launcher, so it has
+ * none of them — without this every `svc up`/`rebuild` failed at compose
+ * interpolation, after the user had already approved it. Fails closed: a
+ * compose step never runs with a guessed data root or tenant.
+ */
+export function resolveComposeEnv(codingRepo) {
+  const bin = path.join(codingRepo, 'bin', 'coding-data-home');
+  const ask = (args) => new Promise((resolve, reject) => {
+    execFile(bin, args, { timeout: 15_000, encoding: 'utf8' }, (err, stdout) => {
+      const out = (stdout || '').trim();
+      if (err || !out) reject(new Error(`bin/coding-data-home ${args.join(' ')} failed${err ? `: ${err.message}` : ' (empty)'}`));
+      else resolve(out);
+    });
+  });
+  return Promise.all([ask(['--ensure']), ask(['--scope'])])
+    .then(([dataHome, scope]) => ({ CODING_REPO: codingRepo, CODING_DATA_HOME: dataHome, CODING_SCOPE: scope }));
 }
 
 /**
@@ -159,7 +182,7 @@ export function createGuard({
   paths = guardPaths(), runDocker = dockerRunner, now = () => Date.now(), codingRepo = REPO, port = guardPort(),
   clipboard = { peek: peekClipboardImage, read: readClipboardImage },
   clipboardEnabled = () => process.env.CODING_GUARD_CLIPBOARD !== 'off',
-  runHost = hostRunner, ghPath = findGh(),
+  runHost = hostRunner, ghPath = findGh(), composeEnv = () => resolveComposeEnv(codingRepo),
 } = {}) {
   const keys = ensureGuardHome(paths);
   writeGuardEndpoint(paths, port);
@@ -335,9 +358,19 @@ export function createGuard({
       if (grant.payload.scope === 'call') grant.consumed = now();
       save();
     }
+    // Compose steps need the launcher's environment (resolveComposeEnv).
+    let env;
+    if (plan.steps.some((argv) => argv[0] === 'compose')) {
+      try {
+        env = await composeEnv();
+      } catch (err) {
+        audit({ event: 'svc.env_failed', verb, session, error: err.message });
+        throw new HttpError(500, `cannot resolve the compose environment: ${err.message}`);
+      }
+    }
     const results = [];
     for (const argv of plan.steps) {
-      const res = await runDocker(argv, { timeout: verb === 'rebuild' ? 15 * 60_000 : 60_000 });
+      const res = await runDocker(argv, { timeout: verb === 'rebuild' ? 15 * 60_000 : 60_000, ...(argv[0] === 'compose' ? { env } : {}) });
       results.push({ argv: ['docker', ...argv], ...res });
       if (res.code !== 0) break;
     }
