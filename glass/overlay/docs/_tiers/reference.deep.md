@@ -9,6 +9,7 @@
 | `glass doctor` | Node version, data home, CA, egress proxy, each agent's path and version, daemon state, and warnings when another local LLM proxy or tmux session overlaps with glass. Exit code 1 when something needs fixing |
 | `glass watch [--task <id>]` | A live one-line status bar for the newest session, or the given one |
 | `glass job-classes [on\|off\|measure\|join <url>\|pull\|leave]` | [Job classes](job-classes.md): switch labelling, measure your recent prompts, use a team's taxonomy. Without an argument: the current state |
+| `glass ab run\|list\|report` | [A/B experiments](comparing-runs.md): the same agent and prompt on two or more models, interleaved and repeated, checked by your command; `glass ab help` for the options |
 | `glass statusline [--format plain\|ansi\|tmux] [--task <id>]` | Print the status line once |
 | `glass report ctx\|net [--task <id>]` | The context or network report (what a status-line click shows) |
 | `glass stop` | Stop the daemon; open agent tunnels are closed, so it exits at once |
@@ -71,10 +72,12 @@
 | `~/.glass/data/llm-proxy/token-usage.db` | Token rows (SQLite, table `token_usage`) |
 | `~/.glass/data/measurements/` | Session records and context captures |
 | `~/.glass/ca/` | The interception CA |
+| `~/.glass/data/ab/<id>/` | An [A/B experiment](comparing-runs.md): `experiment.json`, and each trial's agent and check output |
 | `~/.glass/logs/daemon.log` | Daemon log |
 | `~/.glass/daemon.json` | Running daemon's pid and port |
 | `~/.glass/run/copilot-quota.json` | GitHub's last month-to-date Copilot figure, and the host it came from |
 | `~/.glass/offload.json`, `offload.key` | [Offload](offload.md) settings and the endpoint key (owner-only) |
+| `~/.glass/cluster.json`, `cluster.key`, `cluster-status.key` | [Cluster](cluster.md) nodes and ports; the gateways' key and the status services' key (each optional, owner-only, refused otherwise) |
 | `~/.glass/job-classes.json`, `job-classes/` | [Job classes](job-classes.md) settings (owner-only) and a joined team's taxonomy |
 | `~/.glass/cost.json` | Optional: contract discount and FX for the € / $ views ([How cost is calculated](token-usage.md#how-cost-is-calculated)) |
 
@@ -86,5 +89,5 @@ The daemon serves JSON on `http://127.0.0.1:12445`: `/health`,
 `/api/context-turns?task_id=…`,
 `/api/context-breakdown?task_id=…`, `/api/statusline`,
 `/api/models?hours=N` and `/api/experiments/runs/<session id>/models` (the model mix, see
-[Models & Accounts](models.md)), `/api/calls/unbound`, `/api/offload` (see
+[Models & Accounts](models.md)), `/api/calls/unbound`, `/api/ab` and `/api/ab/<id>` ([A/B experiments](comparing-runs.md)), `/api/offload` (see
 [Offload Easy Calls](offload.md) for its write calls).

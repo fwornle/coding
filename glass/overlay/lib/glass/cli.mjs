@@ -2,6 +2,7 @@
 //
 //   glass <claude|copilot|opencode|pi> [--no-intercept] [--no-tmux] [agent args…]
 //   glass ui | status | doctor | stop | uninstall [--yes] | daemon | --version | help
+//   glass ab run|list|report             A/B experiments (ab-cli.mjs)
 //   glass statusline | watch | click <tag> | report <ctx|net>   the status line
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,7 +18,7 @@ import {
 import { ghDoctorLines, ghEnvIn, runGh } from './copilot-quota.mjs';
 import { runAgent, cmdLine } from './spawn.mjs';
 import { upstreamProxy, proxyEnvOf } from './egress.mjs';
-import { coexistWarnings, opencodeCopilotUpstream, opencodeHttpProviders, piHttpProviders } from './coexist.mjs';
+import { coexistWarnings, sessionRelays } from './coexist.mjs';
 import { configuredBrowser, openUrl } from './open-url.mjs';
 import { chosenBrowser } from '../statusline/browser-tab.mjs';
 import { renderStatusline, renderReport, uiLinks, TAGS } from './statusline.mjs';
@@ -26,6 +27,7 @@ import { update, RELEASE_REPO } from './update.mjs';
 import { loadCostDefaults } from './cost.mjs';
 import { billingProblems } from '../cost/billing-rules.mjs';
 import { jobClassesCmd } from './job-classes-cli.mjs';
+import { abCmd } from './ab-cli.mjs';
 
 const PI_RELAY_EXTENSION = path.join(PKG_ROOT, 'lib', 'glass', 'pi-relay-extension.mjs');
 
@@ -48,6 +50,8 @@ const HELP = `glass ${VERSION} — token measurement and context insight for cod
   glass watch        a live status line for the newest session (--task <id> for another)
   glass job-classes  what kind of job each turn is, labelled with your Copilot account (off
                      until \`glass job-classes on\`); join <url> a team's taxonomy; measure
+  glass ab           A/B: one agent and prompt on two or more models, interleaved and
+                     repeated, each trial checked by your --check command (glass ab help)
 
 Data: GLASS_HOME (default ~/.glass). Port: GLASS_PORT (default 12445).
 --no-intercept: copilot/opencode/pi run without TLS interception (not measured by the proxy).
@@ -171,16 +175,9 @@ async function runMeasured(agent, argv) {
   }
 
   // opencode and pi providers on plain HTTP never reach HTTPS_PROXY: the daemon relays
-  // them. A provider already on this daemon (a nested glass run) is left as it is.
-  // github-copilot is relayed too, to its Copilot API host: opencode then sends its own
-  // login to the daemon by configuration, and its calls need no interception — so
-  // that relay stays on under --no-intercept.
-  const plainHttp = agent === 'opencode' ? opencodeHttpProviders(baseEnv) : agent === 'pi' ? piHttpProviders(baseEnv) : {};
-  const relays = intercept
-    ? Object.fromEntries(Object.entries(plainHttp).filter(([, url]) => !url.startsWith(`http://127.0.0.1:${port}/relay/`)))
-    : {};
-  const copilot = agent === 'opencode' && !relays['github-copilot'] ? opencodeCopilotUpstream(baseEnv) : null;
-  if (copilot) relays['github-copilot'] = copilot;
+  // them. github-copilot is relayed too, to its Copilot API host: opencode then sends
+  // its own login to the daemon by configuration (coexist.mjs sessionRelays).
+  const relays = sessionRelays(agent, { env: baseEnv, port, intercept });
   const up = await daemonFor({ home, port, env: baseEnv });
   if (up?.update) err(`glass ${up.update} is available (this is ${VERSION}) — glass update, or click ⬆ on the status line`);
   const session = up ? await openSession(port, {
@@ -502,6 +499,7 @@ export async function main(argv) {
     case 'watch': return watch(rest);
     case 'status': return status();
     case 'job-classes': return jobClassesCmd(rest, { out, err });
+    case 'ab': return abCmd(rest, { out, err, daemonFor, agentBin, whichBin, projectOf, piExtension: PI_RELAY_EXTENSION });
     case 'doctor': return doctor();
     case 'stop': {
       const stopped = await stopDaemon(glassPort());

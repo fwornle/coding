@@ -12,9 +12,11 @@
 //   POST /sessions, DELETE /sessions/<token>, GET /sessions                wrapper sessions
 //   GET  /health, POST /stop
 //   GET  /, /assets/*, /api/experiments/runs[/<id>/…]   the UI (ui-api.mjs)
+//   GET  /api/ab[/<id>]     A/B experiments of `glass ab` (ui-api.mjs, ab.mjs)
 //   GET  /api/statusline[?task_id=]   status-line facts of a live session (statusline.mjs)
 //   GET|PATCH /api/offload, PUT /api/offload/key, POST /api/offload/test
 //                           the opt-in offload (offload-store.mjs), from the UI
+//   GET  /api/cluster       a GPU cluster's nodes, opt-in via cluster.json (cluster.mjs)
 //   GET  /api/job-classes[/summary|/coverage|/settings], PATCH …/settings,
 //        POST …/test, PUT|DELETE …/team, POST …/team/pull
 //                           job classes, opt-in (job-classes.mjs)
@@ -52,7 +54,7 @@ import { captureForegroundTokens } from '../lsl/token/stop-adapter-registry.mjs'
 import { sweepVscodeTokenRows } from '../lsl/token/vscode-token-rows.mjs';
 import { glassPaths, PKG_ROOT } from './home.mjs';
 import { createEgressFetch, upstreamProxy, proxyEnvOf, noProxyOf, egressEnvFor } from './egress.mjs';
-import { createUiApi } from './ui-api.mjs';
+import { createUiApi, abTagOf } from './ui-api.mjs';
 import { statuslineData, renderReport, TAGS } from './statusline.mjs';
 import { createUsageSource, codingTokenDb, VSCODE_AGENT } from './combined.mjs';
 import { loadCostDefaults, saveExcludedAccounts, saveSources } from './cost.mjs';
@@ -60,6 +62,7 @@ import { createNetworkMonitor } from './network.mjs';
 import { createOffloadStore } from './offload-store.mjs';
 import { createCopilotQuota } from './copilot-quota.mjs';
 import { createGlassJobClasses } from './job-classes.mjs';
+import { createCluster } from './cluster.mjs';
 import { createUpdateCheck, UPDATE_CHECK_MS } from './update.mjs';
 import { createOffloader, createTargetHealth, OFFLOAD_AGENTS } from '../../proxy/proxy-bridge/offload.mjs';
 
@@ -290,6 +293,8 @@ export async function startDaemon({
   });
   const offloader = createOffloader({ fetch: targetFetch, getConfig: offloadStore.getConfig, getKey: offloadStore.getKey, health: offloadHealth });
   const offload = { offloader, getConfig: offloadStore.getConfig };
+  // A GPU cluster's nodes (cluster.mjs): only with cluster.json, polled only while the page reads it.
+  const cluster = createCluster({ home, fetch: targetFetch, log });
   // Probed only while offload is on: a switched-off feature makes no network call.
   const probeIfOn = () => (offloadStore.getConfig().enabled ? offloadHealth.probe() : Promise.resolve(offloadHealth.state));
   probeIfOn().catch(() => {});
@@ -355,6 +360,7 @@ export async function startDaemon({
       token, taskId, agent, intercept: body.intercept !== false,
       cwd: typeof body.cwd === 'string' ? body.cwd : '', project: typeof body.project === 'string' ? body.project : '',
       pid: Number(body.pid) || null, started_at: new Date().toISOString(), relays: relaysOf(body.relays),
+      ...abTagOf(body.ab),
     };
     sessions.set(token, s);
     saveSessions();
@@ -370,7 +376,7 @@ export async function startDaemon({
     saveSessions();
     const span = {
       task_id: s.taskId, agent: s.agent, started_at: s.started_at, ended_at: new Date().toISOString(),
-      meta: { source: 'glass', cwd: s.cwd, project: s.project, intercept: s.intercept },
+      meta: { source: 'glass', cwd: s.cwd, project: s.project, intercept: s.intercept, ...(s.ab ? { ab: s.ab } : {}) },
     };
     try {
       const dir = path.join(p.data, 'measurements');
@@ -549,6 +555,10 @@ export async function startDaemon({
         json, readJson, writeAllowed: (r) => uiWriteAllowed(r, selfPort),
       })) return undefined;
       if (url === '/api/offload' && req.method === 'GET') return json(res, 200, offloadView());
+      if (url.split('?')[0] === '/api/cluster') {
+        if (req.method !== 'GET') return json(res, 405, { error: 'the cluster is read-only here — cluster.json configures it' });
+        return json(res, 200, /[?&]peek=1\b/.test(url) ? cluster.peek() : await cluster.read());
+      }
       if (url.startsWith('/api/offload') && req.method !== 'GET') {
         if (!uiWriteAllowed(req, selfPort)) return json(res, 403, { error: 'offload settings change only from the glass UI or CLI' });
         const body = await readJson(req);
@@ -719,6 +729,7 @@ export async function startDaemon({
     clearInterval(sweepTimer);
     clearInterval(idleTimer);
     clearInterval(offloadTimer);
+    cluster.stop();
     clearInterval(observeTimer);
     clearInterval(updateTimer);
     await updateCheck.settled();
