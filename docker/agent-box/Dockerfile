@@ -66,10 +66,36 @@ RUN apt-get update \
 # PlantUML, so an agent that edits docs/puml/*.puml can render the PNG the
 # docs reference (CLAUDE.md: the `plantuml` CLI, never `java -jar`). Without
 # it a diagram change ships with a stale image. Graphviz is required for
-# component/class layouts; same packages as Dockerfile.coding-services.
+# component/class layouts.
+#
+# The jar is a pinned upstream release, NOT Debian's `plantuml` package:
+# bookworm ships 1.2020.02, years behind the hosts, so newer syntax failed or
+# a re-rendered PNG drifted from the one rendered on the Mac. It comes from
+# Maven Central (not GitHub's release CDN, which 504s through the egress
+# proxy), is checked against Maven's published SHA-1, and must answer
+# `-version` before the layer is kept. /usr/local/bin/plantuml is the CLI.
+#
+# Emoji: on Linux, Java cannot draw colour-bitmap fonts (Noto Color Emoji is
+# CBDT; on macOS it draws Apple Color Emoji), so an emoji in a diagram renders
+# MONOCHROME here and in colour on the Mac. No font package changes that —
+# tested with the colour font hidden from Java: byte-identical output. Render
+# emoji-heavy diagrams on the host. Noto Color Emoji is installed for the
+# browser (Playwright screenshots, mkdocs serve).
+ARG PLANTUML_VERSION=1.2025.2
 RUN apt-get update \
- && apt-get install -y --no-install-recommends default-jre-headless graphviz plantuml \
- && rm -rf /var/lib/apt/lists/*
+ && apt-get install -y --no-install-recommends default-jre-headless graphviz \
+      fontconfig fonts-noto-color-emoji \
+ && rm -rf /var/lib/apt/lists/* \
+ && base="https://repo1.maven.org/maven2/net/sourceforge/plantuml/plantuml/${PLANTUML_VERSION}/plantuml-${PLANTUML_VERSION}.jar" \
+ && install -d -m 755 /opt/plantuml \
+ && curl -fsSL --retry 3 -o /opt/plantuml/plantuml.jar "$base" \
+ && echo "$(curl -fsSL --retry 3 "$base.sha1" | cut -c1-40)  /opt/plantuml/plantuml.jar" | sha1sum -c - \
+ && chmod 644 /opt/plantuml/plantuml.jar \
+ && printf '%s\n' '#!/bin/sh' \
+      'exec java -Djava.awt.headless=true -jar /opt/plantuml/plantuml.jar "$@"' \
+      > /usr/local/bin/plantuml \
+ && chmod 755 /usr/local/bin/plantuml \
+ && plantuml -version | grep -F "PlantUML version ${PLANTUML_VERSION}"
 
 # The guard: root-owned, not writable by the agent user. The hook finds its
 # rules through CONSTRAINT_CONFIG_PATH set in the managed hook command, so a
