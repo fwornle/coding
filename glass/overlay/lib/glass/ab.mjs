@@ -13,6 +13,10 @@
 // Result quality is whatever the `--check` command says (its exit code). There is
 // no LLM judge: a pass rate is only as good as the check.
 //
+// An optional `--before-trial` command runs before every trial (to put a server on
+// the variant's weights, to clear its cache). When it fails, the trial is recorded
+// as failed with that reason and neither the agent nor the check runs.
+//
 // This module is the part without side effects on the machine (apart from the
 // experiment files): the schedule, the store, the orchestration loop with the
 // trial runner injected, and the report. ab-cli.mjs runs real agents.
@@ -30,6 +34,8 @@ const LABEL = /^[A-Za-z0-9._-]{1,40}$/;
  * `label=provider/model`. The model may hold slashes of its own
  * (`local-llama/Qwen/Qwen3.5-4B` → provider local-llama, model Qwen/Qwen3.5-4B).
  * claude and copilot take a bare model (`label=model`): they have no providers.
+ * Two variants may name the same provider/model: only the label must differ
+ * (one server whose weights a --before-trial hook switches per variant).
  */
 export function parseVariant(spec, agent) {
   const m = /^([^=]+)=(.+)$/.exec(String(spec || ''));
@@ -236,6 +242,7 @@ export function trialFacts(t, calls = []) {
     started_at: t.started_at || null, wall_ms: t.wall_ms ?? null,
     agent_exit: t.agent_exit ?? null, timed_out: Boolean(t.timed_out), error: t.error || null,
     agent_failed: agentFailed(t),
+    before_trial: t.before_trial ? { exit: t.before_trial.exit ?? null, wall_ms: t.before_trial.wall_ms ?? null, timed_out: Boolean(t.before_trial.timed_out), passed: t.before_trial.exit === 0 && !t.before_trial.timed_out } : null,
     check: t.check ? { exit: t.check.exit ?? null, passed: t.check.passed === true, wall_ms: t.check.wall_ms ?? null, timed_out: Boolean(t.check.timed_out) } : null,
     calls: calls.length,
     models: [...new Set(calls.map((c) => c.model))],
@@ -285,6 +292,7 @@ export function experimentReport(exp, callsOf = new Map()) {
   });
   return {
     id: exp.id, label: exp.label || '', agent: exp.agent, prompt: exp.prompt, check: exp.check || null,
+    before_trial: exp.before_trial || null,
     repo: exp.repo, repeats: exp.repeats, seed: exp.seed, status: exp.status,
     created_at: exp.created_at, finished_at: exp.finished_at || null,
     variants, trials,
@@ -295,7 +303,7 @@ export function experimentReport(exp, callsOf = new Map()) {
 export function experimentSummary(exp) {
   return {
     id: exp.id, label: exp.label || '', agent: exp.agent, status: exp.status, created_at: exp.created_at,
-    finished_at: exp.finished_at || null, repeats: exp.repeats, check: Boolean(exp.check),
+    finished_at: exp.finished_at || null, repeats: exp.repeats, check: Boolean(exp.check), before_trial: Boolean(exp.before_trial),
     variants: exp.variants.map((v) => ({ label: v.label, provider: v.provider, model: v.model })),
     trials: exp.trials.length, planned: exp.plan.length,
   };
@@ -339,6 +347,7 @@ export function formatReport(r) {
     `${r.id}${r.label ? ` · ${r.label}` : ''} · ${r.agent} · ${r.status} · ${r.repeats} round(s)${r.seed !== undefined ? ` · seed ${r.seed}` : ''}`,
     `prompt: ${r.prompt.length > 100 ? `${r.prompt.slice(0, 97)}…` : r.prompt}`,
     `check:  ${r.check || '(none — no pass rate)'}`,
+    ...(r.before_trial ? [`before: ${r.before_trial}`] : []),
     '',
     table([['', ...r.variants.map((v) => v.label)], ...METRICS.map(([name, f]) => [name, ...r.variants.map(f)])]),
     '',
@@ -346,7 +355,7 @@ export function formatReport(r) {
       ['trial', 'round', 'variant', 'agent', 'check', 'wall', 'calls', 'in', 'out', 'tools', 'task'],
       ...r.trials.map((t) => [
         t.n, t.round, t.variant,
-        t.error ? 'error' : t.timed_out ? 'timeout' : t.agent_exit === null ? dash : `exit ${t.agent_exit}`,
+        t.before_trial && !t.before_trial.passed ? 'skipped' : t.error ? 'error' : t.timed_out ? 'timeout' : t.agent_exit === null ? dash : `exit ${t.agent_exit}`,
         t.check ? (t.check.passed ? 'pass' : t.check.timed_out ? 'timeout' : `fail ${t.check.exit}`) : dash,
         fmtMs(t.wall_ms), t.calls, fmtN(t.input), fmtN(t.output), t.tool_calls ?? dash, t.task_id || dash,
       ]),
@@ -366,13 +375,13 @@ const csvCell = (v) => {
 export function reportCsv(r) {
   const head = ['experiment', 'trial', 'round', 'variant', 'provider', 'model', 'answered_by', 'task_id', 'wall_ms', 'agent_exit',
     'timed_out', 'error', 'check_exit', 'check_passed', 'calls', 'input', 'output', 'reasoning', 'cache_read', 'tool_calls',
-    'turns', 'latency_p50_ms', 'ttft_p50_ms'];
+    'turns', 'latency_p50_ms', 'ttft_p50_ms', 'before_trial_exit'];
   const byLabel = new Map(r.variants.map((v) => [v.label, v]));
   const rows = r.trials.map((t) => {
     const v = byLabel.get(t.variant) || {};
     return [r.id, t.n, t.round, t.variant, v.provider, v.model, t.models.join(' '), t.task_id, t.wall_ms, t.agent_exit,
       t.timed_out, t.error, t.check?.exit, t.check ? t.check.passed : '', t.calls, t.input, t.output, t.reasoning,
-      t.cache_read, t.tool_calls, t.turns, t.latency_p50_ms, t.ttft_p50_ms];
+      t.cache_read, t.tool_calls, t.turns, t.latency_p50_ms, t.ttft_p50_ms, t.before_trial?.exit];
   });
   return [head, ...rows].map((row) => row.map(csvCell).join(',')).join('\n');
 }

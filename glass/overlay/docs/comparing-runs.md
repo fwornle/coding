@@ -36,6 +36,29 @@ agents, and compare what each cost, how fast it answered and whether it got the 
 
     The pass rate is only as good as your `--check`: glass has no judge of its own.
 
+    ## One server, two weights: `--before-trial`
+
+    A base model and its LoRA fine-tune can share one llama-server: load the adapter
+    switched off, and let a hook put the server on each trial's weights first.
+
+    ```sh
+    llama-server -m base.gguf --lora tuned.gguf --lora-init-without-apply \
+      --slot-save-path ./slots --cache-ram 0 --port 8080
+
+    glass ab run --agent pi \
+      --variant base=local-llama/qwen --variant tuned=local-llama/qwen \
+      --before-trial "node lora-scale.mjs" \
+      --prompt "Fix the failing test in cart.py" --check "python -m pytest -q" --repeats 3
+    ```
+
+    The hook runs before every trial, in the trial's copy, with `GLASS_AB_VARIANT` (the
+    label), `GLASS_AB_TRIAL`, `GLASS_AB_MODEL` and `GLASS_AB_EXPERIMENT` set. Here it sets
+    the adapter's scale (`POST /lora-adapters`, 1 for `tuned`, 0 for `base`) **and erases
+    every slot's prompt cache** (`POST /slots/<id>?action=erase`): a request without its
+    own `lora` field takes the global scale but keeps the slot's cached tokens, which were
+    computed under the other weights. A hook that exits non-zero fails its trial — no
+    agent, no check. [The deep dive](#one-server-two-weights) has the script.
+
     ## Two agents, by hand
 
     ```sh
