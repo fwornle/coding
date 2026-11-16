@@ -159,6 +159,7 @@ home|~/.coding/data/<scope>/|create|no|your knowledge base and session history, 
 home|~/bin/coding|symlink|yes|makes the `coding` command available on PATH
 home|$SHELL_RC|one marker block|yes|exports CODING_REPO and adds bin/ to PATH
 home|~/.gsd-browser/|create|yes|gsd-browser CLI, the mandated browser-automation tool; installer reuses a system Chrome when present and otherwise downloads Chrome for Testing. On macOS also writes config.toml [browser] path + a chromium.app symlink, pinning automation to Chrome for Testing so it cannot intercept AppleScript aimed at your own Chrome
+home|~/.local/pipx/venvs/mkdocs-material/|create|no|the docs toolchain (mkdocs-material + mkdocs-minify-plugin, as CI and the agent box install it) for `mkdocs build --strict`, via pipx, so nothing lands in a system Python. Remove with `pipx uninstall mkdocs-material`
 global|~/.claude/settings.json|merge hooks|yes|OPT-IN: adds hooks that run for EVERY claude session, in every project
 global|~/.claude.json|merge mcpServers|yes|OPT-IN: MCP servers visible to bare `claude` everywhere
 global|~/.claude/commands/|copy skills|yes|OPT-IN: slash commands available to bare `claude` everywhere
@@ -1556,6 +1557,65 @@ install_gsd_browser() {
         info "  Retry later: curl -fsSL ${GSD_BROWSER_INSTALLER_URL} | GSD_BROWSER_VERSION=${GSD_BROWSER_VERSION_PIN} bash"
         INSTALLATION_WARNINGS+=("gsd-browser: install failed; bin/gsd-browser will exit 127 until it is installed")
     fi
+}
+
+# The docs toolchain, so `mkdocs build --strict` runs on the host too — the
+# same two packages deploy-docs.yml and docker/agent-box/Dockerfile install.
+# pipx, not pip: one isolated venv, nothing in a system or Homebrew Python, and
+# mkdocs-material picks the mkdocs version it supports (--include-deps exposes
+# its `mkdocs`). Non-fatal: docs builds are for contributors, not for running.
+install_docs_toolchain() {
+    echo -e "\n${CYAN}📚 Installing the docs toolchain (mkdocs)...${NC}"
+
+    # Idempotent: an mkdocs that already has the material theme and the minify
+    # plugin is left alone, wherever it came from.
+    if command -v mkdocs >/dev/null 2>&1 && _mkdocs_has_plugins "$(command -v mkdocs)"; then
+        success "mkdocs already installed ($(mkdocs --version 2>/dev/null | awk '{print $3}'))"
+        return 0
+    fi
+
+    if ! command -v pipx >/dev/null 2>&1; then
+        warning "pipx not found — skipped the docs toolchain"
+        info "  Install pipx (macOS: brew install pipx; Debian/Ubuntu: apt install pipx), then:"
+        info "  pipx install --include-deps mkdocs-material && pipx inject mkdocs-material mkdocs-minify-plugin"
+        INSTALLATION_WARNINGS+=("mkdocs: not installed (no pipx); mkdocs build --strict unavailable on this host")
+        return 0
+    fi
+
+    if ! confirm_system_change \
+        "pipx install mkdocs-material + mkdocs-minify-plugin (into ~/.local/pipx/venvs/mkdocs-material, command in ~/.local/bin)" \
+        "Downloads the docs toolchain from PyPI into its own pipx venv. Needed only to build the docs locally (mkdocs build --strict)."; then
+        warning "Skipped the docs toolchain"
+        info "  Install later: pipx install --include-deps mkdocs-material && pipx inject mkdocs-material mkdocs-minify-plugin"
+        INSTALLATION_WARNINGS+=("mkdocs: not installed (declined); mkdocs build --strict unavailable on this host")
+        return 0
+    fi
+
+    if pipx install --include-deps mkdocs-material >/dev/null 2>&1 \
+        && pipx inject mkdocs-material mkdocs-minify-plugin >/dev/null 2>&1; then
+        local mk="${PIPX_BIN_DIR:-$HOME/.local/bin}/mkdocs"
+        if [[ -x "$mk" ]] && _mkdocs_has_plugins "$mk"; then
+            success "mkdocs installed ($("$mk" --version 2>/dev/null | awk '{print $3}'))"
+            command -v mkdocs >/dev/null 2>&1 \
+                || info "  $(dirname "$mk") is not on PATH yet — run: pipx ensurepath"
+        else
+            warning "pipx reported success but $mk is missing or lacks its plugins"
+            INSTALLATION_WARNINGS+=("mkdocs: pipx install succeeded but $mk is not usable")
+        fi
+    else
+        warning "mkdocs install failed (network, proxy or Python)"
+        info "  Retry later: pipx install --include-deps mkdocs-material && pipx inject mkdocs-material mkdocs-minify-plugin"
+        INSTALLATION_WARNINGS+=("mkdocs: install failed; mkdocs build --strict unavailable on this host")
+    fi
+}
+
+# Does the mkdocs at $1 have the theme and plugin mkdocs.yml needs? Asks its
+# own interpreter, so a bare mkdocs without material does not count.
+_mkdocs_has_plugins() {
+    local py
+    py="$(head -1 "$1" 2>/dev/null | sed -n 's/^#!//p')"
+    [[ -n "$py" ]] || return 1
+    $py -c 'import material, mkdocs_minify_plugin' >/dev/null 2>&1
 }
 
 install_graphify() {
@@ -4831,6 +4891,7 @@ main() {
     initialize_knowledge_databases
     install_plantuml
     install_gsd_browser
+    install_docs_toolchain
     setup_local_llm  # DMR preferred, Ollama as fallback
     setup_llm_cli_proxy  # HTTP bridge for claude/copilot CLI in Docker
     setup_claude_ctx_sweeper  # Windows-only scheduled task; a no-op elsewhere
