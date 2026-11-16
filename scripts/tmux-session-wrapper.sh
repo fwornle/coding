@@ -154,13 +154,29 @@ tmux_session_wrapper() {
   export CODING_REPO
   export CODING_TMUX_MODE=true
 
+  # A boxed session gets a tinted status bar, so "is this agent sandboxed?" can
+  # be answered at a glance. tmux runs on the HOST in both cases — only the
+  # command inside the pane is `agent-box.mjs run` — so the launcher's
+  # CODING_BOX decision is the one source of truth here, not anything the pane
+  # could probe. The fg is set together with the bg: a dark bar with the
+  # terminal's default fg would be black-on-charcoal in a light theme. Every
+  # `bg=default` the renderer emits resolves to THIS style, so the tint runs the
+  # whole width; only the context gauge's own coloured cells sit on top of it.
+  # Unboxed sessions are reset to default explicitly — when the wrapper runs
+  # inside an existing tmux session, a previous boxed launch there would
+  # otherwise leave the tint behind. CODING_BOX_STATUS_STYLE overrides the tint.
+  local status_style="bg=default,fg=default"
+  case "${CODING_BOX:-}" in
+    1|true|TRUE|yes|on) status_style="${CODING_BOX_STATUS_STYLE:-bg=#0f3a57,fg=colour255}" ;;
+  esac
+
   # Helper: apply status bar configuration to a tmux session
   _configure_tmux_status() {
     local target_session="$1"
     tmux set-option -t "$target_session" status on
     tmux set-option -t "$target_session" status-interval 5
     tmux set-option -t "$target_session" status-right-length 200
-    tmux set-option -t "$target_session" status-style "bg=default,fg=default"
+    tmux set-option -t "$target_session" status-style "$status_style"
     tmux set-option -t "$target_session" status-right "#(${status_cmd} 2>/dev/null || echo '[Status Offline]')"
     tmux set-option -t "$target_session" mouse on
     _bind_status_clicks

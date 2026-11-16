@@ -171,7 +171,12 @@ The launch line says which level is running, for example
 Inside the box, `CODING_BOX_MODE` is `box` or `strict`.
 
 Only the final command changes: tmux, the status line and all host services
-stay as they are. With the `constraints` feature off (the Docker-free `harness`
+stay as they are. One thing is different so you can see it: a boxed
+session's status bar has a dark blue background (`bg=#0f3a57,fg=colour255`; see
+[Status Line](../guides/status-line.md)).
+A session on the host keeps your terminal's default background. To use a
+different tint, set `CODING_BOX_STATUS_STYLE` to any tmux style, for example
+`bg=colour17,fg=colour250`. With the `constraints` feature off (the Docker-free `harness`
 tier) the default is the host.
 
 **First run.** Build the image once, then log the agent in once inside the box.

@@ -29,6 +29,15 @@ The current pane's project is rendered with an underline (`#[underscore]…#[nou
 The context gauge is the one segment with no `[…]` brackets and no leading emoji: it
 carries a tinted background instead, which delimits it on its own.
 
+### Box vs. host
+
+The bar's background tells you whether this pane's agent is sandboxed. A session launched
+in the [agent box](../core-systems/agent-box.md) gets `status-style bg=#0f3a57,fg=colour255`, a
+muted navy with near-white text; a session on the host keeps `bg=default,fg=default`. Every
+`bg=default` the renderer emits resolves to the bar's style, so the tint runs the full width;
+only the context gauge keeps its own colours. `CODING_BOX_STATUS_STYLE` replaces the tint
+(boxed sessions only).
+
 ---
 
 ## Complete Glyph Reference
@@ -565,6 +574,7 @@ All coding agents are wrapped in tmux sessions via `scripts/tmux-session-wrapper
 - Handles nesting guard (reuses existing tmux if already inside one)
 - Propagates environment variables (`CODING_REPO`, `SESSION_ID`, etc.)
 - Enables mouse forwarding for terminal interaction
+- Tints `status-style` when the launcher chose the agent box (`CODING_BOX`), and resets it to default otherwise — tmux always runs on the host, so this launch-time decision is the only reliable signal
 
 This replaces the previous approach of using agent-specific status bar APIs (e.g., Claude's `statusLine` config), providing a unified rendering target that works identically for all agents.
 
