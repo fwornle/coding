@@ -75,7 +75,9 @@ unmeasured — it never blocks your agent.
 **Status line.** With tmux installed, `glass <agent>` runs the agent in a tmux session
 with glass's status bar: context gauge, tokens of this session, daemon state. Click a
 field for details or to open the UI. `--no-tmux` (or `GLASS_NO_TMUX=1`) runs it in the
-current terminal instead. Without tmux — native Windows, for instance — Claude Code
+current terminal instead. If the agent quits within 5 seconds of starting, its tmux
+session stays open showing the agent's output until you press Enter, so a startup error
+stays readable. Without tmux — native Windows, for instance — Claude Code
 shows glass's line as its own status line (fields are clickable in Windows Terminal,
 iTerm2 and VS Code); for the other agents run `glass watch` in a split pane
 (`wt split-pane` in Windows Terminal).
