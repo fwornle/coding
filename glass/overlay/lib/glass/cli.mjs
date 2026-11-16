@@ -22,7 +22,7 @@ import { coexistWarnings, sessionRelays } from './coexist.mjs';
 import { configuredBrowser, openUrl } from './open-url.mjs';
 import { chosenBrowser } from '../statusline/browser-tab.mjs';
 import { renderStatusline, renderReport, uiLinks, TAGS } from './statusline.mjs';
-import { tmuxWanted, launchInTmux, configureStatus, popup, message, selfCommand, agentMouseEnv } from './tmux.mjs';
+import { tmuxWanted, launchInTmux, configureStatus, popup, message, selfCommand, agentMouseEnv, holdQuickExit } from './tmux.mjs';
 import { update, RELEASE_REPO } from './update.mjs';
 import { loadCostDefaults } from './cost.mjs';
 import { billingProblems } from '../cost/billing-rules.mjs';
@@ -158,7 +158,16 @@ export async function daemonFor({ home, port, env, version = VERSION, warn = err
   return h;
 }
 
+// coding's launcher flags. glass has no agent box, so they must not slip
+// through to the agent as options of its own (pi stops on an unknown flag).
+const CODING_ONLY_FLAGS = ['--box', '--strict-box', '--no-box'];
+
 async function runMeasured(agent, argv) {
+  const codingFlag = argv.find((a) => CODING_ONLY_FLAGS.includes(a));
+  if (codingFlag) {
+    err(`glass: ${codingFlag} is a coding launcher option — glass runs ${agent} on this machine, it has no agent box. Use \`coding ${agent} ${codingFlag}\` for the box, or \`glass ${agent}\` without it.`);
+    return 2;
+  }
   const intercept = !argv.includes('--no-intercept');
   const args = argv.filter((a) => a !== '--no-intercept' && a !== '--no-tmux');
   const home = glassHome();
@@ -211,7 +220,9 @@ async function runMeasured(agent, argv) {
   }
   // pi takes its relays from glass's extension, for this run (wiring.mjs GLASS_PI_RELAYS).
   if (env.GLASS_PI_RELAYS) agentArgs = ['-e', PI_RELAY_EXTENSION, ...agentArgs];
+  const started = Date.now();
   const code = await runAgent(bin, agentArgs, env);
+  await holdQuickExit({ agent, code, elapsedMs: Date.now() - started });
   restore();
   if (settings) fs.rmSync(settings, { force: true });
   await closeSession(port, session.token);

@@ -9,7 +9,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const { renderStatusline, renderReport, uiLinks, TAGS } = await import('../lib/glass/statusline.mjs');
-const { clickBinding, tmuxWanted, innerEnv, configureStatus, agentMouseEnv, clipboardCommand, mouseCopyBindings } = await import('../lib/glass/tmux.mjs');
+const { clickBinding, tmuxWanted, innerEnv, configureStatus, agentMouseEnv, clipboardCommand, mouseCopyBindings, holdQuickExit, QUICK_EXIT_MS } = await import('../lib/glass/tmux.mjs');
 const { claudeStatusSettings, isTerminalReport, watchHint, clickTarget } = await import('../lib/glass/cli.mjs');
 
 const D = {
@@ -211,6 +211,39 @@ test('tmux: configureStatus on a real server — options set, clicks bound, user
     t('kill-server');
     fs.rmSync(path.dirname(sock), { recursive: true, force: true });
   }
+});
+
+test('tmux: an agent that ends right after starting keeps its pane until Enter', async () => {
+  const { EventEmitter } = await import('node:events');
+  const fakeStdin = () => Object.assign(new EventEmitter(), { isTTY: true, raw: null, setRawMode(v) { this.raw = v; }, resume() {}, pause() {} });
+  const said = [];
+  const stderr = { write: (t) => said.push(t) };
+  const owned = { GLASS_TMUX_OWNED: '1' };
+  // Not held: a long run, a session the user owns, no terminal.
+  assert.equal(await holdQuickExit({ agent: 'pi', code: 0, elapsedMs: QUICK_EXIT_MS, env: owned, stdin: fakeStdin(), stderr }), false);
+  assert.equal(await holdQuickExit({ agent: 'pi', code: 1, elapsedMs: 600, env: {}, stdin: fakeStdin(), stderr }), false);
+  assert.equal(await holdQuickExit({ agent: 'pi', code: 1, elapsedMs: 600, env: owned, stdin: { ...fakeStdin(), isTTY: false }, stderr }), false);
+  assert.deepEqual(said, []);
+  // Held: says why, and lets go on Enter only.
+  const stdin = fakeStdin();
+  let released = false;
+  const held = holdQuickExit({ agent: 'pi', code: 1, elapsedMs: 600, env: owned, stdin, stderr }).then((v) => { released = v; });
+  assert.match(said.join(''), /pi exited after 0\.6s \(code 1\).*Press Enter to close/);
+  stdin.emit('data', Buffer.from('x'));
+  await new Promise((r) => setImmediate(r));
+  assert.equal(released, false, 'another key does not close it');
+  stdin.emit('data', Buffer.from('\r'));
+  await held;
+  assert.equal(released, true);
+  assert.equal(stdin.raw, false, 'the terminal is left in cooked mode');
+});
+
+test('coding launcher flags are refused, not handed to the agent', () => {
+  const r = spawnSync(process.execPath, [path.join(import.meta.dirname, '..', 'bin', 'glass.mjs'), 'pi', '--box'], {
+    encoding: 'utf8', env: { ...process.env, GLASS_NO_TMUX: '1', GLASS_HOME: fs.mkdtempSync(path.join(os.tmpdir(), 'glass-flag-')) },
+  });
+  assert.equal(r.status, 2, r.stderr);
+  assert.match(r.stderr, /--box is a coding launcher option .*coding pi --box/);
 });
 
 test('report popup: terminal reports are not a key press', () => {
