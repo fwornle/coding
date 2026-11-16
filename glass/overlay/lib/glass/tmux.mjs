@@ -84,6 +84,28 @@ export function launchInTmux({ agent, args, env = process.env, cwd = process.cwd
   return code;
 }
 
+/** An agent that ends sooner than this after starting most likely failed to start. */
+export const QUICK_EXIT_MS = 5000;
+
+/**
+ * Inner run in a session glass owns: when the agent ended within
+ * QUICK_EXIT_MS, hold the pane until Enter. The session closes with its last
+ * pane, so without this an agent that fails at startup takes its own error
+ * message with it and the outer terminal shows only tmux's `[exited]`.
+ * @returns {Promise<boolean>} whether it held
+ */
+export function holdQuickExit({ agent, code, elapsedMs, env = process.env, stdin = process.stdin, stderr = process.stderr }) {
+  if (!env.GLASS_TMUX_OWNED || elapsedMs >= QUICK_EXIT_MS || !stdin.isTTY) return Promise.resolve(false);
+  stderr.write(`\nglass: ${agent} exited after ${(elapsedMs / 1000).toFixed(1)}s (code ${code}) — its output is above. Press Enter to close.\n`);
+  return new Promise((resolve) => {
+    const done = () => { stdin.off('data', onData); stdin.pause(); if (stdin.setRawMode) stdin.setRawMode(false); resolve(true); };
+    const onData = (buf) => { if (/[\r\n\x03\x04]/.test(String(buf))) done(); };
+    if (stdin.setRawMode) stdin.setRawMode(true);
+    stdin.resume();
+    stdin.on('data', onData);
+  });
+}
+
 /** A value quoted for a tmux command line ('…', with ' escaped). */
 const tq = (s) => `'${String(s).replace(/'/g, "'\\''")}'`;
 
