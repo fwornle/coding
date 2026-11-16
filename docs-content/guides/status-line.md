@@ -26,12 +26,18 @@ something broken?" questions into a glance.
     Each badge belongs to a feature, and a feature you have switched off contributes no badge
     at all — see [Composing What Runs](features.md).
 
-    ## A blue bar means the agent is in the box
+    ## A tinted bar means the agent is in the box
 
-    The bar's own background says where the agent runs. **Dark blue**: it was launched in the
-    [agent box](../core-systems/agent-box.md) (`coding --box`, or the box is your default). **Your
-    terminal's normal background**: it runs on the host (`--no-box`). Set
-    `CODING_BOX_STATUS_STYLE` to any tmux style to pick a different tint.
+    The bar's own background says where the agent runs:
+
+    | Bar background | The agent runs |
+    |----------------|----------------|
+    | **Dark blue** | in the [agent box](../core-systems/agent-box.md) (`coding --box`, or the box is your default) |
+    | **Dark green** | in the strict box (`--strict-box`): the host's web UIs are hidden too |
+    | **Your terminal's normal background** | on the host (`--no-box`) |
+
+    Set `CODING_BOX_STATUS_STYLE` or `CODING_BOX_STRICT_STATUS_STYLE` to any tmux style to
+    pick a different tint.
 
     ## The badges are clickable
 

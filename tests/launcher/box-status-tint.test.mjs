@@ -52,6 +52,22 @@ describe('boxed sessions get a tinted status bar', () => {
     assert.equal(statusStyleFor({ CODING_BOX: 'true' }), 'bg=#0f3a57,fg=colour255');
   });
 
+  test('strict box (CODING_BOX_STRICT=true) gets the green tint instead', () => {
+    assert.equal(statusStyleFor({ CODING_BOX: 'true', CODING_BOX_STRICT: 'true' }), 'bg=#1b4d2e,fg=colour255');
+    assert.equal(statusStyleFor({ CODING_BOX: 'true', CODING_BOX_STRICT: 'false' }), 'bg=#0f3a57,fg=colour255');
+  });
+
+  test('CODING_BOX_STRICT without the box is still a host session', () => {
+    assert.equal(statusStyleFor({ CODING_BOX: 'false', CODING_BOX_STRICT: 'true' }), 'bg=default,fg=default');
+  });
+
+  test('CODING_BOX_STRICT_STATUS_STYLE overrides only the strict tint', () => {
+    const style = 'bg=colour22,fg=colour255';
+    const env = { CODING_BOX_STRICT_STATUS_STYLE: style };
+    assert.equal(statusStyleFor({ ...env, CODING_BOX: 'true', CODING_BOX_STRICT: 'true' }), style);
+    assert.equal(statusStyleFor({ ...env, CODING_BOX: 'true' }), 'bg=#0f3a57,fg=colour255');
+  });
+
   test('host launch resets the bar to default', () => {
     assert.equal(statusStyleFor({ CODING_BOX: 'false' }), 'bg=default,fg=default');
     assert.equal(statusStyleFor({}), 'bg=default,fg=default');

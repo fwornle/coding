@@ -33,10 +33,11 @@ carries a tinted background instead, which delimits it on its own.
 
 The bar's background tells you whether this pane's agent is sandboxed. A session launched
 in the [agent box](../core-systems/agent-box.md) gets `status-style bg=#0f3a57,fg=colour255`, a
-muted navy with near-white text; a session on the host keeps `bg=default,fg=default`. Every
-`bg=default` the renderer emits resolves to the bar's style, so the tint runs the full width;
-only the context gauge keeps its own colours. `CODING_BOX_STATUS_STYLE` replaces the tint
-(boxed sessions only).
+muted navy with near-white text; a strict-box session (`--strict-box`, `CODING_BOX_STRICT`)
+gets `bg=#1b4d2e,fg=colour255`, a muted green; a session on the host keeps
+`bg=default,fg=default`. Every `bg=default` the renderer emits resolves to the bar's style, so
+the tint runs the full width; only the context gauge keeps its own colours.
+`CODING_BOX_STATUS_STYLE` and `CODING_BOX_STRICT_STATUS_STYLE` replace the two tints.
 
 ---
 

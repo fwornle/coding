@@ -164,10 +164,18 @@ tmux_session_wrapper() {
   # whole width; only the context gauge's own coloured cells sit on top of it.
   # Unboxed sessions are reset to default explicitly — when the wrapper runs
   # inside an existing tmux session, a previous boxed launch there would
-  # otherwise leave the tint behind. CODING_BOX_STATUS_STYLE overrides the tint.
+  # otherwise leave the tint behind. A strict box (--strict-box, host web UIs
+  # hidden) gets a muted green instead of the box's navy, so the two levels can
+  # be told apart too. CODING_BOX_STATUS_STYLE / CODING_BOX_STRICT_STATUS_STYLE
+  # override the two tints.
   local status_style="bg=default,fg=default"
   case "${CODING_BOX:-}" in
-    1|true|TRUE|yes|on) status_style="${CODING_BOX_STATUS_STYLE:-bg=#0f3a57,fg=colour255}" ;;
+    1|true|TRUE|yes|on)
+      case "${CODING_BOX_STRICT:-}" in
+        1|true|TRUE|yes|on) status_style="${CODING_BOX_STRICT_STATUS_STYLE:-bg=#1b4d2e,fg=colour255}" ;;
+        *)                  status_style="${CODING_BOX_STATUS_STYLE:-bg=#0f3a57,fg=colour255}" ;;
+      esac
+      ;;
   esac
 
   # Helper: apply status bar configuration to a tmux session
