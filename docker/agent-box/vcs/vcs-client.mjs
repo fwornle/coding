@@ -50,7 +50,7 @@ async function guard(body) {
   });
   const data = await res.json().catch(() => ({}));
   if (res.status === 403 && data.request) {
-    const e = new Error(`${data.error}\n(approve it in the browser, then run the command again)`);
+    const e = new Error(`${data.error}\n(the guard opens that page in your browser on the host: approve it with Touch ID, a passkey, a key or your password, then run the command again)`);
     e.exitCode = 3;
     throw e;
   }
@@ -325,7 +325,7 @@ export function inlineBodyFile(args, read = (f) => fs.readFileSync(f === '-' ? 0
 
 async function gh(args) {
   if (!args.length || args[0] === '--help' || args[0] === 'help') {
-    say('gh in the agent box runs on the host through the guard, for this repository only:\n  reads: run list|view, pr list|view|checks|diff|status, issue list|view, workflow list|view, repo view, release list|view, api <GET repos/{owner}/{repo}/…>\n  free:  run rerun\n  asks for your approval: pr create|merge|comment|…, issue create|comment|…, run cancel, workflow run');
+    say('gh in the agent box runs on the host through the guard, for this repository only:\n  reads: run list|view, pr list|view|checks|diff|status, issue list|view, workflow list|view, repo view, release list|view, api <GET repos/{owner}/{repo}/…>\n  free:  run rerun\n  asks for your approval: pr create|merge|comment|…, issue create|comment|…, run cancel, workflow run\n  elevated (also asks; runs in an empty directory, no host paths): another repo (-R/--repo, --hostname), any other gh command, api beyond a GET of this repo\n  never: auth, config, extension, alias, ssh-key, gpg-key, codespace, browse; --web, --editor, --input, @file');
     return 0;
   }
   const cwd = process.cwd();
