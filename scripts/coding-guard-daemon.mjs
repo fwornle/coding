@@ -12,7 +12,9 @@
  *                                      (the same rule + session + file still
  *                                      pending → that request, not a new one)
  *   GET  /requests[?status=]           list;  GET /requests/:id  one
- *   GET  /approve/:id                  approval page (opened in the host browser)
+ *   GET  /approve/:id                  approval page (opened in the host browser —
+ *                                      by the guard itself when a box files a new
+ *                                      request; CODING_GUARD_OPEN_APPROVALS=off stops it)
  *   POST /approve/:id/options          { scope, minutes } → WebAuthn challenge
  *   POST /approve/:id/verify           { ceremony, response }       → grant
  *   POST /approve/:id/password         { scope, minutes, password } → grant
@@ -57,6 +59,7 @@
 import { execFile, spawn } from 'node:child_process';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
@@ -178,11 +181,29 @@ function findGh() {
  * The request handler, with every side effect injected so tests can drive it
  * against a temp guard home and a fake docker.
  */
+/**
+ * Open an approval page in the host user's browser (macOS `open`, Windows
+ * `start`, else xdg-open). Off with CODING_GUARD_OPEN_APPROVALS=off. Only the
+ * daemon's main wires this in; createGuard() opens nothing by default, so
+ * tests never launch a browser.
+ */
+export function openApprovalPage(url, env = process.env) {
+  if (env.CODING_GUARD_OPEN_APPROVALS === 'off') return false;
+  const [cmd, args] = process.platform === 'darwin' ? ['open', [url]]
+    : process.platform === 'win32' ? ['cmd', ['/c', 'start', '', url]]
+      : ['xdg-open', [url]];
+  const child = spawn(cmd, args, { stdio: 'ignore', detached: true });
+  child.on('error', () => {});
+  child.unref();
+  return true;
+}
+
 export function createGuard({
   paths = guardPaths(), runDocker = dockerRunner, now = () => Date.now(), codingRepo = REPO, port = guardPort(),
   clipboard = { peek: peekClipboardImage, read: readClipboardImage },
   clipboardEnabled = () => process.env.CODING_GUARD_CLIPBOARD !== 'off',
   runHost = hostRunner, ghPath = findGh(), composeEnv = () => resolveComposeEnv(codingRepo),
+  openApproval = () => {},
 } = {}) {
   const keys = ensureGuardHome(paths);
   writeGuardEndpoint(paths, port);
@@ -323,6 +344,11 @@ export function createGuard({
     state.requests[r.id] = r;
     save();
     audit({ event: 'request.created', request: r.id, rule: r.rule, session: r.session, agent: r.agent, file: r.file, reason: r.reason });
+    // A new request (not a retry of a pending one) puts its page in front of
+    // the user. Opening it grants nothing: approving still needs a factor.
+    if (source === 'agent') {
+      try { openApproval(r.approve); } catch { /* the link in the error still works */ }
+    }
     return r;
   }
 
@@ -383,10 +409,10 @@ export function createGuard({
    * git/gh for the box (lib/guard/vcs.mjs). The url must be pinned for the
    * box's workspace, or approved (`vcs:remote <url>`) — then it is pinned.
    */
-  function requireGrant(session, rule, agent, reason) {
+  function requireGrant(session, rule, agent, reason, excerpt) {
     const grant = liveGrants(session).find((g) => g.payload.rule === rule);
     if (!grant) {
-      const r = newRequest({ rule, session, agent, tool: 'vcs', reason });
+      const r = newRequest({ rule, session, agent, tool: 'vcs', reason, excerpt });
       throw new HttpError(403, `${reason} needs your approval: ${r.approve}`, { request: r });
     }
     if (grant.payload.scope === 'call') grant.consumed = now();
@@ -430,10 +456,20 @@ export function createGuard({
         const remote = parseRemoteUrl(body.url);
         const plan = ghPlan(body.args, remote);
         checkPinned(req, session, remote, body.agent);
-        if (plan.gated) requireGrant(session, plan.rule, body.agent, `gh ${plan.rule.slice(3)}`);
-        const r = await runHost(ghPath, plan.argv, { env: plan.env, cwd: vcsDir, timeout: 5 * 60_000 });
-        audit({ event: 'vcs.gh', args: plan.argv.map((a) => clip(a, 200)), repo: plan.env.GH_REPO, session, code: r.code });
-        return { code: r.code, stdout: text(r), stderr: r.stderr };
+        // The page shows what will run, not only the rule: the rule is the
+        // grant's scope, the command is what this approval is for.
+        const command = `GH_REPO=${plan.env.GH_REPO} gh ${plan.argv.join(' ')}`;
+        if (plan.gated) requireGrant(session, plan.rule, body.agent, `gh ${plan.rule.slice(3)}`, command);
+        // An elevated call runs outside the vocabulary, so in a directory that
+        // holds nothing — whatever gh reads or writes relative to it is empty.
+        const cwd = plan.elevated ? fs.mkdtempSync(path.join(os.tmpdir(), 'coding-guard-gh-')) : vcsDir;
+        try {
+          const r = await runHost(ghPath, plan.argv, { env: plan.env, cwd, timeout: 5 * 60_000 });
+          audit({ event: 'vcs.gh', args: plan.argv.map((a) => clip(a, 200)), repo: plan.env.GH_REPO, rule: plan.rule, elevated: plan.elevated, session, code: r.code });
+          return { code: r.code, stdout: text(r), stderr: r.stderr };
+        } finally {
+          if (plan.elevated) fs.rmSync(cwd, { recursive: true, force: true });
+        }
       }
       if (tool !== 'git') throw new VcsError("tool must be 'git' or 'gh'");
       const op = gitRequest(body);
@@ -773,7 +809,7 @@ export function createGuard({
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = guardPort();
-  const guard = createGuard({ port });
+  const guard = createGuard({ port, openApproval: openApprovalPage });
   const server = listenLocal(guard.handler, port, (addrs) => {
     guard.audit({ event: 'daemon.start', pid: process.pid, port, fingerprint: guard.fingerprint });
     process.stdout.write(`coding-guard listening on ${addrs.join(', ')}:${port} (key ${guard.fingerprint})\n`);

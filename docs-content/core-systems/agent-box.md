@@ -464,6 +464,8 @@ credentials. Every other git command is the real git, untouched.
 | `git ls-remote` | as usual |
 | `gh run list\|view [--log-failed]`, `gh pr list\|view\|checks\|diff`, `gh issue …`, `gh api <GET repos/{owner}/{repo}/…>`, `gh run rerun` | run on the host for **this repository only** |
 | `gh pr create\|merge\|comment`, `gh issue create\|comment`, `gh run cancel`, `gh workflow run` | **need your approval** (the same approve page as an override) |
+| any other `gh` command, another repository (`-R`/`--repo`, `--hostname`), `gh api` beyond a GET of this repository | **elevated**: also needs your approval, then runs on the host (see below) |
+| `gh auth\|config\|extension\|alias\|ssh-key\|gpg-key\|codespace\|browse`, `--web`, `--editor`, `--input`, `@file` | refused, approved or not: they would hand the box your `gh` login, change the host's `gh` set-up, open host apps or read host files |
 | `git push --force`, deleting a branch, pushing tags, `--mirror` | refused: run them from a host shell |
 
 **The host never runs git inside the agent's repository.** Its
@@ -480,9 +482,38 @@ starts. The first launch of a workspace pins them. A remote added later, for
 instance by the agent itself, needs your approval before the guard pushes to
 it or fetches from it. Local paths, `file://` and other transports are never
 used, because they would read or write host folders or run a command. `gh`
-always gets the repository from the pinned remote: `-R`, `--hostname`,
+gets the repository from the pinned remote unless you approve another one.
 `--web`, `@file` arguments and `--input` are refused. A `--body-file` is
 read in the box and sent as text.
+
+### Elevating a blocked gh command
+
+A `gh` command the box doesn't offer by itself is not refused. The guard
+files an approval request, and the box prints the link:
+
+```text
+gh (agent box): gh release list @bmw.ghe.com/AIMAAD/glass needs your approval: http://localhost:3035/approve/3f9c0a1b2d4e
+```
+
+The guard also opens that page in your browser on the host. Set
+`CODING_GUARD_OPEN_APPROVALS=off` in the guard's environment if you only want
+the link. The page shows the exact command that will run, for example
+`GH_REPO=bmw.ghe.com/AIMAAD/glass gh release list -L 3`. You pick a scope and
+confirm with Touch ID, your phone, a security key or your password, as for any
+override. Then run the command again. This works the same for a command the
+agent runs and for one you type with `!` in the agent's prompt, because both
+run inside the box.
+
+The grant covers one rule: the `gh` group and verb, plus `@<host>/<owner>/<repo>`
+when the call targets another repository. `gh api` calls are covered per
+method and endpoint. Approving `gh release list` on one repository does not
+allow `gh release delete`, and does not allow the same command on another
+repository.
+
+An elevated call runs in a new empty directory, which is deleted afterwards.
+Any argument that names a host path (`/…`, `~…`, `..`) is refused before a
+request is filed. So `gh release upload v1 ~/.ssh/id_ed25519` cannot read your
+files, even with your approval.
 
 A `pre-push` hook in the repository runs in the box, as it would locally.
 Every call is in the [audit log](#audit-log) (`vcs.push`, `vcs.fetch`,
