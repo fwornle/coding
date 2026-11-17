@@ -165,30 +165,36 @@ for (const agent of AGENTS) {
     for (const k of [...MOUSE_SWITCHES, 'TMUX', 'TMUX_PANE']) delete env[k];
     Object.assign(env, agentMouseEnv(agent, env));
     let last = '';
+    let since = 0;
     const ready = (s, text) => {
-      // Up, and drawn: a phrase on screen, unchanged since the last look.
-      const settled = text === last && phraseOn(text) !== null;
-      last = text;
-      return settled;
+      // Up, and drawn: a phrase on screen, unchanged for 1.5 s. An agent still
+      // redrawing its start screen can drop a selection made meanwhile.
+      if (text !== last) { last = text; since = Date.now(); }
+      return phraseOn(text) !== null && Date.now() - since >= 1_500;
     };
     const saved = clipRead();
     try {
       // One command argument is run by the shell: quoted, so a path with a space
       // (VS Code's copilot shim lives under "Application Support") stays one word.
       await underTmux([`'${bin.replace(/'/g, "'\\''")}'`], { env, ready }, async ({ inner, screen, drag, buffer }) => {
-        await sleep(1_000);
-        const p = phraseOn(screen());
-        assert.ok(p, `a phrase to drag across: ${screen()}`);
         const by = inner.flag('#{mouse_any_flag}') === '1' ? 'the agent' : 'tmux';
-        clipWrite('glass-probe-sentinel');
-        await drag(p.row, p.from, p.to);
         let copied = '';
+        let p = null;
+        let how = '';
         const got = () => { copied = buffer() || (clipRead() !== 'glass-probe-sentinel' ? clipRead() : ''); return copied !== ''; };
-        let how = 'on release';
-        if (!(await until(got, 5_000)) && COPY_KEY[agent]) {
-          how = `on ${COPY_KEY[agent]}`;
-          inner.t('send-keys', '-t', 's', COPY_KEY[agent]);
-          await until(got, 5_000);
+        // A second drag, as a user would make one, if a redraw took the first
+        // selection away; an agent that never copies fails both.
+        for (let attempt = 1; attempt <= 2 && !copied; attempt++) {
+          p = phraseOn(screen());
+          assert.ok(p, `a phrase to drag across: ${screen()}`);
+          clipWrite('glass-probe-sentinel');
+          await drag(p.row, p.from, p.to);
+          how = `on release, drag ${attempt}`;
+          if (!(await until(got, 5_000)) && COPY_KEY[agent]) {
+            how = `on ${COPY_KEY[agent]}, drag ${attempt}`;
+            inner.t('send-keys', '-t', 's', COPY_KEY[agent]);
+            await until(got, 5_000);
+          }
         }
         t.diagnostic(`${agent}: selected by ${by}, copied ${how}: ${JSON.stringify(copied)}`);
         assert.equal(inner.flag('#{pane_in_mode}'), '0', 'tmux is not left in copy-mode');
