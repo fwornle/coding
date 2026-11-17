@@ -9,7 +9,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const { renderStatusline, renderReport, uiLinks, TAGS } = await import('../lib/glass/statusline.mjs');
-const { clickBinding, tmuxWanted, innerEnv, configureStatus, agentMouseEnv, clipboardCommand, mouseCopyBindings, holdQuickExit, QUICK_EXIT_MS } = await import('../lib/glass/tmux.mjs');
+const { clickBinding, tmuxWanted, innerEnv, configureStatus, agentMouseEnv, AGENT_MOUSE, clipboardCommand, mouseCopyBindings, holdQuickExit, QUICK_EXIT_MS } = await import('../lib/glass/tmux.mjs');
 const { claudeStatusSettings, isTerminalReport, watchHint, clickTarget } = await import('../lib/glass/cli.mjs');
 
 const D = {
@@ -144,23 +144,30 @@ test('tmux: when, the inner env, the chained click binding', () => {
 
 const hasTmux = spawnSync('tmux', ['-V']).status === 0;
 
-test('tmux selection: the agent lets go of the mouse; drags copy to the clipboard', () => {
+test('tmux selection: claude and opencode let go of the mouse; pi and Copilot select by themselves', () => {
+  for (const [agent, who] of Object.entries(AGENT_MOUSE)) {
+    assert.equal(Object.keys(agentMouseEnv(agent, {})).length, who === 'release' ? 1 : 0, `${agent}: ${who}`);
+  }
   assert.deepEqual(agentMouseEnv('claude', {}), { CLAUDE_CODE_DISABLE_MOUSE: '1' });
   assert.deepEqual(agentMouseEnv('opencode', {}), { OPENCODE_DISABLE_MOUSE: '1' });
-  assert.deepEqual(agentMouseEnv('pi', {}), {}, 'pi never takes the mouse');
-  assert.deepEqual(agentMouseEnv('copilot', {}), {}, 'nor does Copilot CLI');
+  assert.deepEqual(agentMouseEnv('pi', {}), {}, 'pi keeps the mouse');
+  assert.deepEqual(agentMouseEnv('copilot', {}), {}, 'so does Copilot CLI');
   assert.deepEqual(agentMouseEnv('claude', { CLAUDE_CODE_DISABLE_MOUSE: '0' }), {}, 'an explicit value stands');
   assert.deepEqual(agentMouseEnv('claude', { GLASS_AGENT_MOUSE: 'keep' }), {}, 'opted out');
   assert.equal(clipboardCommand((b) => b === 'pbcopy'), 'pbcopy');
   assert.equal(clipboardCommand((b) => b === 'xclip'), 'xclip -selection clipboard');
   assert.equal(clipboardCommand(() => false), '');
   const b = Object.fromEntries(mouseCopyBindings('pbcopy').map((x) => [`${x.table} ${x.key}`, x]));
-  assert.doesNotMatch(b['root MouseDrag1Pane'].line, /mouse_any_flag/, 'a drag opens copy-mode even if an agent holds the mouse');
+  for (const k of ['MouseDrag1Pane', 'DoubleClick1Pane', 'TripleClick1Pane']) {
+    assert.match(b[`root ${k}`].line, /if-shell -F "#\{\|\|:#\{pane_in_mode\},#\{mouse_any_flag\}\}" \{ send-keys -M \}/, `${k} goes to an agent that holds the mouse`);
+  }
   assert.match(b['copy-mode MouseDragEnd1Pane'].line, /copy-pipe-and-cancel "pbcopy"$/);
   assert.match(b['copy-mode-vi MouseDragEnd1Pane'].line, /copy-pipe-and-cancel "pbcopy"$/);
   assert.match(b['root WheelUpPane'].line, /send-keys PageUp/);
   const tmuxDefaultDrag = 'if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { copy-mode -M }';
   assert.equal(b['root MouseDrag1Pane'].replace(tmuxDefaultDrag), true, "tmux's default is replaced");
+  assert.equal(b['root MouseDrag1Pane'].replace('if-shell -F "#{pane_in_mode}" { send-keys -M } { copy-mode -M }'), true,
+    'the line that always opened copy-mode is replaced: it takes the drag from pi and Copilot');
   assert.equal(b['root MouseDrag1Pane'].replace('copy-mode -M'), false, "a user's own binding is not");
   assert.equal(b['copy-mode MouseDragEnd1Pane'].replace('send-keys -X copy-pipe-and-cancel'), true);
   assert.equal(b['copy-mode MouseDragEnd1Pane'].replace('send-keys -X copy-pipe-and-cancel "pbcopy"'), false, "coding's is kept");
@@ -195,7 +202,7 @@ test('tmux: configureStatus on a real server — options set, clicks bound, user
     configureStatus({ taskId: 'glass-claude-y', port: 12999, env: {}, tmpDir: path.dirname(sock) })();
     assert.equal(t('list-keys', '-T', 'root', 'MouseDown1Status').stdout.match(/--src glass-tmux/g).length, 1, 'bound once');
     const key = (table, k) => t('list-keys', '-T', table, k).stdout;
-    assert.doesNotMatch(key('root', 'MouseDrag1Pane'), /mouse_any_flag/, 'drag → copy-mode');
+    assert.match(key('root', 'MouseDrag1Pane'), /mouse_any_flag.*send-keys -M.*copy-mode -M/, 'drag → the agent that holds the mouse, else copy-mode');
     assert.match(key('root', 'DoubleClick1Pane'), /select-word/);
     assert.match(key('copy-mode', 'MouseDragEnd1Pane'), /copy-pipe-and-cancel/);
     assert.match(key('root', 'WheelUpPane'), /PageUp/);

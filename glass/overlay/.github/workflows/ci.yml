@@ -3,6 +3,11 @@
 # natively (AIMAAD has no macOS runners; macOS is checked locally), then the
 # install check: pack → npm install -g (offline) → one measured run per agent →
 # uninstall → HOME unchanged.
+#
+# agent-mouse: under tmux a drag must reach whoever makes the selection
+# (tests/agent-mouse.test.mjs). The agents' side of that changes with their
+# releases, not with commits here, so the latest agents are installed and probed
+# on every run and once a week.
 name: glass tests
 
 on:
@@ -10,6 +15,8 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+  schedule:
+    - cron: '17 5 * * 1'
 
 jobs:
   test:
@@ -25,5 +32,26 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
       - run: npm install --omit=dev --ignore-scripts --no-audit --no-fund
+      # The tmux tests skip without tmux; on Linux that must be a failure, not a skip.
+      - if: runner.os == 'Linux'
+        run: tmux -V
       - run: node --test "tests/**/*.test.mjs"
       - run: node tests/install-check.mjs
+
+  agent-mouse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22.x'
+      - run: npm install --omit=dev --ignore-scripts --no-audit --no-fund
+      - run: npm install -g --no-audit --no-fund @github/copilot @earendil-works/pi-coding-agent opencode-ai @anthropic-ai/claude-code
+      - run: |
+          tmux -V
+          for a in copilot pi opencode claude; do command -v "$a"; "$a" --version; done
+      # Claude Code takes the mouse only when logged in, so its half of the
+      # contract reports as skipped here; it runs on a developer's machine.
+      - run: node --test --test-reporter=spec tests/agent-mouse.test.mjs
+        env:
+          GLASS_AGENT_PROBE: '1'

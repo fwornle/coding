@@ -14,9 +14,14 @@
  *
  * So the test drives a real tmux client over a pty and models the one terminal
  * behaviour that matters: motion reporting ends when tracking is switched off
- * mid-gesture. Both cases are asserted — with the agent holding the mouse the
- * selection collapses, without it the whole span is copied — because a test
- * that only checks the good case cannot tell a fix from a coincidence.
+ * mid-gesture. Both sides are asserted — copy-mode over an agent that holds the
+ * mouse collapses the selection, without the grab the whole span is copied —
+ * because a test that only checks the good case cannot tell a fix from a
+ * coincidence.
+ *
+ * pi and Copilot CLI hold the mouse on purpose and make the selection
+ * themselves, so the shipped bindings must not open copy-mode over them at all:
+ * the whole gesture has to reach the agent, motion included.
  */
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -67,10 +72,18 @@ function killServer() {
   }
 }
 
-function startSession({ grab }) {
+/**
+ * The shipped bindings with the drag forced into copy-mode whether or not the
+ * pane holds the mouse — what the wrapper must NOT do over an agent that does.
+ */
+const alwaysCopyMode = (b) => b.replace(
+  'bind-key -T root MouseDrag1Pane if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}"',
+  'bind-key -T root MouseDrag1Pane if-shell -F "#{pane_in_mode}"');
+
+function startSession({ grab, log = '', bindings = shippedBindings() }) {
   killServer();
   execFileSync('tmux', ['-L', SOCKET, 'new-session', '-d', '-s', 't',
-    '-x', '100', '-y', '24', `${APP} ${grab ? 'grab' : 'nograb'}`]);
+    '-x', '100', '-y', '24', `${APP} ${grab ? 'grab' : 'nograb'} ${log}`]);
   tmux('set-option', '-g', 'mouse', 'on');
   // Via a real file, NOT `source-file /dev/stdin` with `{ input }`.
   //
@@ -84,7 +97,7 @@ function startSession({ grab }) {
   const dir = mkdtempSync(path.join(tmpdir(), 'tmux-mouse-'));
   const conf = path.join(dir, 'bindings.conf');
   try {
-    writeFileSync(conf, shippedBindings());
+    writeFileSync(conf, bindings);
     execFileSync('tmux', ['-L', SOCKET, 'source-file', conf]);
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -100,31 +113,52 @@ function startSession({ grab }) {
 
 function drag(steps) {
   try { tmux('delete-buffer'); } catch { /* no buffer yet */ }
-  execFileSync('python3', [CLIENT, SOCKET, steps], { encoding: 'utf8', timeout: 60_000 });
-  try { return execFileSync('tmux', ['-L', SOCKET, 'show-buffer'], { encoding: 'utf8' }); }
-  catch { return ''; }   // empty selection copies nothing and creates no buffer
+  const out = execFileSync('python3', [CLIENT, SOCKET, steps], { encoding: 'utf8', timeout: 60_000 });
+  const dropped = Number(/dropped=(\d+)/.exec(out)?.[1] ?? NaN);
+  try { return { copied: execFileSync('tmux', ['-L', SOCKET, 'show-buffer'], { encoding: 'utf8' }), dropped }; }
+  catch { return { copied: '', dropped }; }   // empty selection copies nothing and creates no buffer
 }
 
 /** Columns 10-29 of the fixture's line 3, the span the drag covers. */
 const SPAN = 'aaaa bbbb cccc dddd ';
+const GESTURE = 'down:10:3,move:15:3,move:22:3,move:30:3,up:30:3';
 
 describe('tmux drag-to-select', { skip: SKIP }, () => {
   after(() => { killServer(); });
 
-  test('the agent holding the mouse is what breaks it', () => {
-    startSession({ grab: true });
+  test('copy-mode over an agent that holds the mouse collapses the selection', () => {
+    startSession({ grab: true, bindings: alwaysCopyMode(shippedBindings()) });
     assert.equal(tmux('display-message', '-p', '#{mouse_any_flag}'), '1');
-    const copied = drag('down:10:3,move:15:3,move:22:3,move:30:3,up:30:3');
+    const { copied } = drag(GESTURE);
     // The full span is "aaaa bbbb cccc dddd ". What survives is only what the
     // drag covered before copy-mode opened and the protocol was downgraded.
     assert.ok(copied.length < 10,
       `expected a collapsed selection while the pane holds 1003, got ${JSON.stringify(copied)}`);
   });
 
+  test('an agent that holds the mouse gets the whole drag (pi and Copilot select by themselves)', () => {
+    const dir = mkdtempSync(path.join(tmpdir(), 'tmux-mouse-app-'));
+    const log = path.join(dir, 'read');
+    try {
+      startSession({ grab: true, log });
+      assert.equal(tmux('display-message', '-p', '#{mouse_any_flag}'), '1');
+      const { copied, dropped } = drag(GESTURE);
+      const read = existsSync(log) ? readFileSync(log, 'latin1') : '';
+      assert.equal(dropped, 0, 'the terminal kept reporting motion: nothing downgraded mid-drag');
+      assert.ok(read.includes('\x1b[<0;10;3M'), `press reaches the agent: ${JSON.stringify(read)}`);
+      assert.equal((read.match(/\x1b\[<32;/g) || []).length, 3, `every motion reaches the agent: ${JSON.stringify(read)}`);
+      assert.ok(read.includes('\x1b[<0;30;3m'), `release reaches the agent: ${JSON.stringify(read)}`);
+      assert.equal(tmux('display-message', '-p', '#{pane_in_mode}'), '0', 'tmux stays out of copy-mode');
+      assert.equal(copied, '', 'and makes no selection of its own');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test('with the mouse left alone, the whole dragged span is copied', () => {
     startSession({ grab: false });
     assert.equal(tmux('display-message', '-p', '#{mouse_any_flag}'), '0');
-    const copied = drag('down:10:3,move:15:3,move:22:3,move:30:3,up:30:3');
+    const { copied } = drag(GESTURE);
     // Whether the cell UNDER the cursor at MouseDragEnd joins the selection
     // depends on whether the last motion event was handled separately or
     // coalesced with the release. Both are correct tmux and which one happens

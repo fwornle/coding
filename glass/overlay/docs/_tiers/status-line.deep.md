@@ -77,24 +77,39 @@ The same reports are available on the command line: `glass report ctx`, `glass r
 
 ## Selecting text in tmux
 
-Clickable fields need tmux's mouse on, so glass sets up selection to keep working:
+Clickable fields need tmux's mouse on, so glass sets up selection to keep working. Who
+makes the selection depends on the agent:
+
+| Agent | Selection |
+|---|---|
+| Claude Code, opencode | tmux. glass starts them with their own mouse handling off (`CLAUDE_CODE_DISABLE_MOUSE`, `OPENCODE_DISABLE_MOUSE`) |
+| pi, Copilot CLI | The agent itself. Both run full-screen and keep the mouse; tmux hands them the drag |
+
+With Claude Code and opencode:
 
 | You do | What happens |
 |---|---|
 | Drag | Selects text and copies it to the clipboard when you release (`pbcopy`, `wl-copy`, `xclip`, `xsel` or `clip.exe`, whichever exists) |
 | Double-click / triple-click | Copies the word / the line |
 | Mouse wheel | Scrolls the agent (sent as PageUp / PageDown) |
+
+With pi and Copilot CLI, drag, double-click, triple-click and the wheel are the agent's own:
+a drag scrolls the conversation when it reaches the edge, and leaves out the agent's
+scrollbar and frame. pi copies on release. Copilot CLI copies on release on macOS and on
+Ctrl+C elsewhere (its `copyOnSelect` setting); under tmux it hands the text to tmux,
+which passes it to the terminal as OSC 52 (iTerm2: allow *Applications in terminal may
+access clipboard*). Copilot's scrollbar is its own; `/settings` turns it off.
+
+| You do | What happens |
+|---|---|
 | `prefix` + `S` | Mouse off for this session: the terminal's own selection, across the scrollback; the status line is not clickable until you press it again |
 
-For this, glass starts Claude Code and opencode with their own mouse handling off
-(`CLAUDE_CODE_DISABLE_MOUSE`, `OPENCODE_DISABLE_MOUSE`). While an agent holds the mouse,
-tmux passes a drag to the agent and nothing is selected. pi and Copilot CLI never take
-the mouse. `GLASS_AGENT_MOUSE=keep` leaves the agents' mouse alone, and a value you set for
-either variable is never overridden.
+`GLASS_AGENT_MOUSE=keep` leaves Claude Code's and opencode's mouse alone (a drag then goes
+to them and selects nothing), and a value you set for either variable is never overridden.
 
 tmux's key bindings apply to the whole tmux server. glass replaces only tmux's own
 defaults for these keys, and binds `prefix` + `S` only where nothing is bound, so bindings
-you made yourself (or coding's) stay as they are.
+you made yourself stay as they are. coding binds the same lines.
 
 ## Refresh
 
