@@ -150,6 +150,11 @@ function phraseOn(text) {
 
 const squash = (s) => s.replace(/\s+/g, ' ').trim();
 
+// An agent that copies a selection only on a key, as a user would press it:
+// Copilot CLI copies on release on macOS and on Ctrl+C elsewhere (its
+// `copyOnSelect` setting).
+const COPY_KEY = { copilot: 'C-c' };
+
 for (const agent of AGENTS) {
   const bin = PROBE && hasTmux ? whichBin(agentBin(agent)) : null;
   const skip = !PROBE ? 'launches the agent: GLASS_AGENT_PROBE=1' : !hasTmux ? 'no tmux' : !bin && `${agent} not installed`;
@@ -178,8 +183,14 @@ for (const agent of AGENTS) {
         clipWrite('glass-probe-sentinel');
         await drag(p.row, p.from, p.to);
         let copied = '';
-        await until(() => { copied = buffer() || (clipRead() !== 'glass-probe-sentinel' ? clipRead() : ''); return copied !== ''; }, 5_000);
-        t.diagnostic(`${agent}: selected by ${by}: ${JSON.stringify(copied)}`);
+        const got = () => { copied = buffer() || (clipRead() !== 'glass-probe-sentinel' ? clipRead() : ''); return copied !== ''; };
+        let how = 'on release';
+        if (!(await until(got, 5_000)) && COPY_KEY[agent]) {
+          how = `on ${COPY_KEY[agent]}`;
+          inner.t('send-keys', '-t', 's', COPY_KEY[agent]);
+          await until(got, 5_000);
+        }
+        t.diagnostic(`${agent}: selected by ${by}, copied ${how}: ${JSON.stringify(copied)}`);
         assert.equal(inner.flag('#{pane_in_mode}'), '0', 'tmux is not left in copy-mode');
         assert.ok(squash(copied).length >= 3 && squash(p.line).includes(squash(copied)),
           `${agent} (selected by ${by}): copied ${JSON.stringify(copied)}, a piece of ${JSON.stringify(p.line.trim())} expected`);
