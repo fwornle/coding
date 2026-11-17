@@ -149,26 +149,41 @@ function sourceSnippet(tmpDir, name, text) {
 }
 
 // ── Selecting text with the mouse ─────────────────────────────────────────────
-// The clickable status line needs `mouse on`, which hands the mouse to tmux. Two
-// things then break selection, and coding's session wrapper fixes both
-// (scripts/tmux-session-wrapper.sh); this is the same fix:
+// The clickable status line needs `mouse on`, which hands the mouse to tmux. A
+// drag then has to reach whoever makes the selection, and coding's session
+// wrapper splits it the same way (scripts/tmux-session-wrapper.sh):
 //
-//   1. Claude Code and opencode ask for ANY-EVENT mouse tracking (DECSET 1003).
-//      tmux's default drag binding forwards a drag to such an app, which ignores
-//      it, and when a drag does open copy-mode, tmux drops the terminal from 1003
-//      to 1002 mid-gesture and the terminal stops reporting the motion: a 30-column
-//      drag copied 6 bytes. So under tmux both agents start with their mouse grab
-//      off (agentMouseEnv). pi and Copilot CLI never take the mouse.
-//   2. tmux's default bindings put a selection in tmux's buffer only. The
-//      bindings below copy it to the clipboard, and hand the wheel to the agent
-//      as PageUp / PageDown, since it no longer reads the wheel itself.
+//   1. Claude Code and opencode ask for ANY-EVENT mouse tracking (DECSET 1003)
+//      but do not select text. Forwarded a drag, they ignore it; and when a drag
+//      opens copy-mode over them, tmux drops the terminal from 1003 to 1002
+//      mid-gesture and the terminal stops reporting the motion: a 30-column drag
+//      copied 6 bytes. So under tmux both start with their mouse grab off
+//      (agentMouseEnv), and a drag opens copy-mode.
+//   2. pi and Copilot CLI run full-screen, hold the mouse and select by
+//      themselves: drag, double/triple click, auto-scroll past the viewport,
+//      copy to the clipboard through tmux. A drag is forwarded to them. tmux's
+//      copy-mode over them would hit the same downgrade, and what it does select
+//      carries their scrollbar and frame glyphs.
+//
+// The bindings below make that split on #{mouse_any_flag}, copy a tmux
+// selection to the clipboard (tmux's defaults stop at its buffer), and hand the
+// wheel to an agent that let go of the mouse as PageUp / PageDown.
 //
 // prefix + S switches the mouse off for the session: the terminal's own
 // selection (scrollback, survives repaints) at the price of status-line clicks.
 
 /**
+ * Who makes the selection under tmux: `release` — the agent's grab is switched
+ * off (agentMouseEnv) and a drag opens tmux's copy-mode; `own` — the agent
+ * keeps the mouse and selects by itself. tests/agent-mouse.test.mjs holds the
+ * installed CLIs to this.
+ */
+export const AGENT_MOUSE = { claude: 'release', opencode: 'release', copilot: 'own', pi: 'own' };
+
+/**
  * What the agent's environment needs under tmux so a drag selects text: its own
- * mouse grab off. An explicit value, or GLASS_AGENT_MOUSE=keep, is left alone.
+ * mouse grab off where it does not select by itself. An explicit value, or
+ * GLASS_AGENT_MOUSE=keep, is left alone.
  */
 export function agentMouseEnv(agent, env = process.env) {
   if (env.GLASS_AGENT_MOUSE === 'keep') return {};
@@ -187,20 +202,23 @@ export function clipboardCommand(which) {
 /**
  * Each selection binding: the table and key, when the current binding may be
  * replaced (tmux's default, or nothing), and glass's line. A binding the user
- * (or coding) changed is left as it is.
+ * changed is left as it is. Replaceable too: the drag-to-copy-mode line glass
+ * and coding bound before pi and Copilot selected by themselves
+ * (`if-shell -F "#{pane_in_mode}"`), which takes the drag from them.
  */
 export function mouseCopyBindings(copy) {
   const pipe = copy ? ` "${copy}"` : '';
-  const isDefaultSelect = (cur) => cur.includes('mouse_any_flag');
+  const toAgent = '#{||:#{pane_in_mode},#{mouse_any_flag}}';
+  const isDefaultSelect = (cur) => cur.includes('mouse_any_flag') || cur.includes('if-shell -F "#{pane_in_mode}"');
   const isDefaultWheel = (cur) => cur.includes('mouse_any_flag') && !cur.includes('PageUp') && !cur.includes('PageDown');
   const isDefaultDragEnd = (cur) => /^send-keys -X copy-pipe-and-cancel\s*$/.test(cur.trim());
   return [
     { table: 'root', key: 'MouseDrag1Pane', replace: isDefaultSelect,
-      line: 'bind-key -T root MouseDrag1Pane if-shell -F "#{pane_in_mode}" { send-keys -M } { copy-mode -M }' },
+      line: `bind-key -T root MouseDrag1Pane if-shell -F "${toAgent}" { send-keys -M } { copy-mode -M }` },
     { table: 'root', key: 'DoubleClick1Pane', replace: isDefaultSelect,
-      line: `bind-key -T root DoubleClick1Pane { select-pane -t = ; if-shell -F "#{pane_in_mode}" { send-keys -M } { copy-mode -H ; send-keys -X select-word ; run-shell -d 0.3 ; send-keys -X copy-pipe-and-cancel${pipe} } }` },
+      line: `bind-key -T root DoubleClick1Pane { select-pane -t = ; if-shell -F "${toAgent}" { send-keys -M } { copy-mode -H ; send-keys -X select-word ; run-shell -d 0.3 ; send-keys -X copy-pipe-and-cancel${pipe} } }` },
     { table: 'root', key: 'TripleClick1Pane', replace: isDefaultSelect,
-      line: `bind-key -T root TripleClick1Pane { select-pane -t = ; if-shell -F "#{pane_in_mode}" { send-keys -M } { copy-mode -H ; send-keys -X select-line ; run-shell -d 0.3 ; send-keys -X copy-pipe-and-cancel${pipe} } }` },
+      line: `bind-key -T root TripleClick1Pane { select-pane -t = ; if-shell -F "${toAgent}" { send-keys -M } { copy-mode -H ; send-keys -X select-line ; run-shell -d 0.3 ; send-keys -X copy-pipe-and-cancel${pipe} } }` },
     { table: 'root', key: 'WheelUpPane', replace: isDefaultWheel,
       line: 'bind-key -T root WheelUpPane if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { if-shell -F "#{alternate_on}" { send-keys PageUp } { copy-mode -e } }' },
     { table: 'root', key: 'WheelDownPane', replace: isDefaultWheel,

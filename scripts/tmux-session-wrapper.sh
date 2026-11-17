@@ -118,11 +118,20 @@ tmux_session_wrapper() {
   # the WheelUpPane/WheelDownPane bindings below hand back as PageUp/PageDown.
   # Set CODING_AGENT_MOUSE=keep to leave the agent's mouse alone and accept that
   # selection stops working — an explicit value here is never overridden.
+  #
+  # pi and Copilot CLI are the other kind: they run full-screen, hold the mouse
+  # and make the selection THEMSELVES (drag, double/triple click, auto-scroll
+  # past the viewport, copy to the clipboard through tmux). Their grab stays,
+  # and _bind_mouse_copy hands them the drag instead of opening copy-mode —
+  # copy-mode over them would downgrade 1003 mid-drag exactly as above, and
+  # where it does select, it copies their scrollbar and frame glyphs with the
+  # text. glass/overlay/lib/glass/tmux.mjs (AGENT_MOUSE) is the same split, and
+  # its tests/agent-mouse.test.mjs holds the installed CLIs to it.
   if [ "${CODING_AGENT_MOUSE:-}" != "keep" ]; then
     case "$agent" in
       claude)   [ -z "${CLAUDE_CODE_DISABLE_MOUSE:-}" ] && export CLAUDE_CODE_DISABLE_MOUSE=1 ;;
       opencode) [ -z "${OPENCODE_DISABLE_MOUSE:-}" ] && export OPENCODE_DISABLE_MOUSE=1 ;;
-      # pi and copilot never enable mouse reporting — nothing to switch off.
+      # pi and copilot select by themselves — their grab is kept (above).
     esac
   fi
   # Pass project identity into status command so each session underlines its OWN project.
@@ -204,17 +213,21 @@ tmux_session_wrapper() {
   #   MouseDrag1Pane  if -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" \
   #                     { send-keys -M } { copy-mode -M }
   #
-  # #{mouse_any_flag} is 0 for these panes now, so the default would already
-  # take the copy-mode branch. It is still dropped from the condition below on
-  # purpose: an agent that starts asking for the mouse again — or one launched
-  # with CODING_AGENT_MOUSE=keep — must not silently take drag-select away with
-  # it a second time. The split is deliberate and is why this is surgical
-  # rather than `mouse off`:
+  # The drag and double/triple-click bindings below keep that condition, so the
+  # gesture goes to whoever makes the selection:
   #
-  #   • DRAG and double/triple click are how a human selects text. No TUI agent
-  #     here binds them to anything, so routing them to copy-mode costs nothing.
-  #   • CLICK (MouseDown1Pane) stays at its default, so an agent that does use
-  #     clicks keeps them.
+  #   • claude / opencode: their grab was switched off above, #{mouse_any_flag}
+  #     is 0, and the drag opens tmux's copy-mode.
+  #   • pi / copilot: they hold the mouse and select by themselves, so the drag
+  #     is forwarded to them whole. Opening copy-mode over them instead is what
+  #     broke selection there — the 1003 downgrade swallows the drag, and what
+  #     does get selected carries their scrollbar and frame glyphs.
+  #
+  # The bindings are written out rather than left to tmux's defaults because the
+  # defaults stop at tmux's buffer; here a selection reaches the clipboard. CLICK
+  # (MouseDown1Pane) stays at its default, so an agent that uses clicks keeps
+  # them. An agent launched with CODING_AGENT_MOUSE=keep holds the mouse and
+  # gets the drag, which claude and opencode ignore: that is the opt-out's cost.
   #
   # #{pane_in_mode} stays in the condition: once copy-mode is open, `send-keys -M`
   # is what routes the drag to the copy-mode table so the selection extends.
@@ -272,14 +285,14 @@ tmux_session_wrapper() {
     local snippet
     snippet="$(mktemp "${TMPDIR:-/tmp}/coding-mouse-copy.XXXXXX")" || return 0
     cat > "$snippet" <<EOF_MOUSE_COPY
-bind-key -T root MouseDrag1Pane if-shell -F "#{pane_in_mode}" { send-keys -M } { copy-mode -M }
+bind-key -T root MouseDrag1Pane if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { copy-mode -M }
 bind-key -T root DoubleClick1Pane {
   select-pane -t =
-  if-shell -F "#{pane_in_mode}" { send-keys -M } { copy-mode -H ; send-keys -X select-word ; run-shell -d 0.3 ; send-keys -X copy-pipe-and-cancel${copy_pipe} }
+  if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { copy-mode -H ; send-keys -X select-word ; run-shell -d 0.3 ; send-keys -X copy-pipe-and-cancel${copy_pipe} }
 }
 bind-key -T root TripleClick1Pane {
   select-pane -t =
-  if-shell -F "#{pane_in_mode}" { send-keys -M } { copy-mode -H ; send-keys -X select-line ; run-shell -d 0.3 ; send-keys -X copy-pipe-and-cancel${copy_pipe} }
+  if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { copy-mode -H ; send-keys -X select-line ; run-shell -d 0.3 ; send-keys -X copy-pipe-and-cancel${copy_pipe} }
 }
 bind-key -T root WheelUpPane if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { if-shell -F "#{alternate_on}" { send-keys PageUp } { copy-mode -e } }
 bind-key -T root WheelDownPane if-shell -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" { send-keys -M } { if-shell -F "#{alternate_on}" { send-keys PageDown } { send-keys -M } }
