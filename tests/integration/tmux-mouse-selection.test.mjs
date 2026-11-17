@@ -172,15 +172,20 @@ describe('tmux drag-to-select', { skip: SKIP }, () => {
   });
 });
 
-describe('the wrapper takes the mouse off the agents it launches', () => {
+describe('the wrapper leaves the agents their mouse; CODING_AGENT_MOUSE=off takes it', () => {
   const src = readFileSync(WRAPPER, 'utf8');
 
-  test('claude and opencode each get their documented opt-out', () => {
+  test('the switches are set only on CODING_AGENT_MOUSE=off', () => {
+    // The agents select by themselves (opencode without its sidebar, Copilot
+    // without its scrollbar); switching their mouse off by default hands the drag
+    // to tmux's copy-mode, which copies whole screen rows.
+    assert.match(src, /if \[ "\$\{CODING_AGENT_MOUSE:-\}" = "off" \]; then\s+case "\$agent" in/);
     assert.match(src, /claude\)\s+\[ -z "\$\{CLAUDE_CODE_DISABLE_MOUSE:-\}" \] && export CLAUDE_CODE_DISABLE_MOUSE=1/);
     assert.match(src, /opencode\)\s+\[ -z "\$\{OPENCODE_DISABLE_MOUSE:-\}" \] && export OPENCODE_DISABLE_MOUSE=1/);
+    assert.equal((src.match(/export (CLAUDE_CODE|OPENCODE)_DISABLE_MOUSE=1/g) || []).length, 2, 'set nowhere else');
   });
 
-  test('the opt-outs travel into a newly created session', () => {
+  test('the switches travel into a newly created session', () => {
     // Exported above, so they must also be on the propagation list or they
     // would apply only to the already-inside-tmux path.
     const envList = src.split('local env_vars=(')[1].split(')')[0];
@@ -189,11 +194,7 @@ describe('the wrapper takes the mouse off the agents it launches', () => {
     }
   });
 
-  test('an explicit choice is never overridden', () => {
-    assert.match(src, /CODING_AGENT_MOUSE:-\}" != "keep"/);
-  });
-
-  test('the wheel is handed back, since the agent can no longer hear it', () => {
+  test('the wheel is handed back to an agent started with its mouse off', () => {
     // Taking the mouse away takes the agent's wheel scrolling with it, and on
     // an alternate screen there is no tmux scrollback to fall back to.
     assert.match(src, /WheelUpPane.*alternate_on.*send-keys PageUp/s);

@@ -115,11 +115,11 @@ describe('boxRunArgs — host integrations keep working', () => {
     assert.strictEqual(e.SECRET_THING, undefined);
   });
 
-  test('the mouse switches the tmux wrapper sets reach the agent (drag-select in tmux)', () => {
+  test('the mouse switches the tmux wrapper sets reach the agent (CODING_AGENT_MOUSE=off)', () => {
     const e = envs(boxRunArgs({ ...base, env: { CLAUDE_CODE_DISABLE_MOUSE: '1', OPENCODE_DISABLE_MOUSE: '1' } }));
     assert.strictEqual(e.CLAUDE_CODE_DISABLE_MOUSE, '1');
     assert.strictEqual(e.OPENCODE_DISABLE_MOUSE, '1');
-    // CODING_AGENT_MOUSE=keep leaves them unset in the wrapper → nothing passed.
+    // By default the wrapper leaves them unset → nothing passed.
     assert.strictEqual(envs(boxRunArgs(base)).CLAUDE_CODE_DISABLE_MOUSE, undefined);
   });
 

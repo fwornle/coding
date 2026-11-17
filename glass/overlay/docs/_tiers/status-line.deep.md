@@ -77,35 +77,28 @@ The same reports are available on the command line: `glass report ctx`, `glass r
 
 ## Selecting text in tmux
 
-Clickable fields need tmux's mouse on, so glass sets up selection to keep working. Who
-makes the selection depends on the agent:
-
-| Agent | Selection |
-|---|---|
-| Claude Code, opencode | tmux. glass starts them with their own mouse handling off (`CLAUDE_CODE_DISABLE_MOUSE`, `OPENCODE_DISABLE_MOUSE`) |
-| pi, Copilot CLI | The agent itself. Both run full-screen and keep the mouse; tmux hands them the drag |
-
-With Claude Code and opencode:
+Clickable fields need tmux's mouse on, so glass sets up selection to keep working. Claude
+Code, opencode, pi and Copilot CLI select text themselves, and tmux hands them the drag:
 
 | You do | What happens |
 |---|---|
-| Drag | Selects text and copies it to the clipboard when you release (`pbcopy`, `wl-copy`, `xclip`, `xsel` or `clip.exe`, whichever exists) |
-| Double-click / triple-click | Copies the word / the line |
-| Mouse wheel | Scrolls the agent (sent as PageUp / PageDown) |
+| Drag | The agent selects. It follows the agent's layout, so opencode's sidebar, Copilot's scrollbar and frames are left out, and it scrolls the conversation when the drag reaches the edge |
+| Double-click / triple-click | The agent selects the word / the line |
+| Mouse wheel | Scrolls the agent |
+| `prefix` + `S` | Mouse off for this session; the status line is not clickable until you press it again |
 
-With pi and Copilot CLI, drag, double-click, triple-click and the wheel are the agent's own:
-a drag scrolls the conversation when it reaches the edge, and leaves out the agent's
-scrollbar and frame. pi copies on release. Copilot CLI copies on release on macOS and on
-Ctrl+C elsewhere (its `copyOnSelect` setting); under tmux it hands the text to tmux,
-which passes it to the terminal as OSC 52 (iTerm2: allow *Applications in terminal may
-access clipboard*). Copilot's scrollbar is its own; `/settings` turns it off.
+Where the selection goes is the agent's: Claude Code, opencode and pi copy on release.
+Copilot CLI copies on release on macOS and on Ctrl+C elsewhere (its `copyOnSelect`
+setting). Under tmux an agent may hand the text to tmux, which passes it to the terminal as
+OSC 52 (iTerm2: allow *Applications in terminal may access clipboard*). Copilot's
+scrollbar is its own; `/settings` turns it off.
 
-| You do | What happens |
-|---|---|
-| `prefix` + `S` | Mouse off for this session: the terminal's own selection, across the scrollback; the status line is not clickable until you press it again |
-
-`GLASS_AGENT_MOUSE=keep` leaves Claude Code's and opencode's mouse alone (a drag then goes
-to them and selects nothing), and a value you set for either variable is never overridden.
+`GLASS_AGENT_MOUSE=off` starts Claude Code and opencode with their mouse handling off
+(`CLAUDE_CODE_DISABLE_MOUSE`, `OPENCODE_DISABLE_MOUSE`; pi and Copilot have no such switch).
+A drag over them is then tmux's: it selects whole screen rows, side panels included, and
+copies on release (`pbcopy`, `wl-copy`, `xclip`, `xsel` or `clip.exe`, whichever exists);
+the wheel scrolls them as PageUp / PageDown; and `prefix` + `S` gives the terminal's own
+selection, across the scrollback. A value you set for either variable is never overridden.
 
 tmux's key bindings apply to the whole tmux server. glass replaces only tmux's own
 defaults for these keys, and binds `prefix` + `S` only where nothing is bound, so bindings

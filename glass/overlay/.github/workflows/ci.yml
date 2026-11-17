@@ -50,8 +50,8 @@ jobs:
       - run: |
           tmux -V
           for a in copilot pi opencode claude; do command -v "$a"; "$a" --version; done
-      # Claude Code takes the mouse only when logged in, so its half of the
-      # contract reports as skipped here; it runs on a developer's machine.
+      # Claude Code takes the mouse only when logged in: here tmux selects over
+      # it, and the log says which side made each selection.
       - run: node --test --test-reporter=spec tests/agent-mouse.test.mjs
         env:
           GLASS_AGENT_PROBE: '1'

@@ -9,8 +9,8 @@ Start with `glass doctor`; most problems show up there.
     | Symptom | Fix |
     |---|---|
     | "daemon not reachable … running unmeasured" | See `~/.glass/logs/daemon.log`; port taken → `GLASS_PORT=<free port>` |
-    | In tmux, dragging the mouse selects nothing, or nothing reaches the clipboard | Restart the agent with `glass <agent>`: the session's mouse bindings and the agent's mouse setting are set when it starts. pi and Copilot CLI select by themselves (Copilot copies with Ctrl+C outside macOS); `prefix` + `S` switches to the terminal's own selection ([Status Line → Selecting text](status-line.md)) |
-    | In tmux, a selection over Copilot CLI is a block of whole lines, with vertical bars in the copied text | tmux's copy-mode selected instead of Copilot: restart it with `glass copilot` so the drag goes to Copilot, or press `q` to leave copy-mode |
+    | In tmux, dragging the mouse selects nothing, or nothing reaches the clipboard | Restart the agent with `glass <agent>`: the session's mouse bindings and the agent's mouse setting are set when it starts. The agent makes the selection (Copilot copies with Ctrl+C outside macOS) ([Status Line → Selecting text](status-line.md)) |
+    | In tmux, a selection is a block of whole lines that takes in the agent's sidebar or vertical bars | tmux's copy-mode selected instead of the agent: restart it with `glass <agent>` (without `GLASS_AGENT_MOUSE=off`) so the drag goes to the agent, or press `q` to leave copy-mode |
     | No rows for copilot | `copilot --version` must be ≥ 1.0.93, and the npm CLI first on `PATH` |
     | Certificate error in an agent | Try `--no-intercept`, then send the daemon log to the maintainers |
     | No status line | Install tmux, or use Claude Code's status line / `glass watch` |

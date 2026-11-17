@@ -151,42 +151,33 @@ function sourceSnippet(tmpDir, name, text) {
 // ── Selecting text with the mouse ─────────────────────────────────────────────
 // The clickable status line needs `mouse on`, which hands the mouse to tmux. A
 // drag then has to reach whoever makes the selection, and coding's session
-// wrapper splits it the same way (scripts/tmux-session-wrapper.sh):
+// wrapper does the same (scripts/tmux-session-wrapper.sh).
 //
-//   1. Claude Code and opencode ask for ANY-EVENT mouse tracking (DECSET 1003)
-//      but do not select text. Forwarded a drag, they ignore it; and when a drag
-//      opens copy-mode over them, tmux drops the terminal from 1003 to 1002
-//      mid-gesture and the terminal stops reporting the motion: a 30-column drag
-//      copied 6 bytes. So under tmux both start with their mouse grab off
-//      (agentMouseEnv), and a drag opens copy-mode.
-//   2. pi and Copilot CLI run full-screen, hold the mouse and select by
-//      themselves: drag, double/triple click, auto-scroll past the viewport,
-//      copy to the clipboard through tmux. A drag is forwarded to them. tmux's
-//      copy-mode over them would hit the same downgrade, and what it does select
-//      carries their scrollbar and frame glyphs.
+// Claude Code, opencode, pi and Copilot CLI run full-screen, hold the mouse
+// (DECSET 1002/1003) and select by themselves: drag, double/triple click,
+// auto-scroll past the viewport, copy to the clipboard. Their selection follows
+// their layout — no opencode sidebar, no Copilot scrollbar, no frame glyphs. So
+// a drag goes to the agent whenever the pane holds the mouse. tmux's copy-mode
+// over them would select whole screen rows, panels included, and switch the
+// terminal from 1003 to 1002 mid-gesture, after which the terminal stops
+// reporting the motion (a 30-column drag copied 6 bytes).
 //
-// The bindings below make that split on #{mouse_any_flag}, copy a tmux
-// selection to the clipboard (tmux's defaults stop at its buffer), and hand the
-// wheel to an agent that let go of the mouse as PageUp / PageDown.
+// The bindings below make that choice on #{mouse_any_flag}, copy a tmux
+// selection (a pane without the mouse) to the clipboard — tmux's defaults stop
+// at its buffer — and hand the wheel to an agent started with its mouse off as
+// PageUp / PageDown.
 //
 // prefix + S switches the mouse off for the session: the terminal's own
 // selection (scrollback, survives repaints) at the price of status-line clicks.
 
 /**
- * Who makes the selection under tmux: `release` — the agent's grab is switched
- * off (agentMouseEnv) and a drag opens tmux's copy-mode; `own` — the agent
- * keeps the mouse and selects by itself. tests/agent-mouse.test.mjs holds the
- * installed CLIs to this.
- */
-export const AGENT_MOUSE = { claude: 'release', opencode: 'release', copilot: 'own', pi: 'own' };
-
-/**
- * What the agent's environment needs under tmux so a drag selects text: its own
- * mouse grab off where it does not select by itself. An explicit value, or
- * GLASS_AGENT_MOUSE=keep, is left alone.
+ * The agent's environment under tmux. Agents keep their mouse and select by
+ * themselves; GLASS_AGENT_MOUSE=off starts Claude Code and opencode with theirs
+ * off (pi and Copilot have no such switch), for tmux's selection instead. A
+ * value set for either switch is left alone.
  */
 export function agentMouseEnv(agent, env = process.env) {
-  if (env.GLASS_AGENT_MOUSE === 'keep') return {};
+  if (env.GLASS_AGENT_MOUSE !== 'off') return {};
   const key = { claude: 'CLAUDE_CODE_DISABLE_MOUSE', opencode: 'OPENCODE_DISABLE_MOUSE' }[agent];
   return key && !env[key] ? { [key]: '1' } : {};
 }
@@ -202,9 +193,9 @@ export function clipboardCommand(which) {
 /**
  * Each selection binding: the table and key, when the current binding may be
  * replaced (tmux's default, or nothing), and glass's line. A binding the user
- * changed is left as it is. Replaceable too: the drag-to-copy-mode line glass
- * and coding bound before pi and Copilot selected by themselves
- * (`if-shell -F "#{pane_in_mode}"`), which takes the drag from them.
+ * changed is left as it is. Replaceable too: a drag-to-copy-mode line glass and
+ * coding bound earlier (`if-shell -F "#{pane_in_mode}"`), which takes the drag
+ * from an agent that holds the mouse.
  */
 export function mouseCopyBindings(copy) {
   const pipe = copy ? ` "${copy}"` : '';

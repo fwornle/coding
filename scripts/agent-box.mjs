@@ -73,9 +73,9 @@ const GRANTS_LIB = 'lib/guard/grants.mjs';
 /**
  * Env passed into the box besides the routing set: terminal, locale, egress
  * proxy, and the agents' mouse switches. tmux-session-wrapper.sh exports
- * CLAUDE_CODE_DISABLE_MOUSE / OPENCODE_DISABLE_MOUSE so the agent never takes
- * the mouse (DECSET 1003) and tmux drag-select keeps working; without them the
- * boxed agent grabs the mouse and selection is lost.
+ * CLAUDE_CODE_DISABLE_MOUSE / OPENCODE_DISABLE_MOUSE on CODING_AGENT_MOUSE=off
+ * (tmux's selection instead of the agent's own); without them in the box, the
+ * boxed agent would hold the mouse regardless.
  */
 const EXTRA_ENV = ['TERM', 'COLORTERM', 'LANG', 'LC_ALL', 'TASK_ID', 'NODE_EXTRA_CA_CERTS',
   'HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY', 'https_proxy', 'http_proxy', 'no_proxy',

@@ -9,7 +9,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 const { renderStatusline, renderReport, uiLinks, TAGS } = await import('../lib/glass/statusline.mjs');
-const { clickBinding, tmuxWanted, innerEnv, configureStatus, agentMouseEnv, AGENT_MOUSE, clipboardCommand, mouseCopyBindings, holdQuickExit, QUICK_EXIT_MS } = await import('../lib/glass/tmux.mjs');
+const { clickBinding, tmuxWanted, innerEnv, configureStatus, agentMouseEnv, clipboardCommand, mouseCopyBindings, holdQuickExit, QUICK_EXIT_MS } = await import('../lib/glass/tmux.mjs');
 const { claudeStatusSettings, isTerminalReport, watchHint, clickTarget } = await import('../lib/glass/cli.mjs');
 
 const D = {
@@ -144,16 +144,14 @@ test('tmux: when, the inner env, the chained click binding', () => {
 
 const hasTmux = spawnSync('tmux', ['-V']).status === 0;
 
-test('tmux selection: claude and opencode let go of the mouse; pi and Copilot select by themselves', () => {
-  for (const [agent, who] of Object.entries(AGENT_MOUSE)) {
-    assert.equal(Object.keys(agentMouseEnv(agent, {})).length, who === 'release' ? 1 : 0, `${agent}: ${who}`);
-  }
-  assert.deepEqual(agentMouseEnv('claude', {}), { CLAUDE_CODE_DISABLE_MOUSE: '1' });
-  assert.deepEqual(agentMouseEnv('opencode', {}), { OPENCODE_DISABLE_MOUSE: '1' });
-  assert.deepEqual(agentMouseEnv('pi', {}), {}, 'pi keeps the mouse');
-  assert.deepEqual(agentMouseEnv('copilot', {}), {}, 'so does Copilot CLI');
-  assert.deepEqual(agentMouseEnv('claude', { CLAUDE_CODE_DISABLE_MOUSE: '0' }), {}, 'an explicit value stands');
-  assert.deepEqual(agentMouseEnv('claude', { GLASS_AGENT_MOUSE: 'keep' }), {}, 'opted out');
+test('tmux selection: agents keep the mouse and select by themselves; GLASS_AGENT_MOUSE=off hands it to tmux', () => {
+  for (const agent of ['claude', 'opencode', 'copilot', 'pi']) assert.deepEqual(agentMouseEnv(agent, {}), {}, `${agent} keeps the mouse`);
+  const off = { GLASS_AGENT_MOUSE: 'off' };
+  assert.deepEqual(agentMouseEnv('claude', off), { CLAUDE_CODE_DISABLE_MOUSE: '1' });
+  assert.deepEqual(agentMouseEnv('opencode', off), { OPENCODE_DISABLE_MOUSE: '1' });
+  assert.deepEqual(agentMouseEnv('pi', off), {}, 'pi has no switch');
+  assert.deepEqual(agentMouseEnv('copilot', off), {}, 'nor has Copilot CLI');
+  assert.deepEqual(agentMouseEnv('claude', { ...off, CLAUDE_CODE_DISABLE_MOUSE: '0' }), {}, 'an explicit value stands');
   assert.equal(clipboardCommand((b) => b === 'pbcopy'), 'pbcopy');
   assert.equal(clipboardCommand((b) => b === 'xclip'), 'xclip -selection clipboard');
   assert.equal(clipboardCommand(() => false), '');
