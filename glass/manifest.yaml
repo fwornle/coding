@@ -249,6 +249,12 @@ targets:
         find: "        os: [ubuntu-latest, windows-latest]"
         replace: "        os: [ubuntu-latest, macos-latest, windows-latest]"
         count: 1
+      # macOS on one Node version: hosted macOS runners queue for minutes when
+      # several jobs ask at once; Linux and Windows keep the 22.13.0 floor.
+      - file: .github/workflows/ci.yml
+        find: "        node: ['22.13.0', '22.x']\n"
+        replace: "        node: ['22.13.0', '22.x']\n        exclude:\n          - os: macos-latest\n            node: '22.13.0'\n"
+        count: 1
       - file: .github/workflows/docs.yml
         find: "(https://aimaad-glass.pages.bmw.ghe.com/, visible to the organization)."
         replace: "(https://fwornle.github.io/glass/)."
