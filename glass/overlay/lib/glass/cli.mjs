@@ -209,8 +209,8 @@ async function runMeasured(agent, argv) {
   let settings = null;
   if (useTmux && process.env.TMUX) {
     restore = configureStatus({ taskId: session.taskId, port, tmpDir: p.run });
-    // claude and opencode let go of the mouse so a drag opens tmux's copy-mode;
-    // pi and Copilot keep it and select by themselves (tmux.mjs AGENT_MOUSE).
+    // The agent keeps its mouse and selects by itself, unless
+    // GLASS_AGENT_MOUSE=off (tmux.mjs agentMouseEnv).
     Object.assign(env, agentMouseEnv(agent, baseEnv));
   } else if (agent === 'claude' && !process.env.GLASS_NO_STATUSLINE && !args.includes('--settings')) {
     settings = claudeStatusSettings(path.join(p.run, `${session.taskId}.settings.json`), { port, taskId: session.taskId });
