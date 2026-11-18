@@ -49,6 +49,21 @@ describe('networkBadge', () => {
     assert.equal(networkBadge({ location: 'open' }).warn, false);
     assert.equal(networkBadge({ location: 'corporate', proxy_running: true, proxy_functional: true }).warn, false);
   });
+  it('WAIT for the minute after a network change, on any network (2026-11-18)', () => {
+    const now = Date.parse('2026-11-18T07:54:43.000Z');
+    const probed = { last_probe_end: '2026-11-18T07:54:43.000Z', internet_reachable: false };
+    const vpn = networkBadge({ location: 'vpn', proxy_running: false, proxy_functional: false, kerberos_ticket: false, ...probed, last_network_change_at: now - 20_000 }, now);
+    assert.equal(vpn.text, 'N:VPN P:OFF WAIT', 'a VPN coming up over a new hotspot: waiting, not a ticket or proxy fault');
+    assert.equal(vpn.settling, true);
+    assert.equal(vpn.warn, true);
+    const open = networkBadge({ location: 'open', proxy_running: true, proxy_functional: true, ...probed, last_network_change_at: now - 5_000 }, now);
+    assert.equal(open.text, 'N:OPEN P:AUTO WAIT');
+    assert.equal(open.offline, false, 'not OFFLINE while it settles');
+    const later = networkBadge({ location: 'open', proxy_running: true, proxy_functional: true, ...probed, last_network_change_at: now - 61_000 }, now);
+    assert.equal(later.text, 'N:OPEN P:AUTO OFFLINE', 'a minute on, still nothing: that is OFFLINE');
+    assert.equal(networkBadge({ location: 'vpn', proxy_running: true, proxy_functional: true, internet_reachable: true, last_probe_end: probed.last_probe_end, last_network_change_at: now - 5_000 }, now).text,
+      'N:VPN P:AUTO', 'a change that already forwards shows nothing extra');
+  });
   it('OFFLINE off the corporate network when a completed probe found no internet (2026-10-24)', () => {
     const probed = { last_probe_end: '2026-10-24T16:46:00.728Z' };
     const b = networkBadge({ location: 'open', proxy_running: true, proxy_functional: true, internet_reachable: false, ...probed });

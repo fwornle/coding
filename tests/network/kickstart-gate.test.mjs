@@ -20,7 +20,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  decideKickstart, isFreshProbeOutcome, pruneWindow,
+  decideKickstart, hostOfflineFrom, isFreshProbeOutcome, pruneWindow,
   KICKSTART_WINDOW_MS, KICKSTART_MAX_IN_WINDOW, KICKSTART_DEBOUNCE_MS,
 } from '../../lib/network/kickstart-gate.mjs';
 
@@ -207,5 +207,35 @@ describe('no failure-driven restart while the host is offline (2026-10-24)', () 
 
   it('online again: dispatch allowed', () => {
     assert.equal(decideKickstart({ now: T0, hostOffline: false }).allowed, true);
+  });
+});
+
+describe('offline on every network: a VPN is no exemption (2026-11-18)', () => {
+  const probed = { last_probe_end: '2026-11-18T07:54:43.000Z' };
+
+  it('replays 08:54: hotspot joined, VPN up over it, nothing forwards — the restart is held', () => {
+    // From the coordinator's log: location=vpn proxy_running=false
+    // proxy_functional=false internet=false, then "dispatching restart_llm_cli_proxy".
+    const network = { location: 'vpn', internet_reachable: false, proxy_running: false, proxy_functional: false, ...probed };
+    assert.equal(hostOfflineFrom(network), true);
+    const d = decideKickstart({ now: T0, hostOffline: hostOfflineFrom(network) });
+    assert.equal(d.allowed, false);
+    assert.equal(d.reason, 'offline');
+  });
+
+  it('the same on the corporate network and off it', () => {
+    for (const location of ['corporate', 'open', 'home']) {
+      assert.equal(hostOfflineFrom({ location, internet_reachable: false, ...probed }), true, location);
+    }
+  });
+
+  it('not before a probe has finished — false is also the default, and a network change clears the stamp', () => {
+    assert.equal(hostOfflineFrom({ location: 'vpn', internet_reachable: false }), false);
+    assert.equal(hostOfflineFrom({ location: 'vpn', internet_reachable: false, last_probe_end: null }), false);
+    assert.equal(hostOfflineFrom(null), false);
+  });
+
+  it('online: never held for being offline', () => {
+    assert.equal(hostOfflineFrom({ location: 'vpn', internet_reachable: true, ...probed }), false);
   });
 });

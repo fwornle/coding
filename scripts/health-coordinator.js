@@ -65,7 +65,7 @@ import {
   classifyProxyHttpFailure, isProxyRestartActionable,
 } from '../lib/network/probe-result-semantics.mjs';
 import {
-  decideKickstart, isFreshProbeOutcome, KICKSTART_DEBOUNCE_MS,
+  decideKickstart, hostOfflineFrom, isFreshProbeOutcome, KICKSTART_DEBOUNCE_MS,
 } from '../lib/network/kickstart-gate.mjs';
 import { probeHttpHealth, probeTcpPort, PROBE_TIMEOUT_ERROR } from '../lib/utils/service-probe.js';
 import net from 'node:net';
@@ -1705,11 +1705,9 @@ function dispatchProxyKickstart({ reason, logPrefix, detail = '', countsTowardCa
     timestamps: currentState.proxy.kickstart_timestamps,
     lastDispatchAt: currentState.proxy.last_kickstart_dispatch_at,
     countsTowardCap,
-    // Only once a probe has run (internet_reachable starts out false), and only
-    // off CN / VPN, where no direct egress is normal and a stale proxy reads
-    // the same way — there the restart may be the cure.
-    hostOffline: currentState.network.last_probe_end != null && currentState.network.internet_reachable === false
-      && currentState.network.location !== 'corporate' && currentState.network.location !== 'vpn',
+    // On every network, CN and VPN included: restarting the LLM proxy changes
+    // neither path the internet probe takes (kickstart-gate.mjs hostOfflineFrom).
+    hostOffline: hostOfflineFrom(currentState.network),
   });
   currentState.proxy.kickstart_timestamps = decision.recent;
 

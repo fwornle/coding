@@ -148,7 +148,7 @@ The health coordinator (`scripts/health-coordinator.js`, probes in
 | A request through the pin cannot connect | LLM proxy | egress decided again; retried once if the pin moved | one re-check at a time | `server.mjs` `proxyFetch` |
 | Provider fails (quota, down, timeout, 5xx) | LLM proxy | next provider in `llm-fallback.yaml`; one same-provider retry on network errors | tools requests only to tools-capable providers | routing config |
 | Qwen cluster unreachable | LLM proxy | dropped from every chain | re-probed every 60 s | `server.mjs` |
-| LLM proxy wedged | coordinator | `launchctl kickstart -k com.coding.llm-cli-proxy`, or `systemctl --user try-restart llm-cli-proxy.service` | 60 s between restarts, at most 3 in 5 min; probes paused while you are away | `kickstart-gate.mjs` |
+| LLM proxy wedged | coordinator | `launchctl kickstart -k com.coding.llm-cli-proxy`, or `systemctl --user try-restart llm-cli-proxy.service` | 60 s between restarts, at most 3 in 5 min; probes paused while you are away; never while the host reaches nothing, on any network including CN / VPN (a restart drops every agent's request in flight and cannot fix the network) | `kickstart-gate.mjs` `hostOfflineFrom` |
 | `:3128` healed | coordinator | LLM proxy restarted to drop stale connections | at most every 10 min | `health-coordinator.js` |
 | LLM proxy or coordinator exits | launchd / systemd | restarted | 10 s / 30 s apart (`ThrottleInterval`, `RestartSec`) | `launchd/*.plist`, `systemd/*.service` |
 | LLM proxy down at launch | launcher | waits 5 × 2 s, then stops with the restart command | — | `proxy-routing.mjs` |

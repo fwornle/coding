@@ -135,6 +135,8 @@ Two ASCII-only badges reflect the network environment detected by the coordinato
 | `P:ON` | Daemon running + functional AND user toggled `px` on | Normal on VPN/CN |
 | `P:AUTO` | Daemon running + functional, `px` toggle off — adaptive `--direct-fallback` mode; pinned sessions still routed | Normal off-CN state |
 | `P:OFF` | Daemon down, or it listens but cannot open a tunnel (`CONNECT api.github.com:443`) | Problem on VPN/CN (bar turns yellow); the coordinator restarts it — see [Connectivity & Recovery](../architecture/connectivity.md#recovery) |
+| `… WAIT` | The OS reported a network change in the last minute (a hotspot joining, a VPN coming up) and the new network does not forward yet | Nothing to do: coding waits for it and does not restart the LLM proxy, so running agents keep their requests. Still there after a minute, it becomes `OFFLINE` (off CN / VPN) |
+| `… OFFLINE` | Off CN / VPN: a finished probe reached nothing, direct or through `:3128` | The network itself, not the proxy: Wi-Fi off and on; after a wake from sleep, failing that, a reboot |
 | `… K:NO` | On VPN/CN without a Kerberos ticket (`klist -s` fails); the corporate proxy refuses every tunnel until there is one | macOS: the coordinator asks the Kerberos SSO extension for one at once — wait ~15 s. Linux / WSL: run `kinit` |
 
 !!! note "P: is three-state since 2026-07-26"
