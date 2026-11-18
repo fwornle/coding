@@ -285,6 +285,10 @@ what happens when one fails. Subscriptions are used before metered API keys.
 On the corporate network, small background calls can go to the **on-prem Qwen
 cluster** instead.
 
+Your agent's model picker lists what the providers serve **right now** —
+Copilot's models and, on corporate, the cluster's. A model you pick is the
+model that answers; the default, *auto*, leaves the choice to the routing.
+
 The proxy also labels each of your prompts with its **kind of job** (fix, ship,
 status, …) and replays past jobs of one kind on a cheaper model, so that kind
 can switch to it once the evidence holds: [Job classes](job-classes.md).

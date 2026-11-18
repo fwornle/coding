@@ -18,6 +18,8 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "declare -x CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=\"1\"",
       "unset OPENCODE_CONFIG_CONTENT",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
@@ -50,6 +52,8 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "declare -x CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=\"1\"",
       "unset OPENCODE_CONFIG_CONTENT",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
@@ -82,6 +86,8 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "declare -x CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=\"1\"",
       "unset OPENCODE_CONFIG_CONTENT",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
@@ -113,6 +119,8 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
       "unset OPENCODE_CONFIG_CONTENT",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
@@ -146,6 +154,8 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
       "unset OPENCODE_CONFIG_CONTENT",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
@@ -165,6 +175,7 @@
     "log": [
       "[OpenCode] 🔀 Model from ~/.config/opencode/opencode.json; provider+model per call from llm-routing.yaml (fg-chat/opencode)",
       "[OpenCode] 🎚  Per-turn band variants available: --variant cheap|standard|deep (cheap → small → offload-eligible)",
+      "[OpenCode] 📋 rapid-proxy models: proxy-auto only — the proxy listed none (not up yet?)",
       "[OpenCode] 🔒 Wrapper-scoped: opencode plugins injected for this session only",
       "[OpenCode] 🔌 opencode → proxy http://127.0.0.1:<up>/v1/messages (anthropic path; best-effort — validate live)"
     ],
@@ -179,7 +190,9 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
-      "declare -x OPENCODE_CONFIG_CONTENT=\"{\\\"plugin\\\":[\\\"<box>/coding/plugins/opencode/compaction-guard.js\\\",\\\"<box>/coding/plugins/opencode/knowledge-injection.js\\\"],\\\"compaction\\\":{\\\"reserved\\\":40000},\\\"enabled_providers\\\":[\\\"rapid-proxy\\\",\\\"github-copilot\\\"],\\\"command\\\":{\\\"sl\\\":{\\\"description\\\":\\\"Load recent session logs for continuity\\\",\\\"template\\\":\\\"Read and follow .claude/commands/sl.md. The user supplied these optional arguments: \\$ARGUMENTS\\\"}},\\\"provider\\\":{\\\"rapid-proxy\\\":{\\\"options\\\":{\\\"headers\\\":{\\\"x-project\\\":\\\"\\\"}},\\\"models\\\":{\\\"claude-sonnet-5\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"claude-haiku-5.5\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"gpt-4o\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"gpt-4o-mini\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}}}},\\\"github-copilot\\\":{\\\"options\\\":{\\\"baseURL\\\":\\\"http://127.0.0.1:<up>/v1/opencode\\\",\\\"headers\\\":{\\\"x-agent\\\":\\\"opencode\\\",\\\"x-project\\\":\\\"\\\"}}}}}\"",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
+      "declare -x OPENCODE_CONFIG_CONTENT=\"{\\\"plugin\\\":[\\\"<box>/coding/plugins/opencode/compaction-guard.js\\\",\\\"<box>/coding/plugins/opencode/knowledge-injection.js\\\"],\\\"compaction\\\":{\\\"reserved\\\":40000},\\\"enabled_providers\\\":[\\\"rapid-proxy\\\",\\\"github-copilot\\\"],\\\"command\\\":{\\\"sl\\\":{\\\"description\\\":\\\"Load recent session logs for continuity\\\",\\\"template\\\":\\\"Read and follow .claude/commands/sl.md. The user supplied these optional arguments: \\$ARGUMENTS\\\"}},\\\"provider\\\":{\\\"rapid-proxy\\\":{\\\"options\\\":{\\\"headers\\\":{\\\"x-project\\\":\\\"\\\"}},\\\"models\\\":{\\\"proxy-auto\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}}}},\\\"github-copilot\\\":{\\\"options\\\":{\\\"baseURL\\\":\\\"http://127.0.0.1:<up>/v1/opencode\\\",\\\"headers\\\":{\\\"x-agent\\\":\\\"opencode\\\",\\\"x-project\\\":\\\"\\\"}}}}}\"",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
       "unset PI_OFFLINE",
@@ -199,6 +212,7 @@
       "[OpenCode] 🔀 Model from ~/.config/opencode/opencode.json; provider+model per call from llm-routing.yaml (fg-chat/opencode)",
       "[OpenCode] 🧪 opencode ANTHROPIC-NATIVE (opt-in) → proxy http://127.0.0.1:<up>/v1/messages (x-agent=opencode; x-task-id=t-oc)",
       "[OpenCode] 🎚  Per-turn band variants available: --variant cheap|standard|deep (cheap → small → offload-eligible)",
+      "[OpenCode] 📋 rapid-proxy models: proxy-auto only — the proxy listed none (not up yet?)",
       "[OpenCode] 🔒 Wrapper-scoped: opencode plugins injected for this session only",
       "[OpenCode] 🔌 opencode → proxy http://127.0.0.1:<up>/v1/messages (anthropic path; best-effort — validate live)"
     ],
@@ -213,7 +227,9 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
-      "declare -x OPENCODE_CONFIG_CONTENT=\"{\\\"plugin\\\":[\\\"<box>/coding/plugins/opencode/compaction-guard.js\\\",\\\"<box>/coding/plugins/opencode/knowledge-injection.js\\\"],\\\"compaction\\\":{\\\"reserved\\\":40000},\\\"enabled_providers\\\":[\\\"rapid-proxy\\\",\\\"github-copilot\\\",\\\"anthropic\\\"],\\\"command\\\":{\\\"sl\\\":{\\\"description\\\":\\\"Load recent session logs for continuity\\\",\\\"template\\\":\\\"Read and follow .claude/commands/sl.md. The user supplied these optional arguments: \\$ARGUMENTS\\\"}},\\\"provider\\\":{\\\"rapid-proxy\\\":{\\\"options\\\":{\\\"headers\\\":{\\\"x-project\\\":\\\"glass\\\"}},\\\"models\\\":{\\\"claude-sonnet-5\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"claude-haiku-5.5\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"gpt-4o\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"gpt-4o-mini\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}}}},\\\"github-copilot\\\":{\\\"options\\\":{\\\"baseURL\\\":\\\"http://127.0.0.1:<up>/v1/opencode/t/t-oc\\\",\\\"headers\\\":{\\\"x-agent\\\":\\\"opencode\\\",\\\"x-project\\\":\\\"glass\\\"}}},\\\"anthropic\\\":{\\\"options\\\":{\\\"baseURL\\\":\\\"http://127.0.0.1:<up>/v1\\\",\\\"headers\\\":{\\\"x-task-id\\\":\\\"t-oc\\\",\\\"x-agent\\\":\\\"opencode\\\",\\\"x-project\\\":\\\"glass\\\"}}}}}\"",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
+      "declare -x OPENCODE_CONFIG_CONTENT=\"{\\\"plugin\\\":[\\\"<box>/coding/plugins/opencode/compaction-guard.js\\\",\\\"<box>/coding/plugins/opencode/knowledge-injection.js\\\"],\\\"compaction\\\":{\\\"reserved\\\":40000},\\\"enabled_providers\\\":[\\\"rapid-proxy\\\",\\\"github-copilot\\\",\\\"anthropic\\\"],\\\"command\\\":{\\\"sl\\\":{\\\"description\\\":\\\"Load recent session logs for continuity\\\",\\\"template\\\":\\\"Read and follow .claude/commands/sl.md. The user supplied these optional arguments: \\$ARGUMENTS\\\"}},\\\"provider\\\":{\\\"rapid-proxy\\\":{\\\"options\\\":{\\\"headers\\\":{\\\"x-project\\\":\\\"glass\\\"}},\\\"models\\\":{\\\"proxy-auto\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}}}},\\\"github-copilot\\\":{\\\"options\\\":{\\\"baseURL\\\":\\\"http://127.0.0.1:<up>/v1/opencode/t/t-oc\\\",\\\"headers\\\":{\\\"x-agent\\\":\\\"opencode\\\",\\\"x-project\\\":\\\"glass\\\"}}},\\\"anthropic\\\":{\\\"options\\\":{\\\"baseURL\\\":\\\"http://127.0.0.1:<up>/v1\\\",\\\"headers\\\":{\\\"x-task-id\\\":\\\"t-oc\\\",\\\"x-agent\\\":\\\"opencode\\\",\\\"x-project\\\":\\\"glass\\\"}}}}}\"",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
       "unset PI_OFFLINE",
@@ -232,6 +248,7 @@
     "log": [
       "[OpenCode] 📌 Model override → rapid-proxy/claude-haiku-4.5",
       "[OpenCode] 🎚  Per-turn band variants available: --variant cheap|standard|deep (cheap → small → offload-eligible)",
+      "[OpenCode] 📋 rapid-proxy models: proxy-auto only — the proxy listed none (not up yet?)",
       "[OpenCode] 🔒 Wrapper-scoped: opencode plugins injected for this session only",
       "[OpenCode] 🔌 opencode → proxy http://127.0.0.1:<up>/v1/messages (anthropic path; best-effort — validate live)"
     ],
@@ -246,7 +263,9 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
-      "declare -x OPENCODE_CONFIG_CONTENT=\"{\\\"plugin\\\":[\\\"<box>/coding/plugins/opencode/compaction-guard.js\\\",\\\"<box>/coding/plugins/opencode/knowledge-injection.js\\\"],\\\"compaction\\\":{\\\"reserved\\\":40000},\\\"enabled_providers\\\":[\\\"rapid-proxy\\\",\\\"github-copilot\\\"],\\\"command\\\":{\\\"sl\\\":{\\\"description\\\":\\\"Load recent session logs for continuity\\\",\\\"template\\\":\\\"Read and follow .claude/commands/sl.md. The user supplied these optional arguments: \\$ARGUMENTS\\\"}},\\\"provider\\\":{\\\"rapid-proxy\\\":{\\\"options\\\":{\\\"headers\\\":{\\\"x-project\\\":\\\"\\\"}},\\\"models\\\":{\\\"claude-sonnet-5\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"claude-haiku-5.5\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"gpt-4o\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"gpt-4o-mini\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}}}},\\\"github-copilot\\\":{\\\"options\\\":{\\\"baseURL\\\":\\\"http://127.0.0.1:<up>/v1/opencode\\\",\\\"headers\\\":{\\\"x-agent\\\":\\\"opencode\\\",\\\"x-project\\\":\\\"\\\"}}}},\\\"model\\\":\\\"rapid-proxy/claude-haiku-4.5\\\"}\"",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
+      "declare -x OPENCODE_CONFIG_CONTENT=\"{\\\"plugin\\\":[\\\"<box>/coding/plugins/opencode/compaction-guard.js\\\",\\\"<box>/coding/plugins/opencode/knowledge-injection.js\\\"],\\\"compaction\\\":{\\\"reserved\\\":40000},\\\"enabled_providers\\\":[\\\"rapid-proxy\\\",\\\"github-copilot\\\"],\\\"command\\\":{\\\"sl\\\":{\\\"description\\\":\\\"Load recent session logs for continuity\\\",\\\"template\\\":\\\"Read and follow .claude/commands/sl.md. The user supplied these optional arguments: \\$ARGUMENTS\\\"}},\\\"provider\\\":{\\\"rapid-proxy\\\":{\\\"options\\\":{\\\"headers\\\":{\\\"x-project\\\":\\\"\\\"}},\\\"models\\\":{\\\"proxy-auto\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}}}},\\\"github-copilot\\\":{\\\"options\\\":{\\\"baseURL\\\":\\\"http://127.0.0.1:<up>/v1/opencode\\\",\\\"headers\\\":{\\\"x-agent\\\":\\\"opencode\\\",\\\"x-project\\\":\\\"\\\"}}}},\\\"model\\\":\\\"rapid-proxy/claude-haiku-4.5\\\"}\"",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
       "unset PI_OFFLINE",
@@ -265,6 +284,7 @@
     "log": [
       "[OpenCode] 🔀 Model from ~/.config/opencode/opencode.json; provider+model per call from llm-routing.yaml (fg-chat/opencode)",
       "[OpenCode] 🎚  Per-turn band variants available: --variant cheap|standard|deep (cheap → small → offload-eligible)",
+      "[OpenCode] 📋 rapid-proxy models: proxy-auto only — the proxy listed none (not up yet?)",
       "[OpenCode] 🔌 opencode → proxy http://127.0.0.1:<up>/v1/messages (anthropic path; best-effort — validate live)"
     ],
     "env": [
@@ -278,7 +298,9 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
-      "declare -x OPENCODE_CONFIG_CONTENT=\"{\\\"enabled_providers\\\":[\\\"rapid-proxy\\\",\\\"github-copilot\\\"],\\\"command\\\":{\\\"sl\\\":{\\\"description\\\":\\\"Load recent session logs for continuity\\\",\\\"template\\\":\\\"Read and follow .claude/commands/sl.md. The user supplied these optional arguments: \\$ARGUMENTS\\\"}},\\\"provider\\\":{\\\"rapid-proxy\\\":{\\\"options\\\":{\\\"headers\\\":{\\\"x-project\\\":\\\"\\\"}},\\\"models\\\":{\\\"claude-sonnet-5\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"claude-haiku-5.5\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"gpt-4o\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"gpt-4o-mini\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}}}},\\\"github-copilot\\\":{\\\"options\\\":{\\\"baseURL\\\":\\\"http://127.0.0.1:<up>/v1/opencode\\\",\\\"headers\\\":{\\\"x-agent\\\":\\\"opencode\\\",\\\"x-project\\\":\\\"\\\"}}}}}\"",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
+      "declare -x OPENCODE_CONFIG_CONTENT=\"{\\\"enabled_providers\\\":[\\\"rapid-proxy\\\",\\\"github-copilot\\\"],\\\"command\\\":{\\\"sl\\\":{\\\"description\\\":\\\"Load recent session logs for continuity\\\",\\\"template\\\":\\\"Read and follow .claude/commands/sl.md. The user supplied these optional arguments: \\$ARGUMENTS\\\"}},\\\"provider\\\":{\\\"rapid-proxy\\\":{\\\"options\\\":{\\\"headers\\\":{\\\"x-project\\\":\\\"\\\"}},\\\"models\\\":{\\\"proxy-auto\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}}}},\\\"github-copilot\\\":{\\\"options\\\":{\\\"baseURL\\\":\\\"http://127.0.0.1:<up>/v1/opencode\\\",\\\"headers\\\":{\\\"x-agent\\\":\\\"opencode\\\",\\\"x-project\\\":\\\"\\\"}}}}}\"",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
       "unset PI_OFFLINE",
@@ -297,6 +319,7 @@
     "log": [
       "[OpenCode] 🔀 Model from ~/.config/opencode/opencode.json; provider+model per call from llm-routing.yaml (fg-chat/opencode)",
       "[OpenCode] 🎚  Per-turn band variants available: --variant cheap|standard|deep (cheap → small → offload-eligible)",
+      "[OpenCode] 📋 rapid-proxy models: proxy-auto only — the proxy listed none (not up yet?)",
       "[OpenCode] 🔌 opencode → proxy http://127.0.0.1:<up>/v1/messages (anthropic path; best-effort — validate live)"
     ],
     "env": [
@@ -310,7 +333,9 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
-      "declare -x OPENCODE_CONFIG_CONTENT=\"{\\\"enabled_providers\\\":[\\\"rapid-proxy\\\",\\\"github-copilot\\\"],\\\"command\\\":{\\\"sl\\\":{\\\"description\\\":\\\"Load recent session logs for continuity\\\",\\\"template\\\":\\\"Read and follow .claude/commands/sl.md. The user supplied these optional arguments: \\$ARGUMENTS\\\"}},\\\"provider\\\":{\\\"rapid-proxy\\\":{\\\"options\\\":{\\\"headers\\\":{\\\"x-project\\\":\\\"\\\"}},\\\"models\\\":{\\\"claude-sonnet-5\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"claude-haiku-5.5\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"gpt-4o\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"gpt-4o-mini\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}}}},\\\"github-copilot\\\":{\\\"options\\\":{\\\"baseURL\\\":\\\"http://127.0.0.1:<up>/v1/opencode\\\",\\\"headers\\\":{\\\"x-agent\\\":\\\"opencode\\\",\\\"x-project\\\":\\\"\\\"}}}}}\"",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
+      "declare -x OPENCODE_CONFIG_CONTENT=\"{\\\"enabled_providers\\\":[\\\"rapid-proxy\\\",\\\"github-copilot\\\"],\\\"command\\\":{\\\"sl\\\":{\\\"description\\\":\\\"Load recent session logs for continuity\\\",\\\"template\\\":\\\"Read and follow .claude/commands/sl.md. The user supplied these optional arguments: \\$ARGUMENTS\\\"}},\\\"provider\\\":{\\\"rapid-proxy\\\":{\\\"options\\\":{\\\"headers\\\":{\\\"x-project\\\":\\\"\\\"}},\\\"models\\\":{\\\"proxy-auto\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}}}},\\\"github-copilot\\\":{\\\"options\\\":{\\\"baseURL\\\":\\\"http://127.0.0.1:<up>/v1/opencode\\\",\\\"headers\\\":{\\\"x-agent\\\":\\\"opencode\\\",\\\"x-project\\\":\\\"\\\"}}}}}\"",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
       "unset PI_OFFLINE",
@@ -329,6 +354,7 @@
     "log": [
       "[OpenCode] 🔀 Model from ~/.config/opencode/opencode.json; provider+model per call from llm-routing.yaml (fg-chat/opencode)",
       "[OpenCode] 🎚  Per-turn band variants available: --variant cheap|standard|deep (cheap → small → offload-eligible)",
+      "[OpenCode] 📋 rapid-proxy models: proxy-auto only — the proxy listed none (not up yet?)",
       "[OpenCode] 🔌 opencode → proxy http://127.0.0.1:<up>/v1/messages (anthropic path; best-effort — validate live)"
     ],
     "env": [
@@ -342,7 +368,9 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
-      "declare -x OPENCODE_CONFIG_CONTENT=\"{\\\"enabled_providers\\\":[\\\"rapid-proxy\\\",\\\"github-copilot\\\"],\\\"command\\\":{\\\"sl\\\":{\\\"description\\\":\\\"Load recent session logs for continuity\\\",\\\"template\\\":\\\"Read and follow .claude/commands/sl.md. The user supplied these optional arguments: \\$ARGUMENTS\\\"}},\\\"provider\\\":{\\\"rapid-proxy\\\":{\\\"options\\\":{\\\"headers\\\":{\\\"x-project\\\":\\\"\\\"}},\\\"models\\\":{\\\"claude-sonnet-5\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"claude-haiku-5.5\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"gpt-4o\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"gpt-4o-mini\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}}}},\\\"github-copilot\\\":{\\\"options\\\":{\\\"baseURL\\\":\\\"http://127.0.0.1:<up>/v1/opencode\\\",\\\"headers\\\":{\\\"x-agent\\\":\\\"opencode\\\",\\\"x-project\\\":\\\"\\\"}}}}}\"",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
+      "declare -x OPENCODE_CONFIG_CONTENT=\"{\\\"enabled_providers\\\":[\\\"rapid-proxy\\\",\\\"github-copilot\\\"],\\\"command\\\":{\\\"sl\\\":{\\\"description\\\":\\\"Load recent session logs for continuity\\\",\\\"template\\\":\\\"Read and follow .claude/commands/sl.md. The user supplied these optional arguments: \\$ARGUMENTS\\\"}},\\\"provider\\\":{\\\"rapid-proxy\\\":{\\\"options\\\":{\\\"headers\\\":{\\\"x-project\\\":\\\"\\\"}},\\\"models\\\":{\\\"proxy-auto\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}}}},\\\"github-copilot\\\":{\\\"options\\\":{\\\"baseURL\\\":\\\"http://127.0.0.1:<up>/v1/opencode\\\",\\\"headers\\\":{\\\"x-agent\\\":\\\"opencode\\\",\\\"x-project\\\":\\\"\\\"}}}}}\"",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
       "unset PI_OFFLINE",
@@ -361,6 +389,7 @@
     "log": [
       "[OpenCode] 🔀 Model from ~/.config/opencode/opencode.json; provider+model per call from llm-routing.yaml (fg-chat/opencode)",
       "[OpenCode] 🎚  Per-turn band variants available: --variant cheap|standard|deep (cheap → small → offload-eligible)",
+      "[OpenCode] 📋 rapid-proxy models: proxy-auto only — the proxy listed none (not up yet?)",
       "[OpenCode] 🔒 Wrapper-scoped: opencode plugins injected for this session only",
       "[OpenCode] 🔌 opencode → proxy http://127.0.0.1:<up>/v1/messages (anthropic path; best-effort — validate live)"
     ],
@@ -375,7 +404,9 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
-      "declare -x OPENCODE_CONFIG_CONTENT=\"{\\\"plugin\\\":[\\\"<box>/coding/plugins/opencode/compaction-guard.js\\\",\\\"<box>/coding/plugins/opencode/knowledge-injection.js\\\"],\\\"compaction\\\":{\\\"reserved\\\":40000},\\\"enabled_providers\\\":[\\\"rapid-proxy\\\",\\\"github-copilot\\\"],\\\"command\\\":{\\\"sl\\\":{\\\"description\\\":\\\"Load recent session logs for continuity\\\",\\\"template\\\":\\\"Read and follow .claude/commands/sl.md. The user supplied these optional arguments: \\$ARGUMENTS\\\"}},\\\"provider\\\":{\\\"rapid-proxy\\\":{\\\"options\\\":{\\\"headers\\\":{\\\"x-project\\\":\\\"\\\"}},\\\"models\\\":{\\\"claude-sonnet-5\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"claude-haiku-5.5\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"gpt-4o\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"gpt-4o-mini\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}}}},\\\"github-copilot\\\":{\\\"options\\\":{\\\"baseURL\\\":\\\"http://127.0.0.1:23456/v1/opencode\\\",\\\"headers\\\":{\\\"x-agent\\\":\\\"opencode\\\",\\\"x-project\\\":\\\"\\\"}}}}}\"",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
+      "declare -x OPENCODE_CONFIG_CONTENT=\"{\\\"plugin\\\":[\\\"<box>/coding/plugins/opencode/compaction-guard.js\\\",\\\"<box>/coding/plugins/opencode/knowledge-injection.js\\\"],\\\"compaction\\\":{\\\"reserved\\\":40000},\\\"enabled_providers\\\":[\\\"rapid-proxy\\\",\\\"github-copilot\\\"],\\\"command\\\":{\\\"sl\\\":{\\\"description\\\":\\\"Load recent session logs for continuity\\\",\\\"template\\\":\\\"Read and follow .claude/commands/sl.md. The user supplied these optional arguments: \\$ARGUMENTS\\\"}},\\\"provider\\\":{\\\"rapid-proxy\\\":{\\\"options\\\":{\\\"headers\\\":{\\\"x-project\\\":\\\"\\\"}},\\\"models\\\":{\\\"proxy-auto\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}}}},\\\"github-copilot\\\":{\\\"options\\\":{\\\"baseURL\\\":\\\"http://127.0.0.1:23456/v1/opencode\\\",\\\"headers\\\":{\\\"x-agent\\\":\\\"opencode\\\",\\\"x-project\\\":\\\"\\\"}}}}}\"",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
       "unset PI_OFFLINE",
@@ -394,6 +425,7 @@
     "log": [
       "[OpenCode] 🔀 Model from ~/.config/opencode/opencode.json; provider+model per call from llm-routing.yaml (fg-chat/opencode)",
       "[OpenCode] 🎚  Per-turn band variants available: --variant cheap|standard|deep (cheap → small → offload-eligible)",
+      "[OpenCode] 📋 rapid-proxy models: proxy-auto only — the proxy listed none (not up yet?)",
       "[OpenCode] 🔒 Wrapper-scoped: opencode plugins injected for this session only",
       "[OpenCode] ℹ️  CODING_PROXY_ROUTE=0 — proxy routing disabled; opencode launches direct (unmeasured)."
     ],
@@ -408,7 +440,9 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
-      "declare -x OPENCODE_CONFIG_CONTENT=\"{\\\"plugin\\\":[\\\"<box>/coding/plugins/opencode/compaction-guard.js\\\",\\\"<box>/coding/plugins/opencode/knowledge-injection.js\\\"],\\\"compaction\\\":{\\\"reserved\\\":40000},\\\"enabled_providers\\\":[\\\"rapid-proxy\\\",\\\"github-copilot\\\"],\\\"command\\\":{\\\"sl\\\":{\\\"description\\\":\\\"Load recent session logs for continuity\\\",\\\"template\\\":\\\"Read and follow .claude/commands/sl.md. The user supplied these optional arguments: \\$ARGUMENTS\\\"}},\\\"provider\\\":{\\\"rapid-proxy\\\":{\\\"options\\\":{\\\"headers\\\":{\\\"x-project\\\":\\\"\\\"}},\\\"models\\\":{\\\"claude-sonnet-5\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"claude-haiku-5.5\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"gpt-4o\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}},\\\"gpt-4o-mini\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}}}},\\\"github-copilot\\\":{\\\"options\\\":{\\\"baseURL\\\":\\\"http://127.0.0.1:<up>/v1/opencode\\\",\\\"headers\\\":{\\\"x-agent\\\":\\\"opencode\\\",\\\"x-project\\\":\\\"\\\"}}}}}\"",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
+      "declare -x OPENCODE_CONFIG_CONTENT=\"{\\\"plugin\\\":[\\\"<box>/coding/plugins/opencode/compaction-guard.js\\\",\\\"<box>/coding/plugins/opencode/knowledge-injection.js\\\"],\\\"compaction\\\":{\\\"reserved\\\":40000},\\\"enabled_providers\\\":[\\\"rapid-proxy\\\",\\\"github-copilot\\\"],\\\"command\\\":{\\\"sl\\\":{\\\"description\\\":\\\"Load recent session logs for continuity\\\",\\\"template\\\":\\\"Read and follow .claude/commands/sl.md. The user supplied these optional arguments: \\$ARGUMENTS\\\"}},\\\"provider\\\":{\\\"rapid-proxy\\\":{\\\"options\\\":{\\\"headers\\\":{\\\"x-project\\\":\\\"\\\"}},\\\"models\\\":{\\\"proxy-auto\\\":{\\\"variants\\\":{\\\"cheap\\\":{\\\"reasoningEffort\\\":\\\"low\\\"},\\\"standard\\\":{\\\"reasoningEffort\\\":\\\"medium\\\"},\\\"deep\\\":{\\\"reasoningEffort\\\":\\\"high\\\"}}}}},\\\"github-copilot\\\":{\\\"options\\\":{\\\"baseURL\\\":\\\"http://127.0.0.1:<up>/v1/opencode\\\",\\\"headers\\\":{\\\"x-agent\\\":\\\"opencode\\\",\\\"x-project\\\":\\\"\\\"}}}}}\"",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
       "unset PI_OFFLINE",
@@ -434,7 +468,7 @@
       "[CoPilot]    • Memory/Knowledge management (fallback services)",
       "[CoPilot]    • Browser automation (Playwright fallback)",
       "[CoPilot]    • LSL system integration",
-      "[CoPilot] 🔌 copilot → proxy http://127.0.0.1:<up>/v1/copilot (BYOK openai; AMBIENT — task_id from reconciler slot; model=claude-sonnet-5; opt-out COPILOT_AMBIENT_ROUTE=0)"
+      "[CoPilot] 🔌 copilot → proxy http://127.0.0.1:<up>/v1/copilot (BYOK openai; AMBIENT — task_id from reconciler slot; model=proxy-auto; opt-out COPILOT_AMBIENT_ROUTE=0)"
     ],
     "env": [
       "unset ANTHROPIC_BASE_URL",
@@ -445,8 +479,10 @@
       "declare -x COPILOT_PROVIDER_BASE_URL=\"http://127.0.0.1:<up>/v1/copilot\"",
       "declare -x COPILOT_PROVIDER_TYPE=\"openai\"",
       "declare -x COPILOT_PROVIDER_API_KEY=\"rapid-proxy-no-auth-placeholder\"",
-      "declare -x COPILOT_MODEL=\"claude-sonnet-5\"",
+      "declare -x COPILOT_MODEL=\"proxy-auto\"",
       "declare -x COPILOT_AUTO_UPDATE=\"false\"",
+      "declare -x COPILOT_PROVIDER_MODEL_ID=\"claude-sonnet-5\"",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
       "unset OPENCODE_CONFIG_CONTENT",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
@@ -473,7 +509,7 @@
       "[CoPilot]    • Memory/Knowledge management (fallback services)",
       "[CoPilot]    • Browser automation (Playwright fallback)",
       "[CoPilot]    • LSL system integration",
-      "[CoPilot] 🔌 copilot → proxy http://127.0.0.1:<up>/v1/copilot/p/glass/b/small/t/t-cp (BYOK openai; measured span; token_usage agent='copilot'; model=claude-sonnet-5)"
+      "[CoPilot] 🔌 copilot → proxy http://127.0.0.1:<up>/v1/copilot/p/glass/b/small/t/t-cp (BYOK openai; measured span; token_usage agent='copilot'; model=proxy-auto)"
     ],
     "env": [
       "unset ANTHROPIC_BASE_URL",
@@ -484,8 +520,10 @@
       "declare -x COPILOT_PROVIDER_BASE_URL=\"http://127.0.0.1:<up>/v1/copilot/p/glass/b/small/t/t-cp\"",
       "declare -x COPILOT_PROVIDER_TYPE=\"openai\"",
       "declare -x COPILOT_PROVIDER_API_KEY=\"rapid-proxy-no-auth-placeholder\"",
-      "declare -x COPILOT_MODEL=\"claude-sonnet-5\"",
+      "declare -x COPILOT_MODEL=\"proxy-auto\"",
       "declare -x COPILOT_AUTO_UPDATE=\"false\"",
+      "declare -x COPILOT_PROVIDER_MODEL_ID=\"claude-sonnet-5\"",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
       "unset OPENCODE_CONFIG_CONTENT",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
@@ -513,7 +551,7 @@
       "[CoPilot]    • Browser automation (Playwright fallback)",
       "[CoPilot]    • LSL system integration",
       "[CoPilot] ⚠️  CODING_COPILOT_BAND='huge' is not one of small|medium|high — ignoring it.",
-      "[CoPilot] 🔌 copilot → proxy http://127.0.0.1:<up>/v1/copilot (BYOK openai; AMBIENT — task_id from reconciler slot; model=claude-sonnet-5; opt-out COPILOT_AMBIENT_ROUTE=0)"
+      "[CoPilot] 🔌 copilot → proxy http://127.0.0.1:<up>/v1/copilot (BYOK openai; AMBIENT — task_id from reconciler slot; model=proxy-auto; opt-out COPILOT_AMBIENT_ROUTE=0)"
     ],
     "env": [
       "unset ANTHROPIC_BASE_URL",
@@ -524,8 +562,10 @@
       "declare -x COPILOT_PROVIDER_BASE_URL=\"http://127.0.0.1:<up>/v1/copilot\"",
       "declare -x COPILOT_PROVIDER_TYPE=\"openai\"",
       "declare -x COPILOT_PROVIDER_API_KEY=\"rapid-proxy-no-auth-placeholder\"",
-      "declare -x COPILOT_MODEL=\"claude-sonnet-5\"",
+      "declare -x COPILOT_MODEL=\"proxy-auto\"",
       "declare -x COPILOT_AUTO_UPDATE=\"false\"",
+      "declare -x COPILOT_PROVIDER_MODEL_ID=\"claude-sonnet-5\"",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
       "unset OPENCODE_CONFIG_CONTENT",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
@@ -565,6 +605,8 @@
       "declare -x COPILOT_PROVIDER_API_KEY=\"rapid-proxy-no-auth-placeholder\"",
       "declare -x COPILOT_MODEL=\"gpt-4o\"",
       "declare -x COPILOT_AUTO_UPDATE=\"false\"",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
       "unset OPENCODE_CONFIG_CONTENT",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
@@ -604,6 +646,8 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "declare -x COPILOT_AUTO_UPDATE=\"false\"",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
       "unset OPENCODE_CONFIG_CONTENT",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
@@ -630,7 +674,7 @@
       "[CoPilot]    • Memory/Knowledge management (fallback services)",
       "[CoPilot]    • Browser automation (Playwright fallback)",
       "[CoPilot]    • LSL system integration",
-      "[CoPilot] 🔌 copilot → proxy http://127.0.0.1:<garbage>/v1/copilot (BYOK openai; AMBIENT — task_id from reconciler slot; model=; opt-out COPILOT_AMBIENT_ROUTE=0)"
+      "[CoPilot] 🔌 copilot → proxy http://127.0.0.1:<garbage>/v1/copilot (BYOK openai; AMBIENT — task_id from reconciler slot; model=proxy-auto; opt-out COPILOT_AMBIENT_ROUTE=0)"
     ],
     "env": [
       "unset ANTHROPIC_BASE_URL",
@@ -641,8 +685,10 @@
       "declare -x COPILOT_PROVIDER_BASE_URL=\"http://127.0.0.1:<garbage>/v1/copilot\"",
       "declare -x COPILOT_PROVIDER_TYPE=\"openai\"",
       "declare -x COPILOT_PROVIDER_API_KEY=\"rapid-proxy-no-auth-placeholder\"",
-      "declare -x COPILOT_MODEL=\"\"",
+      "declare -x COPILOT_MODEL=\"proxy-auto\"",
       "declare -x COPILOT_AUTO_UPDATE=\"false\"",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
       "unset OPENCODE_CONFIG_CONTENT",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",
@@ -664,9 +710,9 @@
       "[Pi] 🔒 Wrapper-scoped: pi config dir is <box>/coding/.pi-agent (bare `pi` still uses ~/.pi/agent)",
       "[Pi] Interactive launch: x-task-id omitted (proxy binds the ambient span)",
       "[Pi] Wrote pi provider config: <box>/coding/.pi-agent/models.json (rapid-proxy-pi + qwen-laptop)",
-      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/claude-sonnet-5)",
+      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/proxy-auto; every model the proxy lists is in the picker)",
       "[Pi] Session transcripts: <box>/project/.observations/pi-sessions",
-      "[Pi] pi extensions installed: 2 in <box>/coding/.pi-agent/extensions",
+      "[Pi] pi extensions installed: 3 in <box>/coding/.pi-agent/extensions",
       "[Pi] pi: /sl prompt installed in <box>/coding/.pi-agent/prompts",
       "[Pi] pi: APPEND_SYSTEM.md written (<box>/coding/.pi-agent)",
       "[Pi] 🔌 pi → proxy http://127.0.0.1:<up>/v1/chat/completions (models.json provider rapid-proxy-pi; x-agent=pi; x-task-id=<ambient>)"
@@ -682,6 +728,8 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
       "unset OPENCODE_CONFIG_CONTENT",
       "declare -x PI_CODING_AGENT_DIR=\"<box>/coding/.pi-agent\"",
       "declare -x PI_CODING_AGENT_SESSION_DIR=\"<box>/project/.observations/pi-sessions\"",
@@ -692,8 +740,8 @@
       "unset CODING_PROJECT_ID"
     ],
     "files": {
-      "coding/.pi-agent/models.json": "{\n  \"providers\": {\n    \"rapid-proxy-pi\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:<up>/v1\",\n      \"apiKey\": \"coding-local-proxy-no-auth\",\n      \"headers\": {\n        \"x-agent\": \"pi\"\n      },\n      \"models\": [\n        {\n          \"id\": \"claude-sonnet-5\",\n          \"name\": \"Claude Sonnet 5 (routed by the coding proxy)\",\n          \"input\": [\n            \"text\",\n            \"image\"\n          ],\n          \"contextWindow\": 200000,\n          \"reasoning\": true,\n          \"thinkingLevelMap\": {\n            \"off\": \"small\",\n            \"minimal\": \"small\",\n            \"low\": \"small\",\n            \"medium\": \"medium\",\n            \"high\": \"high\",\n            \"xhigh\": null,\n            \"max\": null\n          }\n        }\n      ]\n    },\n    \"qwen-laptop\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:8081/v1\",\n      \"apiKey\": \"local-no-auth-placeholder\",\n      \"models\": [\n        {\n          \"id\": \"qwen3.8-27b-local\",\n          \"name\": \"Qwen3.8-27B (this laptop, llama.cpp / Metal)\",\n          \"input\": [\n            \"text\"\n          ],\n          \"contextWindow\": 32768,\n          \"reasoning\": false\n        }\n      ]\n    }\n  }\n}\n",
-      "coding/.pi-agent/settings.json": "{\n  \"defaultProvider\": \"rapid-proxy-pi\",\n  \"defaultModel\": \"claude-sonnet-5\",\n  \"enabledModels\": [\n    \"rapid-proxy-pi/claude-sonnet-5\",\n    \"qwen-laptop/qwen3.8-27b-local\"\n  ]\n}\n"
+      "coding/.pi-agent/models.json": "{\n  \"providers\": {\n    \"rapid-proxy-pi\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:<up>/v1\",\n      \"apiKey\": \"coding-local-proxy-no-auth\",\n      \"headers\": {\n        \"x-agent\": \"pi\"\n      },\n      \"models\": [\n        {\n          \"id\": \"proxy-auto\",\n          \"name\": \"Auto (routed by the coding proxy)\",\n          \"input\": [\n            \"text\",\n            \"image\"\n          ],\n          \"contextWindow\": 200000,\n          \"reasoning\": true,\n          \"thinkingLevelMap\": {\n            \"off\": \"small\",\n            \"minimal\": \"small\",\n            \"low\": \"small\",\n            \"medium\": \"medium\",\n            \"high\": \"high\",\n            \"xhigh\": null,\n            \"max\": null\n          }\n        }\n      ]\n    },\n    \"qwen-laptop\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:8081/v1\",\n      \"apiKey\": \"local-no-auth-placeholder\",\n      \"models\": [\n        {\n          \"id\": \"qwen3.8-27b-local\",\n          \"name\": \"Qwen3.8-27B (this laptop, llama.cpp / Metal)\",\n          \"input\": [\n            \"text\"\n          ],\n          \"contextWindow\": 32768,\n          \"reasoning\": false\n        }\n      ]\n    }\n  }\n}\n",
+      "coding/.pi-agent/settings.json": "{\n  \"defaultProvider\": \"rapid-proxy-pi\",\n  \"defaultModel\": \"proxy-auto\",\n  \"enabledModels\": [\n    \"rapid-proxy-pi/*\",\n    \"qwen-laptop/*\"\n  ]\n}\n"
     },
     "piSessionsDir": true,
     "stderr": []
@@ -706,9 +754,9 @@
       "[Pi] 🔒 Wrapper-scoped: pi config dir is <box>/coding/.pi-agent (bare `pi` still uses ~/.pi/agent)",
       "[Pi] Task-bound launch: the coding-proxy-headers extension sends x-task-id (TASK_ID=t-pi)",
       "[Pi] Merged pi provider config into <box>/coding/.pi-agent/models.json (rapid-proxy-pi + qwen-laptop; preserved: mine)",
-      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/claude-sonnet-5)",
+      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/proxy-auto; every model the proxy lists is in the picker)",
       "[Pi] Session transcripts: <box>/project/.observations/pi-sessions",
-      "[Pi] pi extensions installed: 2 in <box>/coding/.pi-agent/extensions",
+      "[Pi] pi extensions installed: 3 in <box>/coding/.pi-agent/extensions",
       "[Pi] pi: /sl prompt installed in <box>/coding/.pi-agent/prompts",
       "[Pi] pi: APPEND_SYSTEM.md written (<box>/coding/.pi-agent)",
       "[Pi] 🔌 pi → proxy http://127.0.0.1:<up>/v1/chat/completions (models.json provider rapid-proxy-pi; x-agent=pi; x-task-id=t-pi)"
@@ -724,6 +772,8 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
       "unset OPENCODE_CONFIG_CONTENT",
       "declare -x PI_CODING_AGENT_DIR=\"<box>/coding/.pi-agent\"",
       "declare -x PI_CODING_AGENT_SESSION_DIR=\"<box>/project/.observations/pi-sessions\"",
@@ -734,9 +784,9 @@
       "declare -x CODING_PROJECT_ID=\"glass\""
     ],
     "files": {
-      "coding/.pi-agent/models.json": "{\n  \"providers\": {\n    \"mine\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://x/v1\"\n    },\n    \"rapid-proxy-pi\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:<up>/v1\",\n      \"apiKey\": \"coding-local-proxy-no-auth\",\n      \"headers\": {\n        \"x-agent\": \"pi\"\n      },\n      \"models\": [\n        {\n          \"id\": \"claude-sonnet-5\",\n          \"name\": \"Claude Sonnet 5 (routed by the coding proxy)\",\n          \"input\": [\n            \"text\",\n            \"image\"\n          ],\n          \"contextWindow\": 200000,\n          \"reasoning\": true,\n          \"thinkingLevelMap\": {\n            \"off\": \"small\",\n            \"minimal\": \"small\",\n            \"low\": \"small\",\n            \"medium\": \"medium\",\n            \"high\": \"high\",\n            \"xhigh\": null,\n            \"max\": null\n          }\n        }\n      ]\n    },\n    \"qwen-laptop\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:8081/v1\",\n      \"apiKey\": \"local-no-auth-placeholder\",\n      \"models\": [\n        {\n          \"id\": \"qwen3.8-27b-local\",\n          \"name\": \"Qwen3.8-27B (this laptop, llama.cpp / Metal)\",\n          \"input\": [\n            \"text\"\n          ],\n          \"contextWindow\": 32768,\n          \"reasoning\": false\n        }\n      ]\n    }\n  },\n  \"other\": 1\n}\n",
+      "coding/.pi-agent/models.json": "{\n  \"providers\": {\n    \"mine\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://x/v1\"\n    },\n    \"rapid-proxy-pi\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:<up>/v1\",\n      \"apiKey\": \"coding-local-proxy-no-auth\",\n      \"headers\": {\n        \"x-agent\": \"pi\"\n      },\n      \"models\": [\n        {\n          \"id\": \"proxy-auto\",\n          \"name\": \"Auto (routed by the coding proxy)\",\n          \"input\": [\n            \"text\",\n            \"image\"\n          ],\n          \"contextWindow\": 200000,\n          \"reasoning\": true,\n          \"thinkingLevelMap\": {\n            \"off\": \"small\",\n            \"minimal\": \"small\",\n            \"low\": \"small\",\n            \"medium\": \"medium\",\n            \"high\": \"high\",\n            \"xhigh\": null,\n            \"max\": null\n          }\n        }\n      ]\n    },\n    \"qwen-laptop\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:8081/v1\",\n      \"apiKey\": \"local-no-auth-placeholder\",\n      \"models\": [\n        {\n          \"id\": \"qwen3.8-27b-local\",\n          \"name\": \"Qwen3.8-27B (this laptop, llama.cpp / Metal)\",\n          \"input\": [\n            \"text\"\n          ],\n          \"contextWindow\": 32768,\n          \"reasoning\": false\n        }\n      ]\n    }\n  },\n  \"other\": 1\n}\n",
       "coding/.pi-agent/models.json.coding-orig": "{\n  \"providers\": {\n    \"mine\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://x/v1\"\n    },\n    \"rapid-proxy-pi\": {\n      \"stale\": true\n    }\n  },\n  \"other\": 1\n}",
-      "coding/.pi-agent/settings.json": "{\n  \"theme\": \"dark\",\n  \"defaultModel\": \"claude-sonnet-5\",\n  \"defaultProvider\": \"rapid-proxy-pi\",\n  \"enabledModels\": [\n    \"rapid-proxy-pi/claude-sonnet-5\",\n    \"qwen-laptop/qwen3.8-27b-local\"\n  ]\n}\n"
+      "coding/.pi-agent/settings.json": "{\n  \"theme\": \"dark\",\n  \"defaultModel\": \"proxy-auto\",\n  \"defaultProvider\": \"rapid-proxy-pi\",\n  \"enabledModels\": [\n    \"rapid-proxy-pi/*\",\n    \"qwen-laptop/*\"\n  ]\n}\n"
     },
     "piSessionsDir": true,
     "stderr": []
@@ -749,9 +799,9 @@
       "[Pi] 🔒 Wrapper-scoped: pi config dir is <box>/coding/.pi-agent (bare `pi` still uses ~/.pi/agent)",
       "[Pi] Interactive launch: x-task-id omitted (proxy binds the ambient span)",
       "[Pi] Wrote pi provider config: <box>/coding/.pi-agent/models.json (rapid-proxy-pi + qwen-laptop)",
-      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/claude-sonnet-5)",
+      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/proxy-auto; every model the proxy lists is in the picker)",
       "[Pi] Session transcripts: <box>/project/.observations/pi-sessions",
-      "[Pi] pi extensions installed: 2 in <box>/coding/.pi-agent/extensions",
+      "[Pi] pi extensions installed: 3 in <box>/coding/.pi-agent/extensions",
       "[Pi] pi: /sl prompt installed in <box>/coding/.pi-agent/prompts",
       "[Pi] pi: APPEND_SYSTEM.md written (<box>/coding/.pi-agent)",
       "[Pi] 🔌 pi → proxy http://127.0.0.1:<up>/v1/chat/completions (models.json provider rapid-proxy-pi; x-agent=pi; x-task-id=<ambient>)"
@@ -767,6 +817,8 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
       "unset OPENCODE_CONFIG_CONTENT",
       "declare -x PI_CODING_AGENT_DIR=\"<box>/coding/.pi-agent\"",
       "declare -x PI_CODING_AGENT_SESSION_DIR=\"<box>/project/.observations/pi-sessions\"",
@@ -777,9 +829,9 @@
       "unset CODING_PROJECT_ID"
     ],
     "files": {
-      "coding/.pi-agent/models.json": "{\n  \"providers\": {\n    \"rapid-proxy-pi\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:<up>/v1\",\n      \"apiKey\": \"coding-local-proxy-no-auth\",\n      \"headers\": {\n        \"x-agent\": \"pi\"\n      },\n      \"models\": [\n        {\n          \"id\": \"claude-sonnet-5\",\n          \"name\": \"Claude Sonnet 5 (routed by the coding proxy)\",\n          \"input\": [\n            \"text\",\n            \"image\"\n          ],\n          \"contextWindow\": 200000,\n          \"reasoning\": true,\n          \"thinkingLevelMap\": {\n            \"off\": \"small\",\n            \"minimal\": \"small\",\n            \"low\": \"small\",\n            \"medium\": \"medium\",\n            \"high\": \"high\",\n            \"xhigh\": null,\n            \"max\": null\n          }\n        }\n      ]\n    },\n    \"qwen-laptop\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:8081/v1\",\n      \"apiKey\": \"local-no-auth-placeholder\",\n      \"models\": [\n        {\n          \"id\": \"qwen3.8-27b-local\",\n          \"name\": \"Qwen3.8-27B (this laptop, llama.cpp / Metal)\",\n          \"input\": [\n            \"text\"\n          ],\n          \"contextWindow\": 32768,\n          \"reasoning\": false\n        }\n      ]\n    }\n  }\n}\n",
+      "coding/.pi-agent/models.json": "{\n  \"providers\": {\n    \"rapid-proxy-pi\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:<up>/v1\",\n      \"apiKey\": \"coding-local-proxy-no-auth\",\n      \"headers\": {\n        \"x-agent\": \"pi\"\n      },\n      \"models\": [\n        {\n          \"id\": \"proxy-auto\",\n          \"name\": \"Auto (routed by the coding proxy)\",\n          \"input\": [\n            \"text\",\n            \"image\"\n          ],\n          \"contextWindow\": 200000,\n          \"reasoning\": true,\n          \"thinkingLevelMap\": {\n            \"off\": \"small\",\n            \"minimal\": \"small\",\n            \"low\": \"small\",\n            \"medium\": \"medium\",\n            \"high\": \"high\",\n            \"xhigh\": null,\n            \"max\": null\n          }\n        }\n      ]\n    },\n    \"qwen-laptop\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:8081/v1\",\n      \"apiKey\": \"local-no-auth-placeholder\",\n      \"models\": [\n        {\n          \"id\": \"qwen3.8-27b-local\",\n          \"name\": \"Qwen3.8-27B (this laptop, llama.cpp / Metal)\",\n          \"input\": [\n            \"text\"\n          ],\n          \"contextWindow\": 32768,\n          \"reasoning\": false\n        }\n      ]\n    }\n  }\n}\n",
       "coding/.pi-agent/models.json.coding-orig": "ORIGINAL",
-      "coding/.pi-agent/settings.json": "{\n  \"defaultProvider\": \"rapid-proxy-pi\",\n  \"defaultModel\": \"claude-sonnet-5\",\n  \"enabledModels\": [\n    \"rapid-proxy-pi/claude-sonnet-5\",\n    \"qwen-laptop/qwen3.8-27b-local\"\n  ]\n}\n"
+      "coding/.pi-agent/settings.json": "{\n  \"defaultProvider\": \"rapid-proxy-pi\",\n  \"defaultModel\": \"proxy-auto\",\n  \"enabledModels\": [\n    \"rapid-proxy-pi/*\",\n    \"qwen-laptop/*\"\n  ]\n}\n"
     },
     "piSessionsDir": true,
     "stderr": []
@@ -792,9 +844,9 @@
       "[Pi] 🔒 Wrapper-scoped: pi config dir is <box>/coding/.pi-agent (bare `pi` still uses ~/.pi/agent)",
       "[Pi] Interactive launch: x-task-id omitted (proxy binds the ambient span)",
       "[Pi] Wrote pi provider config: <box>/coding/.pi-agent/models.json (rapid-proxy-pi + qwen-laptop)",
-      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/claude-sonnet-5)",
+      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/proxy-auto; every model the proxy lists is in the picker)",
       "[Pi] Session transcripts: <box>/project/.observations/pi-sessions",
-      "[Pi] pi extensions installed: 2 in <box>/coding/.pi-agent/extensions",
+      "[Pi] pi extensions installed: 3 in <box>/coding/.pi-agent/extensions",
       "[Pi] pi: /sl prompt installed in <box>/coding/.pi-agent/prompts",
       "[Pi] pi: APPEND_SYSTEM.md written (<box>/coding/.pi-agent)",
       "[Pi] 🔌 pi → proxy http://127.0.0.1:<up>/v1/chat/completions (models.json provider rapid-proxy-pi; x-agent=pi; x-task-id=<ambient>)"
@@ -810,6 +862,8 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
       "unset OPENCODE_CONFIG_CONTENT",
       "declare -x PI_CODING_AGENT_DIR=\"<box>/coding/.pi-agent\"",
       "declare -x PI_CODING_AGENT_SESSION_DIR=\"<box>/project/.observations/pi-sessions\"",
@@ -820,9 +874,9 @@
       "unset CODING_PROJECT_ID"
     ],
     "files": {
-      "coding/.pi-agent/models.json": "{\n  \"providers\": {\n    \"rapid-proxy-pi\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:<up>/v1\",\n      \"apiKey\": \"coding-local-proxy-no-auth\",\n      \"headers\": {\n        \"x-agent\": \"pi\"\n      },\n      \"models\": [\n        {\n          \"id\": \"claude-sonnet-5\",\n          \"name\": \"Claude Sonnet 5 (routed by the coding proxy)\",\n          \"input\": [\n            \"text\",\n            \"image\"\n          ],\n          \"contextWindow\": 200000,\n          \"reasoning\": true,\n          \"thinkingLevelMap\": {\n            \"off\": \"small\",\n            \"minimal\": \"small\",\n            \"low\": \"small\",\n            \"medium\": \"medium\",\n            \"high\": \"high\",\n            \"xhigh\": null,\n            \"max\": null\n          }\n        }\n      ]\n    },\n    \"qwen-laptop\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:8081/v1\",\n      \"apiKey\": \"local-no-auth-placeholder\",\n      \"models\": [\n        {\n          \"id\": \"qwen3.8-27b-local\",\n          \"name\": \"Qwen3.8-27B (this laptop, llama.cpp / Metal)\",\n          \"input\": [\n            \"text\"\n          ],\n          \"contextWindow\": 32768,\n          \"reasoning\": false\n        }\n      ]\n    }\n  }\n}\n",
+      "coding/.pi-agent/models.json": "{\n  \"providers\": {\n    \"rapid-proxy-pi\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:<up>/v1\",\n      \"apiKey\": \"coding-local-proxy-no-auth\",\n      \"headers\": {\n        \"x-agent\": \"pi\"\n      },\n      \"models\": [\n        {\n          \"id\": \"proxy-auto\",\n          \"name\": \"Auto (routed by the coding proxy)\",\n          \"input\": [\n            \"text\",\n            \"image\"\n          ],\n          \"contextWindow\": 200000,\n          \"reasoning\": true,\n          \"thinkingLevelMap\": {\n            \"off\": \"small\",\n            \"minimal\": \"small\",\n            \"low\": \"small\",\n            \"medium\": \"medium\",\n            \"high\": \"high\",\n            \"xhigh\": null,\n            \"max\": null\n          }\n        }\n      ]\n    },\n    \"qwen-laptop\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:8081/v1\",\n      \"apiKey\": \"local-no-auth-placeholder\",\n      \"models\": [\n        {\n          \"id\": \"qwen3.8-27b-local\",\n          \"name\": \"Qwen3.8-27B (this laptop, llama.cpp / Metal)\",\n          \"input\": [\n            \"text\"\n          ],\n          \"contextWindow\": 32768,\n          \"reasoning\": false\n        }\n      ]\n    }\n  }\n}\n",
       "coding/.pi-agent/models.json.coding-orig": "[1,2",
-      "coding/.pi-agent/settings.json": "{\n  \"defaultProvider\": \"rapid-proxy-pi\",\n  \"defaultModel\": \"claude-sonnet-5\",\n  \"enabledModels\": [\n    \"rapid-proxy-pi/claude-sonnet-5\",\n    \"qwen-laptop/qwen3.8-27b-local\"\n  ]\n}\n"
+      "coding/.pi-agent/settings.json": "{\n  \"defaultProvider\": \"rapid-proxy-pi\",\n  \"defaultModel\": \"proxy-auto\",\n  \"enabledModels\": [\n    \"rapid-proxy-pi/*\",\n    \"qwen-laptop/*\"\n  ]\n}\n"
     },
     "piSessionsDir": true,
     "stderr": []
@@ -835,9 +889,9 @@
       "[Pi] 🌐 Global scope: using pi's default config dir <box>/home/.pi/agent",
       "[Pi] Interactive launch: x-task-id omitted (proxy binds the ambient span)",
       "[Pi] Wrote pi provider config: <box>/home/.pi/agent/models.json (rapid-proxy-pi + qwen-laptop)",
-      "[Pi] Pinned pi provider/model in <box>/home/.pi/agent/settings.json (rapid-proxy-pi/claude-sonnet-5)",
+      "[Pi] Pinned pi provider/model in <box>/home/.pi/agent/settings.json (rapid-proxy-pi/proxy-auto; every model the proxy lists is in the picker)",
       "[Pi] Session transcripts: <box>/project/.observations/pi-sessions",
-      "[Pi] pi extensions installed: 2 in <box>/home/.pi/agent/extensions",
+      "[Pi] pi extensions installed: 3 in <box>/home/.pi/agent/extensions",
       "[Pi] pi: /sl prompt installed in <box>/home/.pi/agent/prompts",
       "[Pi] 🔌 pi → proxy http://127.0.0.1:<up>/v1/chat/completions (models.json provider rapid-proxy-pi; x-agent=pi; x-task-id=<ambient>)"
     ],
@@ -852,6 +906,8 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
       "unset OPENCODE_CONFIG_CONTENT",
       "unset PI_CODING_AGENT_DIR",
       "declare -x PI_CODING_AGENT_SESSION_DIR=\"<box>/project/.observations/pi-sessions\"",
@@ -862,8 +918,8 @@
       "unset CODING_PROJECT_ID"
     ],
     "files": {
-      "home/.pi/agent/models.json": "{\n  \"providers\": {\n    \"rapid-proxy-pi\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:<up>/v1\",\n      \"apiKey\": \"coding-local-proxy-no-auth\",\n      \"headers\": {\n        \"x-agent\": \"pi\"\n      },\n      \"models\": [\n        {\n          \"id\": \"claude-sonnet-5\",\n          \"name\": \"Claude Sonnet 5 (routed by the coding proxy)\",\n          \"input\": [\n            \"text\",\n            \"image\"\n          ],\n          \"contextWindow\": 200000,\n          \"reasoning\": true,\n          \"thinkingLevelMap\": {\n            \"off\": \"small\",\n            \"minimal\": \"small\",\n            \"low\": \"small\",\n            \"medium\": \"medium\",\n            \"high\": \"high\",\n            \"xhigh\": null,\n            \"max\": null\n          }\n        }\n      ]\n    },\n    \"qwen-laptop\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://10.0.0.5:8081/v1\",\n      \"apiKey\": \"local-no-auth-placeholder\",\n      \"models\": [\n        {\n          \"id\": \"qwen3.8-27b-local\",\n          \"name\": \"Qwen3.8-27B (this laptop, llama.cpp / Metal)\",\n          \"input\": [\n            \"text\"\n          ],\n          \"contextWindow\": 32768,\n          \"reasoning\": false\n        }\n      ]\n    }\n  }\n}\n",
-      "home/.pi/agent/settings.json": "{\n  \"defaultProvider\": \"rapid-proxy-pi\",\n  \"defaultModel\": \"claude-sonnet-5\",\n  \"enabledModels\": [\n    \"rapid-proxy-pi/claude-sonnet-5\",\n    \"qwen-laptop/qwen3.8-27b-local\"\n  ]\n}\n"
+      "home/.pi/agent/models.json": "{\n  \"providers\": {\n    \"rapid-proxy-pi\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:<up>/v1\",\n      \"apiKey\": \"coding-local-proxy-no-auth\",\n      \"headers\": {\n        \"x-agent\": \"pi\"\n      },\n      \"models\": [\n        {\n          \"id\": \"proxy-auto\",\n          \"name\": \"Auto (routed by the coding proxy)\",\n          \"input\": [\n            \"text\",\n            \"image\"\n          ],\n          \"contextWindow\": 200000,\n          \"reasoning\": true,\n          \"thinkingLevelMap\": {\n            \"off\": \"small\",\n            \"minimal\": \"small\",\n            \"low\": \"small\",\n            \"medium\": \"medium\",\n            \"high\": \"high\",\n            \"xhigh\": null,\n            \"max\": null\n          }\n        }\n      ]\n    },\n    \"qwen-laptop\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://10.0.0.5:8081/v1\",\n      \"apiKey\": \"local-no-auth-placeholder\",\n      \"models\": [\n        {\n          \"id\": \"qwen3.8-27b-local\",\n          \"name\": \"Qwen3.8-27B (this laptop, llama.cpp / Metal)\",\n          \"input\": [\n            \"text\"\n          ],\n          \"contextWindow\": 32768,\n          \"reasoning\": false\n        }\n      ]\n    }\n  }\n}\n",
+      "home/.pi/agent/settings.json": "{\n  \"defaultProvider\": \"rapid-proxy-pi\",\n  \"defaultModel\": \"proxy-auto\",\n  \"enabledModels\": [\n    \"rapid-proxy-pi/*\",\n    \"qwen-laptop/*\"\n  ]\n}\n"
     },
     "piSessionsDir": true,
     "stderr": []
@@ -876,9 +932,9 @@
       "[Pi] 🔒 Wrapper-scoped: pi config dir is <box>/coding/.pi-agent (bare `pi` still uses ~/.pi/agent)",
       "[Pi] Interactive launch: x-task-id omitted (proxy binds the ambient span)",
       "[Pi] Wrote pi provider config: <box>/coding/.pi-agent/models.json (rapid-proxy-pi + qwen-laptop)",
-      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/claude-sonnet-5)",
+      "[Pi] Pinned pi provider/model in <box>/coding/.pi-agent/settings.json (rapid-proxy-pi/proxy-auto; every model the proxy lists is in the picker)",
       "[Pi] Session transcripts: <box>/project/.observations/pi-sessions",
-      "[Pi] pi extensions installed: 2 in <box>/coding/.pi-agent/extensions",
+      "[Pi] pi extensions installed: 3 in <box>/coding/.pi-agent/extensions",
       "[Pi] pi: /sl prompt installed in <box>/coding/.pi-agent/prompts",
       "[Pi] pi: APPEND_SYSTEM.md written (<box>/coding/.pi-agent)",
       "[Pi] 🔌 pi → proxy http://127.0.0.1:<up>/v1/chat/completions (models.json provider rapid-proxy-pi; x-agent=pi; x-task-id=<ambient>)"
@@ -894,6 +950,8 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
       "unset OPENCODE_CONFIG_CONTENT",
       "declare -x PI_CODING_AGENT_DIR=\"<box>/coding/.pi-agent\"",
       "declare -x PI_CODING_AGENT_SESSION_DIR=\"<box>/project/.observations/pi-sessions\"",
@@ -904,8 +962,8 @@
       "unset CODING_PROJECT_ID"
     ],
     "files": {
-      "coding/.pi-agent/models.json": "{\n  \"providers\": {\n    \"rapid-proxy-pi\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:23456/v1\",\n      \"apiKey\": \"coding-local-proxy-no-auth\",\n      \"headers\": {\n        \"x-agent\": \"pi\"\n      },\n      \"models\": [\n        {\n          \"id\": \"claude-sonnet-5\",\n          \"name\": \"Claude Sonnet 5 (routed by the coding proxy)\",\n          \"input\": [\n            \"text\",\n            \"image\"\n          ],\n          \"contextWindow\": 200000,\n          \"reasoning\": true,\n          \"thinkingLevelMap\": {\n            \"off\": \"small\",\n            \"minimal\": \"small\",\n            \"low\": \"small\",\n            \"medium\": \"medium\",\n            \"high\": \"high\",\n            \"xhigh\": null,\n            \"max\": null\n          }\n        }\n      ]\n    },\n    \"qwen-laptop\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:8081/v1\",\n      \"apiKey\": \"local-no-auth-placeholder\",\n      \"models\": [\n        {\n          \"id\": \"qwen3.8-27b-local\",\n          \"name\": \"Qwen3.8-27B (this laptop, llama.cpp / Metal)\",\n          \"input\": [\n            \"text\"\n          ],\n          \"contextWindow\": 32768,\n          \"reasoning\": false\n        }\n      ]\n    }\n  }\n}\n",
-      "coding/.pi-agent/settings.json": "{\n  \"defaultProvider\": \"rapid-proxy-pi\",\n  \"defaultModel\": \"claude-sonnet-5\",\n  \"enabledModels\": [\n    \"rapid-proxy-pi/claude-sonnet-5\",\n    \"qwen-laptop/qwen3.8-27b-local\"\n  ]\n}\n"
+      "coding/.pi-agent/models.json": "{\n  \"providers\": {\n    \"rapid-proxy-pi\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:23456/v1\",\n      \"apiKey\": \"coding-local-proxy-no-auth\",\n      \"headers\": {\n        \"x-agent\": \"pi\"\n      },\n      \"models\": [\n        {\n          \"id\": \"proxy-auto\",\n          \"name\": \"Auto (routed by the coding proxy)\",\n          \"input\": [\n            \"text\",\n            \"image\"\n          ],\n          \"contextWindow\": 200000,\n          \"reasoning\": true,\n          \"thinkingLevelMap\": {\n            \"off\": \"small\",\n            \"minimal\": \"small\",\n            \"low\": \"small\",\n            \"medium\": \"medium\",\n            \"high\": \"high\",\n            \"xhigh\": null,\n            \"max\": null\n          }\n        }\n      ]\n    },\n    \"qwen-laptop\": {\n      \"api\": \"openai-completions\",\n      \"baseUrl\": \"http://127.0.0.1:8081/v1\",\n      \"apiKey\": \"local-no-auth-placeholder\",\n      \"models\": [\n        {\n          \"id\": \"qwen3.8-27b-local\",\n          \"name\": \"Qwen3.8-27B (this laptop, llama.cpp / Metal)\",\n          \"input\": [\n            \"text\"\n          ],\n          \"contextWindow\": 32768,\n          \"reasoning\": false\n        }\n      ]\n    }\n  }\n}\n",
+      "coding/.pi-agent/settings.json": "{\n  \"defaultProvider\": \"rapid-proxy-pi\",\n  \"defaultModel\": \"proxy-auto\",\n  \"enabledModels\": [\n    \"rapid-proxy-pi/*\",\n    \"qwen-laptop/*\"\n  ]\n}\n"
     },
     "piSessionsDir": true,
     "stderr": []
@@ -927,6 +985,8 @@
       "unset COPILOT_PROVIDER_API_KEY",
       "unset COPILOT_MODEL",
       "unset COPILOT_AUTO_UPDATE",
+      "unset COPILOT_PROVIDER_MODEL_ID",
+      "unset CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY",
       "unset OPENCODE_CONFIG_CONTENT",
       "unset PI_CODING_AGENT_DIR",
       "unset PI_CODING_AGENT_SESSION_DIR",

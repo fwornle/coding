@@ -35,7 +35,8 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, readdirSyn
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { writePiModelsJson } from '../../lib/agents/proxy-routing.mjs';
+import { writePiModelsJson, writePiSettings, PROXY_AUTO_MODEL } from '../../lib/agents/proxy-routing.mjs';
+import { listModelIds, modelsFor, resolveValue } from '../../config/agents/pi-extensions/coding-model-discovery.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
@@ -134,10 +135,88 @@ test('no scratch or temp files are left behind', () => {
   withTempDir((dir) => {
     writeModels(dir);
     assert.deepEqual(readdirSync(dir).sort(), ['extensions', 'models.json']);
-    assert.deepEqual(readdirSync(path.join(dir, 'extensions')), ['coding-proxy-headers.ts']);
+    assert.deepEqual(readdirSync(path.join(dir, 'extensions')).sort(), ['coding-model-discovery.ts', 'coding-proxy-headers.ts']);
     assert.ok(!existsSync(path.join(dir, 'models.json.coding-ours')));
     assert.ok(!existsSync(path.join(dir, 'models.json.tmp')));
   });
+});
+
+// ── the routed default and the picker ────────────────────────────────────────
+
+test('the proxy provider defaults to proxy-auto, which the proxy routes by band', () => {
+  // Any id the proxy lists is a choice its route honours; proxy-auto is listed
+  // by nobody, so the default keeps band routing, classifier and offload.
+  withTempDir((dir) => {
+    const doc = writeModels(dir);
+    assert.deepEqual(doc.providers['rapid-proxy-pi'].models.map((m) => m.id), [PROXY_AUTO_MODEL]);
+    writePiSettings(dir);
+    const s = JSON.parse(readFileSync(path.join(dir, 'settings.json'), 'utf8'));
+    assert.equal(s.defaultProvider, 'rapid-proxy-pi');
+    assert.equal(s.defaultModel, PROXY_AUTO_MODEL);
+  });
+});
+
+test('enabledModels scopes whole providers, each still provider-qualified', () => {
+  // A bare id also matches pi's github-copilot login and routes around the
+  // proxy; a provider glob cannot, and it takes in every discovered model.
+  withTempDir((dir) => {
+    writePiSettings(dir);
+    const s = JSON.parse(readFileSync(path.join(dir, 'settings.json'), 'utf8'));
+    assert.deepEqual(s.enabledModels, ['rapid-proxy-pi/*', 'qwen-laptop/*']);
+  });
+});
+
+// ── the model discovery extension ────────────────────────────────────────────
+
+const SEEDED = {
+  api: 'openai-completions',
+  baseUrl: 'http://192.0.2.10:8000/v1/',
+  apiKey: '$CK',
+  headers: { 'x-agent': 'pi' },
+  models: [{ id: 'known', name: 'Known', input: ['text', 'image'], contextWindow: 200000, reasoning: true }],
+};
+
+test('discovery lists /models with the provider key and headers', async () => {
+  let seen = null;
+  const fetchImpl = async (url, init) => {
+    seen = { url, init };
+    return new Response(JSON.stringify({ data: [{ id: 'a' }, { id: 'b' }, { id: 'a' }, {}] }));
+  };
+  const ids = await listModelIds(SEEDED, { CK: 'k1' }, undefined, fetchImpl);
+  assert.deepEqual(ids, ['a', 'b']);
+  assert.equal(seen.url, 'http://192.0.2.10:8000/v1/models');
+  assert.equal(seen.init.headers.authorization, 'Bearer k1');
+  assert.equal(seen.init.headers['x-agent'], 'pi');
+});
+
+test('discovery yields nothing when the endpoint fails or does not answer', async () => {
+  assert.deepEqual(await listModelIds(SEEDED, {}, undefined, async () => new Response('down', { status: 503 })), []);
+  assert.deepEqual(await listModelIds(SEEDED, {}, undefined, async () => { throw new Error('ECONNREFUSED'); }), []);
+});
+
+test('discovered models take the configured shape; configured ones keep their own and stay', () => {
+  const models = modelsFor(SEEDED, ['new-one', 'known']);
+  assert.deepEqual(models.map((m) => m.id), ['known', 'new-one']);
+  // A configured id the endpoint does not list (the proxy's proxy-auto) is kept.
+  assert.deepEqual(modelsFor(SEEDED, ['other']).map((m) => m.id), ['known', 'other']);
+  assert.equal(models[0].name, 'Known');
+  assert.equal(models[1].name, 'new-one');
+  assert.deepEqual(models[1].input, ['text', 'image']);
+  assert.equal(models[1].contextWindow, 200000);
+  for (const m of models) assert.ok(m.cost && m.maxTokens, `${m.id} lacks cost/maxTokens`);
+});
+
+test('an endpoint that lists nothing leaves the configured models', () => {
+  assert.deepEqual(modelsFor(SEEDED, []).map((m) => m.id), ['known']);
+  assert.deepEqual(modelsFor({ ...SEEDED, models: [] }, []), []);
+});
+
+test('provider values resolve like pi resolves them', () => {
+  assert.equal(resolveValue('literal', {}), 'literal');
+  assert.equal(resolveValue('$A-${B}', { A: '1', B: '2' }), '1-2');
+  assert.equal(resolveValue('$$x', {}), '$x');
+  assert.equal(resolveValue('!printf hi', {}), 'hi');
+  assert.equal(resolveValue(undefined, {}), '');
 });
 
 // ── the one-time backup ──────────────────────────────────────────────────────
