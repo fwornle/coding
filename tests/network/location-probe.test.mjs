@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 
 import {
-  classifyLocation, observeLocation, networkBadge, countFunctionalFailures, publishedFunctional,
+  classifyLocation, observeLocation, networkBadge, networkBadgeTmux, countFunctionalFailures, publishedFunctional,
   readProxyEnabledByUser, probePacResolves, probeProxyFunctional, probeKerberosTicket, requestKerberosTicket, networkProbeIntervalMs, AWAY_NETWORK_PROBE_INTERVAL_MS, probeVpnConnected, isWsl, FUNCTIONAL_FAIL_THRESHOLD, PROXY_PROBE_HOST,
 } from '../../lib/network/location-probe.mjs';
 
@@ -48,6 +48,19 @@ describe('networkBadge', () => {
     assert.equal(networkBadge({ location: 'vpn' }).warn, true);
     assert.equal(networkBadge({ location: 'open' }).warn, false);
     assert.equal(networkBadge({ location: 'corporate', proxy_running: true, proxy_functional: true }).warn, false);
+  });
+  it('tmux: the P half is greyed out on OPEN only, where traffic leaves directly', () => {
+    const up = { proxy_running: true, proxy_functional: true };
+    assert.equal(networkBadgeTmux(networkBadge({ location: 'open', ...up, proxy_enabled_by_user: true })),
+      '[N:OPEN #[fg=colour244]P:ON#[fg=default]]');
+    assert.equal(networkBadgeTmux(networkBadge({ location: 'home', proxy_running: false })),
+      '[N:OPEN #[fg=colour244]P:OFF#[fg=default]]', 'P:OFF does not matter there either');
+    const probed = { last_probe_end: '2026-11-18T08:00:00.000Z', internet_reachable: false };
+    assert.equal(networkBadgeTmux(networkBadge({ location: 'open', ...up, ...probed })),
+      '[N:OPEN #[fg=colour244]P:AUTO#[fg=default] OFFLINE]', 'the tail keeps the normal colour');
+    assert.equal(networkBadgeTmux(networkBadge({ location: 'vpn', ...up, proxy_enabled_by_user: true })), '[N:VPN P:ON]', 'on VPN it matters');
+    assert.equal(networkBadgeTmux(networkBadge({ location: 'corporate', proxy_running: false })), '[N:CN P:OFF]');
+    assert.ok(networkBadgeTmux(networkBadge({ location: 'open', ...up })).startsWith('[N:'), 'still clickable');
   });
   it('WAIT for the minute after a network change, on any network (2026-11-18)', () => {
     const now = Date.parse('2026-11-18T07:54:43.000Z');

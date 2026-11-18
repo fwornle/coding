@@ -18,7 +18,7 @@ import { UKBProcessManager } from './ukb-process-manager.js';
 // gauge has exactly one implementation instead of the duplicate-and-keep-in-sync
 // arrangement that LIFECYCLE_ICONS and _lastContentTimestampMs live with.
 import contextGauge from '../lib/statusline/context-gauge.cjs';
-import { networkBadge } from '../lib/network/location-probe.mjs';
+import { networkBadge, networkBadgeTmux } from '../lib/network/location-probe.mjs';
 import paneCacheKey from '../lib/statusline/pane-cache-key.cjs';
 import featureGate from '../lib/statusline/feature-gate.cjs';
 import { visibleCellWidth } from '../lib/statusline/visible-cell-width.cjs';
@@ -2585,10 +2585,11 @@ class CombinedStatusLine {
     //          pinned sessions still routed — today's normal off-CN state)
     //   OFF  — daemon down or not functional (the only genuinely broken state)
     // Labels and the warn rule: lib/network/location-probe.mjs networkBadge(),
-    // shared with glass's status line.
+    // shared with glass's status line. On OPEN the P half is greyed out: traffic
+    // leaves directly there, so it shows the daemon's state without mattering.
     if (f.health) {
       const badge = networkBadge(network);
-      parts.push(`[${badge.text}]`);
+      parts.push(networkBadgeTmux(badge));
       // On CN/VPN without a working local proxy — external APIs unreachable
       if (badge.warn && overallColor === 'green') overallColor = 'yellow';
     }

@@ -134,6 +134,7 @@ Two ASCII-only badges reflect the network environment detected by the coordinato
 |---------|---------|--------|
 | `P:ON` | Daemon running + functional AND user toggled `px` on | Normal on VPN/CN |
 | `P:AUTO` | Daemon running + functional, `px` toggle off — adaptive `--direct-fallback` mode; pinned sessions still routed | Normal off-CN state |
+| `N:OPEN P:…` (P greyed out) | On an open network traffic leaves directly (`--direct-fallback`), so `P:` does not matter there. It still shows the daemon's real state, which decides what happens when you next join the VPN | Nothing |
 | `P:OFF` | Daemon down, or it listens but cannot open a tunnel (`CONNECT api.github.com:443`) | Problem on VPN/CN (bar turns yellow); the coordinator restarts it — see [Connectivity & Recovery](../architecture/connectivity.md#recovery) |
 | `… WAIT` | The OS reported a network change in the last minute (a hotspot joining, a VPN coming up) and the new network does not forward yet | Nothing to do: coding waits for it and does not restart the LLM proxy, so running agents keep their requests. Still there after a minute, it becomes `OFFLINE` (off CN / VPN) |
 | `… OFFLINE` | Off CN / VPN: a finished probe reached nothing, direct or through `:3128` | The network itself, not the proxy: Wi-Fi off and on; after a wake from sleep, failing that, a reboot |
