@@ -21,7 +21,7 @@ package "Your machine" {
 
 cloud "Corporate network / VPN" {
   component "corporate proxy\nlogs you in with the ticket" as corp <<infra>>
-  component "on-prem Qwen cluster\n(10.x, small calls)" as qwen <<external>>
+  component "on-prem Qwen cluster\n(10.x, small calls + picked models)" as qwen <<external>>
 }
 
 cloud "Internet" {
