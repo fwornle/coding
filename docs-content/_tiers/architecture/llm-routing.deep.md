@@ -180,6 +180,49 @@ Verified on a capture endpoint 2026-08-30, not inferred from the resulting band.
 `provider/model/variant` model string. Older comments claiming opencode sends an `x-complexity`
 header were wrong — it has no `headers` key on its provider block and never sent one.
 
+### A model the user picked: `honor_model_choice`
+
+The band seams above are for when nobody chose a model. When someone did — in pi's `/model`,
+opencode's picker, Copilot CLI's `/model <id>` — the route serves that model:
+
+```yaml
+fg-chat/pi:
+  provider: gh-copilot
+  complexity: from-caller
+  honor_model_choice: true
+```
+
+| Requested id | Who answers | Band, classifier, offload |
+|---|---|---|
+| in **gh-copilot**'s live catalogue | gh-copilot, that model | not applied |
+| in the live catalogue of an offload target usable **on this network** (the cluster on corporate) | that target, that model; gh-copilot is the first fallback | not applied; no size or foreground gate |
+| `proxy-auto` (the agents' default), or anything no catalogue lists | the route, as before | applied as before |
+
+The catalogues are **live**: the proxy keeps the list Copilot's `/models` returns at start
+and every 30 minutes (`COPILOT_CATALOGUE_MS`), chat models the account may use only, and each
+local endpoint's list from its 60 s reprobe. Until a provider has answered once, its declared
+`available_models` stand in. A model the provider stopped listing is no longer honoured — the
+call is routed by band instead of failing.
+
+`GET /v1/models` on the proxy returns exactly what can be picked: gh-copilot's list, then each
+offload target this network allows and that is up, `owned_by` naming the provider. coding
+feeds it to every agent:
+
+| Agent | Picker | Default |
+|---|---|---|
+| pi | `rapid-proxy-pi/*` — the `coding-model-discovery` extension reads `/v1/models` at each start and `/reload` | `rapid-proxy-pi/proxy-auto` |
+| opencode | `rapid-proxy/*` — read at launch into `OPENCODE_CONFIG_CONTENT` | your `opencode.json`; pick `rapid-proxy/proxy-auto` for band routing |
+| copilot | BYOK shows one model; `/model <id>` switches to any listed id | `COPILOT_MODEL=proxy-auto`, token limits of the routed model (`COPILOT_PROVIDER_MODEL_ID`) |
+| claude | `CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=1`; the proxy forwards its Anthropic-wire `/v1/models` to Anthropic | Claude Code's own |
+
+`fg-chat/claude` needs no flag: its passthrough already sends Claude Code's pick to Anthropic
+unchanged, and only an Anthropic-wire provider can answer it — the cluster cannot.
+
+`GET /api/llm/routing/resolve?…&model=<id>` shows a pick as `modelChoice`, checked against the
+same live catalogues, and the offload's skip reason reads `caller chose model "<id>"`. A pick of
+a cluster model carries `offloaded_from` on its row, as an offload does. This replaced opencode's Sol-only `model_profiles` entry: any
+listed model is now a choice, at every band.
+
 ### The prompt classifier (`classifier:`, ships OFF)
 
 `from-caller` only helps when the caller declares something *useful*, and measurement showed two

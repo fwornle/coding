@@ -59,9 +59,12 @@ LLM proxy → on-prem Qwen cluster, directly
 | Agent | How it reaches `:12435` | Answered by |
 |---|---|---|
 | claude | `ANTHROPIC_BASE_URL`, `/v1/messages` | your Claude subscription, passed through unchanged |
-| copilot | BYOK provider, `/v1/copilot` | GitHub Copilot |
-| opencode | provider config, `/v1/opencode` | GitHub Copilot |
-| pi | provider config, `/v1` | GitHub Copilot |
+| copilot | BYOK provider, `/v1/copilot` | GitHub Copilot, or the cluster model you picked |
+| opencode | provider config, `/v1/opencode` | GitHub Copilot, or the cluster model you picked |
+| pi | provider config, `/v1` | GitHub Copilot, or the cluster model you picked |
+
+Each picker lists the proxy's `/v1/models`: what Copilot and, on VPN, the
+cluster serve now. claude's lists Anthropic's models for your login.
 
 The launcher wires this. If the proxy does not answer, the launch **stops** and
 tells you how to restart it, rather than running unmeasured.
@@ -126,7 +129,7 @@ Private addresses, such as the on-prem Qwen cluster, always go direct.
 | Local proxy `:3128` | VPN · office | `P:OFF`, "fetch failed" |
 | Kerberos ticket | VPN · office | `K:NO`, 502 for every call |
 | Corporate proxy | VPN · office | 502 naming the proxy |
-| Qwen cluster | VPN · office, small calls | skipped; Copilot answers instead |
+| Qwen cluster | VPN · office, small calls and models you pick | skipped; Copilot answers instead |
 
 </div>
 <figure class="overview-figure" markdown="1">

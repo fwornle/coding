@@ -205,7 +205,8 @@ PIAPPEND
 # so INSIDE_CN and PROXY_WORKING are already set.
 #
 # The proxy wiring — the config dir for this scope, models.json (the
-# rapid-proxy-pi + qwen-laptop providers, merged into the user's), the pinned
+# rapid-proxy-pi + qwen-laptop providers, merged into the user's;
+# coding-model-discovery.ts lists their models live), the pinned
 # provider/model in settings.json, the session-transcript dir and the PI_* env —
 # is lib/agents/proxy-routing.mjs (preLaunchWiring); it also sets _pi_cfg_dir and
 # _pi_scope for the installers below.

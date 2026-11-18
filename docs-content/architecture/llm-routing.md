@@ -106,6 +106,15 @@ decide where it lands.
     input to routing — `body.provider` and `body.subscription` are deliberately ignored,
     because a caller that can re-route itself can quietly move spend onto another account.
 
+    ## When the user picks a model
+
+    `honor_model_choice: true` on `fg-chat/pi`, `fg-chat/opencode` and `fg-chat/copilot` makes
+    the agent's model picker mean what it says: a model **Copilot or the on-prem cluster lists**
+    is answered by that model, at every band, with no offload and no classifier. The list the
+    pickers show is the proxy's `GET /v1/models`, read **live** from those providers' own
+    `/models`, never from the YAML. The agents' default is `proxy-auto`, which no provider
+    lists, so an untouched session is routed by band exactly as below.
+
     A caller can spell the band three ways, strongest first: `complexity` on the body, an
     `x-complexity` header, or OpenAI's `reasoning_effort`. The third is how **pi** does it, and
     it is why lowering pi's thinking level to `low`/`minimal`/`off` is what makes a turn
