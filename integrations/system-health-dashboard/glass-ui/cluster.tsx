@@ -27,6 +27,8 @@ export interface NodeView {
   lastSeen: string | null
   gateway: { endpoint: string; reachable: boolean; healthy: boolean; status: string; backends: Record<string, boolean>; latencyMs: number | null; error: string } | null
   models: { ids: string[]; adapters?: string[]; error: string } | null
+  // Model servers outside the gateway, on ports the status service reports listening.
+  servers?: ModelServer[]
   status: { state: 'ok' | 'absent' | 'unauthorized' | 'error' | 'no-key'; error: string; ts: string | null; gpus: Gpu[]; host?: Host | null; jobs: Job[]; endpoints: { port: number; process: string }[] } | null
   history: Sample[]
 }
@@ -49,6 +51,21 @@ export interface ClusterView {
 }
 
 const POLL_MS = 15_000
+
+interface ModelServer { port: number; ids: string[]; error: string }
+// llama-server names a model by its file path; the file name is what tells models apart.
+const modelName = (id: string) => id.split('/').pop() || id
+const SERVER_TITLE = 'served on this port directly, not through the gateway — no key, no failover'
+
+function ServerChips({ servers }: { servers: ModelServer[] }) {
+  return <>
+    {servers.flatMap((sv) => (sv.ids.length ? sv.ids : [sv.error || 'no models']).map((m) => (
+      <span key={`${sv.port}/${m}`} className="max-w-full truncate rounded border border-dashed px-1 font-mono text-[10px]" title={`${m}\n${SERVER_TITLE}`}>
+        <span className="text-muted-foreground">:{sv.port}</span> {sv.ids.length ? modelName(m) : m}
+      </span>
+    )))}
+  </>
+}
 
 /** Whether cluster.json configures a cluster — asks without starting the daemon's poller. */
 export function useClusterConfigured(): boolean {
@@ -226,6 +243,7 @@ function NodeTile({ n, served, lit, selected, onSelect }: { n: NodeView; served:
         {(n.models?.ids ?? []).map((m) => (
           <span key={m} className="max-w-full truncate rounded border px-1 font-mono text-[10px]">{m}</span>
         ))}
+        <ServerChips servers={n.servers ?? []} />
         {/* Without the gateway key the page's banner says it once; a tile names only its own trouble —
             and a node with no gateway has no models to fail, so its footer says it once. */}
         {n.models && n.models.ids.length === 0 && n.up && health !== 'nogateway' && n.models.error !== 'no gateway key' &&<span className="text-[10px] text-muted-foreground">{n.models.error || 'no models'}</span>}
@@ -240,7 +258,7 @@ function NodeTile({ n, served, lit, selected, onSelect }: { n: NodeView; served:
       )}
 
       <div className="mt-auto flex justify-between text-[10px] text-muted-foreground">
-        <span>{health === 'down' ? (n.gateway?.error || 'not reachable') : HEALTH_LABEL[health]}</span>
+        <span>{health === 'down' ? (n.gateway?.error || 'not reachable') : HEALTH_LABEL[health]}{health === 'nogateway' && (n.servers ?? []).length > 0 ? ' · model server' : ''}</span>
         <span>seen {ago(n.lastSeen)}</span>
       </div>
     </button>
@@ -358,6 +376,14 @@ function NodeDetail({ n, onClose }: { n: NodeView; onClose: () => void }) {
               <span key={m} className={cn('rounded border px-1 font-mono text-[10px]', adapters.has(m) && 'border-dashed border-indigo-400/70')} title={adapters.has(m) ? 'adapter' : 'base model'}>{m}</span>
             ))}
           </div>
+          {(n.servers ?? []).map((sv) => (
+            <div key={sv.port} className="space-y-1 border-t pt-1.5">
+              <div className="font-medium">Model server <span className="font-mono font-normal text-muted-foreground">{n.host}:{sv.port}</span></div>
+              <div className="text-muted-foreground">{SERVER_TITLE}</div>
+              {sv.error && <div className="text-muted-foreground">{sv.error}</div>}
+              {sv.ids.map((m) => <div key={m} className="break-all font-mono text-[10px]" title={m}>{modelName(m)}</div>)}
+            </div>
+          ))}
         </div>
         <div className="space-y-1 rounded-md border p-2.5">
           <div className="font-medium">Jobs</div>

@@ -95,7 +95,8 @@ test('each key goes only to its own service — gateway key to /v1/models, statu
   assert.equal(v.statusKeySet, true);
   for (const call of calls) {
     if (call.url.endsWith('/health')) assert.equal(call.auth, '', `${call.url} carries no key`);
-    else if (call.url.endsWith('/v1/models')) assert.equal(call.auth, `Bearer ${KEY}`);
+    else if (call.url.endsWith(':8000/v1/models')) assert.equal(call.auth, `Bearer ${KEY}`);
+    else if (call.url.endsWith('/v1/models')) assert.equal(call.auth, '', `${call.url} is no gateway: no key`);
     else if (call.url.endsWith('/status')) assert.equal(call.auth, `Bearer ${STATUS_KEY}`);
     else assert.fail(`unexpected request ${call.url}`);
   }
@@ -245,7 +246,9 @@ test('only the status key: /status is read, /v1/models is skipped ("no gateway k
   writeStatusKey(home);
   const calls = [];
   const v = await createCluster({ home, fetch: stubFetch(calls) }).read();
-  assert.deepEqual(calls.map((x) => x.url).sort(), ['http://192.0.2.1:8000/health', 'http://192.0.2.1:8099/status']);
+  // :8001 is the model-server probe of a port the status service listed — never with a key.
+  assert.deepEqual(calls.map((x) => x.url).sort(), ['http://192.0.2.1:8000/health', 'http://192.0.2.1:8001/v1/models', 'http://192.0.2.1:8099/status']);
+  assert.equal(calls.find((x) => x.url.endsWith(':8001/v1/models')).auth, '');
   assert.equal(calls.find((x) => x.url.endsWith('/status')).auth, `Bearer ${STATUS_KEY}`);
   assert.equal(v.keySet, false);
   assert.equal(v.statusKeySet, true);
@@ -328,6 +331,32 @@ test('history is capped at historySize', async () => {
   const c = createCluster({ home, fetch: stubFetch(), historySize: 3, setTimer: () => null, clearTimer: () => {} });
   for (let i = 0; i < 5; i++) await c.poll();
   assert.equal(c.view().nodes[0].history.length, 3);
+});
+
+test('a model server outside the gateway: ports the status service reports in 8000–8999 are asked /v1/models, with no key', async () => {
+  const calls = [];
+  const fetch = async (url, init) => {
+    calls.push({ url, auth: init?.headers?.authorization || '' });
+    if (url === 'http://192.0.2.5:8099/status') {
+      return res(200, { endpoints: [22, 8000, 8001, 8002, 8003, 8099, 9000].map((port) => ({ port, process: 'unknown' })) });
+    }
+    if (url === 'http://192.0.2.5:8001/v1/models') return res(200, { data: [{ id: '/home/u/Qwen-4B.gguf' }] });
+    if (url === 'http://192.0.2.5:8002/v1/models') return res(401, { error: 'invalid API key' });
+    if (url === 'http://192.0.2.5:8003/v1/models') return res(404, null); // listens, but no model server
+    return refused();
+  };
+  const p = await probeNode({ name: 'e', host: '192.0.2.5' }, { fetch, key: KEY, statusKey: STATUS_KEY, gatewayPort: 8000, statusPort: 8099, timeoutMs: 500 });
+  assert.deepEqual(p.servers, [{ port: 8001, ids: ['/home/u/Qwen-4B.gguf'], error: '' }, { port: 8002, ids: [], error: 'needs a key' }]);
+  const asked = calls.filter((c) => /:(800[1-3]|9000|22)\//.test(c.url));
+  assert.deepEqual(asked.map((c) => c.url).sort(), ['http://192.0.2.5:8001/v1/models', 'http://192.0.2.5:8002/v1/models', 'http://192.0.2.5:8003/v1/models']);
+  assert.ok(asked.every((c) => c.auth === ''), 'neither key reaches a model server outside the gateway');
+});
+
+test('no status service, no model-server requests: the ports come only from its endpoints', async () => {
+  const calls = [];
+  const p = await probeNode({ name: 'b', host: '192.0.2.2' }, { fetch: stubFetch(calls), key: KEY, statusKey: STATUS_KEY, gatewayPort: 8000, statusPort: 8099, timeoutMs: 500 });
+  assert.deepEqual(p.servers, []);
+  assert.ok(!calls.some((c) => /:80(0[1-9]|[1-9]\d)\//.test(c.url) && !c.url.includes(':8099/')));
 });
 
 test('normalizeStatus keeps the contract fields only', () => {
