@@ -23,8 +23,8 @@ follow every call the offload router sent there, kept back, or let fall back.
     - **Summary** — nodes up, gateways healthy (out of the nodes that run a gateway), GPUs
       busy, active jobs, status services; the trace top right is the share of nodes up at each
       poll (the cluster's heartbeat).
-    - **Outside the cluster's network** — an on-prem cluster answers only inside the corporate
-      network or over VPN. When no node answers and none refuses a connection, the page says
+    - **Outside the cluster's network** — a cluster on a private network answers only from
+      inside it, or over VPN. When no node answers and none refuses a connection, the page says
       *the cluster is not reachable from this machine* and when it was last reached, instead
       of showing tiles of stale facts.
     - **A node tile** — its name and gateway endpoint (`host:port`), a status dot (green:

@@ -242,7 +242,7 @@ export function sampleOf(ts, probe) {
  *   'nodes-down'   none answered, but some host refused the connection — the network
  *                  path is there and nothing listens
  *   'unreachable'  none answered and none refused: every request timed out or had no
- *                  route — what an on-prem cluster looks like from outside its network
+ *                  route — what a cluster on a private network looks like from outside it
  *                  (off VPN). Its tiles would only repeat stale facts, so the page says this instead.
  */
 export function reachOf(probes) {

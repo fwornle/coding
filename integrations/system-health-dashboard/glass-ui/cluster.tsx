@@ -474,8 +474,8 @@ export function ClusterPage() {
         <div className="rounded-lg border border-status-warning-line bg-status-warning-subtle px-4 py-3 text-sm" data-testid="cluster-unreachable">
           <div className="font-medium text-status-warning">The cluster is not reachable from this machine</div>
           <p className="mt-1 text-xs text-muted-foreground">
-            None of the {s?.nodes ?? nodes.length} nodes answered and none refused a connection: no request found a route. The cluster is on-prem
-            — it is reachable only inside the corporate network or over VPN. Connect, and this page fills in on its next poll.
+            None of the {s?.nodes ?? nodes.length} nodes answered and none refused a connection: no request found a route. The cluster is on a private
+            network — it is reachable only from inside that network or over VPN. Connect, and this page fills in on its next poll.
           </p>
           <p className="mt-1 text-xs text-muted-foreground">
             {view?.lastReachedAt ? <>Last reached {ago(view.lastReachedAt)}.</> : <>Not reached since glass started.</>} Checking again every {Math.round((view?.intervalMs ?? POLL_MS) / 1000)} s.
