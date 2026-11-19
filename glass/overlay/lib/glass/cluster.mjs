@@ -98,7 +98,19 @@ export function createClusterStore(home, { platform = process.platform } = {}) {
     try { return { key: fs.readFileSync(f, 'utf8').trim(), problem: '' }; } catch { return { key: '', problem: `${name} cannot be read` }; }
   }
 
-  return { getConfig, readKey, file, keyFiles };
+  /** Writes a key owner-only ('' removes it); true when one is set. Offload's settings write cluster.key. */
+  function writeKey(which, key) {
+    const f = keyFiles[which];
+    const k = String(key || '').trim();
+    if (!k) { try { fs.rmSync(f); } catch { /* none */ } return false; }
+    fs.mkdirSync(home, { recursive: true });
+    const tmp = `${f}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, `${k}\n`, { mode: 0o600 });
+    fs.renameSync(tmp, f);
+    return true;
+  }
+
+  return { getConfig, readKey, writeKey, file, keyFiles };
 }
 
 /**
