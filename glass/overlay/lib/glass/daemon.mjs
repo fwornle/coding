@@ -62,7 +62,7 @@ import { createNetworkMonitor } from './network.mjs';
 import { createOffloadStore } from './offload-store.mjs';
 import { createCopilotQuota } from './copilot-quota.mjs';
 import { createGlassJobClasses } from './job-classes.mjs';
-import { createCluster } from './cluster.mjs';
+import { createCluster, createClusterStore } from './cluster.mjs';
 import { createUpdateCheck, UPDATE_CHECK_MS } from './update.mjs';
 import { createOffloader, createTargetHealth, OFFLOAD_AGENTS } from '../../proxy/proxy-bridge/offload.mjs';
 
@@ -274,7 +274,9 @@ export async function startDaemon({
   });
 
   // ── opt-in offload ──
-  const offloadStore = createOffloadStore(home);
+  // One store of cluster.json and its keys, shared: offload to a cluster gateway uses cluster.key.
+  const clusterStore = createClusterStore(home);
+  const offloadStore = createOffloadStore(home, { cluster: clusterStore });
   // Job classes (job-classes.mjs): off until the user switches labelling on; then
   // the user's own Copilot account labels each human turn in the background.
   const jobClasses = createGlassJobClasses({
@@ -294,7 +296,7 @@ export async function startDaemon({
   const offloader = createOffloader({ fetch: targetFetch, getConfig: offloadStore.getConfig, getKey: offloadStore.getKey, health: offloadHealth });
   const offload = { offloader, getConfig: offloadStore.getConfig };
   // A GPU cluster's nodes (cluster.mjs): only with cluster.json, polled only while the page reads it.
-  const cluster = createCluster({ home, fetch: targetFetch, log });
+  const cluster = createCluster({ home, fetch: targetFetch, log, store: clusterStore });
   // Probed only while offload is on: a switched-off feature makes no network call.
   const probeIfOn = () => (offloadStore.getConfig().enabled ? offloadHealth.probe() : Promise.resolve(offloadHealth.state));
   probeIfOn().catch(() => {});
@@ -303,7 +305,7 @@ export async function startDaemon({
   const offloadView = () => {
     const cfg = offloadStore.getConfig();
     return {
-      config: cfg, keySet: offloadStore.hasKey(), agents: OFFLOAD_AGENTS,
+      config: cfg, ...(({ key, file, problem }) => ({ keySet: Boolean(key), keyFile: file, keyProblem: problem }))(offloadStore.keyState()), agents: OFFLOAD_AGENTS,
       health: { ...offloadHealth.state, current: offloadHealth.state.url === cfg.target.url },
       counters: { ...offloader.counters }, inFlight: offloader.inFlight(),
     };

@@ -81,7 +81,7 @@ sparklines and a clicked node's charts — nothing about the cluster is written 
 | File | Holds | Rules |
 |---|---|---|
 | `~/.glass/cluster.json` | `nodes` (`name`, `host`), `gatewayPort` (default 8000), `statusPort` (default 8099) | invalid nodes are skipped and named on the page; at most 256 nodes |
-| `~/.glass/cluster.key` | the gateways' API key, alone | sent only to `/v1/models` |
+| `~/.glass/cluster.key` | the gateways' API key, alone | sent only to `/v1/models` — and by [offload](offload.md), when its endpoint is one of these gateways |
 | `~/.glass/cluster-status.key` | the status services' key, alone — a separate secret | sent only to `/status` |
 
 Both key files are optional and owner-only: one other users can read is **refused**

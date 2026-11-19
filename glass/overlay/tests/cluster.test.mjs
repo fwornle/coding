@@ -377,3 +377,67 @@ test('a changed cluster.json is polled on the next read, and dropped nodes lose 
   assert.deepEqual(v.nodes.map((n) => [n.name, n.up]), [['b', true]]);
   assert.equal(v.nodes[0].history.length, 1);
 });
+
+// ── offload to a cluster gateway: one secret, one file ──
+const { createOffloadStore, isClusterGateway } = await import('../lib/glass/offload-store.mjs');
+const offloadHome = (url) => {
+  const home = tmpHome();
+  writeCfg(home, { nodes: [{ name: 'n1', host: '192.0.2.10' }], gatewayPort: 8000 });
+  fs.writeFileSync(path.join(home, 'offload.json'), JSON.stringify({ enabled: true, target: { name: 't', url } }));
+  return home;
+};
+const has = (home, f) => fs.existsSync(path.join(home, f));
+
+test('isClusterGateway: a node host on the gateway port, nothing else', () => {
+  const c = normalizeClusterConfig({ nodes: [{ name: 'n1', host: '192.0.2.10' }], gatewayPort: 8000 });
+  assert.equal(isClusterGateway('http://192.0.2.10:8000/v1', c), true);
+  assert.equal(isClusterGateway('http://192.0.2.10:8001/v1', c), false, 'another port on the node is not its gateway');
+  assert.equal(isClusterGateway('http://192.0.2.11:8000/v1', c), false);
+  assert.equal(isClusterGateway('http://192.0.2.10:8000/v1', { configured: false }), false);
+});
+
+test('offload to a cluster gateway uses cluster.key; a leftover offload.key is moved, or dropped as a copy', () => {
+  // moved: no cluster.key yet
+  let home = offloadHome('http://192.0.2.10:8000/v1');
+  writeSecret(home, 'offload.key', KEY, 0o600);
+  let s = createOffloadStore(home, { cluster: createClusterStore(home) });
+  assert.deepEqual(s.keyState(), { key: KEY, file: 'cluster.key', problem: '' });
+  assert.equal(has(home, 'offload.key'), false);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(home, 'cluster.key')).mode & 0o777, 0o600);
+
+  // dropped: the same secret twice
+  home = offloadHome('http://192.0.2.10:8000/v1');
+  writeKey(home);
+  writeSecret(home, 'offload.key', KEY, 0o600);
+  s = createOffloadStore(home, { cluster: createClusterStore(home) });
+  assert.equal(s.getKey(), KEY);
+  assert.equal(has(home, 'offload.key'), false);
+
+  // kept and reported: another secret, cluster.key wins
+  home = offloadHome('http://192.0.2.10:8000/v1');
+  writeKey(home);
+  writeSecret(home, 'offload.key', 'another-fixture-token', 0o600);
+  s = createOffloadStore(home, { cluster: createClusterStore(home) });
+  const st = s.keyState();
+  assert.equal(st.key, KEY);
+  assert.match(st.problem, /offload\.key holds another key/);
+  assert.equal(has(home, 'offload.key'), true);
+
+  // the settings' key field writes cluster.key for a cluster target
+  home = offloadHome('http://192.0.2.10:8000/v1');
+  s = createOffloadStore(home, { cluster: createClusterStore(home) });
+  assert.equal(s.setKey('set-fixture-token'), true);
+  assert.equal(fs.readFileSync(path.join(home, 'cluster.key'), 'utf8'), 'set-fixture-token\n');
+  assert.equal(has(home, 'offload.key'), false);
+  s.setKey('');
+  assert.equal(has(home, 'cluster.key'), false);
+});
+
+test('offload to an endpoint outside cluster.json keeps its own offload.key', () => {
+  const home = offloadHome('http://198.51.100.7:8000/v1');
+  writeKey(home);
+  writeSecret(home, 'offload.key', 'endpoint-fixture-token', 0o600);
+  const s = createOffloadStore(home, { cluster: createClusterStore(home) });
+  assert.deepEqual(s.keyState(), { key: 'endpoint-fixture-token', file: 'offload.key', problem: '' });
+  assert.equal(has(home, 'cluster.key'), true);
+});

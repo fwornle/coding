@@ -37,6 +37,9 @@ export interface OffloadConfig {
 export interface OffloadView {
   config: OffloadConfig
   keySet: boolean
+  /** where the key lives: cluster.key when the target is one of cluster.json's gateways, else offload.key */
+  keyFile?: 'cluster.key' | 'offload.key'
+  keyProblem?: string
   health: { url: string; reachable: boolean; checkedAt: number; latencyMs: number; models: string[]; error: string; current: boolean }
   counters: { offloaded: number; fellBack: number; classified: number; downgraded: number }
   inFlight: number
@@ -285,8 +288,13 @@ function OffloadDialog({ open, onOpenChange, view, onSaved }: {
                   : `not reachable — ${health.error}`}
               </span>
             )}
-            <span className="ml-auto text-muted-foreground">the key is kept in your glass home, owner-only, never shown again</span>
+            <span className="ml-auto text-muted-foreground">
+              {view.keyFile === 'cluster.key'
+                ? 'a cluster gateway: the key is cluster.key, shared with the Cluster page — owner-only, never shown again'
+                : 'the key is kept in your glass home, owner-only, never shown again'}
+            </span>
           </div>
+          {view.keyProblem && <div className="text-xs text-amber-600 dark:text-amber-400">{view.keyProblem}</div>}
         </Section>
 
         <Section title="Which calls" note="A call is offloaded only if its band is ticked and the endpoint has a model for it. Turns that carry tool results stay with the agent's provider.">

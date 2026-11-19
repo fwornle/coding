@@ -4,6 +4,7 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import { cn } from '@/lib/utils'
 import { useIsDark } from '@/lib/colors'
 import { RoutingHistory, useEscape, useRouting, type CardCategory, type JobCard, type RoutingRow } from './routing'
+import { ClusterArchitecture } from './cluster-architecture'
 
 /**
  * The Cluster page: a GPU cluster's nodes at a glance — /api/cluster (lib/glass/cluster.mjs,
@@ -11,14 +12,15 @@ import { RoutingHistory, useEscape, useRouting, type CardCategory, type JobCard,
  * gateway, the models it serves, its GPUs, its CPU and RAM, and the job on them. A clicked
  * tile opens over the grid with its charts at full size. The side panel is the history: the
  * routing decisions and the cluster's jobs, tinted by what each is; a call a node's gateway
- * answered lights that node.
+ * answered lights that node. The Architecture view draws how this machine's processes reach
+ * the cluster and the credential each connection carries (cluster-architecture.tsx).
  */
 
 interface Gpu { index: number | null; name: string; utilPct: number | null; memUsedMib: number | null; memTotalMib: number | null; tempC: number | null }
 interface Host { cpuCount: number | null; cpuPct: number | null; load: (number | null)[] | null; memTotalMib: number | null; memUsedMib: number | null; memAvailableMib: number | null }
 interface Job { id: string; name: string; image: string; status: string; started: string | null; gpu: string | null; kind?: 'llm' | 'other' | null }
 interface Sample { ts: string; up: boolean; utilPct: number | null; memPct: number | null; cpuPct?: number | null; ramPct?: number | null; latencyMs: number | null }
-interface NodeView {
+export interface NodeView {
   name: string
   host: string
   up: boolean | null
@@ -410,17 +412,26 @@ function servedByHost(rows: RoutingRow[]): Map<string, number> {
   return m
 }
 
+/** Hosts whose gateway answered an agent configured with the cluster as its provider, not the router. */
+function agentHostsOf(rows: RoutingRow[], byHost: Map<string, string>): Set<string> {
+  return new Set(rows.filter((r) => r.outcome !== 'offloaded' && r.host && byHost.has(r.host)).map((r) => r.host!))
+}
+
+type Mode = 'nodes' | 'architecture'
+
 export function ClusterPage() {
   const { view, error } = useCluster()
   const [hours, setHours] = useState(24)
   const routing = useRouting(hours)
   const [hoverHost, setHoverHost] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const [mode, setMode] = useState<Mode>('nodes')
   const closeNode = useCallback(() => setSelected(null), [])
-  useEscape(selected !== null, closeNode)
+  useEscape(mode === 'nodes' && selected !== null, closeNode)
   const nodes = useMemo(() => view?.nodes ?? [], [view])
   const byHost = useMemo(() => new Map(nodes.map((n) => [n.host, n.name])), [nodes])
   const served = useMemo(() => servedByHost(routing.view?.rows ?? []), [routing.view])
+  const agentHosts = useMemo(() => agentHostsOf(routing.view?.rows ?? [], byHost), [routing.view, byHost])
   const s = view?.summary
   const beat = useMemo(() => heartbeat(nodes), [nodes])
   const offNet = view?.reach === 'unreachable'
@@ -452,10 +463,20 @@ export function ClusterPage() {
             Every node&apos;s gateway, the models it serves, its GPUs, CPU, RAM and jobs — read over HTTP every {Math.round((view?.intervalMs ?? POLL_MS) / 1000)} s while this page is open.
           </p>
         </div>
+        <div className="flex items-center gap-2">
+        <div className="flex rounded-lg border bg-card p-0.5 text-xs" role="tablist" aria-label="Cluster view">
+          {(['nodes', 'architecture'] as Mode[]).map((m) => (
+            <button key={m} type="button" role="tab" aria-selected={mode === m} data-testid={`cluster-mode-${m}`} onClick={() => setMode(m)}
+              className={cn('rounded-md px-3 py-1.5 capitalize', mode === m ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}>
+              {m}
+            </button>
+          ))}
+        </div>
         <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2" title="Nodes up per poll">
           <Radio className={cn('h-4 w-4', s && s.up === s.nodes ? 'text-status-success' : s && s.up > 0 ? 'text-status-warning' : 'text-status-error')} />
           <Sparkline values={beat} className="h-6 w-40 text-status-success" />
           <span className="text-[10px] text-muted-foreground whitespace-nowrap">polled {ago(view?.polledAt)}</span>
+        </div>
         </div>
       </div>
 
@@ -500,7 +521,9 @@ export function ClusterPage() {
         </div>
       )}
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
+      {mode === 'architecture' && view?.configured && <ClusterArchitecture view={view} agentHosts={agentHosts} />}
+
+      {mode === 'nodes' && <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="grid content-start gap-3 [grid-template-columns:repeat(auto-fill,minmax(210px,1fr))]">
           {!view && !error && <div className="text-sm text-muted-foreground">Polling the nodes…</div>}
           {!offNet && detail && <div className="col-span-full"><NodeDetail n={detail} onClose={() => setSelected(null)} /></div>}
@@ -534,7 +557,7 @@ export function ClusterPage() {
             jobs={offNet ? [] : view?.jobLog}
           />
         </aside>
-      </div>
+      </div>}
     </div>
   )
 }
