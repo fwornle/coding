@@ -8,9 +8,10 @@ nodes in parallel:
 | `GET http://<host>:<gatewayPort>/health` | none | `{ status, backends: { url: bool } }` — 200 healthy, 503 no live backend |
 | `GET http://<host>:<gatewayPort>/v1/models` | `cluster.key` | the model ids the gateway serves |
 | `GET http://<host>:<statusPort>/status` | `cluster-status.key` | GPUs (utilisation, memory, temperature), the host's CPU and RAM, jobs, listening endpoints |
+| `GET http://<host>:<port>/v1/models` | none | for each port 8000–8999 the status service lists as listening (not the gateway or status port, at most 4): a model server running outside the gateway — a llama-server for an experiment — shown with its port and marked *not a gateway*. One that wants a key reads *needs a key*; it never gets one |
 
-Each key goes to its own service only: the gateway key never reaches a status service, and
-the status key never reaches a gateway. A request whose key is absent is not made — the tile
+Each key goes to its own service only: the gateway key never reaches a status service or a
+model server outside the gateway, and the status key never reaches a gateway. A request whose key is absent is not made — the tile
 says *no gateway key* or *no status key* — so either secret can be handed out alone.
 
 A node is **up** when any of the three answers. The status service is optional per node: a

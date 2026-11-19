@@ -21,6 +21,11 @@
 //   GET http://<host>:<gatewayPort>/v1/models    cluster.key: the model ids the gateway serves
 //   GET http://<host>:<statusPort>/status        cluster-status.key: GPUs, CPU and RAM, jobs, endpoints (optional — a
 //                                                node without the service says so)
+// then, for each port in MODEL_SERVER_PORTS the status service reports listening (other than
+// the gateway and status ports):
+//   GET http://<host>:<port>/v1/models           no key: a model server running outside the gateway
+//                                                (a llama-server for an experiment); no key is ever
+//                                                sent to it, so one that wants a key reads "needs a key"
 //
 // Polled only while someone looks: the first /api/cluster read starts the poller,
 // and it stops itself once no read came for `activeMs`. A cluster nobody has open
@@ -30,6 +35,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export const CLUSTER_POLL_MS = 15_000;
+/** Ports where a node's status endpoints are asked whether they serve models; at most MAX_SERVERS per node. */
+export const MODEL_SERVER_PORTS = { from: 8000, to: 8999 };
+const MAX_SERVERS = 4;
 const NAME = /^[A-Za-z0-9._-]{1,64}$/;
 const HOST = /^(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?)(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?)*$|^\[[0-9A-Fa-f:.]+\]$/;
 const MAX_NODES = 256;
@@ -177,6 +185,15 @@ export function normalizeStatus(body) {
   };
 }
 
+/** A model server's /v1/models answer: { port, ids, error }, or null when the port does not speak it. */
+export function modelServerOf(port, res) {
+  if (!res || res.error) return null;
+  if (res.status === 401 || res.status === 403) return { port, ids: [], error: 'needs a key' };
+  const data = res.status === 200 && Array.isArray(res.body?.data) ? res.body.data : null;
+  if (!data) return null;
+  return { port, ids: data.slice(0, 32).map((m) => str(m?.id, 200)).filter(Boolean), error: '' };
+}
+
 const backendsOf = (b) => (b && typeof b.backends === 'object' && b.backends
   ? Object.fromEntries(Object.entries(b.backends).slice(0, 32).map(([u, ok]) => [str(u, 200), Boolean(ok)]))
   : {});
@@ -228,8 +245,14 @@ export async function probeNode(node, { fetch, key = '', statusKey = '', gateway
     else statusView = { state: 'ok', error: '', ...normalizeStatus(status.body) };
   }
 
+  const ports = statusView.endpoints.map((e) => e.port)
+    .filter((p) => p >= MODEL_SERVER_PORTS.from && p <= MODEL_SERVER_PORTS.to && p !== gatewayPort && p !== statusPort)
+    .slice(0, MAX_SERVERS);
+  const servers = (await Promise.all(ports.map((p) => getJson(fetch, `http://${node.host}:${p}/v1/models`, { timeoutMs })
+    .then((res) => modelServerOf(p, res))))).filter(Boolean);
+
   const answered = gateway.reachable || (models && !models.error) || (status && !status.error);
-  return { up: Boolean(answered), gateway, models: modelView, status: statusView };
+  return { up: Boolean(answered), gateway, models: modelView, status: statusView, servers };
 }
 
 const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
@@ -361,6 +384,7 @@ export function createCluster({
         lastSeen: s?.lastSeen ?? null,
         gateway: p?.gateway ?? null,
         models: p?.models ?? null,
+        servers: p?.servers ?? [],
         status: p?.status ?? null,
         history: s?.history ?? [],
       };
