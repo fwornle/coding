@@ -45,7 +45,7 @@ Each poll ends with a verdict, `reach` in `/api/cluster`, and the time of the la
 | `nodes-down` | none answered, but a host refused a connection: the network path exists | the tiles, under a banner that no node answers |
 | `unreachable` | none answered and none refused: every request timed out or found no route | one notice — *not reachable from this machine*, last reached — and no tiles |
 
-`unreachable` is what an on-prem cluster looks like from outside its network (off VPN).
+`unreachable` is what a cluster on a private network looks like from outside it (off VPN).
 The page polls on, and fills in with the first poll that reaches a node.
 
 ## What a history card is
