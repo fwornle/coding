@@ -6,7 +6,7 @@ the agent's own provider, and the reason is recorded on the call's row:
 | Gate | Why |
 |---|---|
 | Offload is on, for this agent | Off is the default; each agent is switched separately. |
-| An endpoint is set and **reachable** | It is probed every 60 s while offload is on; an unreachable endpoint costs no call a timeout. |
+| An endpoint is set and **reachable** | It is probed every 60 s while offload is on: it must list its models, and its `/health` (next to `/v1`) must not answer with an error — a gateway whose model server is down is not reachable. An unreachable endpoint costs no call a timeout. |
 | It is a chat call (`/chat/completions`) | The Responses API is not translated. |
 | The turn carries no tool results yet | A turn inside a tool loop can look trivial and is not. |
 | Its **band** is ticked and has a model | small / medium / high, from the call's reasoning effort, else the model the agent picked: mini / nano / haiku / flash → small, opus / pro → high, anything else → medium. |
