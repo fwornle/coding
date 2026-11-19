@@ -22,8 +22,10 @@ opt-in, off by default, switched in the UI at any time.
        **Your endpoint — not set up** node in **Models → Flow**).
     2. Enter the endpoint's **URL** (e.g. `http://host:8000/v1`) and, if it needs one, its
        **API key**. A bare `http://host:8000` means `http://host:8000/v1`. **Test** checks it
-       and lists its models; when it fails, it shows the endpoint's own message — *backend
-       unavailable* is a server that is down, not a wrong address.
+       and lists its models; it also asks the endpoint's `/health`, so a gateway that lists
+       models while its model server is down fails the test. When it fails, it shows the
+       endpoint's own message — *backend unavailable* is a server that is down, not a wrong
+       address.
     3. Pick a model for the **small** band (and more bands if you want) from the list the
        endpoint gave.
     4. Tick the **agents** — opencode, pi, copilot — and **Offload easy calls**. **Save**.
