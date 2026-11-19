@@ -144,6 +144,8 @@ export function normalizeStatus(body) {
   const jobs = (Array.isArray(b.jobs) ? b.jobs : []).slice(0, 50).map((j) => ({
     id: str(j?.id, 80), name: str(j?.name, 120), image: str(j?.image, 200), status: str(j?.status, 60),
     started: j?.started ? str(j.started, 40) : null, gpu: j?.gpu == null ? null : str(j.gpu, 40),
+    // 'llm' (training, inference) or 'other' (a build, any non-LLM work); null when the service does not say.
+    kind: j?.kind === 'llm' || j?.kind === 'other' ? j.kind : null,
   }));
   const endpoints = (Array.isArray(b.endpoints) ? b.endpoints : []).slice(0, 50)
     .map((e) => ({ port: finite(e?.port), process: str(e?.process, 80) }))
@@ -189,14 +191,19 @@ export async function probeNode(node, { fetch, key = '', statusKey = '', gateway
       error: health.status === 503 ? 'no backend live' : (health.status >= 400 ? `HTTP ${health.status}` : ''),
     };
 
-  let modelView = { ids: [], error: noKey };
+  let modelView = { ids: [], adapters: [], error: noKey };
   if (models) {
-    if (models.error) modelView = { ids: [], error: models.error };
-    else if (models.status === 401 || models.status === 403) modelView = { ids: [], error: 'the gateway refused cluster.key' };
-    else if (models.status !== 200) modelView = { ids: [], error: `HTTP ${models.status}` };
+    if (models.error) modelView = { ids: [], adapters: [], error: models.error };
+    else if (models.status === 401 || models.status === 403) modelView = { ids: [], adapters: [], error: 'the gateway refused cluster.key' };
+    else if (models.status !== 200) modelView = { ids: [], adapters: [], error: `HTTP ${models.status}` };
     else {
-      const data = Array.isArray(models.body?.data) ? models.body.data : [];
-      modelView = { ids: data.map((m) => str(m?.id, 120)).filter(Boolean).slice(0, 32), error: '' };
+      const data = (Array.isArray(models.body?.data) ? models.body.data : []).slice(0, 32);
+      modelView = {
+        ids: data.map((m) => str(m?.id, 120)).filter(Boolean),
+        // A fine-tuning adapter names its base model as `parent` (vLLM's LoRA modules); a base model has none.
+        adapters: data.filter((m) => m?.parent && m.parent !== m.id).map((m) => str(m.id, 120)).filter(Boolean),
+        error: '',
+      };
     }
   }
 
@@ -229,6 +236,21 @@ export function sampleOf(ts, probe) {
   };
 }
 
+/**
+ * Whether this machine can reach the cluster at all, from one poll's probes:
+ *   'reachable'    some node answered
+ *   'nodes-down'   none answered, but some host refused the connection — the network
+ *                  path is there and nothing listens
+ *   'unreachable'  none answered and none refused: every request timed out or had no
+ *                  route — what an on-prem cluster looks like from outside its network
+ *                  (off VPN). Its tiles would only repeat stale facts, so the page says this instead.
+ */
+export function reachOf(probes) {
+  if (!probes.length || probes.some((p) => p.up)) return 'reachable';
+  const refused = (e) => /ECONNREFUSED/.test(e || '');
+  return probes.some((p) => refused(p.gateway?.error) || refused(p.status?.error)) ? 'nodes-down' : 'unreachable';
+}
+
 /** A GPU counts as busy at this utilisation or above. */
 export const BUSY_UTIL_PCT = 10;
 
@@ -240,14 +262,20 @@ export const BUSY_UTIL_PCT = 10;
  * @param {number} [o.intervalMs]     between polls while the page is open
  * @param {number} [o.activeMs]       stop polling this long after the last read
  * @param {number} [o.timeoutMs]      per request
- * @param {number} [o.historySize]    samples kept per node
+ * @param {number} [o.historySize]    samples kept per node (240 = an hour at 15 s, for the node's charts)
+ * @param {number} [o.jobLogSize]     jobs kept in the job log
  */
 export function createCluster({
-  home, fetch, log = () => {}, intervalMs = CLUSTER_POLL_MS, activeMs = 120_000, timeoutMs = 3_000, historySize = 40,
-  now = Date.now, setTimer = setTimeout, clearTimer = clearTimeout, store = createClusterStore(home),
+  home, fetch, log = () => {}, intervalMs = CLUSTER_POLL_MS, activeMs = 120_000, timeoutMs = 3_000, historySize = 240,
+  jobLogSize = 200, now = Date.now, setTimer = setTimeout, clearTimer = clearTimeout, store = createClusterStore(home),
 }) {
   const nodes = new Map(); // name → { last probe, lastSeen, history }
+  // node/job id → the job as last seen, with when it was first and last seen: the jobs
+  // the status services reported while the page was open, for the history sidebar.
+  const jobLog = new Map();
   let polledAt = null;
+  let reach = null; // reachOf() of the last poll
+  let lastReachedAt = null;
   let polling = null;
   let timer = null;
   let lastRead = 0;
@@ -275,10 +303,21 @@ export function createCluster({
       const ts = new Date(now()).toISOString();
       cfg.nodes.forEach((n, i) => {
         const p = probes[i];
-        const prev = nodes.get(n.name) || { history: [], lastSeen: null };
+        const prev = nodes.get(n.name) || { history: [], lastSeen: null, hasGateway: false };
         const history = p.gateway ? [...prev.history, sampleOf(ts, p)].slice(-historySize) : prev.history;
-        nodes.set(n.name, { probe: p, lastSeen: p.up ? ts : prev.lastSeen, history });
+        // Once a gateway has answered, the node keeps counting as one that has a gateway:
+        // an outage, or this host losing the network, must not shrink "gateways healthy"'s denominator.
+        nodes.set(n.name, { probe: p, lastSeen: p.up ? ts : prev.lastSeen, history, hasGateway: prev.hasGateway || Boolean(p.gateway?.reachable) });
+        for (const j of p.status?.state === 'ok' ? p.status.jobs : []) {
+          const k = `${n.name}/${j.id || j.name}`;
+          const firstSeen = jobLog.get(k)?.firstSeen ?? ts;
+          jobLog.delete(k); // re-inserted: the Map's order is last-seen order
+          jobLog.set(k, { ...j, node: n.name, host: n.host, firstSeen, lastSeen: ts });
+        }
       });
+      while (jobLog.size > jobLogSize) jobLog.delete(jobLog.keys().next().value);
+      reach = reachOf(probes);
+      if (reach === 'reachable') lastReachedAt = ts;
       polledAt = ts;
     })();
     try { await polling; } finally { polling = null; }
@@ -321,11 +360,13 @@ export function createCluster({
       keySet: Boolean(key), keyProblem: problem,
       statusKeySet: Boolean(status.key), statusKeyProblem: status.problem,
       problems: cfg.problems,
-      polledAt, intervalMs,
+      polledAt, intervalMs, reach, lastReachedAt,
+      jobLog: [...jobLog.values()].reverse(),
       summary: {
         nodes: list.length,
         up: list.filter((n) => n.up).length,
         down: list.filter((n) => n.up === false).length,
+        gateways: cfg.nodes.filter((n) => nodes.get(n.name)?.hasGateway).length,
         gatewaysHealthy: list.filter((n) => n.gateway?.healthy).length,
         gpus: gpus.length,
         gpusBusy: gpus.filter((g) => (g.utilPct ?? 0) >= BUSY_UTIL_PCT).length,

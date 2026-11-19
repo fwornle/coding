@@ -96,6 +96,40 @@ const OUTCOME: Record<Outcome, { label: string; cls: string; dot: string }> = {
   routed: { label: 'routed', cls: 'text-status-info border-status-info-line bg-status-info-subtle', dot: 'bg-status-info' },
 }
 
+/**
+ * What a history card is on the cluster, given by the Cluster page (a card off the cluster has none):
+ * LLM work in faint blues — offloaded calls, agents configured with a cluster model, LLM jobs —,
+ * any other job in faint green; a call an adapter served keeps its colour and gets a dashed frame.
+ */
+export type CardKind = 'offload' | 'agent' | 'llm-job' | 'other-job'
+export interface CardCategory { kind: CardKind; adapter: boolean }
+// cls tints a card faintly; swatch is the same hue, strong enough to read in the legend.
+export const CARD_KIND: Record<CardKind, { label: string; cls: string; swatch: string }> = {
+  offload: { label: 'offload', cls: 'bg-sky-500/10', swatch: 'bg-sky-500/50' },
+  agent: { label: 'agent model', cls: 'bg-indigo-500/10', swatch: 'bg-indigo-500/50' },
+  'llm-job': { label: 'LLM job', cls: 'bg-blue-500/10', swatch: 'bg-blue-500/50' },
+  'other-job': { label: 'non-LLM job', cls: 'bg-emerald-500/10', swatch: 'bg-emerald-500/50' },
+}
+const ADAPTER_FRAME = 'outline-dashed outline-1 -outline-offset-2 outline-indigo-400/70'
+const cardCls = (c: CardCategory | null | undefined) => (c ? cn(CARD_KIND[c.kind].cls, c.adapter && ADAPTER_FRAME) : '')
+
+/** A job the cluster's status services reported, as the job log keeps it. */
+export interface JobCard {
+  id: string; name: string; image: string; status: string; started: string | null; gpu: string | null
+  kind: 'llm' | 'other' | null; node: string; host: string; firstSeen: string; lastSeen: string
+}
+
+function CardLegend() {
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-muted-foreground" data-testid="card-legend">
+      {(Object.keys(CARD_KIND) as CardKind[]).map((k) => (
+        <span key={k} className="flex items-center gap-1"><span className={cn('h-2.5 w-3.5 rounded-sm', CARD_KIND[k].swatch)} />{CARD_KIND[k].label}</span>
+      ))}
+      <span className="flex items-center gap-1"><span className={cn('h-2.5 w-3.5 rounded-sm', ADAPTER_FRAME, 'outline-offset-0')} />with adapter</span>
+    </div>
+  )
+}
+
 export function OutcomeBadge({ outcome }: { outcome: Outcome }) {
   const o = OUTCOME[outcome]
   return <span className={cn('inline-flex items-center rounded border px-1.5 py-0 text-[10px] font-medium', o.cls)}>{o.label}</span>
@@ -144,9 +178,15 @@ export interface RoutingHistoryProps {
   /** only rows served by this host (a node tile clicked) */
   hostFilter?: string | null
   onClearHost?: () => void
+  /** what each card is on the cluster (the Cluster page); without it cards are not tinted */
+  categoryOf?: (r: RoutingRow) => CardCategory | null
+  /** the cluster's jobs, merged into the compact list by when they were last seen */
+  jobs?: JobCard[]
 }
 
-export function RoutingHistory({ hours, onHours, view, error, compact, nodeOf, onHoverHost, hostFilter, onClearHost }: RoutingHistoryProps) {
+type Item = { at: string; row: RoutingRow; job?: undefined } | { at: string; job: JobCard; row?: undefined }
+
+export function RoutingHistory({ hours, onHours, view, error, compact, nodeOf, onHoverHost, hostFilter, onClearHost, categoryOf, jobs }: RoutingHistoryProps) {
   const [filter, setFilter] = useState<Filter>('all')
   const [open, setOpen] = useState<string | null>(null)
   const rows = useMemo(() => (view?.rows ?? []).filter((r) => {
@@ -155,6 +195,12 @@ export function RoutingHistory({ hours, onHours, view, error, compact, nodeOf, o
     if (filter === 'not') return r.outcome !== 'offloaded'
     return true
   }), [view, filter, hostFilter])
+  // Jobs are no routing decisions: only "All" shows them, between the calls by time.
+  const items = useMemo<Item[]>(() => {
+    const list: Item[] = rows.map((row) => ({ at: row.ts, row }))
+    if (filter === 'all') for (const job of jobs ?? []) if (!hostFilter || job.host === hostFilter) list.push({ at: job.lastSeen, job })
+    return list.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+  }, [rows, jobs, filter, hostFilter])
   const c = view?.counts
   const latency = useMemo(() => {
     const ms = (view?.rows ?? []).filter((r) => r.outcome === 'offloaded' && r.latencyMs != null).map((r) => r.latencyMs as number).sort((a, b) => a - b)
@@ -196,6 +242,7 @@ export function RoutingHistory({ hours, onHours, view, error, compact, nodeOf, o
           ))}
         </div>
       )}
+      {compact && categoryOf && <CardLegend />}
       {latency != null && (
         <div className="text-[11px] text-muted-foreground">Median latency of offloaded calls: <span className="tabular-nums text-foreground">{fmtMs(latency)}</span></div>
       )}
@@ -210,32 +257,66 @@ export function RoutingHistory({ hours, onHours, view, error, compact, nodeOf, o
       {view && !view.available && (
         <div className="text-xs text-muted-foreground">This token database has no routing columns yet — decisions are recorded from the next offloaded call on.</div>
       )}
-      {view?.available && rows.length === 0 && (
+      {view?.available && items.length === 0 && (
         <div className="rounded-md border border-dashed p-4 text-xs text-muted-foreground">
           No routing decisions in this window{hostFilter ? ' for this node' : ''}. The router decides only for agents offload is switched on for (the Offload pill, top right).
         </div>
       )}
       {!view && !error && <div className="text-xs text-muted-foreground">Loading…</div>}
 
-      {rows.length > 0 && compact && (
+      {items.length > 0 && compact && (
         <ul className="max-h-[calc(100vh-22rem)] divide-y overflow-auto rounded-md border text-xs">
-          {rows.map((r) => {
+          {items.map(({ row: r, job }) => {
+            if (job) {
+              const c: CardCategory = { kind: job.kind === 'llm' ? 'llm-job' : 'other-job', adapter: false }
+              return (
+                <li
+                  key={`job:${job.node}/${job.id || job.name}`}
+                  data-testid="history-job"
+                  data-kind={c.kind}
+                  onMouseEnter={() => onHoverHost?.(job.host)}
+                  onMouseLeave={() => onHoverHost?.(null)}
+                  className={cn('space-y-0.5 px-2.5 py-2', cardCls(c))}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[11px] text-muted-foreground">{clock(job.lastSeen)}</span>
+                    <span className="rounded border px-1.5 text-[10px] font-medium">job</span>
+                    <span className="truncate text-muted-foreground">{job.status}</span>
+                    <span className="ml-auto text-[10px] text-muted-foreground">{CARD_KIND[c.kind].label}</span>
+                  </div>
+                  <div className="flex items-baseline gap-1.5 font-mono">
+                    <span className="truncate">{job.name || job.id}</span>
+                    <span className="text-muted-foreground">@</span>
+                    <span className="font-medium">{job.node}</span>
+                  </div>
+                  <div className="flex gap-2 text-[10px] text-muted-foreground">
+                    <span className="truncate font-mono">{job.image}</span>
+                    <span className="ml-auto shrink-0">{job.gpu != null ? `GPU ${job.gpu} · ` : ''}seen since {clock(job.firstSeen)}</span>
+                  </div>
+                </li>
+              )
+            }
             const id = rowId(r)
             const node = r.host ? nodeOf?.(r.host) : undefined
             const why = whyOf(r)
             const expanded = open === id
+            const c = categoryOf?.(r) ?? null
             return (
               <li
                 key={id}
+                data-testid="history-call"
+                data-kind={c?.kind ?? ''}
+                data-adapter={c?.adapter ? 'true' : undefined}
                 onMouseEnter={() => onHoverHost?.(r.outcome === 'offloaded' ? r.host : null)}
                 onMouseLeave={() => onHoverHost?.(null)}
                 onClick={() => setOpen(expanded ? null : id)}
-                className={cn('cursor-pointer space-y-0.5 px-2.5 py-2 hover:bg-muted/40', node && r.outcome === 'offloaded' && 'bg-status-success-subtle')}
+                className={cn('cursor-pointer space-y-0.5 px-2.5 py-2 hover:bg-muted/40', cardCls(c))}
               >
                 <div className="flex items-center gap-2">
                   <span className="font-mono text-[11px] text-muted-foreground">{clock(r.ts)}</span>
                   <OutcomeBadge outcome={r.outcome} />
                   <span className="truncate text-muted-foreground">{r.agent}</span>
+                  {c && <span className="text-[10px] text-muted-foreground">{CARD_KIND[c.kind].label}{c.adapter ? ' · adapter' : ''}</span>}
                   <span className="ml-auto tabular-nums">{fmtMs(r.latencyMs)}</span>
                 </div>
                 <div className="flex items-baseline gap-1.5 font-mono">

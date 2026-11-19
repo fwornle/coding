@@ -1,19 +1,22 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Activity, Cpu, Server, Boxes, Radio } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Activity, Cpu, Server, Boxes, Radio, X } from 'lucide-react'
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { cn } from '@/lib/utils'
-import { RoutingHistory, useRouting, type RoutingRow } from './routing'
+import { useIsDark } from '@/lib/colors'
+import { RoutingHistory, useRouting, type CardCategory, type JobCard, type RoutingRow } from './routing'
 
 /**
- * The Cluster page: a GPU cluster's nodes at a glance — the daemon's /api/cluster
- * (lib/glass/cluster.mjs). Shown only when ~/.glass/cluster.json exists (the tab's
- * gate is useClusterConfigured). Each tile is one node: its gateway, the models it
- * serves, its GPUs, its CPU and RAM, and the job on them; the side panel is the routing history, and
- * a call a node's gateway answered lights that node.
+ * The Cluster page: a GPU cluster's nodes at a glance — /api/cluster (lib/glass/cluster.mjs,
+ * served by glass's daemon, or by coding's observations API). Each tile is one node: its
+ * gateway, the models it serves, its GPUs, its CPU and RAM, and the job on them. A clicked
+ * tile opens over the grid with its charts at full size. The side panel is the history: the
+ * routing decisions and the cluster's jobs, tinted by what each is; a call a node's gateway
+ * answered lights that node.
  */
 
 interface Gpu { index: number | null; name: string; utilPct: number | null; memUsedMib: number | null; memTotalMib: number | null; tempC: number | null }
 interface Host { cpuCount: number | null; cpuPct: number | null; load: (number | null)[] | null; memTotalMib: number | null; memUsedMib: number | null; memAvailableMib: number | null }
-interface Job { id: string; name: string; image: string; status: string; started: string | null; gpu: string | null }
+interface Job { id: string; name: string; image: string; status: string; started: string | null; gpu: string | null; kind?: 'llm' | 'other' | null }
 interface Sample { ts: string; up: boolean; utilPct: number | null; memPct: number | null; cpuPct?: number | null; ramPct?: number | null; latencyMs: number | null }
 interface NodeView {
   name: string
@@ -21,7 +24,7 @@ interface NodeView {
   up: boolean | null
   lastSeen: string | null
   gateway: { endpoint: string; reachable: boolean; healthy: boolean; status: string; backends: Record<string, boolean>; latencyMs: number | null; error: string } | null
-  models: { ids: string[]; error: string } | null
+  models: { ids: string[]; adapters?: string[]; error: string } | null
   status: { state: 'ok' | 'absent' | 'unauthorized' | 'error' | 'no-key'; error: string; ts: string | null; gpus: Gpu[]; host?: Host | null; jobs: Job[]; endpoints: { port: number; process: string }[] } | null
   history: Sample[]
 }
@@ -36,7 +39,10 @@ export interface ClusterView {
   statusKeyProblem?: string
   polledAt?: string | null
   intervalMs?: number
-  summary?: { nodes: number; up: number; down: number; gatewaysHealthy: number; gpus: number; gpusBusy: number; jobs: number; statusServices: number }
+  reach?: 'reachable' | 'nodes-down' | 'unreachable' | null
+  lastReachedAt?: string | null
+  jobLog?: JobCard[]
+  summary?: { nodes: number; up: number; down: number; gateways?: number; gatewaysHealthy: number; gpus: number; gpusBusy: number; jobs: number; statusServices: number }
   nodes?: NodeView[]
 }
 
@@ -81,19 +87,22 @@ const ago = (iso: string | null | undefined) => {
   return `${Math.round(s / 3600)} h ago`
 }
 
-type Health = 'ok' | 'degraded' | 'down' | 'unknown'
+type Health = 'ok' | 'degraded' | 'nogateway' | 'down' | 'unknown'
 const healthOf = (n: NodeView): Health => {
   if (n.up == null) return 'unknown'
   if (!n.up) return 'down'
-  return n.gateway?.healthy ? 'ok' : 'degraded'
+  // Up through its status service alone: a node that runs no gateway, not a failing one.
+  if (!n.gateway?.reachable) return 'nogateway'
+  return n.gateway.healthy ? 'ok' : 'degraded'
 }
 const DOT: Record<Health, string> = {
   ok: 'bg-status-success shadow-[0_0_6px_var(--st-success-fg)]',
   degraded: 'bg-status-warning',
+  nogateway: 'bg-status-info',
   down: 'bg-status-error',
   unknown: 'bg-muted-foreground/50',
 }
-const HEALTH_LABEL: Record<Health, string> = { ok: 'gateway healthy', degraded: 'up, no live backend', down: 'not reachable', unknown: 'not polled yet' }
+const HEALTH_LABEL: Record<Health, string> = { ok: 'gateway healthy', degraded: 'up, no live backend', nogateway: 'no gateway', down: 'not reachable', unknown: 'not polled yet' }
 
 /** A small SVG trace of values 0–100 (null = a gap). */
 function Sparkline({ values, className, max = 100 }: { values: (number | null)[]; className?: string; max?: number }) {
@@ -167,7 +176,7 @@ function NodeTile({ n, served, lit, selected, onSelect }: { n: NodeView; served:
             <span className="font-mono text-sm font-semibold">{n.name}</span>
             {served > 0 && <span className="rounded bg-status-success-subtle px-1.5 text-[10px] font-medium text-status-success" title="calls this node's gateway answered in the routing window">{served} routed</span>}
           </div>
-          <div className="truncate font-mono text-[10px] text-muted-foreground">{n.gateway?.endpoint ?? n.host}</div>
+          <div className="truncate font-mono text-[10px] text-muted-foreground">{health === 'nogateway' ? n.host : n.gateway?.endpoint ?? n.host}</div>
         </div>
       </div>
 
@@ -215,8 +224,9 @@ function NodeTile({ n, served, lit, selected, onSelect }: { n: NodeView; served:
         {(n.models?.ids ?? []).map((m) => (
           <span key={m} className="max-w-full truncate rounded border px-1 font-mono text-[10px]">{m}</span>
         ))}
-        {/* Without the gateway key the page's banner says it once; a tile names only its own trouble. */}
-        {n.models && n.models.ids.length === 0 && n.up && n.models.error !== 'no gateway key' && <span className="text-[10px] text-muted-foreground">{n.models.error || 'no models'}</span>}
+        {/* Without the gateway key the page's banner says it once; a tile names only its own trouble —
+            and a node with no gateway has no models to fail, so its footer says it once. */}
+        {n.models && n.models.ids.length === 0 && n.up && health !== 'nogateway' && n.models.error !== 'no gateway key' &&<span className="text-[10px] text-muted-foreground">{n.models.error || 'no models'}</span>}
       </div>
 
       {jobs.length > 0 && (
@@ -232,6 +242,135 @@ function NodeTile({ n, served, lit, selected, onSelect }: { n: NodeView; served:
         <span>seen {ago(n.lastSeen)}</span>
       </div>
     </button>
+  )
+}
+
+// Seconds while the window is short: minute ticks would repeat one another.
+const timeTick = (spanMs: number) => (ms: number) => new Date(ms).toLocaleTimeString([], spanMs < 15 * 60_000
+  ? { hour: '2-digit', minute: '2-digit', second: '2-digit' } : { hour: '2-digit', minute: '2-digit' })
+
+/** One metric over the node's history, with a time axis and a labelled value axis. */
+function NodeChart({ title, points, unit, max, color, testId }: {
+  title: string; points: { t: number; v: number | null }[]; unit: string; max?: number; color: string; testId: string
+}) {
+  const isDark = useIsDark()
+  const axis = { grid: isDark ? '#2f2f2c' : '#e7e7e4', tick: isDark ? '#9c9c96' : '#6b6b66', surface: isDark ? '#1a1a19' : '#ffffff' }
+  const has = points.some((p) => p.v != null)
+  const spanMs = points.length > 1 ? points[points.length - 1].t - points[0].t : 0
+  return (
+    <div className="rounded-lg border bg-card p-3" data-testid={testId}>
+      <div className="mb-1 text-xs font-medium">{title}</div>
+      {has ? (
+        <ResponsiveContainer width="100%" height={190}>
+          <LineChart data={points} margin={{ top: 4, right: 12, bottom: 18, left: 4 }}>
+            <CartesianGrid stroke={axis.grid} strokeDasharray="3 3" />
+            <XAxis
+              dataKey="t" type="number" scale="time" domain={['dataMin', 'dataMax']} tickFormatter={timeTick(spanMs)} minTickGap={48}
+              tick={{ fill: axis.tick, fontSize: 10 }} tickLine={false} axisLine={{ stroke: axis.grid }}
+              label={{ value: 'time', position: 'insideBottom', offset: -12, fill: axis.tick, fontSize: 10 }}
+            />
+            <YAxis
+              domain={max != null ? [0, max] : [0, 'auto']} width={52}
+              tick={{ fill: axis.tick, fontSize: 10 }} tickLine={false} axisLine={{ stroke: axis.grid }}
+              label={{ value: unit, angle: -90, position: 'insideLeft', offset: 10, fill: axis.tick, fontSize: 10 }}
+            />
+            <Tooltip
+              contentStyle={{ background: axis.surface, border: `1px solid ${axis.grid}`, fontSize: 11 }}
+              labelFormatter={(t) => new Date(Number(t)).toLocaleTimeString()}
+              formatter={(v) => [`${v} ${unit}`, title]}
+            />
+            {/* Straight segments between samples: a smoothed curve would draw values never measured. */}
+            <Line type="linear" dataKey="v" stroke={color} strokeWidth={1.75} dot={false} isAnimationActive={false} connectNulls={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      ) : (
+        <div className="flex h-[190px] items-center justify-center text-xs text-muted-foreground">no samples yet</div>
+      )}
+    </div>
+  )
+}
+
+/** A clicked node, over the grid: what it is, its charts at full size, its jobs and ports. */
+function NodeDetail({ n, onClose }: { n: NodeView; onClose: () => void }) {
+  const health = healthOf(n)
+  const st = n.status?.state === 'ok' ? n.status : null
+  const at = (s: Sample) => Date.parse(s.ts)
+  const series = (pick: (s: Sample) => number | null | undefined) => n.history.map((s) => ({ t: at(s), v: s.up ? pick(s) ?? null : null }))
+  const hasGpu = (st?.gpus.length ?? 0) > 0 || n.history.some((s) => s.utilPct != null)
+  const span = n.history.length > 1 ? Math.round((at(n.history[n.history.length - 1]) - at(n.history[0])) / 60_000) : 0
+  const adapters = new Set(n.models?.adapters ?? [])
+  return (
+    <section className="space-y-3 rounded-lg border bg-card p-4" data-testid={`cluster-detail-${n.name}`}>
+      <div className="flex items-start gap-3">
+        <span className={cn('mt-2 h-2.5 w-2.5 shrink-0 rounded-full', DOT[health])} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-x-3">
+            <h2 className="font-mono text-lg font-semibold">{n.name}</h2>
+            <span className="font-mono text-xs text-muted-foreground">{n.host}</span>
+            <span className="text-xs text-muted-foreground">{health === 'down' ? (n.gateway?.error || 'not reachable') : HEALTH_LABEL[health]} · seen {ago(n.lastSeen)}</span>
+          </div>
+          <div className="text-[11px] text-muted-foreground">
+            {span > 0 ? `the last ${span} min, sampled every 15 s while this page is open` : 'collecting samples — every 15 s while this page is open'}
+          </div>
+        </div>
+        <button onClick={onClose} className="flex items-center gap-1 rounded border px-2 py-1 text-xs text-muted-foreground hover:bg-muted" data-testid="cluster-detail-close">
+          <X className="h-3.5 w-3.5" />all nodes
+        </button>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        {hasGpu && <NodeChart testId="chart-gpu" title="GPU utilisation" unit="%" max={100} color="#22c55e" points={series((s) => s.utilPct)} />}
+        {hasGpu && <NodeChart testId="chart-vram" title="GPU memory used" unit="%" max={100} color="#3b82f6" points={series((s) => s.memPct)} />}
+        <NodeChart testId="chart-cpu" title="CPU busy" unit="%" max={100} color="#f59e0b" points={series((s) => s.cpuPct)} />
+        <NodeChart testId="chart-ram" title="RAM used" unit="%" max={100} color="#a855f7" points={series((s) => s.ramPct)} />
+        {(n.gateway?.reachable || n.history.some((s) => s.latencyMs != null)) && (
+          <NodeChart testId="chart-latency" title="Gateway /health latency" unit="ms" color="#06b6d4" points={series((s) => s.latencyMs)} />
+        )}
+      </div>
+
+      <div className="grid gap-3 text-xs md:grid-cols-3">
+        <div className="space-y-1 rounded-md border p-2.5">
+          <div className="font-medium">Hardware</div>
+          {(st?.gpus ?? []).map((g, i) => (
+            <div key={i} className="text-muted-foreground">
+              {g.name || `GPU ${g.index ?? i}`} · {g.memTotalMib ? `${Math.round((g.memUsedMib ?? 0) / 1024)}/${Math.round(g.memTotalMib / 1024)} GiB` : '—'}{g.tempC != null ? ` · ${Math.round(g.tempC)}°C` : ''}
+            </div>
+          ))}
+          {st?.host && (
+            <div className="text-muted-foreground">
+              {st.host.cpuCount ?? '?'} cores · load {st.host.load?.map((l) => (l == null ? '—' : l.toFixed(1))).join(' / ')} · RAM {Math.round((st.host.memUsedMib ?? 0) / 1024)}/{Math.round((st.host.memTotalMib ?? 0) / 1024)} GiB
+            </div>
+          )}
+          {!st && <div className="text-muted-foreground">{n.status ? STATUS_NOTE[n.status.state] ?? n.status.error : 'no status yet'}</div>}
+        </div>
+        <div className="space-y-1 rounded-md border p-2.5">
+          <div className="font-medium">Gateway {n.gateway?.reachable ? <span className="font-mono font-normal text-muted-foreground">{n.gateway.endpoint}</span> : null}</div>
+          {!n.gateway?.reachable && <div className="text-muted-foreground">no gateway on this node</div>}
+          {Object.entries(n.gateway?.backends ?? {}).map(([u, ok]) => (
+            <div key={u} className="flex items-center gap-1.5 font-mono text-[11px]">
+              <span className={cn('h-1.5 w-1.5 rounded-full', ok ? 'bg-status-success' : 'bg-status-error')} />{u}
+            </div>
+          ))}
+          <div className="flex flex-wrap gap-1 pt-1">
+            {(n.models?.ids ?? []).map((m) => (
+              <span key={m} className={cn('rounded border px-1 font-mono text-[10px]', adapters.has(m) && 'border-dashed border-indigo-400/70')} title={adapters.has(m) ? 'adapter' : 'base model'}>{m}</span>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-1 rounded-md border p-2.5">
+          <div className="font-medium">Jobs</div>
+          {(st?.jobs ?? []).length === 0 && <div className="text-muted-foreground">none reported</div>}
+          {(st?.jobs ?? []).map((j) => (
+            <div key={j.id || j.name} className="text-muted-foreground">
+              <span className="font-medium text-foreground">{j.name || j.id}</span> · {j.status}{j.gpu != null ? ` · GPU ${j.gpu}` : ''}{j.started ? ` · ${ago(j.started)}` : ''}
+            </div>
+          ))}
+          {(st?.endpoints ?? []).length > 0 && (
+            <div className="pt-1 text-[11px] text-muted-foreground">listening: {st!.endpoints.map((e) => `${e.port}${e.process && e.process !== 'unknown' ? ` (${e.process})` : ''}`).join(', ')}</div>
+          )}
+        </div>
+      </div>
+    </section>
   )
 }
 
@@ -282,12 +421,21 @@ export function ClusterPage() {
   const served = useMemo(() => servedByHost(routing.view?.rows ?? []), [routing.view])
   const s = view?.summary
   const beat = useMemo(() => heartbeat(nodes), [nodes])
+  const offNet = view?.reach === 'unreachable'
+  const detail = selected ? nodes.find((n) => n.host === selected) ?? null : null
+  const adapters = useMemo(() => new Set(nodes.flatMap((n) => n.models?.adapters ?? [])), [nodes])
+  // A card is cluster work when a node's gateway answered it: offloaded by the router, else an
+  // agent configured with a cluster model; either may be served by an adapter.
+  const categoryOf = useCallback((r: RoutingRow): CardCategory | null => {
+    if (!r.host || !byHost.has(r.host)) return null
+    return { kind: r.outcome === 'offloaded' ? 'offload' : 'agent', adapter: adapters.has(r.model) }
+  }, [byHost, adapters])
 
   if (view && !view.configured) {
     return (
       <div className="p-6 space-y-2" data-testid="cluster-tab">
         <h1 className="text-2xl font-bold">Cluster</h1>
-        <p className="text-sm text-muted-foreground">No cluster is configured: glass reads <code>~/.glass/cluster.json</code> (and, optionally, <code>cluster.key</code> and <code>cluster-status.key</code>).</p>
+        <p className="text-sm text-muted-foreground">No cluster is configured on this machine: the page reads the node list from <code>~/.glass/cluster.json</code> (and, optionally, the keys <code>cluster.key</code> and <code>cluster-status.key</code> beside it).</p>
         {view.problems?.map((p) => <p key={p} className="text-sm text-destructive">{p}</p>)}
       </div>
     )
@@ -321,10 +469,29 @@ export function ClusterPage() {
       )}
       {view?.problems?.map((p) => <div key={p} className="text-xs text-status-warning">cluster.json: {p}</div>)}
 
-      {s && (
+      {/* From outside the cluster's network every tile would only repeat stale facts: say so once instead. */}
+      {offNet && (
+        <div className="rounded-lg border border-status-warning-line bg-status-warning-subtle px-4 py-3 text-sm" data-testid="cluster-unreachable">
+          <div className="font-medium text-status-warning">The cluster is not reachable from this machine</div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            None of the {s?.nodes ?? nodes.length} nodes answered and none refused a connection: no request found a route. The cluster is on-prem
+            — it is reachable only inside the corporate network or over VPN. Connect, and this page fills in on its next poll.
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {view?.lastReachedAt ? <>Last reached {ago(view.lastReachedAt)}.</> : <>Not reached since glass started.</>} Checking again every {Math.round((view?.intervalMs ?? POLL_MS) / 1000)} s.
+          </p>
+        </div>
+      )}
+      {view?.reach === 'nodes-down' && (
+        <div className="rounded-md border border-status-error-line bg-status-error-subtle px-3 py-2 text-xs text-status-error" data-testid="cluster-nodes-down">
+          The cluster&apos;s network is reachable, but no node answers on its gateway or status port.
+        </div>
+      )}
+
+      {s && !offNet && (
         <div className="grid grid-cols-2 gap-2 md:grid-cols-5">
           <Stat icon={Server} label="Nodes up" value={s.up} of={s.nodes} tone={s.down ? 'text-status-warning' : 'text-status-success'} />
-          <Stat icon={Activity} label="Gateways healthy" value={s.gatewaysHealthy} of={s.nodes} />
+          <Stat icon={Activity} label="Gateways healthy" value={s.gatewaysHealthy} of={s.gateways ?? s.nodes} />
           <Stat icon={Cpu} label="GPUs busy" value={s.gpusBusy} of={s.gpus} />
           <Stat icon={Boxes} label="Active jobs" value={s.jobs} />
           <Stat icon={Radio} label="Status services" value={s.statusServices} of={s.nodes} />
@@ -334,7 +501,8 @@ export function ClusterPage() {
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
         <div className="grid content-start gap-3 [grid-template-columns:repeat(auto-fill,minmax(210px,1fr))]">
           {!view && !error && <div className="text-sm text-muted-foreground">Polling the nodes…</div>}
-          {nodes.map((n) => (
+          {!offNet && detail && <div className="col-span-full"><NodeDetail n={detail} onClose={() => setSelected(null)} /></div>}
+          {!offNet && !detail && nodes.map((n) => (
             <NodeTile
               key={n.name}
               n={n}
@@ -360,6 +528,8 @@ export function ClusterPage() {
             onHoverHost={setHoverHost}
             hostFilter={selected}
             onClearHost={() => setSelected(null)}
+            categoryOf={categoryOf}
+            jobs={offNet ? [] : view?.jobLog}
           />
         </aside>
       </div>

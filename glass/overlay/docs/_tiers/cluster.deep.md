@@ -34,12 +34,47 @@ Only while someone looks. The page's first read starts the poller; it polls ever
 and stops by itself two minutes after the last read. A closed page means no traffic to the
 cluster. The tab's own check (`/api/cluster?peek=1`) reads `cluster.json` and nothing else.
 
+## Whether the cluster can be reached at all
+
+Each poll ends with a verdict, `reach` in `/api/cluster`, and the time of the last
+`reachable` poll, `lastReachedAt`:
+
+| `reach` | When | The page |
+|---|---|---|
+| `reachable` | at least one node answered | the tiles |
+| `nodes-down` | none answered, but a host refused a connection: the network path exists | the tiles, under a banner that no node answers |
+| `unreachable` | none answered and none refused: every request timed out or found no route | one notice — *not reachable from this machine*, last reached — and no tiles |
+
+`unreachable` is what an on-prem cluster looks like from outside its network (off VPN).
+The page polls on, and fills in with the first poll that reaches a node.
+
+## What a history card is
+
+| Card | When | Colour |
+|---|---|---|
+| offload | a routing row with `offloaded` whose host is a node | faint sky blue |
+| agent model | any other routing row whose host is a node | faint indigo |
+| … with adapter | the row's model is one a node's gateway lists with a `parent` (its base model) | the same colour, dashed frame |
+| LLM job | a job a status service reports with `kind: "llm"` | faint blue |
+| non-LLM job | a job with `kind: "other"`, or no kind | faint green |
+
+A routing row counts as `offloaded` only when a provider other than the agent's own
+answered; a row whose offload target failed and whose own provider answered is `fell back`.
+
+Jobs come from the job log (`jobLog` in `/api/cluster`): every job a status service
+reported while the page was open, with when it was first and last seen — at most 200,
+in memory only.
+
+**Gateways healthy** counts out of the nodes whose gateway has answered at least once
+since the daemon started (`summary.gateways`), so a node without a gateway does not count,
+and losing the network does not shrink the count.
+
 `host` is optional: a status service from before it was added sends none, and the tile then
 shows the GPUs only. RAM used is total minus available, so page cache the kernel can drop
 counts as free.
 
-The daemon keeps the last 40 samples per node (10 minutes) in memory for the sparklines —
-nothing about the cluster is written to disk.
+The daemon keeps the last 240 samples per node (an hour at 15 s) in memory for the
+sparklines and a clicked node's charts — nothing about the cluster is written to disk.
 
 ## The files
 
