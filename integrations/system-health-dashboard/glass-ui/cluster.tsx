@@ -3,7 +3,7 @@ import { Activity, Cpu, Server, Boxes, Radio, X } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { cn } from '@/lib/utils'
 import { useIsDark } from '@/lib/colors'
-import { RoutingHistory, useRouting, type CardCategory, type JobCard, type RoutingRow } from './routing'
+import { RoutingHistory, useEscape, useRouting, type CardCategory, type JobCard, type RoutingRow } from './routing'
 
 /**
  * The Cluster page: a GPU cluster's nodes at a glance — /api/cluster (lib/glass/cluster.mjs,
@@ -416,6 +416,8 @@ export function ClusterPage() {
   const routing = useRouting(hours)
   const [hoverHost, setHoverHost] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  const closeNode = useCallback(() => setSelected(null), [])
+  useEscape(selected !== null, closeNode)
   const nodes = useMemo(() => view?.nodes ?? [], [view])
   const byHost = useMemo(() => new Map(nodes.map((n) => [n.host, n.name])), [nodes])
   const served = useMemo(() => servedByHost(routing.view?.rows ?? []), [routing.view])

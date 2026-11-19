@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useOffload } from './offload'
 
@@ -186,9 +186,29 @@ export interface RoutingHistoryProps {
 
 type Item = { at: string; row: RoutingRow; job?: undefined } | { at: string; job: JobCard; row?: undefined }
 
+/**
+ * ESC closes what is open while `active`. One press closes one thing: a `first` handler runs in
+ * the capture phase and marks the key handled, so an expanded history card closes before the
+ * node view around it. An open dialog keeps ESC for itself.
+ */
+export function useEscape(active: boolean, onEscape: () => void, first = false) {
+  useEffect(() => {
+    if (!active) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || document.querySelector('[role="dialog"]')) return
+      e.preventDefault()
+      onEscape()
+    }
+    window.addEventListener('keydown', onKey, first)
+    return () => window.removeEventListener('keydown', onKey, first)
+  }, [active, onEscape, first])
+}
+
 export function RoutingHistory({ hours, onHours, view, error, compact, nodeOf, onHoverHost, hostFilter, onClearHost, categoryOf, jobs }: RoutingHistoryProps) {
   const [filter, setFilter] = useState<Filter>('all')
   const [open, setOpen] = useState<string | null>(null)
+  const collapse = useCallback(() => setOpen(null), [])
+  useEscape(open !== null, collapse, true)
   const rows = useMemo(() => (view?.rows ?? []).filter((r) => {
     if (hostFilter && r.host !== hostFilter) return false
     if (filter === 'offloaded') return r.outcome === 'offloaded'
