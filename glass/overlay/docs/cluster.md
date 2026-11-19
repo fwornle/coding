@@ -20,20 +20,35 @@ follow every call the offload router sent there, kept back, or let fall back.
     !!! note "Screenshot to come"
         `images/ui-cluster.png` — the node grid, the summary row and the Routing panel.
 
-    - **Summary** — nodes up, gateways healthy, GPUs busy, active jobs, status services; the
-      trace top right is the share of nodes up at each poll (the cluster's heartbeat).
+    - **Summary** — nodes up, gateways healthy (out of the nodes that run a gateway), GPUs
+      busy, active jobs, status services; the trace top right is the share of nodes up at each
+      poll (the cluster's heartbeat).
+    - **Outside the cluster's network** — an on-prem cluster answers only inside the corporate
+      network or over VPN. When no node answers and none refuses a connection, the page says
+      *the cluster is not reachable from this machine* and when it was last reached, instead
+      of showing tiles of stale facts.
     - **A node tile** — its name and gateway endpoint (`host:port`), a status dot (green:
-      gateway healthy, amber: up but no live backend, red: not reachable), GPU utilisation and
+      gateway healthy, amber: up but no live backend, blue: no gateway — the node answers
+      through its status service only, red: not reachable), GPU utilisation and
       memory bars, the host's CPU load and RAM bars, a sparkline (GPU utilisation, or CPU load
       on a node without a GPU driver), the models its gateway serves, the job on it, and when it
       was last seen.
-    - **Routing panel** — the calls the offload router handled. Hover a row and the node that
-      answered it lights up; click a tile to show only that node's calls.
+    - **A clicked node** — opens over the grid: GPU utilisation, GPU memory, CPU and RAM (and
+      the gateway's latency) as charts with time and value axes, over the last hour the page
+      was open; its hardware, gateway backends, models (an adapter framed dashed) and jobs.
+      **all nodes** goes back.
+    - **History panel** — the calls the offload router handled and the jobs the nodes
+      reported, newest first. A card's faint background says what it is on the cluster:
+      blues for LLM work — *offload* (the router sent the call), *agent model* (an agent
+      configured with a cluster model), *LLM job* — and green for a *non-LLM job*; a call an
+      adapter served keeps its colour with a dashed frame. A call no node served has no tint.
+      Hover a card and its node lights up; click a tile to show only that node's cards.
 
     ## Set it up
 
-    Whoever has the cluster's credentials writes up to three files into `~/.glass` (a
-    devcontainer does it from its `.env`):
+    The Cluster page rests entirely on files in `~/.glass` on your own machine: glass ships
+    no node list and no keys. Whoever has the cluster's credentials writes up to three files
+    there (a devcontainer does it from its `.env`):
 
     ```json title="~/.glass/cluster.json"
     { "nodes": [{ "name": "node1", "host": "192.0.2.10" }, { "name": "node2", "host": "192.0.2.11" }],

@@ -289,6 +289,8 @@ class SystemHealthAPIServer {
             '/api/ukb/processes',
             '/api/ukb/status',
             '/api/health',
+            '/api/cluster',
+            '/api/routing',
         ]);
         this.app.use((req, res, next) => {
             if (!HOT_POLL_PATHS.has(req.path)) {
@@ -593,6 +595,22 @@ class SystemHealthAPIServer {
                  res.status(502).json({ error: 'kgbench API (vkb-server) unreachable', details: err.message });
              }
          });
+
+         // Cluster tab — the on-prem cluster's nodes and the routing history beside them. Read
+         // on the host by obs-api (lib/cluster/cluster-routes.mjs): the nodes answer only on the
+         // corporate network, and the routing rows are in the host's token database. The node
+         // poll waits on up to 3 s per node, hence the timeout above a plain read's.
+         for (const route of ['/api/cluster', '/api/routing']) {
+             this.app.get(route, async (req, res) => {
+                 try {
+                     const qs = new URLSearchParams(req.query).toString();
+                     const resp = await fetch(`http://host.docker.internal:12436${route}${qs ? '?' + qs : ''}`, { signal: AbortSignal.timeout(20_000) });
+                     res.status(resp.status).json(await resp.json());
+                 } catch (err) {
+                     res.status(502).json({ error: 'cluster API (obs-api) unreachable', details: err.message });
+                 }
+             });
+         }
 
          // Observations API (Phase 23)
         this.app.get('/api/observations', this.handleGetObservations.bind(this));

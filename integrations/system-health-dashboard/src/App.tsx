@@ -17,6 +17,7 @@ import { initializeWorkflowConfig } from './store/slices/workflowConfigSlice'
 import { fetchFeatures } from './store/slices/featuresSlice'
 import { FeaturesPage } from './pages/features'
 import { TeamsPage } from './pages/teams'
+import { ClusterPage } from './pages/cluster'
 import { gated } from './components/feature-disabled'
 
 const GatedSessions = gated('lsl', 'Verbatim session transcripts are not being recorded, so there are no sessions to list.', LslSessionsPage)
@@ -53,6 +54,7 @@ function AppContent() {
         <Route path="/coverage" element={<GatedCoverage />} />
         <Route path="/token-usage" element={<GatedTokenUsage />} />
         <Route path="/performance" element={<GatedPerformance />} />
+        <Route path="/cluster" element={<ClusterPage />} />
         <Route path="/features" element={<FeaturesPage />} />
         <Route path="/teams" element={<GatedTeams />} />
         {/* Fullscreen whole-run timeline (D-02) — routed child of Performance. */}

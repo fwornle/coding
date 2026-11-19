@@ -48,7 +48,10 @@ export function routingRowOf(r) {
   const from = String(r.offloaded_from || '');
   const reason = String(trail?.offloadSkipped || '');
   let outcome = 'routed';
-  if (from) outcome = 'offloaded';
+  // Offloaded only when something other than the agent's own provider answered: coding's
+  // proxy also stamps offloaded_from on a call whose offload target failed and that its own
+  // provider then answered (offloaded_from = provider) — that call fell back.
+  if (from && from !== String(r.provider || '')) outcome = 'offloaded';
   else if (attempts.length) outcome = 'failed';
   else if (reason) outcome = 'kept';
   const upstream = hostPortOf(r.upstream);

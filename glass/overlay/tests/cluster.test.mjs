@@ -133,7 +133,85 @@ test('aggregation: up/down, gateway health, models, GPUs, jobs, an absent status
   assert.equal(cNode.gateway.reachable, false);
   assert.equal(cNode.lastSeen, null);
 
-  assert.deepEqual(v.summary, { nodes: 3, up: 2, down: 1, gatewaysHealthy: 1, gpus: 1, gpusBusy: 1, jobs: 1, statusServices: 1 });
+  assert.deepEqual(v.summary, { nodes: 3, up: 2, down: 1, gateways: 2, gatewaysHealthy: 1, gpus: 1, gpusBusy: 1, jobs: 1, statusServices: 1 });
+});
+
+test('a node whose gateway once answered keeps counting among the gateways when it goes silent', async () => {
+  const home = tmpHome();
+  writeCfg(home, CFG);
+  let offline = false;
+  const online = stubFetch();
+  const c = createCluster({ home, fetch: (url, init) => (offline ? refused() : online(url, init)), timeoutMs: 500 });
+  assert.equal((await c.read()).summary.gateways, 2);
+  offline = true;
+  await c.poll();
+  const s = c.view().summary;
+  c.stop();
+  assert.equal(s.up, 0);
+  assert.equal(s.gatewaysHealthy, 0);
+  assert.equal(s.gateways, 2, 'losing the network shows 0 / 2, not 0 / 0');
+});
+
+test('a model whose /v1/models entry names a parent is an adapter; a base model is not', async () => {
+  const home = tmpHome();
+  writeCfg(home, { nodes: [CFG.nodes[0]] });
+  writeKeys(home);
+  const online = stubFetch();
+  const fetch = async (url, init) => (url.endsWith('/v1/models')
+    ? res(200, { data: [{ id: 'qwen-base', parent: null }, { id: 'qwen-lora-ab', parent: 'qwen-base' }] })
+    : online(url, init));
+  const v = await createCluster({ home, fetch, timeoutMs: 500 }).read();
+  assert.deepEqual(v.nodes[0].models.ids, ['qwen-base', 'qwen-lora-ab']);
+  assert.deepEqual(v.nodes[0].models.adapters, ['qwen-lora-ab']);
+});
+
+test('the job log keeps every job seen, newest first, with when it was first and last seen', async () => {
+  const home = tmpHome();
+  writeCfg(home, CFG);
+  writeKeys(home);
+  let t = Date.parse('2026-11-19T10:00:00Z');
+  const c = createCluster({ home, fetch: stubFetch(), timeoutMs: 500, now: () => t });
+  await c.read();
+  t += 15_000;
+  await c.poll();
+  const v = c.view();
+  c.stop();
+  assert.equal(v.jobLog.length, 1, 'the same job on the same node is one entry');
+  const j = v.jobLog[0];
+  assert.equal(j.node, 'a');
+  assert.equal(j.name, 'train');
+  assert.equal(j.kind, null, 'a status service that does not say what kind leaves it open');
+  assert.equal(j.firstSeen, '2026-11-19T10:00:00.000Z');
+  assert.equal(j.lastSeen, '2026-11-19T10:00:15.000Z');
+});
+
+test('normalizeStatus passes a job\'s kind through only when it is llm or other', () => {
+  const s = normalizeStatus({ jobs: [{ id: '1', kind: 'llm' }, { id: '2', kind: 'other' }, { id: '3', kind: 'gpu' }] });
+  assert.deepEqual(s.jobs.map((j) => j.kind), ['llm', 'other', null]);
+});
+
+test('reach: reachable while a node answers; nodes-down when hosts refuse; unreachable when nothing answers at all', async () => {
+  const home = tmpHome();
+  writeCfg(home, CFG);
+  writeKeys(home);
+  const noRoute = () => { const e = new TypeError('fetch failed'); e.cause = { code: 'EHOSTUNREACH' }; throw e; };
+  let mode = 'online';
+  const online = stubFetch();
+  const c = createCluster({ home, fetch: (url, init) => (mode === 'online' ? online(url, init) : mode === 'refused' ? refused() : noRoute()), timeoutMs: 500 });
+  const first = await c.read();
+  assert.equal(first.reach, 'reachable');
+  assert.equal(first.lastReachedAt, first.polledAt);
+
+  mode = 'refused';
+  await c.poll();
+  assert.equal(c.view().reach, 'nodes-down', 'a refused connection means the network path is there');
+
+  mode = 'offline';
+  await c.poll();
+  const v = c.view();
+  c.stop();
+  assert.equal(v.reach, 'unreachable');
+  assert.equal(v.lastReachedAt, first.polledAt, 'when it was last reached is kept');
 });
 
 test('without either key only /health is read, and the view says so', async () => {
