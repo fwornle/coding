@@ -5,6 +5,8 @@ const config: Config = {
   content: [
     './index.html',
     './src/**/*.{js,ts,jsx,tsx}',
+    // The Cluster tab renders glass's page (src/pages/cluster.tsx): its classes live there.
+    './glass-ui/**/*.{ts,tsx}',
   ],
   theme: {
     extend: {

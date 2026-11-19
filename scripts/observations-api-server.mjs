@@ -89,6 +89,7 @@ import { ExperimentApi } from '../lib/experiments/experiment-api.mjs';
 import { writeProjectUsage } from '../lib/usage/project-usage.mjs';
 import UserHashGenerator from '../src/live-logging/user-hash-generator.js';
 import { registerKgbenchRoutes } from '../lib/experiments/kgbench-routes.mjs';
+import { registerClusterRoutes } from '../lib/cluster/cluster-routes.mjs';
 // One derivation, two drivers — the CLI at scripts/enrich-entity-sources.mjs
 // drives these same pure helpers over HTTP. Importing is side-effect-free: the
 // script's main() is behind an argv guard.
@@ -2250,6 +2251,9 @@ registerKgbenchRoutes(app, {
   logger: console,
 });
 process.stderr.write('[obs-api] /api/experiments + /api/kgbench routes mounted\n');
+// The Cluster tab: polled from here because the nodes are reached from the host, not the container.
+registerClusterRoutes(app, { log: (line) => process.stderr.write(`[obs-api] ${line}\n`) });
+process.stderr.write('[obs-api] /api/cluster + /api/routing routes mounted\n');
 
 // ── Insight documents ──────────────────────────────────────────────────────
 //
