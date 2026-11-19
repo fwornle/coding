@@ -126,6 +126,7 @@ function CardLegend() {
         <span key={k} className="flex items-center gap-1"><span className={cn('h-2.5 w-3.5 rounded-sm', CARD_KIND[k].swatch)} />{CARD_KIND[k].label}</span>
       ))}
       <span className="flex items-center gap-1"><span className={cn('h-2.5 w-3.5 rounded-sm', ADAPTER_FRAME, 'outline-offset-0')} />with adapter</span>
+      <span className="basis-full">Only cluster work is coloured: calls a node's gateway answered, and the nodes' jobs.</span>
     </div>
   )
 }
