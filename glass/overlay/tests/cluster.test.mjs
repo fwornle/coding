@@ -89,7 +89,14 @@ test('normalizeClusterConfig keeps valid nodes, names the bad ones, defaults the
   assert.equal(n.gatewayPort, 8000);
   assert.equal(n.statusPort, 8099);
   assert.equal(n.problems.length, 2);
+  assert.equal(n.name, '');
   assert.equal(normalizeClusterConfig({}).configured, false);
+});
+
+test('normalizeClusterConfig keeps a short cluster name for the title', () => {
+  const nodes = [{ name: 'a', host: '192.0.2.1' }];
+  assert.equal(normalizeClusterConfig({ name: ' Turing ', nodes }).name, 'Turing');
+  assert.equal(normalizeClusterConfig({ name: 'x'.repeat(65), nodes }).name, '');
 });
 
 test('each key goes only to its own service — gateway key to /v1/models, status key to /status — never to /health, never in the view', async () => {

@@ -35,6 +35,7 @@ export interface NodeView {
 }
 export interface ClusterView {
   configured: boolean
+  name?: string
   problems?: string[]
   gatewayPort?: number
   statusPort?: number
@@ -501,7 +502,7 @@ export function ClusterPage() {
           two lines whenever the poll label's width changed. */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 lg:flex-1">
-          <h1 className="text-2xl font-bold">Cluster</h1>
+          <h1 className="text-2xl font-bold">{view?.name ? `Cluster ${view.name}` : 'Cluster'}</h1>
           <p className="text-sm text-muted-foreground">
             Every node&apos;s gateway, the models it serves, its GPUs, CPU, RAM and jobs — read over HTTP every {Math.round((view?.intervalMs ?? POLL_MS) / 1000)} s while this page is open.
           </p>
