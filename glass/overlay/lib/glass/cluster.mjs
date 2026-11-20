@@ -10,16 +10,16 @@
 //
 //   cluster.json   { "nodes": [{ "name": "node1", "host": "192.0.2.10" }, …],
 //                    "gatewayPort": 8000, "statusPort": 8099 }
-//   cluster.key          the gateways' API key, alone and owner-only (as offload.key):
-//                        sent only to /v1/models
-//   cluster-status.key   the status services' key, a separate secret, alone and
-//                        owner-only: sent only to /status
+//   .env           owner-only (keys.mjs):
+//                    CLUSTER_OPS_KEY   the gateways' key: sent only to /v1/models
+//                    CLUSTER_MON_KEY   the status services' key, a separate secret:
+//                                      sent only to /status
 //   Either may be absent (that request is skipped); neither is ever logged or returned.
 //
 // Per node, in parallel, each with a short timeout:
 //   GET http://<host>:<gatewayPort>/health       no key: { status, backends: { url: bool } } (503 = no live backend)
-//   GET http://<host>:<gatewayPort>/v1/models    cluster.key: the model ids the gateway serves
-//   GET http://<host>:<statusPort>/status        cluster-status.key: GPUs, CPU and RAM, jobs, endpoints (optional — a
+//   GET http://<host>:<gatewayPort>/v1/models    CLUSTER_OPS_KEY: the model ids the gateway serves
+//   GET http://<host>:<statusPort>/status        CLUSTER_MON_KEY: GPUs, CPU and RAM, jobs, endpoints (optional — a
 //                                                node without the service says so)
 // then, for each port in MODEL_SERVER_PORTS the status service reports listening (other than
 // the gateway and status ports):
@@ -33,6 +33,8 @@
 // every fact here is an HTTP answer.
 import fs from 'node:fs';
 import path from 'node:path';
+
+import { createKeyStore } from './keys.mjs';
 
 export const CLUSTER_POLL_MS = 15_000;
 /** Ports where a node's status endpoints are asked whether they serve models; at most MAX_SERVERS per node. */
@@ -71,10 +73,11 @@ export function normalizeClusterConfig(raw) {
   };
 }
 
-/** cluster.json and the two key files in `home`, each re-read on every poll. */
+/** cluster.json and its two keys in `home`'s .env, each re-read on every poll. */
 export function createClusterStore(home, { platform = process.platform } = {}) {
   const file = path.join(home, 'cluster.json');
-  const keyFiles = { gateway: path.join(home, 'cluster.key'), status: path.join(home, 'cluster-status.key') };
+  const keys = createKeyStore(home, { platform });
+  const which = { gateway: 'ops', status: 'mon' };
   const stat = (f) => { try { return fs.statSync(f); } catch { return null; } };
   let cached = null;
   let cachedMtime = -1;
@@ -92,33 +95,16 @@ export function createClusterStore(home, { platform = process.platform } = {}) {
     return cached;
   }
 
-  /**
-   * The key, or '' — with why when there is a file that cannot be used. A key file
-   * other users can read is refused (POSIX only; Windows has no such mode bits):
-   * the devcontainer and `chmod 600` both make it owner-only.
-   */
-  function readKey(which = 'gateway') {
-    const f = keyFiles[which];
-    const name = path.basename(f);
-    const s = stat(f);
-    if (!s) return { key: '', problem: '' };
-    if (platform !== 'win32' && (s.mode & 0o077)) return { key: '', problem: `${name} is readable by other users — make it owner-only (chmod 600)` };
-    try { return { key: fs.readFileSync(f, 'utf8').trim(), problem: '' }; } catch { return { key: '', problem: `${name} cannot be read` }; }
+  /** The key, or '' — with why when .env cannot be used (keys.mjs). */
+  function readKey(kind = 'gateway') {
+    const { key, problem } = keys.read(which[kind]);
+    return { key, problem };
   }
 
-  /** Writes a key owner-only ('' removes it); true when one is set. Offload's settings write cluster.key. */
-  function writeKey(which, key) {
-    const f = keyFiles[which];
-    const k = String(key || '').trim();
-    if (!k) { try { fs.rmSync(f); } catch { /* none */ } return false; }
-    fs.mkdirSync(home, { recursive: true });
-    const tmp = `${f}.${process.pid}.tmp`;
-    fs.writeFileSync(tmp, `${k}\n`, { mode: 0o600 });
-    fs.renameSync(tmp, f);
-    return true;
-  }
+  /** Writes a key into .env owner-only ('' removes it); true when one is set. Offload's settings write CLUSTER_OPS_KEY. */
+  const writeKey = (kind, key) => keys.write(which[kind], key);
 
-  return { getConfig, readKey, writeKey, file, keyFiles };
+  return { getConfig, readKey, writeKey, file, keys };
 }
 
 /**
@@ -223,7 +209,7 @@ export async function probeNode(node, { fetch, key = '', statusKey = '', gateway
   let modelView = { ids: [], adapters: [], error: noKey };
   if (models) {
     if (models.error) modelView = { ids: [], adapters: [], error: models.error };
-    else if (models.status === 401 || models.status === 403) modelView = { ids: [], adapters: [], error: 'the gateway refused cluster.key' };
+    else if (models.status === 401 || models.status === 403) modelView = { ids: [], adapters: [], error: 'the gateway refused CLUSTER_OPS_KEY' };
     else if (models.status !== 200) modelView = { ids: [], adapters: [], error: `HTTP ${models.status}` };
     else {
       const data = (Array.isArray(models.body?.data) ? models.body.data : []).slice(0, 32);
@@ -240,7 +226,7 @@ export async function probeNode(node, { fetch, key = '', statusKey = '', gateway
   let statusView = { state: 'no-key', error: noStatusKey, ts: null, gpus: [], host: null, jobs: [], endpoints: [], gateway: null };
   if (status) {
     if (status.error) statusView = { ...statusView, state: 'absent', error: status.error };
-    else if (status.status === 401 || status.status === 403) statusView = { ...statusView, state: 'unauthorized', error: 'the status service refused cluster-status.key' };
+    else if (status.status === 401 || status.status === 403) statusView = { ...statusView, state: 'unauthorized', error: 'the status service refused CLUSTER_MON_KEY' };
     else if (status.status !== 200) statusView = { ...statusView, state: 'error', error: `HTTP ${status.status}` };
     else statusView = { state: 'ok', error: '', ...normalizeStatus(status.body) };
   }

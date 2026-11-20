@@ -37,8 +37,8 @@ export interface OffloadConfig {
 export interface OffloadView {
   config: OffloadConfig
   keySet: boolean
-  /** where the key lives: cluster.key when the target is one of cluster.json's gateways, else offload.key */
-  keyFile?: 'cluster.key' | 'offload.key'
+  /** the ~/.glass/.env variable holding the key: CLUSTER_OPS_KEY when the target is one of cluster.json's gateways, else OFFLOAD_KEY */
+  keyFile?: 'CLUSTER_OPS_KEY' | 'OFFLOAD_KEY'
   keyProblem?: string
   health: { url: string; reachable: boolean; checkedAt: number; latencyMs: number; models: string[]; error: string; current: boolean }
   counters: { offloaded: number; fellBack: number; classified: number; downgraded: number }
@@ -90,7 +90,8 @@ interface Ctx {
   isTarget: (provider: string, upstream?: string) => boolean
 }
 
-const OffloadContext = createContext<Ctx>({
+/** Exported so a dashboard with its own offload settings (coding's) can supply openSettings. */
+export const OffloadContext = createContext<Ctx>({
   view: null, error: '', openSettings: () => {}, patch: async () => {}, isTarget: () => false,
 })
 export const useOffload = () => useContext(OffloadContext)
@@ -289,9 +290,9 @@ function OffloadDialog({ open, onOpenChange, view, onSaved }: {
               </span>
             )}
             <span className="ml-auto text-muted-foreground">
-              {view.keyFile === 'cluster.key'
-                ? 'a cluster gateway: the key is cluster.key, shared with the Cluster page — owner-only, never shown again'
-                : 'the key is kept in your glass home, owner-only, never shown again'}
+              {view.keyFile === 'CLUSTER_OPS_KEY'
+                ? 'a cluster gateway: the key is CLUSTER_OPS_KEY in ~/.glass/.env, shared with the Cluster page — owner-only, never shown again'
+                : 'the key is OFFLOAD_KEY in ~/.glass/.env, owner-only, never shown again'}
             </span>
           </div>
           {view.keyProblem && <div className="text-xs text-amber-600 dark:text-amber-400">{view.keyProblem}</div>}

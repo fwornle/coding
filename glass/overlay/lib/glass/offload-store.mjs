@@ -1,13 +1,15 @@
 // lib/glass/offload-store.mjs — the opt-in offload's settings, owner-only, in GLASS_HOME.
 //
 //   offload.json   what the UI / `glass offload` set (normalizeOffloadConfig shape)
-//   offload.key    the endpoint's API key, alone, so no read of the settings can carry it
+//   .env           the endpoint's key (keys.mjs), apart from the settings so no read
+//                  of them can carry it
 //
-// One secret, one file: when the target is a gateway of the cluster in cluster.json
-// (a node's host on its gatewayPort), the key is cluster.key — the Cluster page's
-// key for the same gateways — and offload.key is not used. A leftover offload.key
-// is folded into it: moved when cluster.key is missing, removed when it holds the
-// same secret, and left in place (and reported) when it holds another.
+// One secret, one name: when the target is a gateway of the cluster in cluster.json
+// (a node's host on its gatewayPort), the key is CLUSTER_OPS_KEY — the Cluster page's
+// key for the same gateways — and OFFLOAD_KEY, which is for any other endpoint, is not
+// used. A leftover OFFLOAD_KEY is folded into it: moved when CLUSTER_OPS_KEY is unset,
+// removed when it holds the same secret, and left in place (and reported) when it
+// holds another.
 //
 // Read per call through an mtime check: the UI's PATCH and a hand edit of the file
 // both apply to the next model call — no daemon restart, no agent relaunch. Nothing
@@ -16,6 +18,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { normalizeOffloadConfig } from '../../proxy/proxy-bridge/offload.mjs';
+import { createKeyStore, KEY_NAMES } from './keys.mjs';
 
 /** Whether `url` is a gateway of the cluster `c` (createClusterStore().getConfig()). */
 export function isClusterGateway(url, c) {
@@ -30,7 +33,7 @@ export function isClusterGateway(url, c) {
 /** @param {{ cluster?: ReturnType<import('./cluster.mjs').createClusterStore> }} [o] */
 export function createOffloadStore(home, { cluster = null } = {}) {
   const file = path.join(home, 'offload.json');
-  const keyFile = path.join(home, 'offload.key');
+  const keys = cluster?.keys ?? createKeyStore(home);
   let cached = null;
   let cachedMtime = -1;
 
@@ -68,41 +71,32 @@ export function createOffloadStore(home, { cluster = null } = {}) {
     return next;
   }
 
-  const readOwn = () => { try { return fs.readFileSync(keyFile, 'utf8').trim(); } catch { return ''; } };
-  const removeOwn = () => { try { fs.rmSync(keyFile); } catch { /* none */ } };
+  /** 'ops' when the target is one of cluster.json's gateways, else 'offload'. */
+  const keySource = () => (cluster && isClusterGateway(getConfig().target.url, cluster.getConfig()) ? 'ops' : 'offload');
 
-  /** 'cluster' when the target is one of cluster.json's gateways, else 'offload'. */
-  const keySource = () => (cluster && isClusterGateway(getConfig().target.url, cluster.getConfig()) ? 'cluster' : 'offload');
-
-  /** A leftover offload.key for a cluster target: moved into cluster.key, or dropped as a copy. */
+  /** A leftover OFFLOAD_KEY for a cluster target: moved into CLUSTER_OPS_KEY, or dropped as a copy. */
   function fold() {
-    const own = readOwn();
-    if (!own) return '';
-    const c = cluster.readKey('gateway');
+    const own = keys.read('offload');
+    if (!own.key) return '';
+    const c = keys.read('ops');
     if (c.problem) return '';
-    if (!c.key) { cluster.writeKey('gateway', own); removeOwn(); return ''; }
-    if (c.key === own) { removeOwn(); return ''; }
-    return 'offload.key holds another key than cluster.key and is not used for a cluster gateway — remove it';
+    if (!c.key) { keys.write('ops', own.key); keys.write('offload', ''); return ''; }
+    if (c.key === own.key) { keys.write('offload', ''); return ''; }
+    return `${KEY_NAMES.offload} holds another key than ${KEY_NAMES.ops} and is not used for a cluster gateway — remove it`;
   }
 
-  /** The key the target is called with, which file holds it, and why it cannot be used. */
+  /** The key the target is called with, the variable that holds it, and why it cannot be used. */
   function keyState() {
-    if (keySource() === 'offload') return { key: readOwn(), file: 'offload.key', problem: '' };
-    const leftover = fold();
-    const c = cluster.readKey('gateway');
-    return { key: c.key, file: 'cluster.key', problem: c.problem || leftover };
+    const source = keySource();
+    const leftover = source === 'ops' ? fold() : '';
+    const k = keys.read(source);
+    return { key: k.key, file: k.name, problem: k.problem || leftover };
   }
 
   const getKey = () => keyState().key;
 
-  /** '' removes the key — from the file the target's key lives in. */
-  function setKey(key) {
-    const k = String(key || '').trim();
-    if (keySource() === 'cluster') return cluster.writeKey('gateway', k);
-    if (!k) { removeOwn(); return false; }
-    write(keyFile, `${k}\n`);
-    return true;
-  }
+  /** '' removes the key — from the variable the target's key lives in. */
+  const setKey = (key) => keys.write(keySource(), key);
 
-  return { getConfig, update, getKey, setKey, keyState, hasKey: () => Boolean(getKey()), file, keyFile };
+  return { getConfig, update, getKey, setKey, keyState, hasKey: () => Boolean(getKey()), file, keyFile: keys.file };
 }

@@ -274,7 +274,7 @@ export async function startDaemon({
   });
 
   // ── opt-in offload ──
-  // One store of cluster.json and its keys, shared: offload to a cluster gateway uses cluster.key.
+  // One store of cluster.json and its keys, shared: offload to a cluster gateway uses CLUSTER_OPS_KEY.
   const clusterStore = createClusterStore(home);
   const offloadStore = createOffloadStore(home, { cluster: clusterStore });
   // Job classes (job-classes.mjs): off until the user switches labelling on; then

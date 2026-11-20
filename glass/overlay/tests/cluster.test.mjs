@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 const { createCluster, createClusterStore, normalizeClusterConfig, normalizeStatus, probeNode, sampleOf } = await import('../lib/glass/cluster.mjs');
+const { createKeyStore, parseEnv, setEnvLine } = await import('../lib/glass/keys.mjs');
 
 // Two separate secrets: the gateways' key and the status services' key.
 const KEY = 'unit-fixture-token';
@@ -19,8 +20,17 @@ const writeSecret = (home, name, value, mode) => {
   fs.writeFileSync(f, `${value}\n`, { mode });
   fs.chmodSync(f, mode);
 };
-const writeKey = (home, mode = 0o600) => writeSecret(home, 'cluster.key', KEY, mode);
-const writeStatusKey = (home, mode = 0o600) => writeSecret(home, 'cluster-status.key', STATUS_KEY, mode);
+// One variable of GLASS_HOME/.env, the rest of the file kept.
+const writeVar = (home, name, value, mode = 0o600) => {
+  const f = path.join(home, '.env');
+  let text = '';
+  try { text = fs.readFileSync(f, 'utf8'); } catch { /* new */ }
+  fs.writeFileSync(f, setEnvLine(text, name, value), { mode });
+  fs.chmodSync(f, mode);
+};
+const readVar = (home, name) => { try { return parseEnv(fs.readFileSync(path.join(home, '.env'), 'utf8'))[name]; } catch { return undefined; } };
+const writeKey = (home, mode = 0o600) => writeVar(home, 'CLUSTER_OPS_KEY', KEY, mode);
+const writeStatusKey = (home, mode = 0o600) => writeVar(home, 'CLUSTER_MON_KEY', STATUS_KEY, mode);
 const writeKeys = (home) => { writeKey(home); writeStatusKey(home); };
 
 const res = (status, body) => ({ status, json: async () => body });
@@ -256,31 +266,18 @@ test('only the status key: /status is read, /v1/models is skipped ("no gateway k
   assert.equal(v.nodes[0].models.error, 'no gateway key');
 });
 
-test('a key file other users can read is refused (POSIX)', { skip: process.platform === 'win32' }, async () => {
-  const home = tmpHome();
-  writeCfg(home, { nodes: [CFG.nodes[0]] });
-  writeKey(home, 0o644);
-  const calls = [];
-  const v = await createCluster({ home, fetch: stubFetch(calls) }).read();
-  assert.equal(v.keySet, false);
-  assert.match(v.keyProblem, /owner-only/);
-  assert.ok(calls.every((x) => x.auth === ''), 'the refused key is sent nowhere');
-  assert.match(createClusterStore(home).readKey('gateway').problem, /chmod 600/);
-});
-
-test('a status key file other users can read is refused on its own; the gateway key still works (POSIX)', { skip: process.platform === 'win32' }, async () => {
+test('a .env other users can read is refused, for both keys (POSIX)', { skip: process.platform === 'win32' }, async () => {
   const home = tmpHome();
   writeCfg(home, { nodes: [CFG.nodes[0]] });
   writeKey(home);
-  writeStatusKey(home, 0o640);
+  writeStatusKey(home, 0o644);
   const calls = [];
   const v = await createCluster({ home, fetch: stubFetch(calls) }).read();
-  assert.equal(v.keySet, true);
+  assert.equal(v.keySet, false);
   assert.equal(v.statusKeySet, false);
-  assert.match(v.statusKeyProblem, /cluster-status\.key is readable by other users/);
-  assert.equal(v.keyProblem, '');
-  assert.ok(!calls.some((x) => x.url.endsWith('/status')), 'the refused status key is sent nowhere');
-  assert.match(v.nodes[0].status.error, /owner-only/);
+  assert.match(v.keyProblem, /\.env is readable by other users/);
+  assert.ok(calls.every((x) => x.auth === ''), 'the refused keys are sent nowhere');
+  assert.match(createClusterStore(home).readKey('gateway').problem, /chmod 600/);
 });
 
 test('a refused key reads as such, not as an outage', async () => {
@@ -288,7 +285,7 @@ test('a refused key reads as such, not as an outage', async () => {
     fetch: stubFetch(), key: 'wrong', statusKey: KEY, gatewayPort: 8000, statusPort: 8099, timeoutMs: 500,
   });
   assert.equal(p.up, true);
-  assert.equal(p.models.error, 'the gateway refused cluster.key');
+  assert.equal(p.models.error, 'the gateway refused CLUSTER_OPS_KEY');
   assert.equal(p.status.state, 'unauthorized');
 });
 
@@ -425,48 +422,88 @@ test('isClusterGateway: a node host on the gateway port, nothing else', () => {
   assert.equal(isClusterGateway('http://192.0.2.10:8000/v1', { configured: false }), false);
 });
 
-test('offload to a cluster gateway uses cluster.key; a leftover offload.key is moved, or dropped as a copy', () => {
-  // moved: no cluster.key yet
+test('offload to a cluster gateway uses CLUSTER_OPS_KEY; a leftover OFFLOAD_KEY is moved, or dropped as a copy', () => {
+  // moved: no CLUSTER_OPS_KEY yet
   let home = offloadHome('http://192.0.2.10:8000/v1');
-  writeSecret(home, 'offload.key', KEY, 0o600);
+  writeVar(home, 'OFFLOAD_KEY', KEY);
   let s = createOffloadStore(home, { cluster: createClusterStore(home) });
-  assert.deepEqual(s.keyState(), { key: KEY, file: 'cluster.key', problem: '' });
-  assert.equal(has(home, 'offload.key'), false);
-  if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(home, 'cluster.key')).mode & 0o777, 0o600);
+  assert.deepEqual(s.keyState(), { key: KEY, file: 'CLUSTER_OPS_KEY', problem: '' });
+  assert.equal(readVar(home, 'OFFLOAD_KEY'), undefined);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(home, '.env')).mode & 0o777, 0o600);
 
   // dropped: the same secret twice
   home = offloadHome('http://192.0.2.10:8000/v1');
   writeKey(home);
-  writeSecret(home, 'offload.key', KEY, 0o600);
+  writeVar(home, 'OFFLOAD_KEY', KEY);
   s = createOffloadStore(home, { cluster: createClusterStore(home) });
   assert.equal(s.getKey(), KEY);
-  assert.equal(has(home, 'offload.key'), false);
+  assert.equal(readVar(home, 'OFFLOAD_KEY'), undefined);
 
-  // kept and reported: another secret, cluster.key wins
+  // kept and reported: another secret, CLUSTER_OPS_KEY wins
+  const other = 'another-fixture-value';
   home = offloadHome('http://192.0.2.10:8000/v1');
   writeKey(home);
-  writeSecret(home, 'offload.key', 'another-fixture-token', 0o600);
+  writeVar(home, 'OFFLOAD_KEY', other);
   s = createOffloadStore(home, { cluster: createClusterStore(home) });
   const st = s.keyState();
   assert.equal(st.key, KEY);
-  assert.match(st.problem, /offload\.key holds another key/);
-  assert.equal(has(home, 'offload.key'), true);
+  assert.match(st.problem, /OFFLOAD_KEY holds another key/);
+  assert.equal(readVar(home, 'OFFLOAD_KEY'), other);
 
-  // the settings' key field writes cluster.key for a cluster target
+  // the settings' key field writes CLUSTER_OPS_KEY for a cluster target
+  const set = 'set-fixture-value';
   home = offloadHome('http://192.0.2.10:8000/v1');
   s = createOffloadStore(home, { cluster: createClusterStore(home) });
-  assert.equal(s.setKey('set-fixture-token'), true);
-  assert.equal(fs.readFileSync(path.join(home, 'cluster.key'), 'utf8'), 'set-fixture-token\n');
-  assert.equal(has(home, 'offload.key'), false);
+  assert.equal(s.setKey(set), true);
+  assert.equal(readVar(home, 'CLUSTER_OPS_KEY'), set);
+  assert.equal(readVar(home, 'OFFLOAD_KEY'), undefined);
   s.setKey('');
-  assert.equal(has(home, 'cluster.key'), false);
+  assert.equal(readVar(home, 'CLUSTER_OPS_KEY'), undefined);
 });
 
-test('offload to an endpoint outside cluster.json keeps its own offload.key', () => {
+test('offload to an endpoint outside cluster.json uses OFFLOAD_KEY', () => {
+  const own = 'endpoint-fixture-value';
   const home = offloadHome('http://198.51.100.7:8000/v1');
   writeKey(home);
-  writeSecret(home, 'offload.key', 'endpoint-fixture-token', 0o600);
+  writeVar(home, 'OFFLOAD_KEY', own);
   const s = createOffloadStore(home, { cluster: createClusterStore(home) });
-  assert.deepEqual(s.keyState(), { key: 'endpoint-fixture-token', file: 'offload.key', problem: '' });
+  assert.deepEqual(s.keyState(), { key: own, file: 'OFFLOAD_KEY', problem: '' });
+  assert.equal(readVar(home, 'CLUSTER_OPS_KEY'), KEY);
+});
+
+// ── GLASS_HOME/.env: one file for the keys, earlier key files moved into it ──
+test('the earlier key files move into .env once: unset → moved, same → removed, other → kept and reported', () => {
+  const home = tmpHome();
+  writeSecret(home, 'cluster.key', KEY, 0o600);
+  writeSecret(home, 'cluster-status.key', STATUS_KEY, 0o600);
+  const keys = createKeyStore(home);
+  assert.deepEqual(keys.read('ops'), { key: KEY, name: 'CLUSTER_OPS_KEY', problem: '' });
+  assert.deepEqual(keys.read('mon'), { key: STATUS_KEY, name: 'CLUSTER_MON_KEY', problem: '' });
+  assert.equal(has(home, 'cluster.key'), false);
+  assert.equal(has(home, 'cluster-status.key'), false);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(path.join(home, '.env')).mode & 0o777, 0o600);
+
+  writeSecret(home, 'cluster.key', KEY, 0o600);
+  assert.equal(keys.read('ops').problem, '');
+  assert.equal(has(home, 'cluster.key'), false, 'a copy of the same key is removed');
+
+  const other = 'another-fixture-value';
+  writeSecret(home, 'cluster.key', other, 0o600);
+  const r = keys.read('ops');
+  assert.equal(r.key, KEY, '.env wins');
+  assert.match(r.problem, /cluster\.key holds another key than CLUSTER_OPS_KEY/);
   assert.equal(has(home, 'cluster.key'), true);
+});
+
+test('writing a key keeps the rest of .env — comments, other variables, order', () => {
+  const home = tmpHome();
+  const f = path.join(home, '.env');
+  fs.writeFileSync(f, '# glass keys\nFOO=bar\nCLUSTER_MON_KEY="quoted"\n', { mode: 0o600 });
+  const keys = createKeyStore(home);
+  assert.equal(keys.read('mon').key, 'quoted');
+  keys.write('ops', KEY);
+  keys.write('mon', STATUS_KEY);
+  assert.equal(fs.readFileSync(f, 'utf8'), `# glass keys\nFOO=bar\nCLUSTER_MON_KEY=${STATUS_KEY}\nCLUSTER_OPS_KEY=${KEY}\n`);
+  keys.write('mon', '');
+  assert.equal(fs.readFileSync(f, 'utf8'), `# glass keys\nFOO=bar\nCLUSTER_OPS_KEY=${KEY}\n`);
 });

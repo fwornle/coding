@@ -76,8 +76,9 @@
 | `~/.glass/logs/daemon.log` | Daemon log |
 | `~/.glass/daemon.json` | Running daemon's pid and port |
 | `~/.glass/run/copilot-quota.json` | GitHub's last month-to-date Copilot figure, and the host it came from |
-| `~/.glass/offload.json`, `offload.key` | [Offload](offload.md) settings and the key of an endpoint outside the cluster (owner-only) |
-| `~/.glass/cluster.json`, `cluster.key`, `cluster-status.key` | [Cluster](cluster.md) nodes and ports; the gateways' key — also offload's, when offload targets a gateway — and the status services' key (each optional, owner-only, refused otherwise) |
+| `~/.glass/offload.json` | [Offload](offload.md) settings (owner-only) |
+| `~/.glass/.env` | the keys, owner-only: `CLUSTER_OPS_KEY` (the [cluster](cluster.md)'s gateways — also offload's, when offload targets a gateway), `CLUSTER_MON_KEY` (the status services), `OFFLOAD_KEY` (an offload endpoint outside the cluster); each optional |
+| `~/.glass/cluster.json` | [Cluster](cluster.md) nodes and ports |
 | `~/.glass/job-classes.json`, `job-classes/` | [Job classes](job-classes.md) settings (owner-only) and a joined team's taxonomy |
 | `~/.glass/cost.json` | Optional: contract discount and FX for the € / $ views ([How cost is calculated](token-usage.md#how-cost-is-calculated)) |
 
