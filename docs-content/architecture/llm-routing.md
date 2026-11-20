@@ -157,6 +157,19 @@ decide where it lands.
     target for this network, the target is switched off, or the target does not serve this kind
     of work. They have different fixes.
 
+    ### The cluster's endpoint and key
+
+    `qwen-local` calls a gateway of the on-prem cluster with **`CLUSTER_OPS_KEY`**. The key
+    belongs to the application that runs the proxy, not to the proxy: coding's launcher
+    (`scripts/llm-proxy-service.sh`) names `coding/.env` as the proxy's env file
+    (`LLM_PROXY_ENV_FILE`), so the key lives there. glass, which runs its own offload, keeps
+    its copy in `~/.glass/.env`. Each installation holds its own copy — rotating the key means
+    setting it in every application that offloads to the cluster.
+
+    Set the endpoint URL and the key in the dashboard: **LLM Routing → Settings → Endpoint**,
+    or **Offload settings** on the Cluster tab (the same dialog). The URL is saved in the
+    routing config; the key is written to `coding/.env` and applies to the next call.
+
     ## When a provider can't serve
 
     `llm-fallback.yaml` gives each provider an ordered list of what to try next:

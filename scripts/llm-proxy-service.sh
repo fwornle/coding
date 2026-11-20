@@ -69,6 +69,10 @@ mkdir -p "$LLM_PROXY_DATA_DIR/llm-proxy/logs" || {
 }
 
 export CODING_REPO="$REPO_ROOT"
+# This instance's settings and secrets (provider keys, CLUSTER_OPS_KEY) live with
+# coding, not in the proxy checkout: the proxy sources the file named here and writes
+# keys set from the dashboard back to it.
+export LLM_PROXY_ENV_FILE="$REPO_ROOT/.env"
 export LLM_PROXY_DATA_DIR
 export LLM_PROXY_PORT="${LLM_PROXY_PORT:-${LLM_CLI_PROXY_PORT:-12435}}"
 
