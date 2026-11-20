@@ -497,14 +497,16 @@ export function ClusterPage() {
 
   return (
     <div className="p-6 space-y-4" data-testid="cluster-tab">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+      {/* The description wraps, not the controls: a flex-wrap row here jumped between one and
+          two lines whenever the poll label's width changed. */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 lg:flex-1">
           <h1 className="text-2xl font-bold">Cluster</h1>
           <p className="text-sm text-muted-foreground">
             Every node&apos;s gateway, the models it serves, its GPUs, CPU, RAM and jobs — read over HTTP every {Math.round((view?.intervalMs ?? POLL_MS) / 1000)} s while this page is open.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-2">
         {/* Offload sends easy calls to a cluster gateway: its endpoint and CLUSTER_OPS_KEY are set here as on the Routing page. */}
         <button type="button" onClick={offload.openSettings} data-testid="cluster-offload-settings"
           className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-2 text-xs hover:bg-muted" title="Offload endpoint, key and bands">
@@ -523,7 +525,7 @@ export function ClusterPage() {
         <div className="flex items-center gap-2 rounded-lg border bg-card px-3 py-2" title="Nodes up per poll">
           <Radio className={cn('h-4 w-4', s && s.up === s.nodes ? 'text-status-success' : s && s.up > 0 ? 'text-status-warning' : 'text-status-error')} />
           <Sparkline values={beat} className="h-6 w-40 text-status-success" />
-          <span className="text-[10px] text-muted-foreground whitespace-nowrap">polled {ago(view?.polledAt)}</span>
+          <span className="w-24 text-right text-[10px] tabular-nums text-muted-foreground whitespace-nowrap">polled {ago(view?.polledAt)}</span>
         </div>
         </div>
       </div>
