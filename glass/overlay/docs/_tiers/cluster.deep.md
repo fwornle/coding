@@ -6,8 +6,8 @@ nodes in parallel:
 | Request | Key | Gives |
 |---|---|---|
 | `GET http://<host>:<gatewayPort>/health` | none | `{ status, backends: { url: bool } }` — 200 healthy, 503 no live backend |
-| `GET http://<host>:<gatewayPort>/v1/models` | `cluster.key` | the model ids the gateway serves |
-| `GET http://<host>:<statusPort>/status` | `cluster-status.key` | GPUs (utilisation, memory, temperature), the host's CPU and RAM, jobs, listening endpoints |
+| `GET http://<host>:<gatewayPort>/v1/models` | `CLUSTER_OPS_KEY` | the model ids the gateway serves |
+| `GET http://<host>:<statusPort>/status` | `CLUSTER_MON_KEY` | GPUs (utilisation, memory, temperature), the host's CPU and RAM, jobs, listening endpoints |
 | `GET http://<host>:<port>/v1/models` | none | for each port 8000–8999 the status service lists as listening (not the gateway or status port, at most 4): a model server running outside the gateway — a llama-server for an experiment — shown with its port and marked *not a gateway*. One that wants a key reads *needs a key*; it never gets one |
 
 Each key goes to its own service only: the gateway key never reaches a status service or a
@@ -17,6 +17,10 @@ says *no gateway key* or *no status key* — so either secret can be handed out 
 A node is **up** when any of the three answers. The status service is optional per node: a
 node without it shows *no status service*, and its tile keeps gateway health and models.
 A refused key reads as *refused the key*, not as an outage.
+
+A model split over two nodes shows on both: the node running llama-server and the gateway
+lists the models, and the node holding the other half of the layers — its status service
+reports the ggml RPC port, 50052, listening — shows *model layers (RPC)*.
 
 The status service answers in this shape (fields beyond it are dropped):
 
@@ -82,8 +86,8 @@ sparklines and a clicked node's charts — nothing about the cluster is written 
 | File | Holds | Rules |
 |---|---|---|
 | `~/.glass/cluster.json` | `nodes` (`name`, `host`), `gatewayPort` (default 8000), `statusPort` (default 8099) | invalid nodes are skipped and named on the page; at most 256 nodes |
-| `~/.glass/cluster.key` | the gateways' API key, alone | sent only to `/v1/models` — and by [offload](offload.md), when its endpoint is one of these gateways |
-| `~/.glass/cluster-status.key` | the status services' key, alone — a separate secret | sent only to `/status` |
+| `~/.glass/.env` `CLUSTER_OPS_KEY` | the gateways' API key | sent only to `/v1/models` — and by [offload](offload.md), when its endpoint is one of these gateways |
+| `~/.glass/.env` `CLUSTER_MON_KEY` | the status services' key — a separate secret | sent only to `/status` |
 
 Both key files are optional and owner-only: one other users can read is **refused**
 (`chmod 600`) and the page names it, while the other key keeps working. Neither is ever

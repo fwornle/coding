@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { cn } from '@/lib/utils'
-import type { ClusterView, NodeView } from './cluster'
+import { holdsLayers, modelName, RPC_PORT, type ClusterView, type NodeView } from './cluster'
 import { hostOf, useOffload } from './offload'
 
 /**
@@ -68,7 +68,7 @@ function Wire({ from, to, label, tone, dashed, at = 0.5 }: {
 }
 
 const gatewayTone = (g: Gateway): Tone => (g.refused ? 'bad' : g.healthy ? 'ok' : 'warn')
-const gatewayNote = (g: Gateway) => (g.refused ? 'refuses cluster.key' : g.healthy ? 'healthy' : 'up, no live backend')
+const gatewayNote = (g: Gateway) => (g.refused ? 'refuses CLUSTER_OPS_KEY' : g.healthy ? 'healthy' : 'up, no live backend')
 
 export function ClusterArchitecture({ view, agentHosts }: { view: ClusterView; agentHosts: Set<string> }) {
   const { view: offload } = useOffload()
@@ -88,6 +88,11 @@ export function ClusterArchitecture({ view, agentHosts }: { view: ClusterView; a
     }),
   })), [nodes, nameOf])
 
+  // Models served without a gateway: a model server on its own port (no key), and the nodes
+  // holding part of a pair's layers over ggml RPC (that pair's gateway is the door, if any).
+  const servers = useMemo(() => nodes.flatMap((n) => (n.servers ?? []).map((sv) => ({ node: n, sv, key: `${n.name}:${sv.port}` }))), [nodes])
+  const layerNodes = useMemo(() => nodes.filter(holdsLayers), [nodes])
+
   const statusUp = nodes.filter((n) => n.status?.state === 'ok').length
   const sshd = nodes.filter((n) => n.status?.state === 'ok' && n.status.endpoints.some((e) => e.port === 22)).length
   const jobs = nodes.reduce((k, n) => k + (n.status?.state === 'ok' ? n.status.jobs.length : 0), 0)
@@ -97,10 +102,13 @@ export function ClusterArchitecture({ view, agentHosts }: { view: ClusterView; a
   const offloadOn = Boolean(oc?.enabled)
   const targetHost = oc?.target.url ? hostOf(oc.target.url) : ''
   const targetGw = gateways.find((g) => g.node.gateway?.endpoint === targetHost)
+  const targetServer = servers.find((x) => `${x.node.host}:${x.sv.port}` === targetHost)
+  // A node of cluster.json on its gateway port whose gateway does not answer: still the cluster's.
+  const targetNode = nodes.find((n) => `${n.host}:${gatewayPort}` === targetHost)
   const offloadAgents = oc ? Object.entries(oc.agents).filter(([, on]) => on).map(([a]) => a) : []
   const offloadTone: Tone = !offloadOn ? 'off' : offload?.health.reachable ? 'ok' : 'bad'
-  // Offload to a cluster gateway uses cluster.key (offload-store.mjs); offload.key is only for an endpoint outside it.
-  const offloadKey = offload?.keyFile ?? 'offload.key'
+  // Offload to a cluster gateway uses CLUSTER_OPS_KEY (offload-store.mjs); OFFLOAD_KEY is only for an endpoint outside it.
+  const offloadKey = offload?.keyFile ?? 'OFFLOAD_KEY'
 
   // Right column, top to bottom: gateways (as tall as their backend lists), an offload target
   // outside the cluster, the status services, SSH.
@@ -111,7 +119,9 @@ export function ClusterArchitecture({ view, agentHosts }: { view: ClusterView; a
     rows.push({ key: g.node.name, y, h })
     y += h + 18
   }
-  const extTarget = offloadOn && targetHost && !targetGw
+  for (const x of servers) { rows.push({ key: x.key, y, h: BOX_H }); y += BOX_H + 18 }
+  for (const n of layerNodes) { rows.push({ key: `${n.name}:${RPC_PORT}`, y, h: BOX_H }); y += BOX_H + 18 }
+  const extTarget = offloadOn && targetHost && !targetGw && !targetServer
   const extY = y
   if (extTarget) y += BOX_H + 18
   const statusY = y
@@ -197,9 +207,31 @@ export function ClusterArchitecture({ view, agentHosts }: { view: ClusterView; a
               </g>
             )
           })}
+          {servers.map((x) => {
+            const r = rowOf(x.key)
+            return (
+              <g key={x.key} data-testid={`arch-server-${x.key}`}>
+                <Box x={GW_X} y={r.y} w={GW_W} dashed tone={x.sv.error ? 'warn' : 'ok'}
+                  title={`${x.node.name} · model server :${x.sv.port}`} sub={x.sv.ids.map(modelName).join(', ') || x.sv.error || 'no models'} />
+                <text x={BE_X} y={r.y + 26} className="fill-muted-foreground text-[11px]">served directly, not through a gateway:</text>
+                <text x={BE_X} y={r.y + 42} className="fill-muted-foreground text-[11px]">no key, no failover — glass only lists it</text>
+              </g>
+            )
+          })}
+          {layerNodes.map((n) => {
+            const r = rowOf(`${n.name}:${RPC_PORT}`)
+            return (
+              <g key={n.name} data-testid={`arch-layers-${n.name}`}>
+                <Box x={GW_X} y={r.y} w={GW_W} dashed tone="ok" title={`${n.name} · model layers :${RPC_PORT}`} sub="ggml RPC, for a llama-server on another node" />
+                <text x={BE_X} y={r.y + 26} className="fill-muted-foreground text-[11px]">half of a pair&apos;s model: called by the</text>
+                <text x={BE_X} y={r.y + 42} className="fill-muted-foreground text-[11px]">llama-server behind the pair&apos;s gateway</text>
+              </g>
+            )
+          })}
           {extTarget && (
             <Box testId="arch-offload-target" x={GW_X} y={extY} w={GW_W} tone={offloadTone}
-              title={`offload endpoint · ${oc!.target.name || 'target'}`} sub={`${targetHost} — not in cluster.json`} />
+              title={`offload endpoint · ${oc!.target.name || 'target'}`}
+              sub={targetNode ? `${targetNode.name} :${gatewayPort} — no gateway answers` : `${targetHost} — not in cluster.json`} />
           )}
           <Box testId="arch-status" x={GW_X} y={statusY} w={GW_W} tone={statusUp ? 'ok' : view.statusKeySet ? 'warn' : 'off'}
             title={`status service :${statusPort}`} sub={`answers on ${statusUp} of ${nodes.length} nodes · read-only`} />
@@ -213,14 +245,15 @@ export function ClusterArchitecture({ view, agentHosts }: { view: ClusterView; a
           {/* The wires, each labelled with the credential it carries. */}
           {offloadOn && targetGw && <Wire from={out(0)} to={[GW_X, mid(rowOf(targetGw.node.name)) - 10]} label={offloadKey} tone={offloadTone} at={0.22} />}
           {extTarget && <Wire from={out(0)} to={[GW_X, extY + BOX_H / 2]} label={offloadKey} tone={offloadTone} at={0.22} />}
+          {offloadOn && targetServer && <Wire from={out(0)} to={[GW_X, mid(rowOf(targetServer.key))]} label={offloadKey} tone={offloadTone} at={0.22} />}
           {agentGws.map((g) => (
             <Wire key={g.node.name} from={out(1)} to={[GW_X, mid(rowOf(g.node.name))]} label="gateway key" tone="ok" at={0.5} />
           ))}
           {gateways.map((g) => (
             <Wire key={g.node.name} from={out(2)} to={[GW_X, mid(rowOf(g.node.name)) + 10]}
-              label="cluster.key" tone={!view.keySet ? 'off' : g.refused ? 'bad' : 'ok'} dashed={!view.keySet} at={0.7} />
+              label="CLUSTER_OPS_KEY" tone={!view.keySet ? 'off' : g.refused ? 'bad' : 'ok'} dashed={!view.keySet} at={0.7} />
           ))}
-          <Wire from={out(2)} to={[GW_X, statusY + BOX_H / 2]} label="cluster-status.key"
+          <Wire from={out(2)} to={[GW_X, statusY + BOX_H / 2]} label="CLUSTER_MON_KEY"
             tone={!view.statusKeySet ? 'off' : statusUp ? 'ok' : 'warn'} dashed={!view.statusKeySet} at={0.62} />
           <Wire from={out(3)} to={[GW_X, sshY + BOX_H / 2]} label="SSH login" tone="off" dashed at={0.5} />
         </svg>
@@ -235,9 +268,10 @@ export function ClusterArchitecture({ view, agentHosts }: { view: ClusterView; a
             </thead>
             <tbody className="align-top [&_td]:py-1 [&_td]:pr-3">
               <tr className="border-t"><td className="font-mono">{offloadKey}</td><td>the proxy, for an offloaded call</td><td className="font-mono">{targetHost || '—'} /chat/completions</td><td>{offload?.keySet ? 'set' : 'not set'}</td></tr>
-              <tr className="border-t"><td className="font-mono">cluster.key</td><td>the Cluster page{offloadKey === 'cluster.key' ? ', and offload' : ''}</td><td className="font-mono">each gateway&apos;s /v1/models</td><td>{view.keySet ? 'set' : 'not set'}</td></tr>
+              <tr className="border-t"><td className="font-mono">CLUSTER_OPS_KEY</td><td>the Cluster page{offloadKey === 'CLUSTER_OPS_KEY' ? ', and offload' : ''}</td><td className="font-mono">each gateway&apos;s /v1/models</td><td>{view.keySet ? 'set' : 'not set'}</td></tr>
               <tr className="border-t"><td className="font-mono">—</td><td>the Cluster page</td><td className="font-mono">each gateway&apos;s /health</td><td>no key</td></tr>
-              <tr className="border-t"><td className="font-mono">cluster-status.key</td><td>the Cluster page</td><td className="font-mono">:{statusPort}/status on every node</td><td>{view.statusKeySet ? 'set' : 'not set'}</td></tr>
+              <tr className="border-t"><td className="font-mono">—</td><td>the Cluster page</td><td className="font-mono">a model server&apos;s /v1/models (ports 8000–8999 a node lists)</td><td>no key</td></tr>
+              <tr className="border-t"><td className="font-mono">CLUSTER_MON_KEY</td><td>the Cluster page</td><td className="font-mono">:{statusPort}/status on every node</td><td>{view.statusKeySet ? 'set' : 'not set'}</td></tr>
               <tr className="border-t"><td>the gateway key</td><td>agents configured with the cluster as a provider</td><td className="font-mono">a gateway&apos;s /v1/*</td><td>in that agent&apos;s config</td></tr>
               <tr className="border-t"><td>an SSH login</td><td>job submitters, outside glass</td><td className="font-mono">sshd :22</td><td>—</td></tr>
             </tbody>
@@ -246,12 +280,18 @@ export function ClusterArchitecture({ view, agentHosts }: { view: ClusterView; a
         <div className="space-y-2 rounded-lg border bg-card p-3 text-xs">
           <h3 className="text-sm font-semibold">Reading it</h3>
           <p className="text-muted-foreground">A gateway is the cluster&apos;s only door for model calls; it checks one key and forwards to its backends. The status service is a separate, read-only door with its own key, so a status viewer holds nothing that can run inference.</p>
+          <p className="text-muted-foreground">glass reads both keys from <span className="font-mono">~/.glass/.env</span>, owner-only: <span className="font-mono">CLUSTER_OPS_KEY</span> for the gateways (and offload to them), <span className="font-mono">CLUSTER_MON_KEY</span> for the status services. <span className="font-medium text-foreground">Offload settings</span>, top right, sets the endpoint and <span className="font-mono">CLUSTER_OPS_KEY</span>.</p>
+          {offloadOn && targetNode && !targetGw && (
+            <p className="rounded-md border border-status-warning-line bg-status-warning-subtle px-2 py-1.5 text-status-warning" data-testid="arch-target-down">
+              Offload points at {targetNode.name}&apos;s gateway :{gatewayPort}, which does not answer: every call goes to its own provider.
+            </p>
+          )}
           {offload?.keyProblem && (
             <p className="rounded-md border border-status-warning-line bg-status-warning-subtle px-2 py-1.5 text-status-warning" data-testid="arch-key-problem">{offload.keyProblem}</p>
           )}
           {gateways.filter((g) => g.refused).map((g) => (
             <p key={g.node.name} className="rounded-md border border-status-error-line bg-status-error-subtle px-2 py-1.5 text-status-error">
-              {g.node.name}&apos;s gateway refuses <span className="font-mono">cluster.key</span>: it was deployed with another key.
+              {g.node.name}&apos;s gateway refuses <span className="font-mono">CLUSTER_OPS_KEY</span>: it was deployed with another key.
             </p>
           ))}
           {offloadOn && targetGw && gateways.length > 1 && (

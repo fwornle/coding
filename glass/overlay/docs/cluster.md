@@ -47,25 +47,30 @@ follow every call the offload router sent there, kept back, or let fall back.
     ## Set it up
 
     The Cluster page rests entirely on files in `~/.glass` on your own machine: glass ships
-    no node list and no keys. Whoever has the cluster's credentials writes up to three files
-    there (a devcontainer does it from its `.env`):
+    no node list and no keys. Whoever has the cluster's credentials writes two files there
+    (a devcontainer does it from its `.env`):
 
     ```json title="~/.glass/cluster.json"
     { "nodes": [{ "name": "node1", "host": "192.0.2.10" }, { "name": "node2", "host": "192.0.2.11" }],
       "gatewayPort": 8000, "statusPort": 8099 }
     ```
 
-    Two keys, two secrets — each optional, each owner-only:
+    Two keys, two secrets — each optional — in one owner-only file:
 
-    ```bash
-    # the gateways' key: lets glass list the models each gateway serves
-    printf '%s\n' "$CLUSTER_API_KEY" > ~/.glass/cluster.key && chmod 600 ~/.glass/cluster.key
+    ```bash title="~/.glass/.env"
+    # the gateways' key: lets glass list the models each gateway serves, and offload to it
+    CLUSTER_OPS_KEY=…
     # the status services' key: lets glass read GPUs, CPU and RAM, jobs and endpoints
-    printf '%s\n' "$CLUSTER_STATUS_KEY" > ~/.glass/cluster-status.key && chmod 600 ~/.glass/cluster-status.key
+    CLUSTER_MON_KEY=…
     ```
 
-    With neither, the page still shows each gateway's health. Open `glass ui` → **Cluster**.
-    No restart: the files are re-read when they change.
+    `chmod 600 ~/.glass/.env` — glass refuses a `.env` other users can read. `CLUSTER_OPS_KEY`
+    can also be set from the page: **Offload settings** (top right) opens the offload dialog,
+    whose API key field writes it when the endpoint is a cluster gateway.
+
+    With neither key, the page still shows each gateway's health. Open `glass ui` → **Cluster**.
+    No restart: the file is re-read when it changes. Key files of earlier set-ups
+    (`cluster.key`, `cluster-status.key`, `offload.key`) are moved into `.env` once.
 
     ## The Routing tab
 

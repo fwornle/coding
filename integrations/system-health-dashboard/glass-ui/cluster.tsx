@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Activity, Cpu, Server, Boxes, Radio, X } from 'lucide-react'
+import { Activity, Cpu, Server, Boxes, Radio, Settings2, X } from 'lucide-react'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { cn } from '@/lib/utils'
 import { useIsDark } from '@/lib/colors'
 import { RoutingHistory, useEscape, useRouting, type CardCategory, type JobCard, type RoutingRow } from './routing'
 import { ClusterArchitecture } from './cluster-architecture'
+import { offloadStatus, TONE_DOT, useOffload } from './offload'
 
 /**
  * The Cluster page: a GPU cluster's nodes at a glance — /api/cluster (lib/glass/cluster.mjs,
@@ -54,8 +55,14 @@ const POLL_MS = 15_000
 
 interface ModelServer { port: number; ids: string[]; error: string }
 // llama-server names a model by its file path; the file name is what tells models apart.
-const modelName = (id: string) => id.split('/').pop() || id
+export const modelName = (id: string) => id.split('/').pop() || id
 const SERVER_TITLE = 'served on this port directly, not through the gateway — no key, no failover'
+
+// A 27B pair splits the model over two nodes: llama-server and the gateway on one, half the
+// layers on the other, served to it by a ggml RPC server — that node serves the model too.
+export const RPC_PORT = 50052
+const RPC_TITLE = `ggml RPC server :${RPC_PORT}: holds part of a model's layers for a llama-server on another node`
+export const holdsLayers = (n: NodeView) => (n.status?.endpoints ?? []).some((e) => e.port === RPC_PORT)
 
 function ServerChips({ servers }: { servers: ModelServer[] }) {
   return <>
@@ -244,6 +251,7 @@ function NodeTile({ n, served, lit, selected, onSelect }: { n: NodeView; served:
           <span key={m} className="max-w-full truncate rounded border px-1 font-mono text-[10px]">{m}</span>
         ))}
         <ServerChips servers={n.servers ?? []} />
+        {holdsLayers(n) && <span className="max-w-full truncate rounded border border-dashed px-1 font-mono text-[10px]" title={RPC_TITLE}><span className="text-muted-foreground">:{RPC_PORT}</span> model layers (RPC)</span>}
         {/* Without the gateway key the page's banner says it once; a tile names only its own trouble —
             and a node with no gateway has no models to fail, so its footer says it once. */}
         {n.models && n.models.ids.length === 0 && n.up && health !== 'nogateway' && n.models.error !== 'no gateway key' &&<span className="text-[10px] text-muted-foreground">{n.models.error || 'no models'}</span>}
@@ -258,7 +266,7 @@ function NodeTile({ n, served, lit, selected, onSelect }: { n: NodeView; served:
       )}
 
       <div className="mt-auto flex justify-between text-[10px] text-muted-foreground">
-        <span>{health === 'down' ? (n.gateway?.error || 'not reachable') : HEALTH_LABEL[health]}{health === 'nogateway' && (n.servers ?? []).length > 0 ? ' · model server' : ''}</span>
+        <span>{health === 'down' ? (n.gateway?.error || 'not reachable') : HEALTH_LABEL[health]}{health === 'nogateway' && (n.servers ?? []).length > 0 ? ' · model server' : ''}{health === 'nogateway' && holdsLayers(n) ? ' · model layers' : ''}</span>
         <span>seen {ago(n.lastSeen)}</span>
       </div>
     </button>
@@ -376,6 +384,12 @@ function NodeDetail({ n, onClose }: { n: NodeView; onClose: () => void }) {
               <span key={m} className={cn('rounded border px-1 font-mono text-[10px]', adapters.has(m) && 'border-dashed border-indigo-400/70')} title={adapters.has(m) ? 'adapter' : 'base model'}>{m}</span>
             ))}
           </div>
+          {holdsLayers(n) && (
+            <div className="space-y-1 border-t pt-1.5">
+              <div className="font-medium">Model layers <span className="font-mono font-normal text-muted-foreground">{n.host}:{RPC_PORT}</span></div>
+              <div className="text-muted-foreground">{RPC_TITLE}</div>
+            </div>
+          )}
           {(n.servers ?? []).map((sv) => (
             <div key={sv.port} className="space-y-1 border-t pt-1.5">
               <div className="font-medium">Model server <span className="font-mono font-normal text-muted-foreground">{n.host}:{sv.port}</span></div>
@@ -452,6 +466,7 @@ export function ClusterPage() {
   const [hoverHost, setHoverHost] = useState<string | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
   const [mode, setMode] = useState<Mode>('nodes')
+  const offload = useOffload()
   const closeNode = useCallback(() => setSelected(null), [])
   useEscape(mode === 'nodes' && selected !== null, closeNode)
   const nodes = useMemo(() => view?.nodes ?? [], [view])
@@ -474,7 +489,7 @@ export function ClusterPage() {
     return (
       <div className="p-6 space-y-2" data-testid="cluster-tab">
         <h1 className="text-2xl font-bold">Cluster</h1>
-        <p className="text-sm text-muted-foreground">No cluster is configured on this machine: the page reads the node list from <code>~/.glass/cluster.json</code> (and, optionally, the keys <code>cluster.key</code> and <code>cluster-status.key</code> beside it).</p>
+        <p className="text-sm text-muted-foreground">No cluster is configured on this machine: the page reads the node list from <code>~/.glass/cluster.json</code> (and, optionally, the keys <code>CLUSTER_OPS_KEY</code> and <code>CLUSTER_MON_KEY</code> from <code>~/.glass/.env</code>).</p>
         {view.problems?.map((p) => <p key={p} className="text-sm text-destructive">{p}</p>)}
       </div>
     )
@@ -490,6 +505,13 @@ export function ClusterPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+        {/* Offload sends easy calls to a cluster gateway: its endpoint and CLUSTER_OPS_KEY are set here as on the Routing page. */}
+        <button type="button" onClick={offload.openSettings} data-testid="cluster-offload-settings"
+          className="flex items-center gap-1.5 rounded-lg border bg-card px-3 py-2 text-xs hover:bg-muted" title="Offload endpoint, key and bands">
+          <Settings2 className="h-3.5 w-3.5" />
+          {offload.view && <span className={cn('h-1.5 w-1.5 rounded-full', TONE_DOT[offloadStatus(offload.view).tone])} />}
+          Offload settings
+        </button>
         <div className="flex rounded-lg border bg-card p-0.5 text-xs" role="tablist" aria-label="Cluster view">
           {(['nodes', 'architecture'] as Mode[]).map((m) => (
             <button key={m} type="button" role="tab" aria-selected={mode === m} data-testid={`cluster-mode-${m}`} onClick={() => setMode(m)}
@@ -512,8 +534,8 @@ export function ClusterPage() {
       ))}
       {view?.configured && ((!view.keySet && !view.keyProblem) || (!view.statusKeySet && !view.statusKeyProblem)) && (
         <div className="rounded-md border px-3 py-2 text-xs text-muted-foreground">
-          {!view.keySet && !view.keyProblem && <div>No <code>cluster.key</code>: the gateways&apos; models are not read.</div>}
-          {!view.statusKeySet && !view.statusKeyProblem && <div>No <code>cluster-status.key</code>: GPUs, CPU, RAM, jobs and endpoints are not read.</div>}
+          {!view.keySet && !view.keyProblem && <div>No <code>CLUSTER_OPS_KEY</code> in <code>~/.glass/.env</code>: the gateways&apos; models are not read.</div>}
+          {!view.statusKeySet && !view.statusKeyProblem && <div>No <code>CLUSTER_MON_KEY</code> in <code>~/.glass/.env</code>: GPUs, CPU, RAM, jobs and endpoints are not read.</div>}
         </div>
       )}
       {view?.problems?.map((p) => <div key={p} className="text-xs text-status-warning">cluster.json: {p}</div>)}

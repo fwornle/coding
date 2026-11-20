@@ -53,7 +53,7 @@ or editor headers. The endpoint key goes to the endpoint only, never to a provid
 | File | Content |
 |---|---|
 | `~/.glass/offload.json` | the settings (owner-only) |
-| `~/.glass/offload.key` | the endpoint key, on its own (owner-only); no API returns it. When the endpoint is a gateway of the [cluster](cluster.md) — a node's host on its `gatewayPort` — the key is `cluster.key` instead: one secret, one file. An `offload.key` left beside it is moved into `cluster.key` when that is missing, removed when it holds the same key, and reported when it holds another |
+| `~/.glass/.env` `OFFLOAD_KEY` | the endpoint key (the file is owner-only); no API returns it. When the endpoint is a gateway of the [cluster](cluster.md) — a node's host on its `gatewayPort` — the key is `CLUSTER_OPS_KEY` instead: one secret, one name. An `OFFLOAD_KEY` left beside it is moved into `CLUSTER_OPS_KEY` when that is unset, removed when it holds the same key, and reported when it holds another |
 
 An endpoint on a private address (loopback, `10.x`, `172.16–31.x`, `192.168.x`, a single
 label or `.local` name) is reached directly; any other through your egress proxy, like the
@@ -75,7 +75,7 @@ The UI's calls, on `http://127.0.0.1:12445`:
 |---|---|
 | `GET /api/offload` | settings (without the key), whether a key is set, reachability, counts |
 | `PATCH /api/offload` | change settings (only the fields sent) |
-| `PUT /api/offload/key` | set (`{"key": "…"}`) or clear (`{"key": ""}`) the key — in `cluster.key` for a cluster gateway, which the Cluster page reads too |
+| `PUT /api/offload/key` | set (`{"key": "…"}`) or clear (`{"key": ""}`) the key — `CLUSTER_OPS_KEY` for a cluster gateway, which the Cluster page reads too, else `OFFLOAD_KEY` |
 | `POST /api/offload/test` | probe the endpoint now |
 
 Writes need the header `x-glass-ui: 1` and a JSON body, and are refused from any other web

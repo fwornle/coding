@@ -31,7 +31,7 @@ They are forwarded, never logged and never stored.
 Only if you switch [offload](offload.md) on, and only for the agents you tick: an easy call's
 request body goes to the endpoint you named, with that endpoint's key — never your agent's
 login or headers. Everything else, and any call the endpoint fails, goes where it went before.
-The endpoint key is kept owner-only in `~/.glass/offload.key` — or in `~/.glass/cluster.key` when the endpoint is a gateway of your cluster — and no API returns it.
+The endpoint key is kept in the owner-only `~/.glass/.env` — as `OFFLOAD_KEY`, or as `CLUSTER_OPS_KEY` when the endpoint is a gateway of your cluster — and no API returns it.
 
 ## With job classes on
 

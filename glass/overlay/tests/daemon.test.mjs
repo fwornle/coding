@@ -453,7 +453,7 @@ test('offload settings: off by default; writes only from the UI; the key is stor
   assert.equal(k.body.keySet, true);
   assert.equal(JSON.stringify((await api('GET', '/api/offload')).body).includes('target-secret'), false);
   if (process.platform !== 'win32') {
-    assert.equal(fs.statSync(path.join(home, 'offload.key')).mode & 0o777, 0o600);
+    assert.equal(fs.statSync(path.join(home, '.env')).mode & 0o777, 0o600);
     assert.equal(fs.statSync(path.join(home, 'offload.json')).mode & 0o777, 0o600);
   }
 });
@@ -614,12 +614,13 @@ test('cluster: hidden without cluster.json; with it, nodes read over HTTP, each 
   });
   await new Promise((r) => st.listen(0, '127.0.0.1', r));
   const statusPort = st.address().port;
+  const envFile = path.join(home, '.env');
+  let envBefore = '';
+  try { envBefore = fs.readFileSync(envFile, 'utf8'); } catch { /* none yet */ }
   try {
     fs.writeFileSync(path.join(home, 'cluster.json'), JSON.stringify({ nodes: [{ name: 'node1', host: '127.0.0.1' }], gatewayPort: gw.address().port, statusPort }));
-    fs.writeFileSync(path.join(home, 'cluster.key'), 'cluster-fixture-token\n', { mode: 0o600 });
-    fs.chmodSync(path.join(home, 'cluster.key'), 0o600);
-    fs.writeFileSync(path.join(home, 'cluster-status.key'), 'status-fixture-token\n', { mode: 0o600 });
-    fs.chmodSync(path.join(home, 'cluster-status.key'), 0o600);
+    fs.writeFileSync(envFile, `${envBefore}CLUSTER_OPS_KEY=cluster-fixture-token\nCLUSTER_MON_KEY=status-fixture-token\n`, { mode: 0o600 });
+    fs.chmodSync(envFile, 0o600);
     assert.deepEqual((await api('GET', '/api/cluster?peek=1')).body, { configured: true });
     assert.equal(seen.length, 0, 'peek polls nothing');
     const { status, body } = await api('GET', '/api/cluster');
@@ -639,8 +640,7 @@ test('cluster: hidden without cluster.json; with it, nodes read over HTTP, each 
     assert.equal((await api('POST', '/api/cluster', {})).status, 405);
   } finally {
     fs.rmSync(path.join(home, 'cluster.json'), { force: true });
-    fs.rmSync(path.join(home, 'cluster.key'), { force: true });
-    fs.rmSync(path.join(home, 'cluster-status.key'), { force: true });
+    fs.writeFileSync(envFile, envBefore, { mode: 0o600 });
     await new Promise((r) => gw.close(r));
     await new Promise((r) => st.close(r));
   }
