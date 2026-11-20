@@ -51,7 +51,7 @@ const BOTH_NETWORKS = () => ({
       id: 'qwen-local',
       base_url: 'http://10.143.242.184:8000/v1',
       model: 'qwen3.8-27b-dual-fast',
-      api_key_env: 'QWEN_LOCAL_API_KEY',
+      api_key_env: 'CLUSTER_OPS_KEY',
       require_network: 'corporate',
       enabled: true,
       timeout_ms: 15000,

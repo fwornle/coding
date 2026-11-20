@@ -62,13 +62,13 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
  * Secrets come from the repo's .env, not from the launchd plist.
  *
  * WHY THIS EXISTS. Backends name an env var to authenticate with
- * (`api_key_env: QWEN_LOCAL_API_KEY`) and askBackend() reads
+ * (`api_key_env: CLUSTER_OPS_KEY`) and askBackend() reads
  * `process.env[that]`. Nothing ever put it there: com.coding.prompt-classifier
  * launches node directly with an `EnvironmentVariables` block containing only
  * PATH, and this module loaded no .env. So the variable was structurally always
  * undefined and the judge could never answer — measured on a live service,
  * `asked: 18, answered: 0, failed: 18`, every one of them
- * "QWEN_LOCAL_API_KEY not set". It failed open, so the caller's own band stood
+ * "CLUSTER_OPS_KEY not set". It failed open, so the caller's own band stood
  * and nothing looked broken from outside; it simply never contributed.
  *
  * The mechanism follows rapid-llm-proxy's bin/start-llm-proxy.sh, whose own
@@ -89,7 +89,7 @@ const ENV_FILE = process.env.CLASSIFIER_ENV_FILE || path.join(REPO, '.env');
 let envFileLoaded = false;
 try {
   // An EMPTY variable counts as set, and loadEnvFile will not replace it — so a
-  // wrapper that exports `QWEN_LOCAL_API_KEY=` (the usual shape of `export
+  // wrapper that exports `CLUSTER_OPS_KEY=` (the usual shape of `export
   // FOO="$FOO"` on an unset FOO) silently defeats this whole mechanism, and the
   // resulting error is the same "not set" as having no .env at all. Found the
   // hard way while proving this change. Nothing legitimately wants an empty
@@ -667,7 +667,7 @@ const server = http.createServer(async (req, res) => {
       // question worth answering is "is it set", and a health endpoint that can
       // leak a bearer token is a worse problem than the one it diagnoses.
       //
-      // Here because "QWEN_LOCAL_API_KEY not set" on its own is unactionable:
+      // Here because "CLUSTER_OPS_KEY not set" on its own is unactionable:
       // the reader's next question is always "not set WHERE", and the answer
       // used to require reading a launchd plist to discover that nothing loaded
       // a .env at all.

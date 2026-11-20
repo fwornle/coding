@@ -4,7 +4,7 @@
  *
  * ── What this file is defending ─────────────────────────────────────────────
  * config/prompt-classifier.yaml lets a backend name the variable it
- * authenticates with (`api_key_env: QWEN_LOCAL_API_KEY`), and askBackend()
+ * authenticates with (`api_key_env: CLUSTER_OPS_KEY`), and askBackend()
  * reads `process.env[that]`. Nothing ever put it there. The launchd job
  * (com.coding.prompt-classifier) execs node directly with an
  * `EnvironmentVariables` block containing only PATH, and the service loaded no
@@ -13,7 +13,7 @@
  * Measured on the live service before the fix:
  *
  *     counts: { asked: 18, answered: 0, failed: 18 }
- *     qwen-local  lastError: "QWEN_LOCAL_API_KEY not set"
+ *     qwen-local  lastError: "CLUSTER_OPS_KEY not set"
  *
  * The judge had never once returned a verdict. It failed open, which is the
  * designed behaviour and exactly why nobody noticed: every caller kept its own
@@ -81,12 +81,12 @@ function startNetwork(mode = 'public') {
  * the .env file under test.
  *
  * `env -u` is not enough here: the ambient shell on a developer machine may
- * export a stale QWEN_LOCAL_API_KEY (one did, during this work), and a test
+ * export a stale CLUSTER_OPS_KEY (one did, during this work), and a test
  * that inherits it would pass while proving nothing.
  */
 async function withService(env, fn) {
   const base = { ...process.env };
-  delete base.QWEN_LOCAL_API_KEY;
+  delete base.CLUSTER_OPS_KEY;
   const child = spawn(process.execPath, [SERVICE], {
     env: {
       ...base,
@@ -138,7 +138,7 @@ describe('the judge reads its bearer token from .env', () => {
       '  - id: qwen-local',
       `    base_url: http://127.0.0.1:${STUB_PORT}/v1`,
       '    model: qwen3.8-27b-dual-fast',
-      '    api_key_env: QWEN_LOCAL_API_KEY',
+      '    api_key_env: CLUSTER_OPS_KEY',
       '    require_network: public',
       '    enabled: true',
       '    timeout_ms: 5000',
@@ -169,7 +169,7 @@ describe('the judge reads its bearer token from .env', () => {
 
   it('THE REGRESSION: a key on disk reaches the wire, and a verdict comes back', async () => {
     const envFile = path.join(tmp, 'with-key.env');
-    fs.writeFileSync(envFile, `QWEN_LOCAL_API_KEY=${KEY}\n`);
+    fs.writeFileSync(envFile, `CLUSTER_OPS_KEY=${KEY}\n`);
     stub.state.auth = undefined;
 
     await withService({ CLASSIFIER_ENV_FILE: envFile }, async () => {
@@ -186,11 +186,11 @@ describe('the judge reads its bearer token from .env', () => {
     // The file must fill a gap, never overwrite a deliberate choice — otherwise
     // a one-off override or a test harness could not steer the service.
     const envFile = path.join(tmp, 'with-key.env');
-    fs.writeFileSync(envFile, `QWEN_LOCAL_API_KEY=${KEY}\n`);
+    fs.writeFileSync(envFile, `CLUSTER_OPS_KEY=${KEY}\n`);
     stub.state.auth = undefined;
 
     await withService(
-      { CLASSIFIER_ENV_FILE: envFile, QWEN_LOCAL_API_KEY: 'explicit-wins' },
+      { CLASSIFIER_ENV_FILE: envFile, CLUSTER_OPS_KEY: 'explicit-wins' },
       async () => {
         await classify();
         assert.equal(stub.state.auth, 'Bearer explicit-wins');
@@ -200,16 +200,16 @@ describe('the judge reads its bearer token from .env', () => {
 
   it('an EMPTY exported key does not shadow the file', async () => {
     // process.loadEnvFile treats empty-but-set as set and will not replace it,
-    // so `export QWEN_LOCAL_API_KEY=` — the usual shape of `export FOO="$FOO"`
+    // so `export CLUSTER_OPS_KEY=` — the usual shape of `export FOO="$FOO"`
     // on an unset FOO — silently defeated the whole mechanism, producing the
     // very same "not set" error as having no .env. Nothing wants an empty
     // bearer token; empty must mean absent.
     const envFile = path.join(tmp, 'with-key.env');
-    fs.writeFileSync(envFile, `QWEN_LOCAL_API_KEY=${KEY}\n`);
+    fs.writeFileSync(envFile, `CLUSTER_OPS_KEY=${KEY}\n`);
     stub.state.auth = undefined;
 
     await withService(
-      { CLASSIFIER_ENV_FILE: envFile, QWEN_LOCAL_API_KEY: '' },
+      { CLASSIFIER_ENV_FILE: envFile, CLUSTER_OPS_KEY: '' },
       async () => {
         const { status } = await classify();
         assert.equal(status, 200);
@@ -232,19 +232,19 @@ describe('the judge reads its bearer token from .env', () => {
       assert.equal(health.envFile, absent);
 
       const backend = health.backends.find(b => b.id === 'qwen-local');
-      assert.equal(backend.apiKeyEnv, 'QWEN_LOCAL_API_KEY');
+      assert.equal(backend.apiKeyEnv, 'CLUSTER_OPS_KEY');
       // The field that turns "why is there no verdict" into one glance.
       assert.equal(backend.hasKey, false);
 
       const { status, body } = await classify();
       assert.equal(status, 502);
-      assert.match(body.error, /QWEN_LOCAL_API_KEY not set/);
+      assert.match(body.error, /CLUSTER_OPS_KEY not set/);
     });
   });
 
   it('/health reports whether the key arrived, and never the key itself', async () => {
     const envFile = path.join(tmp, 'with-key.env');
-    fs.writeFileSync(envFile, `QWEN_LOCAL_API_KEY=${KEY}\n`);
+    fs.writeFileSync(envFile, `CLUSTER_OPS_KEY=${KEY}\n`);
 
     await withService({ CLASSIFIER_ENV_FILE: envFile }, async () => {
       const health = await waitForHealth();
