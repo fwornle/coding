@@ -29,14 +29,13 @@ test one, and how to override a false positive honestly.
 
     ## When it is genuinely wrong
 
-    Say so explicitly, in the request:
+    Stop and say so: which rule, why it is wrong here. The block has already filed an override
+    request with the host guard, which opens the approval page in the user's browser; give the
+    user the link from the message. They approve it with Touch ID, phone, security key or
+    password, then the same call is repeated. Nothing typed into a prompt overrides a rule.
 
-    ```
-    OVERRIDE_CONSTRAINT: <constraint-id>
-    ```
-
-    with a sentence of rationale. That keeps the escape hatch auditable — an override is a
-    recorded decision, a reworded command is a silent one.
+    That keeps the escape hatch auditable — an override is a signed, logged decision by the
+    user, a reworded command is a silent one.
 
     ## Where to look
 

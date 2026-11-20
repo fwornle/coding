@@ -165,40 +165,23 @@ When a WARNING or INFO violation is detected, the tool call proceeds with feedba
 
 ## Constraint Overrides
 
-The system supports **temporary constraint overrides** for situations where a constraint needs to be bypassed.
+### How an override works
 
-### How to Use Overrides
+There is one override, in the agent box and on the host alike: **the user approves it in the
+browser with an enrolled factor** (Touch ID, phone passkey, security key or password). Nothing typed
+into a prompt overrides a rule.
 
-Include `OVERRIDE_CONSTRAINT` directives in your prompt to Claude:
+1. A blocked call files a request with the host guard (`coding-guard`, :3035) for the rule, the
+   agent session and the file. The guard opens the approval page in the user's browser, and the
+   block message gives the agent the link to pass on.
+2. The user reads the request (rule, file, excerpt, the agent's reason) and picks a scope: one
+   call, N minutes, or the session. Confirming with a factor makes the guard sign a grant.
+3. The agent repeats the same call. The hook fetches the grants for its session, verifies the
+   signature with the guard's public key and lets the call through. A one-call grant is spent.
 
-```
-OVERRIDE_CONSTRAINT: constraint-id-1
-OVERRIDE_CONSTRAINT: constraint-id-2
-
-Your actual task description goes here...
-```
-
-### Override Mechanism
-
-1. **UserPromptSubmit Hook** (`prompt-override-parser.js`) detects `OVERRIDE_CONSTRAINT` directives
-2. Creates temporary state file: `/tmp/constraint-override-{session-id}.json`
-3. **PreToolUse Hook** reads the state file and bypasses specified constraints
-4. **Automatic Expiration**: Override expires after **3 prompt sets** or **5 minutes**
-
-### Override State File Format
-
-```json
-{
-  "constraintIds": [
-    "documentation-style-skill-required",
-    "plantuml-standard-styling"
-  ],
-  "createdAt": 1763282756000,
-  "expiresAt": 1763283056000,
-  "promptCount": 0,
-  "maxPrompts": 3
-}
-```
+A host agent's session is `host-<agent session id>`; a box session is the container's hostname.
+If the guard is not running, nothing can be overridden and the call stays blocked.
+Full reference: [Approving an override](../core-systems/agent-box.md#approving-an-override).
 
 ### When to Use Overrides
 
@@ -215,6 +198,8 @@ Your actual task description goes here...
 - Bypassing security constraints without justification
 - Creating parallel versions or evolutionary naming
 - Permanent workarounds
+- Getting past a pattern by rewording, splitting or encoding the content — ask for the override
+  instead
 
 ---
 

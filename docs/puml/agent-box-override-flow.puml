@@ -1,11 +1,11 @@
 @startuml agent-box-override-flow
 !include _standard-style.puml
 
-title Overriding a rule from inside the agent box
+title Overriding a rule (agent box or host)
 
 actor "You" as user
-participant "Agent\n(in the box)" as agent
-participant "Constraint hook\n(in the box)" as hook
+participant "Agent\n(box or host)" as agent
+participant "Constraint hook\n(PreToolUse)" as hook
 participant "coding-guard\n(host :3035)" as guard
 participant "Approval page\n(host browser)" as page
 participant "Authenticator\nTouch ID · phone · key" as authn
@@ -13,6 +13,7 @@ participant "Authenticator\nTouch ID · phone · key" as authn
 agent -> hook : tool call (e.g. Write)
 hook -> hook : rule matches → block
 hook -> guard : POST /requests\n{rule, session, file, excerpt, reason}
+guard -> page : opens the approval page
 guard --> hook : pending + approval link
 hook --> agent : blocked: "approve at\nhttp://localhost:3035/approve/<id>"
 agent --> user : shows the link
@@ -40,8 +41,8 @@ end
 hook --> agent : allowed
 
 note over hook
-  In the box the transcript grants nothing:
-  OVERRIDE_CONSTRAINT in a prompt is ignored.
+  Nothing in a prompt overrides a rule,
+  on the host or in the box.
   Guard unreachable or keys missing → blocked.
 end note
 

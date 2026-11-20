@@ -38,10 +38,29 @@ Read-only tools stay allowed so the problem can be diagnosed.
 
 ## Overrides
 
-| Where the agent runs | How a rule is overridden |
-|---|---|
-| Agent box | You approve the request in the host browser with an enrolled factor (Touch ID, phone, security key, password). See [Approving an override](agent-box.md#approving-an-override). |
-| Host (`--no-box`) | Type `OVERRIDE_CONSTRAINT: <id>` in **your own** prompt. It counts only from a typed human turn and lasts for that turn. |
+There is one way to override a rule, in the agent box and on the host
+(`--no-box`) alike: **you approve it in your browser with an enrolled factor**
+(Touch ID, phone, security key or password). A blocked call files the request
+with the host guard, which opens the approval page; the agent also shows you the
+link. See [Approving an override](agent-box.md#approving-an-override).
+
+- Nothing typed into a prompt overrides a rule. The guard reads no keyword from
+  the transcript.
+- A grant is bound to the rule, the agent session and (if named) the file, for
+  the scope you pick: one call, N minutes, or the session.
+- On the host a session is the agent's own session id, so approving one agent's
+  request covers no other agent.
+- If the guard is not running (`coding guard status`), nothing can be
+  overridden: the call stays blocked.
+
+**An agent must never reword, split, encode or relocate content just so a
+pattern stops matching.** That is working around the rule. It either fixes what
+the rule is about, or it stops, says why it needs the exception (including "this
+is a false positive") and gives you the link.
+
+On the host the agent runs as you, so the guard is a decision point for an agent
+that follows the rules, not a wall against one that does not. The box is the
+wall.
 
 ## Severity Levels
 
