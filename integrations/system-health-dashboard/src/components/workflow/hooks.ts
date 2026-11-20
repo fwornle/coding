@@ -17,6 +17,7 @@ import {
 } from '@/store/slices/workflowConfigSlice'
 import { WORKFLOW_AGENTS, ORCHESTRATOR_NODE, STEP_TO_AGENT, STEP_TO_SUBSTEP, MULTI_AGENT_EDGES, AGENT_SUBSTEPS } from './constants'
 import { rowsFromRecentResponse, type RecentCall } from './recent-calls-contract'
+import { PROXY_BASE, PROXY_PORT } from '@/lib/llm-proxy'
 
 // Hook to get workflow definitions from Redux (populated by API with fallback to constants)
 export function useWorkflowDefinitions(workflowName?: string) {
@@ -226,8 +227,6 @@ export function useWorkflowLayout(
 
 // ─── Phase 52 D-04: Live LLM badge hooks ───────────────────────────────────
 
-const PROXY_PORT = '12435'
-const PROXY_BASE = `http://localhost:${PROXY_PORT}`
 const REFRESH_INTERVAL_MS = 30_000
 const RECENT_LIMIT = 50
 const N_PER_TAG = 10

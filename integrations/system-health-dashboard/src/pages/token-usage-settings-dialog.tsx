@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -108,6 +109,25 @@ interface RoutingData {
   runtime: { network: string; availableImpls: string[]; allImpls: string[] }
 }
 
+/**
+ * The cluster offload endpoint — where the proxy's `qwen-local` provider sends
+ * the work the semantic offload moves (proxy GET/PUT /api/llm/cluster-endpoint).
+ * The key itself never comes back: only whether one is set, and where it lives.
+ */
+interface ClusterEndpoint {
+  provider: string
+  url: string
+  urlSource: 'config' | 'env' | 'default'
+  keyEnv: string
+  keySet: boolean
+  keyFile: string
+  keyProblem: string
+  /** null: not probed */
+  reachable: boolean | null
+  models: string[]
+  error: string
+}
+
 interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -140,6 +160,35 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours 
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // The cluster endpoint is a separate resource with its own life: a proxy that
+  // predates it still serves routing, and a routing load failure must not hide it.
+  const [endpoint, setEndpoint] = useState<ClusterEndpoint | null>(null)
+  const [endpointMissing, setEndpointMissing] = useState(false)
+  const [endpointError, setEndpointError] = useState<string | null>(null)
+  const [urlDraft, setUrlDraft] = useState('')
+  const [keyDraft, setKeyDraft] = useState('')
+  const [keyClear, setKeyClear] = useState(false)
+  const [testing, setTesting] = useState(false)
+
+  const applyEndpoint = (e: ClusterEndpoint) => {
+    setEndpoint(e)
+    setUrlDraft(e.url)
+    setKeyDraft('')
+    setKeyClear(false)
+  }
+
+  const loadEndpoint = useCallback(() => {
+    setEndpointMissing(false)
+    setEndpointError(null)
+    fetch(`${proxyBase}/api/llm/cluster-endpoint`)
+      .then(async r => {
+        if (r.status === 404) { setEndpoint(null); setEndpointMissing(true); return }
+        const body = await r.json().catch(() => null)
+        if (!r.ok) throw new Error(body?.error || `HTTP ${r.status}`)
+        applyEndpoint(body as ClusterEndpoint)
+      })
+      .catch(e => { setEndpoint(null); setEndpointError(`Failed to load the cluster endpoint: ${e.message}`) })
+  }, [proxyBase])
 
   const load = useCallback(() => {
     setLoading(true)
@@ -170,7 +219,48 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours 
       .finally(() => setLoading(false))
   }, [proxyBase])
 
-  useEffect(() => { if (open) load() }, [open, load])
+  useEffect(() => { if (open) { load(); loadEndpoint() } }, [open, load, loadEndpoint])
+
+  // Only the fields that changed: an untouched URL is not re-sent (it may be the
+  // default or come from the environment), and an empty key field means "keep".
+  const endpointPatch = useMemo(() => {
+    if (!endpoint) return null
+    const out: { url?: string; key?: string } = {}
+    if (urlDraft.trim() !== endpoint.url) out.url = urlDraft.trim()
+    if (keyClear) out.key = ''
+    else if (keyDraft) out.key = keyDraft
+    return Object.keys(out).length ? out : null
+  }, [endpoint, urlDraft, keyDraft, keyClear])
+
+  const putEndpoint = async (body: { url?: string; key?: string }): Promise<ClusterEndpoint> => {
+    const res = await fetch(`${proxyBase}/api/llm/cluster-endpoint`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    const j = await res.json().catch(() => null)
+    if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`)
+    return j as ClusterEndpoint
+  }
+
+  // Test what is typed: an edited URL or key is written first, then probed —
+  // the same contract as the Save button, minus closing the dialog.
+  const testEndpoint = async () => {
+    setTesting(true)
+    setEndpointError(null)
+    try {
+      if (endpointPatch) applyEndpoint(await putEndpoint(endpointPatch))
+      else {
+        const r = await fetch(`${proxyBase}/api/llm/cluster-endpoint`)
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        applyEndpoint(await r.json() as ClusterEndpoint)
+      }
+    } catch (e) {
+      setEndpointError(`Endpoint not saved: ${(e as Error).message}`)
+    } finally {
+      setTesting(false)
+    }
+  }
 
   const setRoute = (key: string, patch: Partial<RouteEntry>) =>
     setRouteDraft(d => ({ ...d, [key]: { ...d[key], ...patch } }))
@@ -225,15 +315,33 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours 
     [data, semanticDraft],
   )
 
-  const dirty = Object.keys(changedRoutes).length > 0
+  const routingDirty = Object.keys(changedRoutes).length > 0
     || Object.keys(changedDefaults).length > 0
     || fallbackChanged
     || semanticChanged
+  const dirty = routingDirty || !!endpointPatch
 
   const save = async () => {
-    if (!data || !fallbackDraft) return
     setSaving(true)
     setError(null)
+    setEndpointError(null)
+    // The endpoint first: it is one small file of its own, and the routing PATCH
+    // after it is validated separately — so a rejected routing edit leaves a
+    // saved endpoint saved, and the message says which of the two was written.
+    if (endpointPatch) {
+      try {
+        applyEndpoint(await putEndpoint(endpointPatch))
+      } catch (e) {
+        setEndpointError(`Endpoint not saved: ${(e as Error).message}`)
+        setSaving(false)
+        return
+      }
+    }
+    if (!routingDirty || !data || !fallbackDraft) {
+      setSaving(false)
+      onOpenChange(false)
+      return
+    }
     try {
       const res = await fetch(`${proxyBase}/api/llm/routing`, {
         method: 'PATCH',
@@ -252,8 +360,10 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours 
         throw new Error(errBody.error || `HTTP ${res.status}`)
       }
       onOpenChange(false)
-    } catch (e: any) {
-      setError(`Rejected — nothing was written. ${e.message}`)
+    } catch (e) {
+      setError(endpointPatch
+        ? `Routing rejected — the endpoint was saved, the routing files were not. ${(e as Error).message}`
+        : `Rejected — nothing was written. ${(e as Error).message}`)
     } finally {
       setSaving(false)
     }
@@ -358,6 +468,98 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours 
         )}
 
         <div className="flex-1 overflow-y-auto min-h-0 -mx-6 px-6 pt-3">
+          {/* The cluster endpoint sits above the tabs' content because every
+              tab depends on it: it is where the offload sends work, and the
+              place this dialog is opened from on the Cluster page. */}
+          {endpointMissing && (
+            <div
+              className="text-xs text-muted-foreground bg-muted/30 border rounded px-3 py-2 mb-3"
+              data-testid="cluster-endpoint-unsupported"
+            >
+              Cluster endpoint: this rapid-llm-proxy is too old to edit it here (no{' '}
+              <span className="font-mono">/api/llm/cluster-endpoint</span>). Update and restart the proxy.
+            </div>
+          )}
+          {endpointError && (
+            <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded px-3 py-2 mb-3">
+              {endpointError}
+            </div>
+          )}
+          {endpoint && (
+            <div
+              className={`rounded border px-3 py-2.5 space-y-2 mb-4 ${endpointPatch ? 'bg-amber-500/10 border-amber-500/40' : 'bg-muted/30'}`}
+              data-testid="cluster-endpoint"
+            >
+              <div className="flex items-center gap-2 text-sm font-medium">
+                Endpoint
+                <span className="text-xs font-normal text-muted-foreground">
+                  the on-prem cluster, as the <span className="font-mono">{endpoint.provider}</span> offload target
+                </span>
+              </div>
+              <div className="grid grid-cols-[90px_1fr] items-center gap-2 text-sm">
+                <span className="text-muted-foreground text-xs">URL</span>
+                <div className="flex items-center gap-2">
+                  <Input
+                    className="h-8 font-mono text-xs"
+                    value={urlDraft}
+                    onChange={e => setUrlDraft(e.target.value)}
+                    placeholder="empty — the built-in default"
+                    data-testid="cluster-endpoint-url"
+                  />
+                  <Badge variant="outline" className="text-[10px] whitespace-nowrap">
+                    {endpoint.urlSource === 'config' ? 'from config'
+                      : endpoint.urlSource === 'env' ? 'from environment' : 'default'}
+                  </Badge>
+                </div>
+                <span className="text-muted-foreground text-xs">API key</span>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="password"
+                    className="h-8 text-xs"
+                    value={keyDraft}
+                    onChange={e => { setKeyDraft(e.target.value); setKeyClear(false) }}
+                    placeholder={keyClear ? 'removed on save' : endpoint.keySet ? 'set — type to replace' : 'none'}
+                    autoComplete="off"
+                    data-testid="cluster-endpoint-key"
+                  />
+                  {endpoint.keySet && !keyClear && (
+                    <Button variant="outline" size="sm" onClick={() => { setKeyClear(true); setKeyDraft('') }}>Clear</Button>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-3 text-xs flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={testEndpoint}
+                  disabled={testing || saving}
+                  title={endpointPatch ? 'Saves the edited URL / key, then probes it' : 'Probes the saved endpoint'}
+                >
+                  {testing ? 'Testing…' : 'Test'}
+                </Button>
+                <span
+                  data-testid="cluster-endpoint-status"
+                  className={endpoint.reachable === true
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : endpoint.reachable === false ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}
+                >
+                  {endpoint.reachable === true
+                    ? `reachable · ${endpoint.models.length} model${endpoint.models.length === 1 ? '' : 's'}${endpoint.models.length ? ': ' + endpoint.models.join(', ') : ''}`
+                    : endpoint.reachable === false
+                      ? `not reachable — ${endpoint.error || 'no answer'}`
+                      : 'not checked'}
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                The key is <span className="font-mono">{endpoint.keyEnv}</span> in{' '}
+                <span className="font-mono">{endpoint.keyFile}</span> — owner-only, never shown again.
+              </p>
+              {endpoint.keyProblem && (
+                <div className="text-xs text-amber-600 dark:text-amber-400">{endpoint.keyProblem}</div>
+              )}
+            </div>
+          )}
+
           {loading && (
             <div className="flex items-center justify-center py-8">
               <RefreshCw className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -685,14 +887,17 @@ export function TokenUsageSettingsDialog({ open, onOpenChange, proxyBase, hours 
         <DialogFooter className="flex-shrink-0 sm:justify-between items-center">
           <span className="text-xs text-muted-foreground">
             {dirty
-              ? `${Object.keys(changedRoutes).length + Object.keys(changedDefaults).length} route change(s)${fallbackChanged ? ' + fallback' : ''} — validated before anything is written`
+              ? [
+                  routingDirty && `${Object.keys(changedRoutes).length + Object.keys(changedDefaults).length} route change(s)${fallbackChanged ? ' + fallback' : ''}`,
+                  endpointPatch && 'endpoint',
+                ].filter(Boolean).join(' + ') + ' — validated before anything is written'
               : 'No changes'}
           </span>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
               Cancel
             </Button>
-            <Button onClick={save} disabled={saving || loading || !data || !dirty}>
+            <Button onClick={save} disabled={saving || loading || (!data && !endpoint) || !dirty}>
               {saving ? 'Saving…' : 'Save'}
             </Button>
           </div>

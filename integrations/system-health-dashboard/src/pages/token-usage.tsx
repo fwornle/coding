@@ -35,6 +35,7 @@ import { SeriesTooltip } from '@/components/cost/series-tooltip'
 import { fetchAccountSelection, type AccountSelection, type SourcesControl } from '@/components/cost/account-selection'
 import { RefreshButton } from '@/components/ui/refresh-button'
 import { usePageAttended } from '@/hooks/usePageAttended'
+import { PROXY_BASE } from '@/lib/llm-proxy'
 
 /**
  * What every figure on the page is measured in. Tokens are what was consumed;
@@ -63,8 +64,6 @@ function linkedTab(tabs: TokenUsageTab[]): TokenUsageTab | null {
   return want && (tabs as string[]).includes(want) ? want as TokenUsageTab : null
 }
 
-const PROXY_PORT = '12435'
-const PROXY_BASE = `http://localhost:${PROXY_PORT}`
 const REFRESH_INTERVAL = 30_000
 
 /** One Evolution bucket: `hour` plus a number per series key. */
