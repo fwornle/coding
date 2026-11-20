@@ -51,9 +51,12 @@ follow every call the offload router sent there, kept back, or let fall back.
     (a devcontainer does it from its `.env`):
 
     ```json title="~/.glass/cluster.json"
-    { "nodes": [{ "name": "node1", "host": "192.0.2.10" }, { "name": "node2", "host": "192.0.2.11" }],
+    { "name": "Turing",
+      "nodes": [{ "name": "node1", "host": "192.0.2.10" }, { "name": "node2", "host": "192.0.2.11" }],
       "gatewayPort": 8000, "statusPort": 8099 }
     ```
+
+    `name` is optional; with it the page's title reads "Cluster Turing".
 
     Two keys, two secrets — each optional — in one owner-only file:
 

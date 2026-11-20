@@ -8,8 +8,9 @@
 // Opt-in and read-only. The files live in GLASS_HOME, written by whoever has the
 // cluster's credentials (a devcontainer from its .env, or by hand):
 //
-//   cluster.json   { "nodes": [{ "name": "node1", "host": "192.0.2.10" }, …],
+//   cluster.json   { "name": "Turing", "nodes": [{ "name": "node1", "host": "192.0.2.10" }, …],
 //                    "gatewayPort": 8000, "statusPort": 8099 }
+//                  `name` is optional: the page's title reads "Cluster <name>".
 //   .env           owner-only (keys.mjs):
 //                    CLUSTER_OPS_KEY   the gateways' key: sent only to /v1/models
 //                    CLUSTER_MON_KEY   the status services' key, a separate secret:
@@ -64,8 +65,10 @@ export function normalizeClusterConfig(raw) {
     nodes.push({ name, host });
     if (nodes.length === MAX_NODES) { problems.push(`more than ${MAX_NODES} nodes: the rest are left out`); break; }
   }
+  const name = String(raw.name ?? '').trim();
   return {
     configured: true,
+    name: name.length <= 64 ? name : '',
     nodes,
     gatewayPort: port(raw.gatewayPort, 8000),
     statusPort: port(raw.statusPort, 8099),
@@ -378,6 +381,7 @@ export function createCluster({
     const gpus = list.flatMap((n) => (n.up ? n.status?.gpus ?? [] : []));
     return {
       configured: true,
+      name: cfg.name,
       gatewayPort: cfg.gatewayPort, statusPort: cfg.statusPort,
       keySet: Boolean(key), keyProblem: problem,
       statusKeySet: Boolean(status.key), statusKeyProblem: status.problem,
