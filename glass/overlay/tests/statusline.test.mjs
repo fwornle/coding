@@ -36,10 +36,11 @@ test('plain, tmux and ansi carry the same fields', () => {
   assert.equal(strip(ansi), plain);
 });
 
-test('a newer release: [⬆ x.y.z] after the health field, a click runs glass update in a popup', () => {
+test('a newer release: a notice after the health field says what to run, a click runs glass update in a popup', () => {
   assert.doesNotMatch(renderStatusline(D, { port: 1 }), /⬆/, 'nothing while this is the latest');
   const plain = renderStatusline({ ...D, update: '0.2.0' }, { port: 1 });
-  assert.match(plain, /^\[glass ●\] \[⬆ 0\.2\.0\] \[ctx /);
+  assert.match(plain, /^\[glass ●\] \[⬆ glass 0\.2\.0 available · Run: glass update\] \[ctx /);
+  assert.ok(renderStatusline({ ...D, update: '0.2.0' }, { format: 'ansi', port: 1 }).includes('\x1b[33m⬆ glass 0.2.0 available · Run: glass update'), 'yellow, as Claude Code shows its own');
   assert.ok(renderStatusline({ ...D, update: '0.2.0' }, { format: 'tmux', port: 1 }).includes(`#[range=user|${TAGS.upd}]`));
   assert.deepEqual(clickTarget(TAGS.upd, uiLinks(1, D.task_id)), { run: ['update', '--hold'], title: 'glass · update', fallback: uiLinks(1, D.task_id).root });
 });

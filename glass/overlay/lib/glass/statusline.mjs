@@ -11,7 +11,8 @@
 //             (all sessions — it is the account's bill, not this run's)
 //   g:net     network location, local proxy  click → network report (tmux popup)
 //             — coding's [N:… P:…], from the same probes (network.mjs)
-//   g:upd     a newer glass release          click → glass update (tmux popup)
+//   g:upd     a newer glass release, and     click → glass update (tmux popup)
+//             what to run
 //             — shown only while one is out (update.mjs)
 //
 // The context gauge is the proxy's own measurement of the conversation's latest
@@ -171,8 +172,9 @@ export function renderStatusline(d, { format = 'plain', port }) {
   if (!d) return field(TAGS.health, `glass ${color('colour196', '31', '✗')} down`, links.root);
 
   const parts = [field(TAGS.health, `glass ${color('colour46', '32', '●')}`, links.root)];
-  // A newer release: one click installs it (the UI's Update button, outside tmux).
-  if (d.update) parts.push(field(TAGS.upd, `${color('colour214', '33', '⬆')} ${d.update}`, links.root));
+  // A newer release, said as Claude Code says its own: what is out and what to run. One
+  // click installs it (the UI's Update button, outside tmux).
+  if (d.update) parts.push(field(TAGS.upd, color('colour214', '33', `⬆ glass ${d.update} available · Run: glass update`), links.root));
 
   let ctxText = 'ctx —';
   if (d.ctx?.pct != null) {
