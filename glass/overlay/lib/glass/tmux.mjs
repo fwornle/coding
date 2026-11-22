@@ -258,7 +258,8 @@ export function configureStatus({ taskId, port, env = process.env, tmpDir = os.t
   set('@glass_port', String(port));
   set('status', 'on');
   set('status-interval', '5');
-  set('status-right-length', '120');
+  // Room for the update notice (statusline.mjs g:upd) beside the usual fields.
+  set('status-right-length', '180');
   // The terminal's own colours, as coding's session wrapper sets them — not the
   // global status-style (tmux's default, and many configs, paint it green).
   set('status-style', 'bg=default,fg=default');

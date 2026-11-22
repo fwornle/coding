@@ -24,8 +24,8 @@ Install glass from the release tarball, check the setup, run your first measured
     `glass browser edge`, once.
 
     **Update:** `glass update` (`--check` only reports a newer release). When a release is
-    out, the status line shows `[⬆ <version>]` and the UI an **Update** button: one click
-    installs it.
+    out, the status line shows `[⬆ glass <version> available · Run: glass update]` and the UI
+    an **Update** button: one click installs it.
 
     **Remove it again:** `glass uninstall` then `npm rm -g glass`.
 

@@ -209,6 +209,9 @@ async function runMeasured(agent, argv) {
   let settings = null;
   if (useTmux && process.env.TMUX) {
     restore = configureStatus({ taskId: session.taskId, port, tmpDir: p.run });
+    // The line printed above is gone once the agent draws its screen: say it again
+    // across the status bar for a few seconds; the status line's notice stays.
+    if (up.update) message({ text: `glass ${up.update} is available — Run: glass update, or click ⬆ on the status line` });
     // The agent keeps its mouse and selects by itself, unless
     // GLASS_AGENT_MOUSE=off (tmux.mjs agentMouseEnv).
     Object.assign(env, agentMouseEnv(agent, baseEnv));
