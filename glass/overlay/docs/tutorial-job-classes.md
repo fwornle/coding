@@ -106,9 +106,11 @@ since you switched labelling on.
 
 The **Gate** card says whether each class's labels can be trusted yet. A class passes when the
 second pass agrees with at least 90 % of its labels, over at least 20 turns that were
-checked. At first every class is still collecting:
+checked. At first every class is still collecting. With your team's classes joined, the
+**Team** columns add up the counts your teammates publish (step 6), so a class can pass
+for the team long before it does on your machine alone:
 
-![The gate: every class at 0 / 20 checked turns, collecting](images/ui-job-classes-gate.png)
+![The gate with a team's classes: this machine has checked 4 turns of fix and is still collecting; with a teammate's published counts the team has 22, 91 % agreed, so fix is consistent for the team; the members and a teammate on other models, not added, are listed below](images/ui-job-classes-gate.png)
 
 Every turn of a class is checked until that class has its 20 checks, so a class needs 20
 turns of its own kind — fewer when your team publishes its counts too (step 6). Then the
@@ -131,15 +133,20 @@ You can also paste the URL in the **Taxonomy** field and click **Join**. glass f
 the `job-classes/` folder, using your normal git login. From then on your turns are labelled
 with the team's classes:
 
-![Taxonomy: your team's, from the team's repo, with Update and Use the default](images/ui-job-classes-team.png)
+![Labelling on this machine with a team joined: Taxonomy shows your team's repo, with Update, Use the default and Publish my gate counts](images/ui-job-classes-team.png)
 
 | Do | Command | In the tab |
 |---|---|---|
 | Get the team's newest version | `glass job-classes pull` | **Update** |
 | Go back to the classes glass ships | `glass job-classes leave` | **Use the default** |
+| Share your gate counts with the team | `glass job-classes publish` | **Publish my gate counts** |
 
-The team's repo holds the classes and their changelog, and never any prompts. Joining
-doesn't send anything to it either: your labels and gate counts stay on your machine.
+The team's repo holds the classes, their changelog and — once members publish them — gate
+counts, and never any prompts. Joining doesn't send anything to it. **Publishing** writes
+your counts per class (how many turns were labelled, checked and agreed) as
+`job-classes/gate/<pseudonym>.json` and pushes them with your git login; it needs write
+access to the repo. Publishing again with unchanged counts changes nothing. Your labels
+themselves stay on your machine.
 
 ## What next
 

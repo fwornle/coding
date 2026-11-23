@@ -256,7 +256,7 @@ counts your teammates published, added up with yours.
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![The gate: every class at 0 / 20 checked turns, collecting](images/ui-job-classes-gate.png)](images/ui-job-classes-gate.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![The gate with a team's classes: this machine has checked 4 turns of fix and is still collecting; with a teammate's published counts the team has 22, 91 % agreed, so fix is consistent for the team; the members and a teammate on other models, not added, are listed below](images/ui-job-classes-gate.png)](images/ui-job-classes-gate.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
 <figcaption>Right after switching on, every class is still collecting.</figcaption>
 </figure>
@@ -289,7 +289,7 @@ your machine; your gate counts go to the repo only if you publish them.
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Taxonomy: your team's, from the team's repo, with Update and Use the default](images/ui-job-classes-team.png)](images/ui-job-classes-team.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![Labelling on this machine with a team joined: Taxonomy shows your team's repo, with Update, Use the default and Publish my gate counts](images/ui-job-classes-team.png)](images/ui-job-classes-team.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
 <figcaption>glass fetches only the job-classes/ folder, with your normal git login.</figcaption>
 </figure>
