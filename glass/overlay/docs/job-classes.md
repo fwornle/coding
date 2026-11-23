@@ -18,9 +18,9 @@ labelled in the background with your own Copilot account. Opt-in, off by default
     model answers all of it. Job classes sort your prompts into kinds of job, so you can see
     what your work consists of and, later, which kinds a cheaper model does just as well.
 
-    A cheap **student** model labels every turn; a strong **teacher** model re-checks a share
-    of them. A class's labels are trusted once the teacher agrees with at least 90 % of them,
-    over at least 20 checked turns (the **gate**).
+    The strong **teacher** model labels your turns and checks some of them a second time. A
+    class's labels are trusted once the second pass agrees with at least 90 % of them, over
+    at least 20 checked turns (the **gate**). After that, a sample of 1 turn in 5 is enough.
 
     ## Switch it on
 
@@ -73,7 +73,7 @@ labelled in the background with your own Copilot account. Opt-in, off by default
 
     | | glass alone | needs coding |
     |---|---|---|
-    | Label your turns (student + teacher, your Copilot account) | ✅ | |
+    | Label your turns (the teacher model, your Copilot account) | ✅ | |
     | Measure your past prompts; tree, map, gate | ✅ | |
     | Join and update a team's classes | ✅ | |
     | Pool the gate with your team (`glass job-classes publish`) | ✅ | |

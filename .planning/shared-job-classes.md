@@ -972,6 +972,24 @@ pseudonym (no prompt text), a republish changed nothing, and the panel summed th
 machine + one teammate (fix 22 checked, 91%, passes) while naming a teammate on other
 models as not added.
 
+**P6c + P6e built 2026-11-23** (rapid-llm-proxy `feat/job-classes-pooled-sampling`,
+coding `feat/job-classes-sonnet-sampling`): the tagger reads the team pool for the
+taxonomy it labels under (`pooledChecks`, 5-min cache, this member's own file replaced
+by its live counts) — `sample_until_gate: true` checks every turn of a class below 20
+pooled checks (on for coding in `llm-routing.yaml`); `report_sample_every: N` labels 1 turn
+in N once every class has 20, stored as `turn_job_class.weight`, which the summary
+multiplies into turns and tokens (`sampledLabels`). An unreadable pool keeps the
+configured rates and labels every turn. `GET /api/job-classes` reports each taxonomy's
+`sampling` phase; the Classes tab shows it as a badge. glass: the live labeller is the
+teacher (Sonnet), `sampleUntilGate` on, `reportSampleEvery` 5 (setting "After the gate"),
+second pass 10 % (was 25 %); `measure` still scores the Haiku student; the settings card
+gains the sample field and **Publish my gate counts** (P6d). Verified: proxy 700/700
+node tests (4 new: check until the gate, base rate after, unreadable pool, reporting
+weight 5 in the summary), glass 182/182 on the extract, and a scratch glass showing
+"collecting: every turn" with the 10 classes still below 20, then "reporting: 1 turn in
+5" once a teammate's counts covered every class, and the Publish button republishing
+"unchanged".
+
 Rough size: P6a and P6b are a few days together. P6c is small once P6b reads
 the pool. Nothing here changes the labeller or the taxonomy.
 

@@ -104,13 +104,13 @@ Steps 2 and 3 run on a machine with coding installed. The team shares the result
 
 | Word | Meaning |
 |---|---|
-| **student** | The cheap, fast model (`claude-haiku-5.5`) that labels every turn. |
-| **teacher** | The strong model (`claude-sonnet-5`). It re-labels a share of turns, and its labels count as right. |
-| **gate** | The bar a class clears before its labels count as trusted: 90 % of the student's labels confirmed, over at least 20 checked turns. |
+| **teacher** | The strong model (`claude-sonnet-5`). It labels your turns, and labels some a second time to check itself. |
+| **student** | A cheap, fast model (`claude-haiku-5.5`) scored by the measurement; it did not reach the gate, so it labels nothing live. |
+| **gate** | The bar a class clears before its labels count as trusted: 90 % agreement between the two passes, over at least 20 checked turns — then 1 turn in 5 is enough. |
 | **reference set** | Your past prompts that the teacher labelled twice, giving the same class both times. |
 
 </figure>
-<p class="overview-takeaway">The student labels, the teacher checks, the gate says when to trust a label.</p>
+<p class="overview-takeaway">The teacher labels and checks itself; the gate says when to trust a label.</p>
 </section>
 
 <section class="overview-slide overview-essential" id="slide-4" aria-labelledby="gjc-on" markdown="1">
@@ -239,15 +239,16 @@ since you switched labelling on.
 
 ## The gate: can the label be trusted? {#gjc-gate}
 
-For each class, the gate asks: **of the turns the student put in this class,
-how many did the teacher put there too?**
+For each class, the gate asks: **of the turns labelled with this class and
+checked a second time, how many did the second pass put there too?**
 
-- A class **passes** at 90 % or more, over at least 20 turns the teacher checked.
+- A class **passes** at 90 % or more, over at least 20 checked turns.
 - Below 90 % it is **below the gate**: its test needs sharpening.
 - With fewer than 20 checks it is still **collecting**.
 
-With the teacher checking 25 % of turns, a class needs about 80 turns of its own
-kind to pass. Raise **Teacher re-checks** to get there sooner. That uses more quota.
+Every turn of a class is checked until it has 20 checks, so a class needs about 20
+turns of its own kind — fewer when teammates publish their counts. Then 10 % are
+checked, and once every class has a verdict, 1 turn in 5 is labelled.
 
 </div>
 <figure class="overview-figure" markdown="1">

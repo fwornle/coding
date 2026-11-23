@@ -17,17 +17,18 @@ glass ui
 Go to **Token Usage → Classes**. The first card, **Labelling on this machine**, starts off:
 glass sends nothing anywhere until you tick the box.
 
-![Labelling on this machine, switched off: the Copilot account, the student and teacher models, the teacher's share and the Try the account button](images/ui-job-classes-settings.png)
+![Labelling on this machine, switched off: the Copilot account, the labelling model, the second pass, the sample after the gate and the Try the account button](images/ui-job-classes-settings.png)
 
 | Field | What it means |
 |---|---|
 | **Copilot account** | Where the labels are asked for: your own Copilot account, on the host your `gh` login reaches. |
-| **Student · teacher** | The cheap model that labels every turn, and the strong one that re-checks some of them. |
-| **Teacher re-checks** | The share of turns the teacher checks too. The gate (step 5) is counted from these. |
+| **Labels with** | The teacher model that labels your turns. |
+| **Second pass** | The share of turns labelled a second time once a class has its 20 checks; until then every turn of the class is. The gate (step 5) is counted from these. |
+| **After the gate** | Once every class has its 20 checks, only 1 turn in this many is labelled; each label counts for that many turns. |
 
 ## 2. Try the account, then switch labelling on
 
-Click **Try the account**. glass sends one made-up prompt and shows the class the student
+Click **Try the account**. glass sends one made-up prompt and shows the class the teacher
 gave it. If your Copilot plan does not offer the models, it says so here. Nothing else is sent.
 
 Then tick **Label my turns**. It applies to the next turn of every agent you start with
@@ -104,13 +105,15 @@ since you switched labelling on.
 ## 5. Watch the gate
 
 The **Gate** card says whether each class's labels can be trusted yet. A class passes when the
-teacher agrees with at least 90 % of the student's labels for it, over at least 20 turns the
-teacher checked. At first every class is still collecting:
+second pass agrees with at least 90 % of its labels, over at least 20 turns that were
+checked. At first every class is still collecting:
 
 ![The gate: every class at 0 / 20 checked turns, collecting](images/ui-job-classes-gate.png)
 
-With the teacher checking 25 % of turns, a class needs about 80 turns of its own kind
-before it can pass. Raise **Teacher re-checks** to get there sooner. That uses more quota.
+Every turn of a class is checked until that class has its 20 checks, so a class needs 20
+turns of its own kind — fewer when your team publishes its counts too (step 6). Then the
+second pass falls back to **Second pass** (10 %), and once every class has passed or failed,
+only 1 turn in 5 is labelled.
 
 A label changes nothing about your turn. glass only counts it and shows it.
 

@@ -1294,7 +1294,7 @@ test('CLI: daemon unreachable → one warning, the agent runs unwired', { skip: 
   fs.rmSync(cliHome, { recursive: true, force: true });
 });
 
-test("job classes: off by default, no model call of glass's own; switched on from the UI, a turn is labelled on the user's Copilot account", async () => {
+test("job classes: off by default, no model call of glass's own; switched on from the UI, a turn is labelled (by the teacher model) on the user's Copilot account", async () => {
   const v = (await api('GET', '/api/job-classes/settings')).body;
   assert.equal(v.config.enabled, false);
   assert.equal(v.host, 'acme.ghe.com');
@@ -1318,7 +1318,8 @@ test("job classes: off by default, no model call of glass's own; switched on fro
   assert.deepEqual(sum.body.byClass.map((r) => [r.jobClass, r.turns, r.teacherSampled, r.teacherAgree]), [['ship', 1, 1, 1]]);
   const calls = ownCalls();
   assert.deepEqual(calls.map((c) => [c.headers['x-test-host'], JSON.parse(c.body).model]),
-    [['copilot-api.acme.ghe.com', 'claude-haiku-5.5'], ['copilot-api.acme.ghe.com', 'claude-sonnet-5']]);
+    // The teacher labels (P6e) and, the class still collecting, checks itself.
+    [['copilot-api.acme.ghe.com', 'claude-sonnet-5'], ['copilot-api.acme.ghe.com', 'claude-sonnet-5']]);
   assert.notEqual(calls[0].headers.authorization, 'Bearer agent-own-login', "gh's login, not the agent's");
   assert.ok(ghCalls.some((c) => c === 'auth token --hostname acme.ghe.com'));
   const counters = (await api('GET', '/api/job-classes')).body;

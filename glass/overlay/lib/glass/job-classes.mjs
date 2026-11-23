@@ -5,8 +5,13 @@
 // tagger as coding's proxy (proxy-bridge/job-class.mjs) and the same read side
 // (job-class-api.mjs), with three things of glass's own:
 //
-//   the model     the user's own Copilot account: the student labels every turn,
-//                 the teacher re-checks a share of them. Called with the token of
+//   the model     the user's own Copilot account. Live labels come from the
+//                 TEACHER model (Sonnet), as in coding since 2026-10-30: no cheap
+//                 student cleared the gate. A second teacher pass checks every
+//                 turn of a class the team's gate still collects for, then a share
+//                 (sample_until_gate); once every class has a verdict, only 1 turn
+//                 in `reportSampleEvery` is labelled (P6e). The student model is
+//                 kept for `measure`, which still scores it. Called with the token of
 //                 the user's `gh` login for the account's GitHub host (the host the
 //                 Copilot quota uses), read from gh per use and never stored.
 //   the switch    job-classes.json in GLASS_HOME, OFF until the user turns it on:
@@ -37,9 +42,11 @@ const DEFAULTS = {
   enabled: false,
   studentModel: 'claude-haiku-5.5',
   teacherModel: 'claude-sonnet-5',
-  // A quarter of the turns is enough for the gate within a few weeks of normal
-  // use, at about a third more Copilot use than the student alone.
-  teacherSamplePct: 0.25,
+  // The second teacher pass once a class has its 20 checks: a consistency check.
+  // Until then every turn of the class is checked (sample_until_gate).
+  teacherSamplePct: 0.1,
+  // Once every class has a verdict, label 1 turn in this many (1 = every turn).
+  reportSampleEvery: 5,
   maxInFlight: 2,
   team: null, // { url, dir } once `join` cloned a team's taxonomy
 };
@@ -54,6 +61,8 @@ export function normalizeJobClassConfig(raw = {}) {
     studentModel: model(r.studentModel, DEFAULTS.studentModel),
     teacherModel: model(r.teacherModel, DEFAULTS.teacherModel),
     teacherSamplePct: Number.isFinite(pct) ? Math.min(Math.max(pct, 0), 1) : DEFAULTS.teacherSamplePct,
+    reportSampleEvery: Number.isInteger(Number(r.reportSampleEvery)) && Number(r.reportSampleEvery) >= 1
+      ? Math.min(Number(r.reportSampleEvery), 50) : DEFAULTS.reportSampleEvery,
     maxInFlight: Math.min(Math.max(Number(r.maxInFlight) || DEFAULTS.maxInFlight, 1), 8),
     team,
   };
@@ -224,8 +233,11 @@ export function createGlassJobClasses({
     const c = store.get();
     return {
       enabled: c.enabled, taxonomyPath: taxonomyPath(), bindingsPath: '',
-      studentProcess: STUDENT_PROCESS, teacherProcess: TEACHER_PROCESS,
+      // The teacher labels (P6e): student == teacher, so the panels speak of
+      // consistency, and glass's counts pool with coding's teacher-only ones.
+      studentProcess: TEACHER_PROCESS, teacherProcess: TEACHER_PROCESS,
       teacherSamplePct: c.teacherSamplePct, maxInFlight: c.maxInFlight, skipTaskBound: false,
+      sampleUntilGate: true, reportSampleEvery: c.reportSampleEvery,
     };
   };
   const tagger = createJobClassTagger({ getConfig: taggerConfig, complete: ask, db, redact, log, logErr });
@@ -235,12 +247,12 @@ export function createGlassJobClasses({
     return { config: store.get(), host: h, copilotApi: copilotApiBase(h), taxonomy: taggerConfig().taxonomyPath, shipped: defaultTaxonomy };
   };
 
-  /** One student call on a made-up prompt: is the account able to label at all? */
+  /** One labeller (teacher) call on a made-up prompt: is the account able to label at all? */
   async function test() {
     const tax = loadTaxonomy(taxonomyPath());
     const started = Date.now();
     try {
-      const r = await ask({ process: STUDENT_PROCESS, messages: renderRequest(tax, 'Commit this and push.') });
+      const r = await ask({ process: TEACHER_PROCESS, messages: renderRequest(tax, 'Commit this and push.') });
       return { ok: true, label: parseLabel(tax, r.content), model: r.model, ms: Date.now() - started };
     } catch (err) {
       return { ok: false, error: err?.message || String(err) };
@@ -264,7 +276,7 @@ export function createGlassJobClasses({
     if (url === '/api/job-classes/settings' && req.method === 'PATCH') {
       const before = store.get();
       const next = store.update(body);
-      if (before.enabled !== next.enabled) log(`job classes: labelling ${next.enabled ? 'on' : 'off'} (student ${next.studentModel}, teacher ${Math.round(next.teacherSamplePct * 100)} % of turns)`);
+      if (before.enabled !== next.enabled) log(`job classes: labelling ${next.enabled ? 'on' : 'off'} (labeller ${next.teacherModel}; second pass ${Math.round(next.teacherSamplePct * 100)} % of turns once a class has its checks; then 1 turn in ${next.reportSampleEvery})`);
       json(res, 200, await view());
       return true;
     }

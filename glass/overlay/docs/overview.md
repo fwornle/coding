@@ -355,8 +355,9 @@ Some of what you ask an agent is hard: find out why something broke. Much of it 
 routine: commit and push, is it finished, rerun the tests. One strong model answers all of it.
 
 Switch on **Token Usage → Classes** and glass labels every turn: fix, build, ship, status,
-explain, and so on. A cheap **student** model of **your own Copilot account** labels each
-turn, and a strong **teacher** re-checks a share of them. Prompts are redacted first.
+explain, and so on. The strong **teacher** model of **your own Copilot account** labels
+each turn and checks some a second time; once every class is trusted, it labels 1 turn in
+5. Prompts are redacted first.
 
 `glass job-classes measure` labels your past prompts as well, so the tree fills in at once.
 
