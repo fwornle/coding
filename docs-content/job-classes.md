@@ -314,7 +314,7 @@ route.
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Token Usage → Classes → Gate: one row per class with turns labelled, teacher-checked turns against the minimum of 20, teacher agreements, precision and a verdict; every class is still collecting.](images/job-classes-gate.png)](images/job-classes-gate.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![Token Usage → Classes → Gate: the switch for whose gate routing by class trusts (this machine, the default, or the team); one row per class with turns labelled, re-checked turns against the minimum of 20, second-pass agreements and a consistency verdict for this machine, then the same for the team; below, the members who published and a pool that is not added.](images/job-classes-gate.png)](images/job-classes-gate.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
 <figcaption>The gate panel, a day after version 2 went live: every class still collecting. Today it also shows the team's pooled columns (see *Pool the gate*).</figcaption>
 </figure>
@@ -542,7 +542,7 @@ The Classes tab, the gate and the coverage map are the same as here. Routing by 
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![glass's Classes tab: the labelling switch, the user's Copilot account, the student and teacher models, the teacher's share of turns, a button to try the account, and a field to join a team's taxonomy by git URL.](images/glass-job-classes-settings.png)](images/glass-job-classes-settings.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![glass's Classes tab: the labelling switch, the user's Copilot account, the model that labels (the teacher), the second-pass share, how many turns to label after the gate, a button to try the account, and a field to join a team's taxonomy by git URL.](images/glass-job-classes-settings.png)](images/glass-job-classes-settings.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
 <figcaption>glass → Token Usage → Classes: off until the user switches it on.</figcaption>
 </figure>
