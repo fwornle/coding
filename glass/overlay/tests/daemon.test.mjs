@@ -920,7 +920,7 @@ test('glass ui: config.json\'s browser wins over BROWSER, and reaches the tab re
   fs.writeFileSync(file, '{"browser":"edge"}');
   assert.equal(configuredBrowser(file), 'edge');
   assert.equal(browserEnv({ BROWSER: 'chrome', X: '1' }, configuredBrowser(file)).BROWSER, 'edge');
-  assert.equal(browserEnv({ BROWSER: 'chrome' }, undefined).BROWSER, 'chrome');
+  assert.equal(browserEnv({ BROWSER: 'chrome' }, null).BROWSER, 'chrome', 'no choice (null; undefined would read the real ~/.glass/config.json)');
   const seen = [];
   await openUrl('http://127.0.0.1:12445/', 'http://127.0.0.1:12445/', {
     platform: 'darwin', env: { BROWSER: 'edge' }, focusTab: (url, prefix, o) => { seen.push(o.env.BROWSER); return 'reused'; },
