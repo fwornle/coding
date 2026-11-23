@@ -177,6 +177,7 @@ nothing changes silently.
 | **P3 — contributions + dedup** ✅ | `proposals/`, maintainer fold with absorb/add/merge/stability check, versioned CHANGELOG, tombstones | A forced cap overflow merges correctly and keeps old rows resolvable |
 | **P4 — per-class replay trials + evidence** | Whole-turn replays of sampled real turns in a sandbox, incumbent vs candidate, judged blind; `evidence/` in the team package; the class-aware floor for agents the proxy routes. Design below. Infrastructure built 2026-10-31 for every agent, from the proxy ("P4 infrastructure" below), and the proxy-side class floor the same day ("Routing by class" below) | Replays of one answer-only class reach a verdict, and the A/A noise floor is measured |
 | **P5 — glass** | For machines without coding: opt-in live labelling with the user's Copilot account, the Classes tab, a team taxonomy from a git URL, and the measurement over the agents' own transcripts. Design below | Independent of coding's gate. Done when a glass-only user with labelling on sees the same class as coding for the same prompt and taxonomy, and with it off glass sends nothing new |
+| **P6 — team-pooled gate** | Members publish per-class gate COUNTS (no prompts) into the team package; the proxy and the Gate panel add them up per (taxonomy, student, teacher); per-class sampling drops to the base rate once the POOL has a verdict. Design below | Two machines on one taxonomy show the same team total, each counted once; a republish changes nothing; a member on other models is shown apart, never added |
 
 Touch points: coding (service, trainer, teacher, sync, teams, dashboard),
 rapid-llm-proxy (`job_class` column, trial keying, class-aware band floor in
@@ -713,7 +714,10 @@ What this defers rather than settles:
   consistency per class (for example within 5 points of it, over at least 20
   checks), not an absolute 90% that the teacher does not reach on every class.
 - **The dashboard's Gate panel** now compares two teacher passes. Its wording
-  ("student precision") is wrong for that until it is relabelled.
+  ("student precision") is wrong for that until it is relabelled. *Done
+  2026-11-23 (`48785c16`): the Classes tab reads the labeller mode and says
+  "consistency" against the teacher's own 94%, and a disabled tagger shows a
+  notice instead of empty tables.*
 - **glass (P5)** still labels with Haiku through the user's Copilot account. The
   same reasoning applies there, but a Sonnet call per turn on someone else's
   Copilot plan is their quota, so glass changes only when that is decided.
@@ -805,6 +809,131 @@ its gate and a maintainer records evidence.
 **Today it routes nothing.** No class has passed its gate (all collecting) and
 the coding team's package has no `evidence/` yet.
 
+## P6 — a team-pooled gate (design, 2026-11-23)
+
+**Why.** The gate is reached one machine at a time, and one machine is slow.
+Re-checked 2026-11-23 on coding (teacher-only labeller since 2026-10-31):
+`status` passes (37/40, 92.5%) because it is re-checked on every turn;
+`explain` has 12/12; every other class has 0–5 checks at 1 turn in 10. Three
+things multiply into that:
+
+| Factor | Today | Lever |
+|---|---|---|
+| Turns that get a label | ~10 a day per person; ~95% of what the proxy sees is mid-loop, utility, automated or noise and is skipped, rightly | none: the skip is what keeps the label a *job* label |
+| Labels that get re-checked | coding 10% (100% for status/explain), glass 25% | 100% while a class is collecting (below) |
+| People counted | one: labels stay in the local token DB | **pool the counts across a team** |
+
+A 3% class needs ~700 labelled turns at 10% re-checks. Five members at 100%
+re-checks reach 20 checks for it in about two weeks, and the common classes in
+one to two days.
+
+glass's own page shows the first problem in its purest form: labelling is
+opt-in (`enabled: false`), so a glass user who never ticks "Label my turns"
+sees a gate of zeros. Nothing below helps until members switch it on.
+
+**What exists to build on.** A team already shares ONE taxonomy: coding binds
+it through `teams.yaml` (P2), glass through `glass job-classes join <git-url>`,
+which keeps a shallow sparse clone of the package's `job-classes/` under
+`GLASS_HOME` (`syncTeamTaxonomy`, `lib/glass/job-classes.mjs`). Proposals
+(P3) already show the privacy rule: no prompt leaves a machine, members are
+10-character pseudonyms. What is NOT shared is the gate's evidence: the
+`(teacherSampled, teacherAgree)` pairs per class (`classAgreement()` in
+rapid-llm-proxy `job-class.mjs`) live only in each machine's token DB.
+
+### Design
+
+**1. What a member publishes: counts, never prompts.** One file per member,
+`job-classes/gate/<pseudonym>.json`, a full snapshot that replaces itself
+(so a republish is idempotent and nothing double-counts):
+
+```json
+{
+  "member": "k3v9q2x7pa",
+  "publishedAt": "2026-11-23T10:00:00Z",
+  "pools": [{
+    "taxonomy": "job-classes-coding-v2",
+    "student": "claude-haiku-5.5",
+    "teacher": "claude-sonnet-5",
+    "since": "2026-10-31T00:00:00Z",
+    "classes": { "status": { "labelled": 43, "checked": 40, "agree": 37 } },
+    "confusions": [["status", "explain", 2]]
+  }]
+}
+```
+
+- **Pool key = (taxonomy version tag, student model, teacher model).** Counts
+  are only added within one key. coding's teacher-only labeller (student ==
+  teacher) measures consistency; glass's Haiku → Sonnet measures student
+  precision. Different questions, so they are shown side by side, never summed.
+  A taxonomy fold (P3) starts a new tag, so a new pool; old tags still resolve
+  through `resolveClass` as they do in `summary`.
+- **`confusions`**: `(labeller class, teacher class, n)` for the disagreements.
+  Pooled, these are exactly what `fold` needs to pick the merge-to-make-room
+  pair, from a team's worth of turns instead of the maintainer's reference set.
+  Still counts only.
+- **Counts reveal volume and the kind of work** a pseudonym does. That is less
+  than a proposal reveals, but it is not nothing: publishing is opt-in, and a
+  member's first publish says so, the way offload's "what leaves your machine"
+  does.
+
+**2. Where it is written, and by whom.** Into the team PACKAGE repo, under
+`gate/`, one file per member, each member writing only its own.
+
+- This departs from P3, where a proposal sits in the proposer's own learning
+  repo and the maintainer gathers them. That works for coding members, but a
+  glass-only member HAS no learning repo. A per-member file in a shared
+  directory keeps the P3 property that matters (no two writers touch one file,
+  so no merge conflict) and asks members for write access to the package repo.
+  For a small group on bmw.ghe that is the normal setup. The validator rejects
+  a commit that touches another member's file or anything outside `gate/`.
+- **glass**: `glass job-classes publish` (and a button in the Classes tab)
+  writes the file into the sparse clone, commits and pushes with the user's own
+  git credentials, as `join` already pulls. A shallow clone can push a new
+  commit on top of its tip. On a non-fast-forward it pulls and retries once:
+  another member's file never conflicts with ours. Opt-in auto-publish once a
+  day while labelling is on.
+- **coding**: the same writer, run by `coding sync --push` into the team's
+  package clone under `var/shared/`, keeping "nothing else ever pushes".
+
+**3. Reading the pool.** rapid-llm-proxy `GET /api/job-classes/summary` gains
+`scope=team`. It reads `gate/*.json` beside the taxonomy file it already
+resolves, drops this machine's own pseudonym (its live local counts replace
+the published snapshot, so it is never counted twice), and adds the rest per
+pool key. The Gate panel shows **this machine** and **team** columns. Its
+verdict comes from the team pool, with the member count beside it, and a
+member file older than 14 days is greyed and left out.
+
+**4. Sampling that stops when the pool is done.** Per class, the teacher
+re-checks every turn while that class's POOLED checks are below 20, then
+falls back to the base rate (coding 0.1, glass the user's setting). This
+generalises `teacher_sample_by_class` from a hand-written list into a rule.
+Each member's extra Sonnet calls go only to classes the team still needs, so
+the quota cost shrinks as the gate fills. It needs the pool locally, which
+`pull`/`coding sync` already deliver.
+
+**5. What the pool may drive.** Reporting: from day one. The class floor
+(routing, P4) recounts the gate itself (`GATE` in `job-class.mjs`). Whether it
+may count teammates' numbers is a trust decision: a member can publish any
+numbers, and the floor changes which model answers. Default: the floor keeps
+the LOCAL gate, and `job_classes.routing.gate_scope: team` lets a team opt in.
+
+**6. Past turns stay apart.** `glass job-classes measure` / coding's
+measurement give hundreds of checked prompts at once, but from a different
+draw (recent transcripts, two teacher passes, one student) than live turns.
+They are shown as "offline" beside the live pool, never added to it.
+
+### Steps
+
+| Step | Where | Check |
+|---|---|---|
+| P6a format + validator + writer | shared `lib/job-classes/gate-pool.mjs` (extracted into glass), `glass job-classes publish`, `coding sync --push` hook | republishing twice leaves one identical file; a touched foreign file is refused |
+| P6b team read | rapid-llm-proxy `summary?scope=team`, `GateProgress.tsx` team column | two stub members + local counts give the right sums per pool key; own pseudonym not counted twice; mismatched models shown apart |
+| P6c pooled sampling | `job-class.mjs` sampler reads the pool | a class with 20 pooled checks drops to base rate; with the pool unreadable, the tagger keeps the configured rates (fail-open) |
+| P6d glass UI | Classes tab: publish button, member count, the "labelling is off" notice already landed | a glass-only member publishes and sees the team total |
+
+Rough size: P6a and P6b are a few days together. P6c is small once P6b reads
+the pool. Nothing here changes the labeller or the taxonomy.
+
 ## Open questions (yours to decide)
 
 1. **What is the class primarily for**: routing savings, or reporting plus trial
@@ -820,3 +949,11 @@ the coding team's package has no `evidence/` yet.
    dedup to be reproducible, and teacher LLM calls are not.
 5. **Real exemplars on bmw.ghe.** Allowed opt-in, or synthetic-only everywhere for
    one rule instead of two?
+6. **P6 write access.** Members write their own `gate/<pseudonym>.json` into the
+   team package repo (needs write access for every member), or a maintainer
+   collects from members' own repos as in P3 (no glass-only members then)?
+7. **P6 and routing.** May the class floor count teammates' published numbers
+   (`gate_scope: team`), or only this machine's own?
+8. **P6 for glass's labeller.** Pool glass as Haiku → Sonnet (student precision),
+   or switch glass to teacher-only like coding so both pools measure the same
+   thing and can be added up, at a Sonnet call per turn on each member's quota?
