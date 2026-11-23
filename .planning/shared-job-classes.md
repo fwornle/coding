@@ -914,8 +914,10 @@ the quota cost shrinks as the gate fills. It needs the pool locally, which
 **5. What the pool may drive.** Reporting: from day one. The class floor
 (routing, P4) recounts the gate itself (`GATE` in `job-class.mjs`). Whether it
 may count teammates' numbers is a trust decision: a member can publish any
-numbers, and the floor changes which model answers. Default: the floor keeps
-the LOCAL gate, and `job_classes.routing.gate_scope: team` lets a team opt in.
+numbers, and the floor changes which model answers. **Decided (Q7): the team
+pool by default** (`job_classes.routing.gate_scope: team`); a member can set
+`local` in the config or switch it off in the dashboard's Routing / Classes
+view, and the Gate panel says which scope the floor is using.
 
 **6. Past turns stay apart.** `glass job-classes measure` / coding's
 measurement give hundreds of checked prompts at once, but from a different
@@ -949,11 +951,13 @@ the pool. Nothing here changes the labeller or the taxonomy.
    dedup to be reproducible, and teacher LLM calls are not.
 5. **Real exemplars on bmw.ghe.** Allowed opt-in, or synthetic-only everywhere for
    one rule instead of two?
-6. **P6 write access.** Members write their own `gate/<pseudonym>.json` into the
-   team package repo (needs write access for every member), or a maintainer
-   collects from members' own repos as in P3 (no glass-only members then)?
-7. **P6 and routing.** May the class floor count teammates' published numbers
-   (`gate_scope: team`), or only this machine's own?
+6. ~~**P6 write access.**~~ **Decided 2026-11-23: every member gets write access**
+   to the team package repo and writes its own `gate/<pseudonym>.json`.
+7. ~~**P6 and routing.**~~ **Decided 2026-11-23: configurable, default team.** The
+   class floor counts the team pool by default (`job_classes.routing.gate_scope:
+   team`); a member can switch to `local` in the config and in the dashboard's
+   Routing / Classes view. This reverses the design's proposed default (§5 above):
+   the team defines routing unless a member opts out.
 8. **P6 for glass's labeller.** Pool glass as Haiku → Sonnet (student precision),
    or switch glass to teacher-only like coding so both pools measure the same
    thing and can be added up, at a Sonnet call per turn on each member's quota?
