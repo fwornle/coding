@@ -8,9 +8,10 @@
 #     Error: navigate failed: send failed because receiver is gone
 #
 # and keeps failing forever, because nothing notices. The daemon is not
-# supervised — no launchd job, no KeepAlive — and the published binary is a
-# closed prebuilt (a root-owned symlink into ~/.gsd-browser/bin), so the restart
-# cannot be added where it belongs, inside the daemon. This shim is the next
+# supervised — no launchd job, no KeepAlive — and the binary is upstream's
+# (open-gsd/gsd-browser; scripts/build-gsd-browser.sh rebuilds it locally only
+# to carry the #fragment-navigation fix), so a restart inside the daemon is an
+# upstream change, not one to carry here as well. This shim is the next
 # best place: it sits earlier on PATH than /usr/local/bin, notices that exact
 # failure, restarts the daemon, and retries once.
 #
