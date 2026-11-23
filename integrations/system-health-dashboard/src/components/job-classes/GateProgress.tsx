@@ -17,6 +17,12 @@
  * there is no student to gate. The same counts then measure the teacher's
  * consistency: a second teacher pass on a sample of turns, agreeing with the
  * first. The panel says so rather than calling that "the student's precision".
+ *
+ * TEAM (P6): with a team package, the same counts summed over the members who
+ * publish theirs (`summary?scope=team`, rapid-llm-proxy gate-pool.mjs) — this
+ * machine live, teammates from their `gate/<pseudonym>.json`. Only one pool is
+ * added up (same taxonomy version, labeller and checker); a member on other
+ * models or an older version is named, not added.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -28,6 +34,10 @@ const GATE_PRECISION = 0.9
 const GATE_MIN_CHECKED = 20
 
 interface ClassCount { jobClass: string; turns: number; teacherSampled: number; teacherAgree: number }
+interface PoolCounts { labelled: number; checked: number; agree: number }
+interface TeamPool { taxonomy: string; labeller: string; checker: string; members: string[]; local: boolean; classes: Record<string, PoolCounts> }
+interface TeamMember { member: string; self?: boolean; live?: boolean; publishedAt?: string; stale?: boolean; error?: string }
+interface Team { gateDir: string | null; self: string; members: TeamMember[]; pools: TeamPool[] }
 type Verdict = 'passes' | 'below' | 'collecting'
 
 const pct = (x: number) => `${(x * 100).toFixed(0)}%`
@@ -50,6 +60,7 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
   const [samplePct, setSamplePct] = useState<number | null>(null)
   // Classes the tagger re-checks on every turn (teacher_sample_by_class: 1.0), e.g. the replay classes.
   const [alwaysChecked, setAlwaysChecked] = useState<string[]>([])
+  const [team, setTeam] = useState<Team | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -57,11 +68,12 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
       const get = (path: string) => fetch(`${proxyBase}${path}`).then(r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json() })
       const [cov, sum, tagger] = await Promise.all([
         get(`/api/job-classes/coverage?days=90&${q}`),
-        get(`/api/job-classes/summary?days=90&${q}`),
+        get(`/api/job-classes/summary?days=90&${q}&scope=team`),
         get('/api/job-classes').catch(() => null),
       ])
       setClasses(((cov?.taxonomy?.classes ?? []) as { id: string }[]).map(c => c.id))
       setCounts(sum?.byClass ?? [])
+      setTeam(sum?.team?.gateDir ? sum.team as Team : null)
       const cfg = tagger?.config
       setSelfCheck(!!cfg?.studentProcess && cfg.studentProcess === cfg.teacherProcess)
       setSamplePct(typeof cfg?.teacherSamplePct === 'number' ? cfg.teacherSamplePct : null)
@@ -80,6 +92,26 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
     const agree = c?.teacherAgree ?? 0
     return { id, turns: c?.turns ?? 0, checked, agree, verdict: verdictOf(checked, agree) }
   }), [classes, counts])
+  // The team's pool: the one this machine labels into most (it may have older,
+  // student-era pools too), else — nothing labelled here yet — the one most
+  // members share. The others are named below the table, not added.
+  const teamPool = useMemo(() => {
+    const all = team?.pools ?? []
+    const size = (p: TeamPool) => Object.values(p.classes).reduce((n, c) => n + c.labelled, 0)
+    const local = all.filter(p => p.local).sort((a, b) => size(b) - size(a))
+    return local[0] ?? [...all].sort((a, b) => b.members.length - a.members.length || size(b) - size(a))[0] ?? null
+  }, [team])
+  const teamRows = useMemo(() => new Map(rows.map(r => {
+    const c = teamPool?.classes[r.id]
+    return [r.id, { checked: c?.checked ?? 0, agree: c?.agree ?? 0, verdict: verdictOf(c?.checked ?? 0, c?.agree ?? 0) }]
+  })), [rows, teamPool])
+  const teamPassing = [...teamRows.values()].filter(r => r.verdict === 'passes').length
+  const otherPools = (team?.pools ?? []).filter(p => p !== teamPool)
+  const ago = (iso?: string) => {
+    if (!iso) return ''
+    const d = Math.floor((Date.now() - Date.parse(iso)) / 86_400_000)
+    return d <= 0 ? 'today' : d === 1 ? '1 day ago' : `${d} days ago`
+  }
   const passing = rows.filter(r => r.verdict === 'passes').length
   const below = rows.filter(r => r.verdict === 'below').length
   const label = selfCheck ? SELF_CHECK_LABEL : VERDICT_LABEL
@@ -118,6 +150,11 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
             <span className="font-medium">{passing} of {rows.length}</span> classes {selfCheck ? 'consistent' : 'pass'}
             {below > 0 && <>, <span className="font-medium">{below}</span> {label.below}</>}
             , {rows.length - passing - below} still collecting.
+            {teamPool && (
+              <> Across the team (<span className="font-medium">{teamPool.members.length}</span>{' '}
+                {teamPool.members.length === 1 ? 'member' : 'members'}): <span className="font-medium">{teamPassing} of {rows.length}</span>{' '}
+                {selfCheck ? 'consistent' : 'pass'}.</>
+            )}
           </div>
         )}
         {classes && (
@@ -130,6 +167,9 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
                 <TableHead className="text-right">{selfCheck ? 'Second pass agrees' : 'Teacher agrees'}</TableHead>
                 <TableHead className="text-right">{selfCheck ? 'Agreement' : 'Precision'}</TableHead>
                 <TableHead>{selfCheck ? 'Consistency' : 'Gate'}</TableHead>
+                {teamPool && <TableHead className="border-l">Team: checked</TableHead>}
+                {teamPool && <TableHead className="text-right">Team agreement</TableHead>}
+                {teamPool && <TableHead>Team</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -148,10 +188,54 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
                   <TableCell className="text-right tabular-nums">{r.checked ? r.agree : '—'}</TableCell>
                   <TableCell className="text-right tabular-nums">{r.checked ? pct(r.agree / r.checked) : '—'}</TableCell>
                   <TableCell><Badge variant={VERDICT_BADGE[r.verdict]}>{label[r.verdict]}</Badge></TableCell>
+                  {teamPool && (() => {
+                    const t = teamRows.get(r.id)!
+                    return (
+                      <>
+                        <TableCell className="border-l">
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 w-24 rounded bg-muted overflow-hidden">
+                              <div className="h-full bg-primary" style={{ width: `${Math.min(1, t.checked / GATE_MIN_CHECKED) * 100}%` }} />
+                            </div>
+                            <span className="text-xs text-muted-foreground tabular-nums">{t.checked} / {GATE_MIN_CHECKED}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">{t.checked ? `${t.agree} (${pct(t.agree / t.checked)})` : '—'}</TableCell>
+                        <TableCell data-testid={`gate-team-${r.id}`}><Badge variant={VERDICT_BADGE[t.verdict]}>{label[t.verdict]}</Badge></TableCell>
+                      </>
+                    )
+                  })()}
                 </TableRow>
               ))}
             </TableBody>
           </Table>
+        )}
+        {team && (
+          <div className="text-xs text-muted-foreground space-y-1" data-testid="gate-team">
+            <div>
+              Team counts come from <span className="font-mono">gate/</span> in the team package: each member publishes
+              per-class counts, never a prompt (<span className="font-mono">coding job-classes publish</span> /{' '}
+              <span className="font-mono">glass job-classes publish</span>).
+              {teamPool && <> Added up: {teamPool.labeller}{teamPool.checker && teamPool.checker !== teamPool.labeller ? <> checked by {teamPool.checker}</> : teamPool.checker ? ' (checked by itself)' : ''}, <span className="font-mono">{teamPool.taxonomy}</span>.</>}
+            </div>
+            <div>
+              Members:{' '}
+              {team.members.map((m, i) => (
+                <span key={m.member} className={m.error || m.stale ? 'line-through' : ''} title={m.error || (m.stale ? 'older than 14 days: not added' : '')}>
+                  {i > 0 && ', '}<span className="font-mono">{m.member}</span>
+                  {m.self ? ' (this machine, live)' : m.error ? ' (unreadable)' : m.stale ? ` (stale, ${ago(m.publishedAt)})` : ` (${ago(m.publishedAt)})`}
+                </span>
+              ))}
+              {team.members.length === 1 && team.members[0].self && '. No teammate has published yet.'}
+            </div>
+            {otherPools.map(p => (
+              <div key={`${p.taxonomy}|${p.labeller}|${p.checker}`}>
+                Not added: {p.members.map(m => m === team.self ? 'this machine' : m).join(', ')} with {p.labeller}
+                {p.checker ? ` checked by ${p.checker}` : ''} under <span className="font-mono">{p.taxonomy}</span>
+                {' '}({Object.values(p.classes).reduce((n, c) => n + c.checked, 0)} checked turns): a different labeller or taxonomy version measures something else.
+              </div>
+            ))}
+          </div>
         )}
       </CardContent>
     </Card>

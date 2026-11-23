@@ -13,6 +13,10 @@
 //                 off, glass makes no model call of its own for this.
 //   the taxonomy  the shipped default (config/job-classes.yaml), or a team's,
 //                 cloned from its learning repo (`job-classes/` only).
+//   the gate      with a team's taxonomy, `publish` writes this member's gate
+//                 COUNTS (never a prompt) to the clone's job-classes/gate/ and
+//                 pushes them, so the team's Gate panel adds them up
+//                 (proxy-bridge/gate-pool.mjs, coding's P6; members have write access).
 //
 // Every glass session is bound to a task id of its own, so the task binding is
 // no sign of an automated run here (skipTaskBound: false); headless `claude -p`
@@ -23,6 +27,7 @@ import { execFile } from 'node:child_process';
 
 import { createJobClassTagger, loadTaxonomy, renderRequest, parseLabel } from '../../proxy/proxy-bridge/job-class.mjs';
 import { handleJobClassRead } from '../../proxy/proxy-bridge/job-class-api.mjs';
+import { gateDirOf, gateSnapshot, memberId, publishGate } from '../../proxy/proxy-bridge/gate-pool.mjs';
 import { runGh, loggedInHosts } from './copilot-quota.mjs';
 
 export const STUDENT_PROCESS = 'job-class-student';
@@ -283,6 +288,25 @@ export function createGlassJobClasses({
       try {
         const tax = await syncTeamTaxonomy({ url: t.url, dir: t.dir, git });
         json(res, 200, { ...(await view()), tag: tax.tag });
+      } catch (err) {
+        json(res, 400, { error: err?.message || String(err) });
+      }
+      return true;
+    }
+    if (url === '/api/job-classes/team/publish' && req.method === 'POST') {
+      const t = store.get().team;
+      if (!t || !fs.existsSync(teamTaxonomyFile(t.dir))) { json(res, 400, { error: 'no team taxonomy: join one first (only a team pools its gate)' }); return true; }
+      if (!db) { json(res, 400, { error: 'token DB unavailable' }); return true; }
+      try {
+        const tax = loadTaxonomy(teamTaxonomyFile(t.dir));
+        const member = memberId();
+        const pools = gateSnapshot({ db, tax });
+        const r = await publishGate({
+          checkout: t.dir, gateDir: gateDirOf(teamTaxonomyFile(t.dir)), member, pools, push: body.push !== false,
+          git: (args) => git('git', ['-C', t.dir, ...args]),
+        });
+        log(`job classes: gate counts of ${member} for ${tax.tag}: ${r.changed ? 'updated' : 'unchanged'}${r.pushed ? ', pushed' : ''}${r.error ? ` — ${r.error}` : ''}`);
+        json(res, r.error ? 502 : 200, { ...r, member, tag: tax.tag, pools: pools.length });
       } catch (err) {
         json(res, 400, { error: err?.message || String(err) });
       }
