@@ -48,6 +48,8 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
   // The teacher labels live turns itself; its second pass is a consistency check.
   const [selfCheck, setSelfCheck] = useState(false)
   const [samplePct, setSamplePct] = useState<number | null>(null)
+  // Classes the tagger re-checks on every turn (teacher_sample_by_class: 1.0), e.g. the replay classes.
+  const [alwaysChecked, setAlwaysChecked] = useState<string[]>([])
 
   const load = useCallback(async () => {
     try {
@@ -63,6 +65,7 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
       const cfg = tagger?.config
       setSelfCheck(!!cfg?.studentProcess && cfg.studentProcess === cfg.teacherProcess)
       setSamplePct(typeof cfg?.teacherSamplePct === 'number' ? cfg.teacherSamplePct : null)
+      setAlwaysChecked(Object.entries((cfg?.teacherSampleByClass ?? {}) as Record<string, number>).filter(([, p]) => p >= 1).map(([id]) => id))
       setError(sum?.error ?? null)
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e))
@@ -80,7 +83,10 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
   const passing = rows.filter(r => r.verdict === 'passes').length
   const below = rows.filter(r => r.verdict === 'below').length
   const label = selfCheck ? SELF_CHECK_LABEL : VERDICT_LABEL
-  const sample = samplePct !== null ? `1 turn in ${Math.round(1 / samplePct)}` : 'a sample of turns'
+  const base = samplePct === null ? 'a sample of turns' : samplePct >= 1 ? 'every turn' : samplePct > 0 ? `1 turn in ${Math.round(1 / samplePct)}` : 'no turn'
+  const sample = alwaysChecked.length > 0 && samplePct !== null && samplePct < 1
+    ? `${base} (every turn of ${alwaysChecked.join(', ')})`
+    : base
 
   return (
     <Card>
@@ -97,8 +103,9 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
             </>
           ) : (
             <>
-              A class passes when the teacher agrees with at least {pct(GATE_PRECISION)} of the student's labels for it,
-              over at least {GATE_MIN_CHECKED} teacher-checked turns. Counted over every label made under{' '}
+              The teacher re-labels {sample}. A class passes when the teacher agrees with at least{' '}
+              {pct(GATE_PRECISION)} of the student's labels for it, over at least {GATE_MIN_CHECKED} teacher-checked
+              turns. Counted over every label made under{' '}
               <span className="font-mono">{taxonomy}</span>, whatever the page's window.
             </>
           )}

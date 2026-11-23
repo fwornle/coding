@@ -32,6 +32,8 @@ import { RefreshButton } from '@/components/ui/refresh-button'
 
 /** Student-vs-teacher agreement on the test set, prompts nobody read while writing the taxonomy (claude-haiku-5.5, taxonomy v2). */
 const OFFLINE_AGREEMENT = 0.855
+/** Teacher pass 2 vs pass 1 on the same dev+test prompts (taxonomy v2, 2026-10-30): the ceiling a teacher-only labeller is checked against. */
+const OFFLINE_SELF_AGREEMENT = 0.942
 
 interface ClassRow {
   jobClass: string
@@ -64,7 +66,7 @@ interface Summary {
 }
 interface TaggerState {
   enabled: boolean
-  config?: { teacherSamplePct: number; studentProcess: string } | null
+  config?: { teacherSamplePct: number; studentProcess: string; teacherProcess?: string } | null
   observed: number
   labelled: number
   teacherSampled: number
@@ -141,6 +143,10 @@ export function JobClassesTab({ proxyBase, hours, controls, measureCommand }: { 
   const agreement = summary?.agreement
   const liveRate = agreement && agreement.sampled > 0 ? (agreement.agree ?? 0) / agreement.sampled : null
   const skipped = tagger ? Object.entries(tagger.skipped).sort((a, b) => b[1] - a[1]) : []
+  // The live labeller IS the teacher (coding since 2026-10-30): no student, and the
+  // teacher check is a second teacher pass. Same test as GateProgress.
+  const selfCheck = !!tagger?.config?.studentProcess && tagger.config.studentProcess === tagger.config.teacherProcess
+  const labeller = selfCheck ? 'the labeller' : 'the student'
 
   return (
     <div className="space-y-4">
@@ -150,8 +156,9 @@ export function JobClassesTab({ proxyBase, hours, controls, measureCommand }: { 
             <div>
               <CardTitle className="text-base flex items-center gap-2"><Tags className="h-4 w-4" /> Job classes</CardTitle>
               <CardDescription>
-                What kind of job each turn was, labelled in the background by a cheap model. Shadow only: nothing
-                routes on these labels yet.
+                What kind of job each turn was, labelled in the background by{' '}
+                {selfCheck ? 'the teacher model' : 'a cheap student model, with a share re-checked by a stronger teacher'}.
+                Shadow only: nothing routes on these labels yet.
               </CardDescription>
             </div>
             <RefreshButton onRefresh={() => load()} iconClassName="h-3.5 w-3.5" />
@@ -189,12 +196,20 @@ export function JobClassesTab({ proxyBase, hours, controls, measureCommand }: { 
               </span>
             </div>
           )}
+          {tagger && !tagger.enabled && (
+            <div className="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-foreground" data-testid="labelling-off">
+              Labelling is off on this machine, so no turn is labelled and every table below stays empty.
+              {controls ? ' Switch on "Label my turns" below to start.' : ' Enable job_classes in the proxy config to start.'}
+            </div>
+          )}
           <div className="text-muted-foreground">
-            Teacher check:{' '}
+            {selfCheck ? 'Consistency check' : 'Teacher check'}:{' '}
             {liveRate === null
-              ? 'no turn has been checked by the teacher in this window yet.'
-              : <>the student agreed with the teacher on <span className="text-foreground font-medium">{agreement!.agree} of {agreement!.sampled}</span> sampled turns ({pct(liveRate)}).</>}
-            {' '}Measured offline on unseen prompts: {pct(OFFLINE_AGREEMENT)}.
+              ? `no turn has been ${selfCheck ? 're-checked' : 'checked by the teacher'} in this window yet.`
+              : selfCheck
+                ? <>a second teacher pass agreed with the first on <span className="text-foreground font-medium">{agreement!.agree} of {agreement!.sampled}</span> re-checked turns ({pct(liveRate)}).</>
+                : <>the student agreed with the teacher on <span className="text-foreground font-medium">{agreement!.agree} of {agreement!.sampled}</span> sampled turns ({pct(liveRate)}).</>}
+            {' '}Measured offline on unseen prompts: {pct(selfCheck ? OFFLINE_SELF_AGREEMENT : OFFLINE_AGREEMENT)}.
             {liveRate !== null && agreement!.sampled < 100 && ' Too few checked turns to read much into yet.'}
           </div>
         </CardContent>
@@ -213,8 +228,8 @@ export function JobClassesTab({ proxyBase, hours, controls, measureCommand }: { 
         <CardHeader className="pb-2">
           <CardTitle className="text-base">By class</CardTitle>
           <CardDescription>
-            A class's tokens are every call of the turns labelled with it, tool loops included. "none" is a turn the
-            student could not place in any class.
+            A class's tokens are every call of the turns labelled with it, tool loops included. "none" is a turn {labeller}{' '}
+            could not place in any class.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -263,7 +278,7 @@ export function JobClassesTab({ proxyBase, hours, controls, measureCommand }: { 
       <Card>
         <CardHeader className="pb-2">
           <CardTitle className="text-base">Recently labelled turns</CardTitle>
-          <CardDescription>The opening of what the student was given, after redaction.</CardDescription>
+          <CardDescription>The opening of what {labeller} was given, after redaction.</CardDescription>
         </CardHeader>
         <CardContent>
           {(summary?.recent ?? []).length === 0 ? (
