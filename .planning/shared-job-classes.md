@@ -914,10 +914,31 @@ the quota cost shrinks as the gate fills. It needs the pool locally, which
 **5. What the pool may drive.** Reporting: from day one. The class floor
 (routing, P4) recounts the gate itself (`GATE` in `job-class.mjs`). Whether it
 may count teammates' numbers is a trust decision: a member can publish any
-numbers, and the floor changes which model answers. **Decided (Q7): the team
-pool by default** (`job_classes.routing.gate_scope: team`); a member can set
-`local` in the config or switch it off in the dashboard's Routing / Classes
-view, and the Gate panel says which scope the floor is using.
+numbers, and the floor changes which model answers. **Decided (Q7): this
+machine's own gate by default** (`job_classes.routing.gate_scope: local`); a
+member can opt in to routing by the team's verdict (`team`) in the config or in
+the dashboard's Routing / Classes view, and the Gate panel says which scope the
+floor is using. Reporting always shows both columns, whatever the scope.
+
+**5a. glass labels with Sonnet only, and samples once the gate is done
+(Q8).** glass switches to a teacher-only labeller like coding
+(`studentProcess == teacherProcess`, Sonnet), so glass and coding members
+measure the same thing and their counts add up in one pool. Labelling has two
+phases, per taxonomy version:
+
+| Phase | When | Labelled | Second pass |
+|---|---|---|---|
+| collecting | some class's POOLED checks < 20 | every turn | every turn of a class still below 20, base rate for the rest (§4) |
+| reporting | every class has a verdict (passes or below) in the pool | 1 turn in `report_sample_every` (default 5) | base rate, as a drift check |
+
+glass does not route, so its labels only feed the shares and tokens per class,
+and a uniform sample keeps those unbiased: the "By class" table scales a
+sampled turn's weight by N and says it does. coding keeps labelling every turn,
+because the class floor needs each turn's class. A new taxonomy version (a
+fold) starts collecting again. The Classes tab names the phase ("collecting:
+every turn" / "reporting: 1 turn in 5"), so a falling label rate reads as
+intended, not as a stalled labeller. With the pool unreadable the labeller
+stays in collecting (fail-open toward more labels, never fewer).
 
 **6. Past turns stay apart.** `glass job-classes measure` / coding's
 measurement give hundreds of checked prompts at once, but from a different
@@ -931,7 +952,8 @@ They are shown as "offline" beside the live pool, never added to it.
 | P6a format + validator + writer | shared `lib/job-classes/gate-pool.mjs` (extracted into glass), `glass job-classes publish`, `coding sync --push` hook | republishing twice leaves one identical file; a touched foreign file is refused |
 | P6b team read | rapid-llm-proxy `summary?scope=team`, `GateProgress.tsx` team column | two stub members + local counts give the right sums per pool key; own pseudonym not counted twice; mismatched models shown apart |
 | P6c pooled sampling | `job-class.mjs` sampler reads the pool | a class with 20 pooled checks drops to base rate; with the pool unreadable, the tagger keeps the configured rates (fail-open) |
-| P6d glass UI | Classes tab: publish button, member count, the "labelling is off" notice already landed | a glass-only member publishes and sees the team total |
+| P6d glass UI | Classes tab: publish button, member count, phase ("collecting" / "reporting: 1 turn in N"), the "labelling is off" notice already landed (0.1.93) | a glass-only member publishes and sees the team total |
+| P6e glass labeller | teacher-only labeller (Sonnet), collecting → reporting phase switch, `report_sample_every`, By-class weights | with the pool complete the tagger labels 1 in N and the shares match a full run within sampling error; with it unreadable every turn is labelled |
 
 Rough size: P6a and P6b are a few days together. P6c is small once P6b reads
 the pool. Nothing here changes the labeller or the taxonomy.
@@ -953,11 +975,12 @@ the pool. Nothing here changes the labeller or the taxonomy.
    one rule instead of two?
 6. ~~**P6 write access.**~~ **Decided 2026-11-23: every member gets write access**
    to the team package repo and writes its own `gate/<pseudonym>.json`.
-7. ~~**P6 and routing.**~~ **Decided 2026-11-23: configurable, default team.** The
-   class floor counts the team pool by default (`job_classes.routing.gate_scope:
-   team`); a member can switch to `local` in the config and in the dashboard's
-   Routing / Classes view. This reverses the design's proposed default (§5 above):
-   the team defines routing unless a member opts out.
-8. **P6 for glass's labeller.** Pool glass as Haiku → Sonnet (student precision),
-   or switch glass to teacher-only like coding so both pools measure the same
-   thing and can be added up, at a Sonnet call per turn on each member's quota?
+7. ~~**P6 and routing.**~~ **Decided 2026-11-23: configurable, default this
+   machine.** The class floor counts only this machine's gate by default
+   (`job_classes.routing.gate_scope: local`); a member can opt in to the team's
+   verdict (`team`) in the config and in the dashboard's Routing / Classes view
+   (§5). (Briefly decided as team-by-default the same day, then reconsidered.)
+8. ~~**P6 for glass's labeller.**~~ **Decided 2026-11-23: Sonnet only, sampled
+   after the gate.** glass labels every turn with the teacher while the pooled
+   gate collects, then 1 turn in `report_sample_every` (§5a). Labelling never
+   stops on its own; only its rate falls.
