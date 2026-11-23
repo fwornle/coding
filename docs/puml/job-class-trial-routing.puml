@@ -15,7 +15,7 @@ component "**judge, blind, both orders**\nthe same core answer?\ncontradictions?
 component "**verdict per class, agent, model**\n>= 20 pairs · 90 % the same core" as verdict <<core>>
 component "**the maintainer records it**\njob-classes replay evidence" as accept <<cli>>
 file "**evidence/status.json**\nin the team repo\ncounts and models, no prompts" as ev <<storage>>
-component "**the proxy's class floor**\nthe rest of a 'status' turn\n-> the cheaper model\n(gate passed, same provider)" as next <<core>>
+component "**the proxy's class floor**\nthe rest of a 'status' turn\n-> the cheaper model\n(same provider; gate passed on\nthis machine or for the team,\nper gate_scope, default local)" as next <<core>>
 
 turns -[#9C27B0,thickness=2]right-> inc
 turns -[#9C27B0,thickness=2]down-> cand

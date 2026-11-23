@@ -36,7 +36,7 @@ Which kinds of job fill your days?
 Is the label right often enough to rely on?
 
 **Share**  
-One set of classes for the whole team.
+One set of classes, and one gate, for the whole team.
 
 </div>
 
@@ -132,11 +132,11 @@ so labelling never slows a turn down.
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![The labelling settings: the switch, the Copilot account, the student and teacher models, the teacher's share of turns, Try the account, and the team taxonomy field](images/ui-job-classes-settings.png)](images/ui-job-classes-settings.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![The labelling settings: the switch, the Copilot account, Labels with (the teacher model), Second pass, After the gate: label 1 turn in N, Try the account, and the taxonomy with Publish my gate counts](images/ui-job-classes-settings.png)](images/ui-job-classes-settings.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
 <figcaption>Off until you tick Label my turns.</figcaption>
 </figure>
-<p class="overview-takeaway">Your account, your quota, redacted prompts. Nothing is sent anywhere else.</p>
+<p class="overview-takeaway">Your account, your quota, redacted prompts. No prompt is sent anywhere else.</p>
 </section>
 
 <section class="overview-slide overview-essential" id="slide-5" aria-labelledby="gjc-measure" markdown="1">
@@ -250,6 +250,9 @@ Every turn of a class is checked until it has 20 checks, so a class needs about 
 turns of its own kind — fewer when teammates publish their counts. Then 10 % are
 checked, and once every class has a verdict, 1 turn in 5 is labelled.
 
+With a team's classes joined, **Team** columns stand beside this machine's: the
+counts your teammates published, added up with yours.
+
 </div>
 <figure class="overview-figure" markdown="1">
 
@@ -280,8 +283,8 @@ glass job-classes join https://<host>/<owner>/<repo>.git
 | Get the newest version | `glass job-classes pull` | **Update** |
 | Go back to the default | `glass job-classes leave` | **Use the default** |
 
-The repo holds classes and their changelog, never prompts. Your labels and gate
-counts stay on your machine.
+The repo holds classes and their changelog, never prompts. Your labels stay on
+your machine; your gate counts go to the repo only if you publish them.
 
 </div>
 <figure class="overview-figure" markdown="1">
@@ -293,7 +296,49 @@ counts stay on your machine.
 <p class="overview-takeaway">One taxonomy for the team, whether a colleague runs coding or only glass.</p>
 </section>
 
-<section class="overview-slide overview-essential" id="slide-10" aria-labelledby="gjc-split" markdown="1">
+<section class="overview-slide" id="slide-10" aria-labelledby="gjc-pool" markdown="1">
+<div class="overview-copy" markdown="1">
+
+<p class="overview-kicker">Share, continued · in glass</p>
+
+## Pool the gate with your team {#gjc-pool}
+
+Alone, a class reaches its 20 checks slowly. A team gets there together:
+
+```sh
+glass job-classes publish            # or: Publish my gate counts
+```
+
+This writes your **counts** — per class: labelled, checked, agreed, and which
+classes were confused — to `job-classes/gate/<pseudonym>.json` in the team's
+repo, and pushes it with your own git login. The pseudonym is a hash of host
+and user name, not your name. No prompt is in it. You need write access to the
+repo; `--no-push` only commits.
+
+The Gate panel adds up the members on the **same models and taxonomy
+version**; the others are listed as *Not added*. Files older than 14 days are
+left out, and your own counts are taken live, never twice.
+
+</div>
+<figure class="overview-figure" markdown="1">
+
+```text
+$ glass job-classes publish
+job-classes-v2 as <pseudonym>: 1 pool(s), updated, committed, pushed
+Counts only (labelled / checked / agreed per class); no prompt leaves this machine.
+```
+
+| Phase | Labelled | Second pass |
+|---|---|---|
+| **collecting**: some class below 20 checks, team included | every turn | every turn of a class below 20 checks |
+| **reporting**: every class has its 20 checks | 1 turn in 5, each label counted 5 times | 10 % of turns |
+
+<figcaption>Nothing is published until you run it. Publishing unchanged counts changes nothing; a new taxonomy version starts collecting again.</figcaption>
+</figure>
+<p class="overview-takeaway">The team reaches the gate sooner; prompts still stay on each machine.</p>
+</section>
+
+<section class="overview-slide overview-essential" id="slide-11" aria-labelledby="gjc-split" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">glass and coding</p>
@@ -307,6 +352,7 @@ Most people only install glass. It labels, measures and shows on its own.
 |---|---|---|
 | Label turns; tree, map, gate | ✅ | ✅ |
 | Join a team's classes | ✅ | ✅ |
+| Pool the gate with the team (publish counts) | ✅ | ✅ |
 | Create and grow a team's classes | | ✅ |
 | Replay a class on a cheaper model | | ✅ |
 | Route a proven class cheaper | | ✅ pi, opencode, Copilot CLI |
@@ -315,14 +361,14 @@ Most people only install glass. It labels, measures and shows on its own.
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![In glass, your prompt is labelled by the student and checked by the teacher, and the Classes tab shows the result; the team repo's classes are joined by URL. On a machine running coding, past turns of a class are replayed on a cheaper model and judged blind; the evidence goes to the team repo, and proven classes are routed to the cheaper model.](images/glass-job-classes-split.png)](images/glass-job-classes-split.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
+[![In glass, your prompt is labelled by the teacher model (Sonnet) on your Copilot account and checked by a second pass, every turn of a class until it has 20 checks; your gate counts are published to the team repo, and the Classes tab shows this machine and the team. The team repo's classes are joined by URL. On a machine running coding, past turns of a class are replayed on a cheaper model and judged blind; the evidence goes to the team repo, and proven classes are routed to the cheaper model.](images/glass-job-classes-split.png)](images/glass-job-classes-split.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
 
-<figcaption>The team repo carries the classes to glass, and the evidence from coding.</figcaption>
+<figcaption>The team repo carries the classes and the members' gate counts, and the evidence from coding. Never a prompt.</figcaption>
 </figure>
 <p class="overview-takeaway">glass sorts and shows; coding proves and routes; the team shares both.</p>
 </section>
 
-<section class="overview-slide" id="slide-11" aria-labelledby="gjc-why" markdown="1">
+<section class="overview-slide" id="slide-12" aria-labelledby="gjc-why" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">glass and coding, continued</p>
@@ -367,7 +413,7 @@ glass doesn't do this, for two reasons:
 <p class="overview-takeaway">No model gets cheaper without evidence from real past turns.</p>
 </section>
 
-<section class="overview-slide" id="slide-12" aria-labelledby="gjc-trials" markdown="1">
+<section class="overview-slide" id="slide-13" aria-labelledby="gjc-trials" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Next to classes</p>

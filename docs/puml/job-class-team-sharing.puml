@@ -6,25 +6,31 @@ skinparam arrowFontSize 13
 skinparam shadowing false
 skinparam componentStyle rectangle
 hide stereotype
-title A team shares one taxonomy
+title A team shares one taxonomy and pools its gate
 
 package "a team member's learning repo  (e.g. coding-history)" {
   component "**job-classes/taxonomy.yaml**\nname, version, classes,\ngroups, prompt" as tax <<storage>>
   component "**job-classes/CHANGELOG.md**\none line per version" as log <<storage>>
+  component "**job-classes/gate/<pseudonym>.json**\none per member: per-class counts\nlabelled · checked · agree, confusions\nno prompts" as gate <<storage>>
 }
 
 component "**first member**\ncoding job-classes init --team <id>\nwrites the package, commits locally;\ncoding sync --push shares it" as first <<cli>>
 component "**each other member**\ncoding job-classes join ~--team <id> ~--repo <url>\nbinds the team in $HOME/.coding/teams.yaml,\nclones the repo; coding sync pulls it" as member <<cli>>
 component "**bindings index**\nvar/job-classes/bindings.json\nproject -> team -> taxonomy file" as index <<storage>>
+component "**Classes -> Gate panel**\nadds up the members of one pool\n(taxonomy version, labeller, checker);\nthis machine counts live, never twice" as panel <<api>>
 component "**LLM proxy**\nlabels a project's turns with its\nteam's taxonomy, the rest with the\ndefault; a project two teams claim\nis not labelled" as proxy <<core>>
 
-first -[#9C27B0,thickness=2]right-> tax : creates
-first -[#9C27B0,thickness=2]right-> log
+first -[#9C27B0,thickness=2]right-> tax
+first -[#9C27B0,thickness=2]right-> log : creates
 tax -[#FF9800,thickness=2]down-> member : pull
 member -[#9C27B0,thickness=2]right-> index : rewritten on join\nand on every pull
 index -[#FF9800,thickness=2]right-> proxy : read by mtime
 tax -[#FF9800,thickness=2]down-> proxy : the file it names
 tax -[hidden]right- log
+tax -[hidden]down- gate
+member -[#9C27B0,thickness=2]up-> gate : coding job-classes\npublish
+member -[hidden]down- panel
+gate -[#FF9800,thickness=2]down-> panel : pulled on sync
 
 legend right
   built

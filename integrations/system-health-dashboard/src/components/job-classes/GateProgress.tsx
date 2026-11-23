@@ -66,6 +66,8 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
   const [samplePct, setSamplePct] = useState<number | null>(null)
   // Classes the tagger re-checks on every turn (teacher_sample_by_class: 1.0), e.g. the replay classes.
   const [alwaysChecked, setAlwaysChecked] = useState<string[]>([])
+  // sample_until_gate (P6c): every turn of a class below 20 pooled checks is re-checked.
+  const [untilGate, setUntilGate] = useState(false)
   const [team, setTeam] = useState<Team | null>(null)
   // The floor's gate scope; null where the proxy does not route by class (glass).
   const [scope, setScope] = useState<'local' | 'team' | null>(null)
@@ -87,6 +89,7 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
       const cfg = tagger?.config
       setSelfCheck(!!cfg?.studentProcess && cfg.studentProcess === cfg.teacherProcess)
       setSamplePct(typeof cfg?.teacherSamplePct === 'number' ? cfg.teacherSamplePct : null)
+      setUntilGate(cfg?.sampleUntilGate === true)
       setAlwaysChecked(Object.entries((cfg?.teacherSampleByClass ?? {}) as Record<string, number>).filter(([, p]) => p >= 1).map(([id]) => id))
       setError(sum?.error ?? null)
     } catch (e: unknown) {
@@ -144,9 +147,10 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
   const below = rows.filter(r => r.verdict === 'below').length
   const label = selfCheck ? SELF_CHECK_LABEL : VERDICT_LABEL
   const base = samplePct === null ? 'a sample of turns' : samplePct >= 1 ? 'every turn' : samplePct > 0 ? `1 turn in ${Math.round(1 / samplePct)}` : 'no turn'
-  const sample = alwaysChecked.length > 0 && samplePct !== null && samplePct < 1
+  const withFixed = alwaysChecked.length > 0 && samplePct !== null && samplePct < 1
     ? `${base} (every turn of ${alwaysChecked.join(', ')})`
     : base
+  const sample = untilGate ? `every turn of a class with fewer than ${GATE_MIN_CHECKED} checks, then ${withFixed}` : withFixed
 
   return (
     <Card>

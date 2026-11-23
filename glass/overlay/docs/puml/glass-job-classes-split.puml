@@ -10,12 +10,12 @@ title glass sorts and shows; coding proves and routes
 
 rectangle "Your machine, glass" {
   component "**Your prompt**\n“Is the benchmark finished?”" as turn <<agent>>
-  component "**1  Label**\nthe student (your Copilot account)\nsays: this is a **status** job" as label <<core>>
-  component "**2  Check the label**\nthe teacher re-labels a share;\nthe gate: 90 % of 20+ checks" as check <<core>>
-  component "**Classes tab**\ntree · map · gate\nwhat your work consists of" as tab <<api>>
+  component "**1  Label**\nthe teacher (Sonnet, your Copilot account)\nsays: this is a **status** job" as label <<core>>
+  component "**2  Second pass**\nevery turn of a class until it has\n20 checks; the gate: 90 % agree" as check <<core>>
+  component "**Classes tab**\ntree · map · gate\nthis machine + the team" as tab <<api>>
 }
 
-file "**Team repo**\nclasses + evidence\nno prompts" as repo <<storage>>
+file "**Team repo**\nclasses, gate counts, evidence\nno prompts" as repo <<storage>>
 
 rectangle "A machine running coding" {
   component "**3  Prove a cheaper model**\nreplay past turns of a class,\na blind judge compares the answers" as prove <<core>>
@@ -26,6 +26,8 @@ turn -[#E53935,thickness=2]down-> label
 label -[#9C27B0,thickness=2]down-> check
 check -[#9C27B0,thickness=2]down-> tab
 repo -[#FF9800,thickness=2]left-> label : classes, joined by URL
+check -[#FF9800,thickness=2]right-> repo : gate counts\n(publish)
+repo -[#FF9800,thickness=2]left-> tab : team's counts
 prove -[#FF9800,thickness=2]up-> repo : evidence
 prove -[#9C27B0,thickness=2]down-> route
 
