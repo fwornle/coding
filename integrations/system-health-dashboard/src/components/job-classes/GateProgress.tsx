@@ -23,11 +23,17 @@
  * machine live, teammates from their `gate/<pseudonym>.json`. Only one pool is
  * added up (same taxonomy version, labeller and checker); a member on other
  * models or an older version is named, not added.
+ *
+ * GATE SCOPE: where the proxy routes by class (the class floor — coding, not
+ * glass), its gate is this machine's checks by default; the switch here sets
+ * `job_classes.routing.gate_scope` to `team` (PATCH /api/llm/routing) so the
+ * team's pooled verdict decides instead.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 const GATE_PRECISION = 0.9
@@ -61,6 +67,9 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
   // Classes the tagger re-checks on every turn (teacher_sample_by_class: 1.0), e.g. the replay classes.
   const [alwaysChecked, setAlwaysChecked] = useState<string[]>([])
   const [team, setTeam] = useState<Team | null>(null)
+  // The floor's gate scope; null where the proxy does not route by class (glass).
+  const [scope, setScope] = useState<'local' | 'team' | null>(null)
+  const [scopeBusy, setScopeBusy] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -74,6 +83,7 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
       setClasses(((cov?.taxonomy?.classes ?? []) as { id: string }[]).map(c => c.id))
       setCounts(sum?.byClass ?? [])
       setTeam(sum?.team?.gateDir ? sum.team as Team : null)
+      setScope(tagger?.routing ? (tagger.routing.gateScope === 'team' ? 'team' : 'local') : null)
       const cfg = tagger?.config
       setSelfCheck(!!cfg?.studentProcess && cfg.studentProcess === cfg.teacherProcess)
       setSamplePct(typeof cfg?.teacherSamplePct === 'number' ? cfg.teacherSamplePct : null)
@@ -85,6 +95,24 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
   }, [proxyBase, taxonomy])
 
   useEffect(() => { void load() }, [load])
+
+  const setGateScope = useCallback(async (next: 'local' | 'team') => {
+    setScopeBusy(true)
+    try {
+      const res = await fetch(`${proxyBase}/api/llm/routing`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobClasses: { routing: { gateScope: next } } }),
+      })
+      const out = await res.json().catch(() => ({}))
+      if (!res.ok || out?.error) throw new Error(out?.error || `save failed (HTTP ${res.status})`)
+      await load()
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setScopeBusy(false)
+    }
+  }, [proxyBase, load])
 
   const rows = useMemo(() => (classes ?? []).map(id => {
     const c = counts.find(x => x.jobClass === id)
@@ -155,6 +183,23 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
                 {teamPool.members.length === 1 ? 'member' : 'members'}): <span className="font-medium">{teamPassing} of {rows.length}</span>{' '}
                 {selfCheck ? 'consistent' : 'pass'}.</>
             )}
+          </div>
+        )}
+        {scope && (
+          <div className="flex flex-wrap items-center gap-2 text-sm" data-testid="gate-scope">
+            <span className="text-muted-foreground">Routing by class trusts the gate of</span>
+            <div className="inline-flex rounded-md border">
+              <Button size="sm" variant={scope === 'local' ? 'default' : 'ghost'} className="h-7 rounded-r-none" disabled={scopeBusy}
+                onClick={() => scope !== 'local' && void setGateScope('local')} data-testid="gate-scope-local">this machine</Button>
+              <Button size="sm" variant={scope === 'team' ? 'default' : 'ghost'} className="h-7 rounded-l-none" disabled={scopeBusy || !team}
+                title={team ? '' : 'no team package: there is no team gate'}
+                onClick={() => scope !== 'team' && void setGateScope('team')} data-testid="gate-scope-team">the team</Button>
+            </div>
+            <span className="text-xs text-muted-foreground">
+              {scope === 'team'
+                ? "A class passing on the team's checks may move your calls to a cheaper model."
+                : "Teammates' numbers are shown, but only this machine's checks can change which model answers you."}
+            </span>
           </div>
         )}
         {classes && (
