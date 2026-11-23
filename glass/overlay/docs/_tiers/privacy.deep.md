@@ -41,6 +41,22 @@ login (read from `gh` when needed, never stored). `glass job-classes measure` se
 recent prompts from the agents' transcripts the same way, redacted, when you run it. The
 label and a 120-character redacted preview are kept in the token DB.
 
+The labels come from the **teacher** model (`claude-sonnet-5`) of that Copilot account; a
+share of turns is labelled a second time by the same model, on the same account. Nothing
+else is sent: not the agent's answer, not your files.
+
+## Publishing gate counts
+
+Only when you run `glass job-classes publish`, or click **Publish my gate counts** in the
+Classes tab, and only with a team's classes joined: glass writes your per-class **counts**
+— labelled, checked, agreed, and the confusions between classes — to
+`job-classes/gate/<pseudonym>.json` in your clone of the team's repo, commits it under the
+pseudonym and pushes it with your own git credentials (`--no-push` only commits). The
+pseudonym is a hash of host and user name, not your name. The file holds the models,
+the taxonomy version and the counts — never a prompt, a preview or a project name.
+Nothing is published unless you run it; `glass job-classes leave` stops reading the
+team's files, and deleting your file from the repo removes your counts from the pool.
+
 ## The interception CA
 
 | | |

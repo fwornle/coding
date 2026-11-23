@@ -81,9 +81,20 @@ model's standing, the pairs side by side and what each answer missed. glass show
 dashboard, where accepting one switches the job's model.
 
 **Classes** shows what kind of job each turn was (fix, build, ship, status, explain, …),
-once you switch labelling on: a cheap model of your own Copilot account labels every turn
-and a strong one re-checks a share. The tab has the switch, the gate per class, the taxonomy
-as a tree or a map, and the tokens per class. See [Job Classes](job-classes.md).
+once you switch labelling on: the teacher model of your own Copilot account labels each
+turn and labels a share a second time. The tab has the switch, the gate per class, the
+taxonomy as a tree or a map, and the tokens per class. See [Job Classes](job-classes.md).
+
+- A **phase badge** says how turns are labelled now: *collecting: every turn* (some class
+  still has fewer than 20 checks; those classes are named) or *reporting: 1 turn in N*
+  (every class has its checks). If the team's counts can't be read, glass keeps labelling
+  every turn.
+- With a team's classes joined, the **Gate** panel adds **Team** columns — checked, agreement
+  and verdict over the members' published counts — and lists the members and when each
+  published. Members on other models or another taxonomy version are named as *Not added*;
+  files older than 14 days are struck through and left out.
+- **By class** notes how many of its labels were sampled after the gate: each counts for the
+  N turns it stands for, so the shares and tokens still cover every turn.
 
 ### How cost is calculated
 

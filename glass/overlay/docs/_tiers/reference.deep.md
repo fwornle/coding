@@ -8,7 +8,8 @@
 | `glass status` | Daemon state, live sessions, the latest recorded calls |
 | `glass doctor` | Node version, data home, CA, egress proxy, each agent's path and version, daemon state, and warnings when another local LLM proxy or tmux session overlaps with glass. Exit code 1 when something needs fixing |
 | `glass watch [--task <id>]` | A live one-line status bar for the newest session, or the given one |
-| `glass job-classes [on\|off\|measure\|join <url>\|pull\|leave]` | [Job classes](job-classes.md): switch labelling, measure your recent prompts, use a team's taxonomy. Without an argument: the current state |
+| `glass job-classes [status\|on\|off\|measure\|join <url>\|pull\|leave]` | [Job classes](job-classes.md): switch labelling, measure your recent prompts (`--days N`, `--max N`), use a team's taxonomy. Without an argument, `status`: on or off, the Copilot account, then a **labeller** line (the teacher model; every turn until each class has a verdict, then 1 turn in N), a **second pass** line (every turn of a class still collecting checks, else the configured share), a **student** line (scored by `measure` only), the taxonomy, and what was labelled since the daemon started |
+| `glass job-classes publish [--no-push]` | Share this machine's gate counts with the team: per class labelled / checked / agreed and the confusions, never a prompt, written to `job-classes/gate/<pseudonym>.json` in the joined team's repo, committed under the pseudonym and pushed with your git credentials (rebased once over a teammate's push). `--no-push` commits only. Needs a joined team and write access to its repo; unchanged counts change nothing ([Pooling the gate](job-classes.md#pooling-the-gate-with-your-team)) |
 | `glass ab run\|list\|report` | [A/B experiments](comparing-runs.md): the same agent and prompt on two or more models, interleaved and repeated, checked by your command. `--before-trial "<cmd>"` runs before every trial in its copy (system shell, `GLASS_AB_EXPERIMENT`, `GLASS_AB_VARIANT`, `GLASS_AB_TRIAL`, `GLASS_AB_MODEL` set, output in `before.log`, `--before-trial-timeout` default 60 s); a non-zero exit fails the trial without running the agent or the check ([one server, two weights](comparing-runs.md#one-server-two-weights)). `glass ab help` for the options |
 | `glass statusline [--format plain\|ansi\|tmux] [--task <id>]` | Print the status line once |
 | `glass report ctx\|net [--task <id>]` | The context or network report (what a status-line click shows) |
@@ -65,6 +66,20 @@
 - `updateCheck: false` stops the daemon asking for the latest release, and with it the
   update offer on the status line and in the UI ([Update](getting-started.md#update)).
 
+## Job classes settings
+
+`~/.glass/job-classes.json` (owner-only) is written by the Classes tab and
+`glass job-classes`; you rarely edit it by hand:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `enabled` | `false` | Label my turns |
+| `teacherModel` | `claude-sonnet-5` | Labels with: the model that labels each turn, on your Copilot account |
+| `studentModel` | `claude-haiku-5.5` | Scored by `glass job-classes measure` only; labels nothing live |
+| `teacherSamplePct` | `0.1` | Second pass: the share of turns labelled a second time once a class has its 20 checks (until then every turn of the class). 0 to 1 |
+| `reportSampleEvery` | `5` | After the gate: label 1 turn in N, each label counted N times. 1 to 50; 1 labels every turn |
+| `team` | `null` | The joined team's repo URL and local clone (`glass job-classes join`) |
+
 ## Files
 
 | Path | Content |
@@ -91,4 +106,8 @@ The daemon serves JSON on `http://127.0.0.1:12445`: `/health`,
 `/api/context-breakdown?task_id=…`, `/api/statusline`,
 `/api/models?hours=N` and `/api/experiments/runs/<session id>/models` (the model mix, see
 [Models & Accounts](models.md)), `/api/calls/unbound`, `/api/ab` and `/api/ab/<id>` ([A/B experiments](comparing-runs.md)), `/api/offload` (see
-[Offload Easy Calls](offload.md) for its write calls).
+[Offload Easy Calls](offload.md) for its write calls), `/api/job-classes` and
+`/api/job-classes/settings` ([Job classes](job-classes.md)). The job-classes writes —
+`PATCH /api/job-classes/settings`, `PUT` / `DELETE /api/job-classes/team`,
+`POST /api/job-classes/team/pull` and `POST /api/job-classes/team/publish`
+(`{"push": false}` commits only) — are what the Classes tab and `glass job-classes` call.

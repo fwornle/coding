@@ -472,11 +472,21 @@ each kind cost?" — the step before routing a kind of job to a cheaper model. T
 mechanism, step by step, is the [job classes deck](../job-classes.md).
 
 - **Labels** — the proxy's shadow tagger (`rapid-llm-proxy/proxy-bridge/job-class.mjs`)
-  labels every foreground human turn once, in the background, with a cheap **student**
-  model (Haiku 5.5) against a taxonomy: each class has a test, examples and a group
-  (programming · operating · communicating). The **teacher**, a strong model (Sonnet 5)
-  whose labels count as the right answer, labels a share of turns as well
-  (`teacher_sample_pct`; every turn until each class has a gate verdict). Sub-agent and
+  labels every foreground human turn once, in the background, against a taxonomy: each
+  class has a test, examples and a group (programming · operating · communicating). Since
+  2026-10-30 the live labeller is the **teacher**, a strong model (claude-sonnet-5;
+  `student_process: job-class-teacher`, the same as `teacher_process`), because no cheap
+  student cleared the gate offline (Haiku about 84.5 %); the Haiku student remains only in
+  the offline measurement. A **second teacher pass** re-labels some turns as a consistency
+  check (offline, pass 2 agrees with pass 1 about 94 % of the time). With
+  `sample_until_gate: true` every turn of a class is re-checked while the team's pooled
+  checks for it are under 20, then the configured rates apply (`teacher_sample_pct: 0.1`;
+  `status` and `explain` stay at 1.0 via `teacher_sample_by_class`, as the replay
+  classes); the pool is recounted at most every 5 minutes, and an unreadable pool keeps
+  the configured rates. `report_sample_every: N` (default 0 = off; glass uses 5) starts a
+  **reporting phase** once every class has a verdict in the pool: only 1 turn in N is
+  labelled, stored with `weight` N, and By class counts it N times. coding leaves it off,
+  because the class floor needs every turn's label. Sub-agent and
   utility calls carry no job of their own and are skipped, and so are automated runs: a
   request bound to a task id (benchmark and experiment cells) or sent by headless
   `claude -p` (replays, tool probes). A label routes nothing by itself; see **Routing** below.
@@ -484,10 +494,15 @@ mechanism, step by step, is the [job classes deck](../job-classes.md).
   shared one), then:
   - **Taxonomy and coverage**, as a **Tree** (group → class, each with its share of the
     turns) or a **Map** (classes by project, with the gaps the taxonomy cannot place);
-  - **Gate** — per class, the student's precision against the teacher: a class passes at
-    90 % over at least 20 teacher-checked turns, counted over the whole taxonomy version.
-    Only a class that passes may later drive a route;
-  - **By class** — turns, tokens and the student's agreement with the teacher per class;
+  - **Gate** — per class, how often the second pass agrees with the labeller: a class
+    passes at ≥ 90 % over ≥ 20 checked turns, over a 90-day window, with the labels of
+    every version of the taxonomy resolved to its current classes. `none` has no gate.
+    Beside this machine's columns, **Team: checked**, **Team agreement** and **Team**
+    show the team's pooled gate (`?scope=team`), with the members, the age of their file,
+    and the members **Not added**. A badge shows the phase: `collecting: every turn` (with
+    the classes still collecting) or `reporting: 1 turn in N`. Only a class that passes
+    may later drive a route;
+  - **By class** — turns, tokens and the second pass's agreement per class;
   - **Recently labelled turns**, with the prompt preview (redacted).
 - **Replay** — for a turn of a kept class (`job_classes.replay.keep`: `status`, `explain`)
   the tagger records the prompt as sent, the conversation before it and, when the next
@@ -504,7 +519,12 @@ mechanism, step by step, is the [job classes deck](../job-classes.md).
 - **Routing** — the class floor (`rapid-llm-proxy/proxy-bridge/class-floor.mjs`,
   `job_classes.routing` in `llm-routing.yaml`). Once a turn is labelled, its later calls
   (the tool loop and the answer; the first call is what triggers the label) go to the
-  evidence's candidate model when all of these hold: the class passes the gate; a verdict
+  evidence's candidate model when all of these hold: the class passes the gate (the one
+  `job_classes.routing.gate_scope` names: `local`, the default, this machine's own
+  checks, so a teammate's numbers never choose the model that answers you; or `team`,
+  the pooled verdict, where an unreadable pool gives no verdict and floors nothing,
+  never falling back to `local`; switched in the Gate panel, which PATCHes
+  `/api/llm/routing`); a verdict
   in `evidence/<class>.json` beside the team's taxonomy still passes the judge's rule
   (≥ 20 pairs, ≥ 90 %, A/A floor not below), is for this agent, and was measured against
   the model the call would otherwise get; and the route's own provider serves the
@@ -517,17 +537,32 @@ mechanism, step by step, is the [job classes deck](../job-classes.md).
   grow it with `coding job-classes propose` and the maintainer's `fold`. A class merged
   away keeps its history: its labels count for the class it was merged into. Labels made
   under two different taxonomies are never counted together.
+- **Team gate** — `coding job-classes publish [--team <id>] [--push]` writes
+  `job-classes/gate/<pseudonym>.json` beside `taxonomy.yaml` in the team package: per
+  class the counts labelled, checked and agreed, plus confusions (labeller class, teacher
+  class, n), never a prompt. The pseudonym is the first 10 hex of sha1(hostname:user), as
+  for proposals. The file is a full snapshot, so unchanged counts leave it byte-identical
+  and nothing is committed. In the member's own learning checkout it is only committed
+  (`coding sync --push` pushes it, after asking, since that repo carries transcripts); a
+  shared clone under `var/shared/` is pushed directly with `--push`. `coding sync --push`
+  re-publishes for every team the member already published to: the first manual publish
+  is the opt-in. Every member needs write access to the team repo. Counts are added only
+  within a pool (taxonomy version tag, labeller model, checker model; provider prefix
+  dropped, `.` ≡ `-`); a pool with no checker folds into the checked pool of the same
+  labeller. Files older than 14 days are shown greyed and not added, invalid files are
+  listed and not added, and this machine's own file is replaced by its live counts.
 
 API on the proxy: `GET /api/job-classes` (the tagger's counters, `labelled` / `skipped`,
 `replay`: turns pending and awaiting their answer, and `routing`: how often the floor
 applied, per class, and why it declined),
 `GET /api/job-classes/summary?days=7&taxonomy=<name>-v<n>` (tokens and agreement by class,
-joined to `token_usage` on the turn identity), `GET /api/job-classes/coverage`. Store: the
+joined to `token_usage` on the turn identity; `&scope=team` adds the pooled gate), `GET /api/job-classes/coverage`. Store: the
 `turn_job_class` table in the token DB. Plan: `.planning/shared-job-classes.md`.
 
 **In glass** (machines without coding) the same tagger and read side run in glass's daemon,
-opt-in: the student and teacher are the user's own Copilot account, reached with their `gh`
-login; `glass job-classes measure` takes its prompts from the agents' own transcripts
+opt-in: the labeller and checker are the user's own Copilot account, reached with their `gh`
+login, and the live labeller is Sonnet with the reporting phase on (1 turn in 5);
+`glass job-classes publish` adds the user's counts to the team's gate; `glass job-classes measure` takes its prompts from the agents' own transcripts
 (`lib/job-classes/prompts.mjs`) instead of the session logs, and shares the scoring with
 `measure-job-classes.mjs` (`lib/job-classes/measure.mjs`); a team's taxonomy is joined by its
 git URL. See glass's Job Classes page.

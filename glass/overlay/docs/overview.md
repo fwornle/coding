@@ -361,7 +361,9 @@ each turn and checks some a second time; once every class is trusted, it labels 
 
 `glass job-classes measure` labels your past prompts as well, so the tree fills in at once.
 
-A team shares its own classes from a git repo: `glass job-classes join <url>`.
+A team shares its own classes from a git repo: `glass job-classes join <url>`. With
+`glass job-classes publish` each member adds their gate counts (never a prompt), so the
+team reaches the gate sooner.
 
 </div>
 <figure class="overview-figure" markdown="1">

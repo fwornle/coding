@@ -60,11 +60,12 @@ last one stopped.
 
 | Command | |
 |---|---|
-| `glass job-classes` | on or off, the Copilot account, the taxonomy, what was labelled |
+| `glass job-classes` (or `status`) | on or off, the Copilot account, the labeller, the second pass, the student, the taxonomy, what was labelled |
 | `glass job-classes on` / `off` | switch labelling |
 | `glass job-classes measure [--days N] [--max N]` | label your recent prompts; the reference set |
 | `glass job-classes join <git URL>` | use a team's taxonomy (its learning repo's `job-classes/`) |
 | `glass job-classes pull` / `leave` | update the team's taxonomy / go back to the shipped default |
+| `glass job-classes publish [--no-push]` | share your gate counts (per class: labelled, checked, agreed; never a prompt) as `job-classes/gate/<pseudonym>.json` in the team's repo, and push them; `--no-push` only commits |
 
 ## For a team's maintainer
 

@@ -13,8 +13,9 @@ component "**LLM proxy :12435**\nforwards the call\nunchanged" as fwd <<core>>
 component "**model provider**" as model <<external>>
 component "**job-class tagger**\nfirst call of a human turn\nskips sub-agents, tool loops,\nharness text, automated runs" as tagger <<core>>
 component "**clean + redact**\nreminders, pastes out\n27 patterns, fail closed" as redact <<util>>
-component "**student**\nclaude-haiku-5.5\n~2 s, every turn" as student <<agent>>
-component "**teacher**\nclaude-sonnet-5\na sample of turns\n(every turn until the gate)" as teacher <<agent>>
+component "**teacher labels**\nclaude-sonnet-5\nevery turn" as student <<agent>>
+component "**second teacher pass**\nconsistency check:\nevery turn of a class until the\nteam has 20 checks, then a sample" as teacher <<agent>>
+file "**team pool**\njob-classes/gate/*.json\n+ this machine's live counts" as pool <<storage>>
 database "**turn_job_class**\nbeside token_usage" as db <<storage>>
 component "**dashboard**\nToken Usage -> Classes" as dash <<api>>
 file "**taxonomy**\nthe team's, else\nconfig/job-classes.yaml" as tax <<storage>>
@@ -26,7 +27,15 @@ tagger -[#FF9800,thickness=2]right-> redact
 redact -[#FF9800,thickness=2]right-> student
 redact -[#757575,thickness=1,dotted]down-> teacher : sampled
 student -[#FF9800,thickness=2]right-> db : class
-teacher -[#FF9800,thickness=2]right-> db : teacher class
+teacher -[#FF9800,thickness=2]right-> db : second class
+pool -[#757575,thickness=1,dotted]right-> teacher : checks per class\n(recounted every 5 min)
 db -[#FF9800,thickness=2]right-> dash
 tax -[#757575,thickness=1,dotted]right-> tagger : hot-reloaded
+
+legend right
+  reporting phase (report_sample_every: N,
+  off in coding, 5 in glass): once every class
+  has a verdict, 1 turn in N is labelled
+  and counts N times
+endlegend
 @enduml

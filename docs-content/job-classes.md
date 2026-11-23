@@ -23,14 +23,15 @@ hide:
 # The cheapest model that does each job well {#jc-title}
 
 Every prompt you give an agent is one of a few **kinds of job**: fix something,
-build something, ship it, check on it, explain it. A cheap model labels each
-turn with its kind. Then each kind can **earn** a cheaper model with evidence
-from a trial, not by reputation.
+build something, ship it, check on it, explain it. A strong model labels each
+turn with its kind, and a second pass checks that it labels consistently. Then
+each kind can **earn** a cheaper model with evidence from a trial, not by
+reputation.
 
 <div class="overview-benefits" markdown="1">
 
 **Built and running**  
-define · measure · label live · gate each class · read the coverage · share and grow as a team · replay per class · route by class · in glass too
+define · measure · label live · gate each class · pool the gate as a team · read the coverage · share and grow as a team · replay per class · route by class · in glass too
 
 **Waiting on data**  
 no class has passed its gate or has evidence yet, so nothing is routed cheaper today
@@ -40,7 +41,7 @@ no class has passed its gate or has evidence yet, so nothing is routed cheaper t
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Seven steps: define, measure, label live with a per-class gate, read the coverage, share with a team, replay per class, route by class. Gaps found in the coverage feed back into the definition.](images/job-class-lifecycle.png)](images/job-class-lifecycle.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
+[![Seven steps: define, measure, label live with the teacher and a per-class gate pooled by the team, read the coverage, share with a team, replay per class, route by class. Gaps found in the coverage feed back into the definition.](images/job-class-lifecycle.png)](images/job-class-lifecycle.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
 
 <figcaption>All seven steps are built. Gaps found in step 4 feed back into step 1.</figcaption>
 </figure>
@@ -60,18 +61,20 @@ Once a kind of job has proven a cheaper model, the proxy sends that kind of job
 to it. Hard jobs like fix stay on the strong one. This works for pi, opencode
 and Copilot CLI, whose model the proxy picks; Claude Code picks its own.
 
-**Learn.** A cheap model labels every prompt. A strong model checks a sample
-of those labels. Past prompts of one kind are replayed on the cheaper model,
-and a blind judge compares its answers with the current model's. Nothing
-switches without that evidence.
+**Learn.** A strong model labels every prompt. A second pass of the same
+model re-labels some of them, to check that its labels are consistent. Past
+prompts of one kind are replayed on the cheaper model, and a blind judge
+compares its answers with the current model's. Nothing switches without that
+evidence.
 
-**Share.** The kinds of job and the evidence go into the team's repo, with no
-prompts in it. One member's proof spares the rest of the team from repeating it.
+**Share.** The kinds of job, the gate counts and the evidence go into the
+team's repo, with no prompts in it. One member's proof spares the rest of the
+team from repeating it.
 
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Your prompt is labelled by the proxy's cheap model (step 1); a strong model checks a sample of labels (step 2); past turns of a class are replayed on a cheaper model and judged blind (step 3), and the evidence goes to the team repo with the classes, but no prompts; pulled on sync, it lets every member route that class to the cheaper model (step 4). Prompts no class fits become proposals for a new class.](images/job-class-at-a-glance.png)](images/job-class-at-a-glance.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
+[![Your prompt is labelled by the proxy's strong model (step 1); a second pass re-labels some turns, and each member's counts are pooled into a team gate (step 2); past turns of a class are replayed on a cheaper model and judged blind (step 3), and the evidence goes to the team repo with the classes, but no prompts; pulled on sync, it lets every member route that class to the cheaper model (step 4). Prompts no class fits become proposals for a new class.](images/job-class-at-a-glance.png)](images/job-class-at-a-glance.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
 
 <figcaption>All four steps run today. Step 4 switches a class only once steps 2 and 3 have proven it.</figcaption>
 </figure>
@@ -91,8 +94,8 @@ Today the same strong, expensive model answers all of it.
 
 The idea, in three steps:
 
-1. **Sort** every prompt into a kind of job. A cheap, fast model does the
-   sorting. A strong model checks a sample of its work.
+1. **Sort** every prompt into a kind of job. A strong model does the
+   sorting. A second pass of it checks that the sorting is consistent.
 2. **Try** a cheaper model on past jobs of one kind: replay them on it and
    compare its answers with the current model's.
 3. **Switch** that kind of job to the cheaper model only if it does the job
@@ -129,8 +132,8 @@ All three steps are built. Step 3 waits for the evidence from step 2.
 | **class** | A kind of job (fix, ship, status, …), defined by its **test**: which prompts belong. |
 | **taxonomy** | All classes with tests and examples: one versioned file. |
 | **group** | Classes put together for reading: programming, operating, communicating. |
-| **student** | The cheap, fast model (Haiku 5.5) that labels every turn. |
-| **teacher** | The strong model (Sonnet 5); its labels count as right. It checks the student. |
+| **teacher** | The strong model (Sonnet 5); its labels count as right. Since no cheap model cleared the gate, it labels every turn live. |
+| **student** | A cheap, fast model (Haiku 5.5), scored against the teacher in the offline measurement only. |
 
 </div>
 <figure class="overview-figure" markdown="1">
@@ -141,13 +144,14 @@ All three steps are built. Step 3 waits for the evidence from step 2.
 | **reference set** | Past prompts the teacher labelled twice, giving the same class both times. |
 | **dev / test set** | Prompts read while writing the tests (dev), and prompts never read (test). Only the test set gives an honest score. |
 | **agreement · kappa** | How often two labellers give the same class. Kappa removes the agreement luck alone would give: 0 is chance, 1 is perfect. |
-| **precision** | Of the turns the student put in a class, the share the teacher put there too. |
-| **gate** | The bar a class must clear before anything acts on it: 90 % precision over at least 20 checked turns. |
+| **precision** | Of the turns the labeller put in a class, the share the second pass put there too. |
+| **gate** | The bar a class must clear before anything acts on it: 90 % agreement over at least 20 checked turns. |
+| **pool** | Gate counts from members who label with the same taxonomy version and the same models, added up for the team. |
 | **band** | How hard the router thinks a prompt is (small, medium, high). A class says what kind of job it is. |
 | **replay · judge** | A past turn is run again, once on the current model and once on a cheaper one. A strong judge compares the two answers without knowing which is which. |
 
 </figure>
-<p class="overview-takeaway">The student labels, the teacher checks, the gate decides when a label can be trusted.</p>
+<p class="overview-takeaway">The teacher labels, a second pass checks, the gate decides when a label can be trusted.</p>
 </section>
 
 <section class="overview-slide" id="slide-5" aria-labelledby="jc-why" markdown="1">
@@ -256,7 +260,7 @@ are never committed, because they are your real prompts.
 
 <figcaption>Taxonomy version 2 unless marked. What the student still misses is mostly short follow-ups ("do the other ones too"), which need the conversation, not just the prompt.</figcaption>
 </figure>
-<p class="overview-takeaway">A cheap student agrees with the strong teacher more than 4 times in 5.</p>
+<p class="overview-takeaway">A cheap student agrees with the teacher more than 4 times in 5, but none reached the 90 % gate, so the teacher labels live.</p>
 </section>
 
 <section class="overview-slide" id="slide-8" aria-labelledby="jc-live" markdown="1">
@@ -266,20 +270,21 @@ are never committed, because they are your real prompts.
 
 ## Label every turn, in shadow {#jc-live}
 
-The LLM proxy labels the **first call of each human turn** with the student,
-**after** forwarding it. The turn itself never waits for the label and is
-never changed by it.
+The LLM proxy labels the **first call of each human turn** with the teacher
+(claude-sonnet-5), **after** forwarding it. The turn itself never waits for the
+label and is never changed by it.
 
 - Sub-agents, tool loops and harness messages are skipped.
 - **Automated runs** are skipped too: benchmark and experiment cells, replays and `claude -p`. Their prompts are scripted, not work a person handed over.
-- The prompt is redacted before the student sees it. If redaction fails, the turn is skipped.
-- The teacher labels a sample of turns as well (`teacher_sample_pct`). Until every class has passed or failed its gate, the sample is every turn.
+- The prompt is redacted before the teacher sees it. If redaction fails, the turn is skipped.
+- A **second teacher pass** re-labels some turns: a consistency check. While the team's pooled checks for a class are under 20, every turn of it is re-checked (`sample_until_gate`); after that, a share of turns (`teacher_sample_pct`, 0.1 in coding; status and explain stay at every turn, for replay).
 - The label is stored beside the turn's tokens, so tokens per class come for free.
+- An optional **reporting phase** (`report_sample_every: N`, off in coding, 5 in glass): once every class has a verdict, only 1 turn in N is labelled and counts N times. coding leaves it off, because routing by class needs every turn's label.
 
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![The agent's call goes through the LLM proxy unchanged; after forwarding, the tagger skips sub-agents, tool loops, harness text and automated runs, cleans and redacts the prompt, the student (haiku) labels it, the teacher labels a sample, and both labels land in turn_job_class beside token_usage, read by the dashboard. The taxonomy is the team's, or the default file.](images/job-class-live-tagging.png)](images/job-class-live-tagging.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
+[![The agent's call goes through the LLM proxy unchanged; after forwarding, the tagger skips sub-agents, tool loops, harness text and automated runs, cleans and redacts the prompt, the teacher (sonnet) labels it, a second teacher pass re-checks every turn of a class until the team pool (the members' gate files plus this machine's live counts) has 20 checks for it and a sample after that, and both labels land in turn_job_class beside token_usage, read by the dashboard. The taxonomy is the team's, or the default file. In the optional reporting phase only 1 turn in N is labelled and counts N times.](images/job-class-live-tagging.png)](images/job-class-live-tagging.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
 
 <figcaption>Labelling happens after the turn has been forwarded, so nothing it does can slow a turn down.</figcaption>
 </figure>
@@ -293,25 +298,27 @@ never changed by it.
 
 ## The gate: can the label be trusted? {#jc-gate}
 
-A label is only useful if it is right. For each class, the gate asks: **of
-the turns the student put in this class, how many did the teacher put there
-too?**
+A label is only useful if it is right and stable. For each class, the gate
+asks: **of the turns the teacher put in this class, how many did its second
+pass put there too?** Offline, the two passes agree about 94 % of the time.
 
-- A class **passes** at 90 % or more, over at least 20 turns the teacher checked.
+- A class **passes** at 90 % or more, over at least 20 re-checked turns.
 - Below 90 % it is **below the gate**: its test needs sharpening.
 - With fewer than 20 checks it is still **collecting**.
+- **none** has no gate.
 
-Only a class that passes may later drive a route. The count starts
-again at zero with every new taxonomy version, because the tests changed.
+Checks count over the last 90 days. Labels from every version of a taxonomy
+are counted under today's classes. Only a class that passes may later drive a
+route.
 
 </div>
 <figure class="overview-figure" markdown="1">
 
 [![Token Usage → Classes → Gate: one row per class with turns labelled, teacher-checked turns against the minimum of 20, teacher agreements, precision and a verdict; every class is still collecting.](images/job-classes-gate.png)](images/job-classes-gate.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
-<figcaption>The gate panel, a day after version 2 went live: every class still collecting.</figcaption>
+<figcaption>The gate panel, a day after version 2 went live: every class still collecting. Today it also shows the team's pooled columns (see *Pool the gate*).</figcaption>
 </figure>
-<p class="overview-takeaway">No class acts on its label until the teacher has confirmed it enough times.</p>
+<p class="overview-takeaway">No class acts on its label until the second pass has confirmed it enough times.</p>
 </section>
 
 <section class="overview-slide" id="slide-10" aria-labelledby="jc-coverage" markdown="1">
@@ -362,9 +369,9 @@ version, and **Classes** has a picker for which one to read.
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![The first member writes job-classes/taxonomy.yaml and CHANGELOG.md into their learning repo; each other member joins, which binds the team and clones the repo; a bindings index maps each project to its team's taxonomy file, and the LLM proxy labels each project with it.](images/job-class-team-sharing.png)](images/job-class-team-sharing.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
+[![The first member writes job-classes/taxonomy.yaml and CHANGELOG.md into their learning repo; each other member joins, which binds the team and clones the repo; a bindings index maps each project to its team's taxonomy file, and the LLM proxy labels each project with it. Each member publishes job-classes/gate/<pseudonym>.json with per-class counts and no prompts; the Gate panel adds up the members of one pool, counting this machine live and never twice.](images/job-class-team-sharing.png)](images/job-class-team-sharing.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
 
-<figcaption>The shared package holds no prompts: only the taxonomy and its changelog.</figcaption>
+<figcaption>The shared package holds no prompts: only the taxonomy, its changelog and each member's gate counts.</figcaption>
 </figure>
 <p class="overview-takeaway">A project in two teams with two taxonomies is not labelled, not guessed.</p>
 </section>
@@ -391,7 +398,38 @@ version, and **Classes** has a picker for which one to read.
 <p class="overview-takeaway">One maintainer writes the taxonomy; every member can propose.</p>
 </section>
 
-<section class="overview-slide overview-essential" id="slide-13" aria-labelledby="jc-trial" markdown="1">
+<section class="overview-slide" id="slide-13" aria-labelledby="jc-pool" markdown="1">
+<div class="overview-copy" markdown="1">
+
+<p class="overview-kicker">Step 5, continued · built</p>
+
+## Pool the gate as a team {#jc-pool}
+
+One machine collects 20 checks per class slowly. A team adds up its members' counts.
+
+1. Each member runs `coding job-classes publish --team <id>`. It writes `job-classes/gate/<pseudonym>.json` beside `taxonomy.yaml`: per class the turns labelled, checked and agreed, and which classes the two passes confused. Never a prompt. The pseudonym is the first 10 hex characters of sha1(hostname:user), as for proposals.
+2. If the package is in your own learning repo, the file is only committed. `coding sync --push` pushes it, and asks first, because that repo also carries transcripts. A shared clone under `var/shared/` is pushed directly with `--push`.
+3. The first publish is the opt-in. After it, `coding sync --push` publishes again for that team. Unchanged counts leave the file byte for byte the same, so nothing is committed.
+
+Every member needs write access to the team repo.
+
+</div>
+<figure class="overview-figure" markdown="1">
+
+| Which counts are added up |
+|---|
+| Only within a **pool**: the same taxonomy version, the same labeller model, the same checker model. Model names are compared without provider prefix, and `.` counts as `-`. |
+| A member on other models or an older version is listed under **Not added**. |
+| Labels nobody has checked yet count with the checked pool of the same labeller. |
+| A file older than 14 days is greyed out and not added. An invalid file is listed, not added. |
+| This machine's own file is replaced by its live counts, so it is never counted twice. |
+
+<figcaption>Token Usage → Classes → Gate shows this machine's columns beside <b>Team: checked</b>, <b>Team agreement</b> and <b>Team</b> (from <code>GET /api/job-classes/summary?scope=team</code>), the members with the age of their file, and the Not added lines. A badge says whether labelling is still <b>collecting: every turn</b> or <b>reporting: 1 turn in N</b>.</figcaption>
+</figure>
+<p class="overview-takeaway">The team's counts decide the gate together; no prompt leaves a machine.</p>
+</section>
+
+<section class="overview-slide overview-essential" id="slide-14" aria-labelledby="jc-trial" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Step 6 · built</p>
@@ -418,14 +456,14 @@ blind, in both orders. A class passes for that agent and model after at least
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Turns labelled status are answered as usual while the proxy keeps the prompt, the conversation, the answer read and the repo state; the current model and the cheaper candidate each replay the turn in a sandbox; a blind judge compares the answers; the verdict per class, agent and model needs 20 pairs and 90 % the same core; the maintainer records it as evidence/status.json in the team repo, and the proxy's class floor sends the rest of each status turn to the cheaper model.](images/job-class-trial-routing.png)](images/job-class-trial-routing.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
+[![Turns labelled status are answered as usual while the proxy keeps the prompt, the conversation, the answer read and the repo state; the current model and the cheaper candidate each replay the turn in a sandbox; a blind judge compares the answers; the verdict per class, agent and model needs 20 pairs and 90 % the same core; the maintainer records it as evidence/status.json in the team repo, and the proxy's class floor sends the rest of each status turn to the cheaper model, on the same provider, once the gate has passed on this machine or for the team, as gate_scope says (default: this machine).](images/job-class-trial-routing.png)](images/job-class-trial-routing.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
 
 <figcaption>A replay never touches your live repos, data or agent sessions, and its own calls are not labelled.</figcaption>
 </figure>
 <p class="overview-takeaway">No model gets cheaper without evidence from your own past turns.</p>
 </section>
 
-<section class="overview-slide overview-essential" id="slide-14" aria-labelledby="jc-route" markdown="1">
+<section class="overview-slide overview-essential" id="slide-15" aria-labelledby="jc-route" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Step 7 · built</p>
@@ -445,12 +483,18 @@ The proxy's **class floor** reads it. Once a turn is labelled, its later calls
 (the tool loop and the answer) go to the cheaper model, but only if all of
 these hold:
 
-- the class has **passed its gate**;
+- the class has **passed its gate**: by default this machine's own checks, or the team's pooled verdict (see below);
 - the evidence is for **this agent**, and was measured against the model the call would otherwise get;
 - the route's **own provider** serves the cheaper model, in a **lower band**.
 
 Otherwise nothing changes. This works for pi, opencode and Copilot CLI. Claude
 Code picks its own model, so for it the evidence is a recommendation.
+
+Which gate counts is `job_classes.routing.gate_scope`: `local` (the default, so
+a teammate's numbers never choose the model that answers you) or `team`. The
+Gate panel switches it ("Routing by class trusts the gate of: this machine |
+the team"). With `team`, an unreadable pool gives no verdict and nothing is
+routed cheaper; it never falls back to `local`.
 
 </div>
 <figure class="overview-figure" markdown="1">
@@ -478,7 +522,7 @@ Code picks its own model, so for it the evidence is a recommendation.
 <p class="overview-takeaway">The class picks which jobs to try; the evidence decides the model.</p>
 </section>
 
-<section class="overview-slide" id="slide-15" aria-labelledby="jc-glass" markdown="1">
+<section class="overview-slide" id="slide-16" aria-labelledby="jc-glass" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">In glass · built</p>
@@ -487,12 +531,13 @@ Code picks its own model, so for it the evidence is a recommendation.
 
 Most people will only ever run **glass**. It labels their turns the same way, opt-in:
 
-- the **student and teacher are their own Copilot account**, reached with their `gh` login;
+- the labels come from **their own Copilot account**, reached with their `gh` login; the live labeller is Sonnet, as in coding;
+- once every class has a verdict, glass labels only 1 turn in 5 (the reporting phase);
 - prompts are redacted first, and nothing is sent until they tick **Label my turns**;
 - `glass job-classes measure` reads their recent prompts from the **agents' own transcripts** (Claude Code, Copilot CLI, VS Code), so no session logs are needed;
-- a team's taxonomy is joined by its git URL: `glass job-classes join <url>`.
+- a team's taxonomy is joined by its git URL: `glass job-classes join <url>`, and `glass job-classes publish` adds their gate counts to the team's pool.
 
-The Classes tab, the gate and the coverage map are the same as here.
+The Classes tab, the gate and the coverage map are the same as here. Routing by class, and with it the gate scope switch, is coding only.
 
 </div>
 <figure class="overview-figure" markdown="1">
