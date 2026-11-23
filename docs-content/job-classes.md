@@ -132,8 +132,8 @@ All three steps are built. Step 3 waits for the evidence from step 2.
 | **class** | A kind of job (fix, ship, status, …), defined by its **test**: which prompts belong. |
 | **taxonomy** | All classes with tests and examples: one versioned file. |
 | **group** | Classes put together for reading: programming, operating, communicating. |
-| **teacher** | The strong model (Sonnet 5); its labels count as right. Since no cheap model cleared the gate, it labels every turn live. |
-| **student** | A cheap, fast model (Haiku 5.5), scored against the teacher in the offline measurement only. |
+| **teacher** | The strong model (Sonnet 5). It labels every turn live: no cheap model cleared the gate. |
+| **student** | A cheap model (Haiku 5.5), scored in the offline measurement only. |
 
 </div>
 <figure class="overview-figure" markdown="1">
@@ -142,13 +142,13 @@ All three steps are built. Step 3 waits for the evidence from step 2.
 |---|---|
 | **shadow** | Labels are recorded; nothing acts on a class until it has passed its gate and has evidence. |
 | **reference set** | Past prompts the teacher labelled twice, giving the same class both times. |
-| **dev / test set** | Prompts read while writing the tests (dev), and prompts never read (test). Only the test set gives an honest score. |
-| **agreement · kappa** | How often two labellers give the same class. Kappa removes the agreement luck alone would give: 0 is chance, 1 is perfect. |
+| **dev / test set** | Prompts read while writing the tests, and prompts never read. Only the test set scores honestly. |
+| **agreement · kappa** | How often two labellers agree; kappa removes luck (0 chance, 1 perfect). |
 | **precision** | Of the turns the labeller put in a class, the share the second pass put there too. |
 | **gate** | The bar a class must clear before anything acts on it: 90 % agreement over at least 20 checked turns. |
-| **pool** | Gate counts from members who label with the same taxonomy version and the same models, added up for the team. |
+| **pool** | The team's gate counts on the same models and taxonomy version, added up. |
 | **band** | How hard the router thinks a prompt is (small, medium, high). A class says what kind of job it is. |
-| **replay · judge** | A past turn is run again, once on the current model and once on a cheaper one. A strong judge compares the two answers without knowing which is which. |
+| **replay · judge** | A past turn rerun on the current and a cheaper model; a judge compares the answers blind. |
 
 </figure>
 <p class="overview-takeaway">The teacher labels, a second pass checks, the gate decides when a label can be trusted.</p>
@@ -274,12 +274,11 @@ The LLM proxy labels the **first call of each human turn** with the teacher
 (claude-sonnet-5), **after** forwarding it. The turn itself never waits for the
 label and is never changed by it.
 
-- Sub-agents, tool loops and harness messages are skipped.
-- **Automated runs** are skipped too: benchmark and experiment cells, replays and `claude -p`. Their prompts are scripted, not work a person handed over.
-- The prompt is redacted before the teacher sees it. If redaction fails, the turn is skipped.
-- A **second teacher pass** re-labels some turns: a consistency check. While the team's pooled checks for a class are under 20, every turn of it is re-checked (`sample_until_gate`); after that, a share of turns (`teacher_sample_pct`, 0.1 in coding; status and explain stay at every turn, for replay).
-- The label is stored beside the turn's tokens, so tokens per class come for free.
-- An optional **reporting phase** (`report_sample_every: N`, off in coding, 5 in glass): once every class has a verdict, only 1 turn in N is labelled and counts N times. coding leaves it off, because routing by class needs every turn's label.
+- Skipped: sub-agents, tool loops, harness messages and **automated runs** (benchmarks, replays, `claude -p`).
+- The prompt is redacted first; if redaction fails, the turn is skipped.
+- A **second teacher pass** checks consistency: every turn of a class while the team has under 20 checks for it (`sample_until_gate`), then 1 in 10 (status and explain: every turn, for replay).
+- The label sits beside the turn's tokens: tokens per class for free.
+- **Reporting phase** (`report_sample_every`, glass: 5): once every class has a verdict, 1 turn in N is labelled and counts N times. Off in coding, where routing needs every label.
 
 </div>
 <figure class="overview-figure" markdown="1">
@@ -470,31 +469,19 @@ blind, in both orders. A class passes for that agent and model after at least
 
 ## Route one kind of job to a cheaper model {#jc-route}
 
-The team's maintainer records a passing verdict as `evidence/<class>.json` in
-the team repo. The file holds counts and models, never prompts. `coding sync
---push` shares it, and every member pulls it.
+The maintainer records a passing verdict (`coding job-classes replay evidence
+--team <id> --class <c> --candidate <model>`) as `evidence/<class>.json` in the
+team repo — counts and models, never prompts; every member pulls it.
 
-```bash
-coding job-classes replay evidence --team coding \
-  --class status --candidate claude-haiku-5.5
-```
+The proxy's **class floor** then sends a labelled turn's later calls to the
+cheaper model, only if:
 
-The proxy's **class floor** reads it. Once a turn is labelled, its later calls
-(the tool loop and the answer) go to the cheaper model, but only if all of
-these hold:
+- the class **passed its gate** — this machine's checks by default, or the team's (`gate_scope: team`, set in the Gate panel; an unreadable pool routes nothing);
+- the evidence is for **this agent** and the model the call would get;
+- the route's **own provider** serves the cheaper model in a **lower band**.
 
-- the class has **passed its gate**: by default this machine's own checks, or the team's pooled verdict (see below);
-- the evidence is for **this agent**, and was measured against the model the call would otherwise get;
-- the route's **own provider** serves the cheaper model, in a **lower band**.
-
-Otherwise nothing changes. This works for pi, opencode and Copilot CLI. Claude
-Code picks its own model, so for it the evidence is a recommendation.
-
-Which gate counts is `job_classes.routing.gate_scope`: `local` (the default, so
-a teammate's numbers never choose the model that answers you) or `team`. The
-Gate panel switches it ("Routing by class trusts the gate of: this machine |
-the team"). With `team`, an unreadable pool gives no verdict and nothing is
-routed cheaper; it never falls back to `local`.
+For pi, opencode and Copilot CLI. Claude Code picks its own model, so there
+the evidence is a recommendation.
 
 </div>
 <figure class="overview-figure" markdown="1">
@@ -508,16 +495,12 @@ routed cheaper; it never falls back to `local`.
     "incumbents": ["claude-opus-5"],
     "agent": "pi",
     "pairs": 24,
-    "sameCore": 23,
-    "sameRate": 0.96,
-    "floorRate": 0.95,
-    "judge": "bg-model-trial-judge",
-    "recordedAt": "…"
+    "sameRate": 0.96
   }]
 }
 ```
 
-<figcaption>The shape of evidence/status.json, shortened, with made-up numbers. One member's replays spare the rest of the team from running them. <code>curl -s localhost:12435/api/job-classes</code> shows under <code>routing</code> how often the floor applied, and why it did not.</figcaption>
+<figcaption>evidence/status.json, shortened, made-up numbers. <code>GET /api/job-classes</code> → <code>routing</code> shows how often the floor applied, and why not.</figcaption>
 </figure>
 <p class="overview-takeaway">The class picks which jobs to try; the evidence decides the model.</p>
 </section>
@@ -531,13 +514,12 @@ routed cheaper; it never falls back to `local`.
 
 Most people will only ever run **glass**. It labels their turns the same way, opt-in:
 
-- the labels come from **their own Copilot account**, reached with their `gh` login; the live labeller is Sonnet, as in coding;
-- once every class has a verdict, glass labels only 1 turn in 5 (the reporting phase);
-- prompts are redacted first, and nothing is sent until they tick **Label my turns**;
-- `glass job-classes measure` reads their recent prompts from the **agents' own transcripts** (Claude Code, Copilot CLI, VS Code), so no session logs are needed;
-- a team's taxonomy is joined by its git URL: `glass job-classes join <url>`, and `glass job-classes publish` adds their gate counts to the team's pool.
+- Sonnet labels through **their own Copilot account** (their `gh` login); after the gate, 1 turn in 5;
+- prompts are redacted, and nothing is sent until they tick **Label my turns**;
+- `glass job-classes measure` reads the **agents' own transcripts**, so no session logs are needed;
+- `glass job-classes join <url>` takes a team's taxonomy; `publish` adds their gate counts to its pool.
 
-The Classes tab, the gate and the coverage map are the same as here. Routing by class, and with it the gate scope switch, is coding only.
+The Classes tab, the gate and the map are the same; routing by class is coding only.
 
 </div>
 <figure class="overview-figure" markdown="1">
