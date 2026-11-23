@@ -5,6 +5,8 @@
 //   on | off          switch labelling (it applies to the next turn)
 //   join <git-url>    use a team's taxonomy, from its learning repo's job-classes/
 //   pull | leave      update the team's taxonomy | go back to the shipped default
+//   publish           share your gate counts with the team (per class: labelled,
+//                     checked, agreed; never a prompt) and push them to its repo
 //   measure           label your recent prompts (from the agents' own transcripts)
 //                     with the teacher twice and the student once: how well the
 //                     student agrees, and the reference set the coverage map reads
@@ -120,6 +122,12 @@ export async function jobClassesCmd(argv, { out, err }) {
       return 0;
     }
     if (sub === 'pull') { const v = await api(port, 'POST', '/api/job-classes/team/pull', {}); out(`taxonomy ${v.tag}`); return 0; }
+    if (sub === 'publish') {
+      const v = await api(port, 'POST', '/api/job-classes/team/publish', { push: !rest.includes('--no-push') });
+      out(`${v.tag} as ${v.member}: ${v.pools} pool(s), ${v.changed ? 'updated' : 'unchanged'}${v.committed ? ', committed' : ''}${v.pushed ? ', pushed' : ''}`);
+      out('Counts only (labelled / checked / agreed per class); no prompt leaves this machine.');
+      return 0;
+    }
     if (sub === 'leave') { await api(port, 'DELETE', '/api/job-classes/team', {}); out('taxonomy: the shipped default'); return 0; }
     if (sub === 'measure') {
       const days = Number(opt(rest, '--days')) || 28;
@@ -146,7 +154,7 @@ export async function jobClassesCmd(argv, { out, err }) {
       out(`reference set          ${r.reference.prompts} prompts, ${r.reference.agreed} with an agreed class → the Classes tab's coverage map`);
       return 0;
     }
-    err(`unknown: glass job-classes ${sub} (status | on | off | join <url> | pull | leave | measure [--days N] [--max N])`);
+    err(`unknown: glass job-classes ${sub} (status | on | off | join <url> | pull | leave | publish [--no-push] | measure [--days N] [--max N])`);
     return 2;
   } catch (e) {
     err(`glass job-classes ${sub}: ${e?.message || e}`);

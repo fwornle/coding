@@ -955,6 +955,23 @@ They are shown as "offline" beside the live pool, never added to it.
 | P6d glass UI | Classes tab: publish button, member count, phase ("collecting" / "reporting: 1 turn in N"), the "labelling is off" notice already landed (0.1.93) | a glass-only member publishes and sees the team total |
 | P6e glass labeller | teacher-only labeller (Sonnet), collecting → reporting phase switch, `report_sample_every`, By-class weights | with the pool complete the tagger labels 1 in N and the shares match a full run within sampling error; with it unreadable every turn is labelled |
 
+**P6a + P6b built 2026-11-23** (rapid-llm-proxy `feat/job-classes-gate-pool`, coding
+`feat/job-classes-gate-pool`): `proxy-bridge/gate-pool.mjs` (snapshot, validate, write,
+team sum, publish via an injected git runner), `summary?scope=team`, `coding job-classes
+publish [--team] [--push]` (`lib/job-classes/gate.mjs`), `coding sync --push`
+republishing where the member already published (the first publish is the opt-in),
+`glass job-classes publish` + `POST /api/job-classes/team/publish`, and the Gate panel's
+team columns. Deviations from the design: no `since` in the file (a moving date made
+every republish a commit; the window is the gate's 90 days before `publishedAt`); a
+package in the member's OWN learning checkout is only committed — pushing it would push
+pending transcripts too, so `coding sync --push` does it after asking; a shared clone is
+pushed directly. Verified: proxy 696/696 node tests (10 new), coding 22/22 job-classes
+team tests (5 new, real git against bare repos), glass 182/182 on the extract, and end to
+end on a scratch glass: publish from its shallow sparse clone pushed one commit under the
+pseudonym (no prompt text), a republish changed nothing, and the panel summed this
+machine + one teammate (fix 22 checked, 91%, passes) while naming a teammate on other
+models as not added.
+
 Rough size: P6a and P6b are a few days together. P6c is small once P6b reads
 the pool. Nothing here changes the labeller or the taxonomy.
 
