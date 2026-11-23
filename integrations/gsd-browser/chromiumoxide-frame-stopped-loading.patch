@@ -1,0 +1,22 @@
+--- a/src/handler/target.rs
++++ b/src/handler/target.rs
+@@ -254,6 +254,19 @@
+             CdpEvent::PageFrameStartedLoading(ev) => {
+                 self.frame_manager.on_frame_started_loading(ev);
+             }
++            // `frameStartedLoading` clears the frame's lifecycle set, and a
++            // same-document navigation (e.g. `Page.navigate` to `page.html#2`
++            // while on `page.html`) never re-fires `Page.lifecycleEvent`
++            // "load". `frameStoppedLoading` is the only signal that the frame
++            // is loaded again; without it the NavigationWatcher never sees
++            // "load" and `Page::goto` hangs until the request timeout, while
++            // every later navigation queues behind it.
++            // `FrameManager::on_frame_stopped_loading` already existed for
++            // exactly this (as in Puppeteer's `_onLoadingStopped`) but was
++            // never dispatched.
++            CdpEvent::PageFrameStoppedLoading(ev) => {
++                self.frame_manager.on_frame_stopped_loading(ev);
++            }
+ 
+             // `Target` events
+             CdpEvent::TargetAttachedToTarget(ev) => {

@@ -159,6 +159,7 @@ home|~/.coding/data/<scope>/|create|no|your knowledge base and session history, 
 home|~/bin/coding|symlink|yes|makes the `coding` command available on PATH
 home|$SHELL_RC|one marker block|yes|exports CODING_REPO and adds bin/ to PATH
 home|~/.gsd-browser/|create|yes|gsd-browser CLI, the mandated browser-automation tool; installer reuses a system Chrome when present and otherwise downloads Chrome for Testing. On macOS also writes config.toml [browser] path + a chromium.app symlink, pinning automation to Chrome for Testing so it cannot intercept AppleScript aimed at your own Chrome
+home|~/.gsd-browser/src/|create|yes|only with Rust installed and your consent: gsd-browser and chromiumoxide source plus build output (~2 GB), used to replace the stock binary with one patched for the #fragment-navigation hang (scripts/build-gsd-browser.sh)
 home|~/.local/pipx/venvs/mkdocs-material/|create|no|the docs toolchain (mkdocs-material + mkdocs-minify-plugin, as CI and the agent box install it) for `mkdocs build --strict`, via pipx, so nothing lands in a system Python. Remove with `pipx uninstall mkdocs-material`
 global|~/.claude/settings.json|merge hooks|yes|OPT-IN: adds hooks that run for EVERY claude session, in every project
 global|~/.claude.json|merge mcpServers|yes|OPT-IN: MCP servers visible to bare `claude` everywhere
@@ -1501,8 +1502,76 @@ pin_gsd_browser_bundle_split() {
 # against (0.2.1 relaunches a browser that died in a lid-close sleep itself, and its
 # `daemon stop` really stops) rather than whatever `main` holds that day. The installer
 # keeps the layout the shim expects: ~/.gsd-browser/bin/gsd-browser.
+#
+# The prebuilt 0.2.1 hangs for 30 s on any same-document navigation
+# (page.html#1 -> page.html#2) and every later command queues behind it: its
+# chromiumoxide 0.9.1 never dispatches Page.frameStoppedLoading. So once a
+# binary is in place, ensure_gsd_browser_patched replaces the stock pin with a
+# local build carrying integrations/gsd-browser/chromiumoxide-frame-stopped-loading.patch
+# (scripts/build-gsd-browser.sh). That build reports <pin>+frame-stopped-loading,
+# which is the marker checked here. Drop this step once an upstream release
+# ships the fix.
 GSD_BROWSER_VERSION_PIN="0.2.1"
+GSD_BROWSER_PATCH_MARK="frame-stopped-loading"
 GSD_BROWSER_INSTALLER_URL="https://raw.githubusercontent.com/open-gsd/gsd-browser/v${GSD_BROWSER_VERSION_PIN}/install.sh"
+
+# Path of a usable cargo, or nothing. Homebrew's rustup is keg-only (not on
+# PATH) and rustup-init uses ~/.cargo/bin; scripts/build-gsd-browser.sh looks
+# in the same places.
+gsd_browser_find_cargo() {
+    local d
+    if command -v cargo >/dev/null 2>&1; then command -v cargo; return 0; fi
+    for d in /opt/homebrew/opt/rustup/bin /usr/local/opt/rustup/bin "${HOME}/.cargo/bin"; do
+        if [[ -x "${d}/cargo" ]]; then echo "${d}/cargo"; return 0; fi
+    done
+    return 0
+}
+
+# Replace a stock gsd-browser at the pinned version with the locally patched
+# build. Needs cargo; a machine without Rust keeps the stock binary and is told
+# what that costs. Never fatal.
+ensure_gsd_browser_patched() {
+    local gsd_bin="$1"
+    local version
+    version="$("$gsd_bin" --version 2>/dev/null | head -1)"
+
+    if [[ "$version" == *"+${GSD_BROWSER_PATCH_MARK}"* ]]; then
+        success "gsd-browser carries the fragment-navigation fix (${version})"
+        return 0
+    fi
+    # Only the pinned stock release is known to need (and take) the patch. Any
+    # other version came from `gsd-browser update`, the user's call; leave it.
+    if [[ "$version" != "gsd-browser ${GSD_BROWSER_VERSION_PIN}" ]]; then
+        info "gsd-browser is ${version:-of unknown version}, not the pinned ${GSD_BROWSER_VERSION_PIN}; not patching it"
+        return 0
+    fi
+
+    if [[ -z "$(gsd_browser_find_cargo)" ]]; then
+        warning "gsd-browser ${GSD_BROWSER_VERSION_PIN} is the stock build: navigating to a #fragment of the open page hangs for 30 s"
+        info "  Fix: brew install rustup && rustup default stable, then scripts/build-gsd-browser.sh"
+        INSTALLATION_WARNINGS+=("gsd-browser: stock ${GSD_BROWSER_VERSION_PIN}; #fragment navigation hangs until scripts/build-gsd-browser.sh is run (needs Rust)")
+        return 0
+    fi
+
+    if ! confirm_system_change \
+        "build gsd-browser ${GSD_BROWSER_VERSION_PIN} from source with the chromiumoxide fix, replacing ${gsd_bin}" \
+        "Clones open-gsd/gsd-browser v${GSD_BROWSER_VERSION_PIN} and downloads its crates into ~/.gsd-browser/src (build output ~2 GB, ~4 min). Stops the running gsd-browser daemon."; then
+        warning "Kept the stock gsd-browser; #fragment navigation will hang for 30 s"
+        info "  Build later: scripts/build-gsd-browser.sh"
+        INSTALLATION_WARNINGS+=("gsd-browser: stock ${GSD_BROWSER_VERSION_PIN} kept (declined); #fragment navigation hangs")
+        return 0
+    fi
+
+    info "Building the patched gsd-browser (a few minutes)..."
+    if "${CODING_REPO}/scripts/build-gsd-browser.sh" "${GSD_BROWSER_VERSION_PIN}" >/dev/null 2>&1 \
+        && [[ "$("$gsd_bin" --version 2>/dev/null)" == *"+${GSD_BROWSER_PATCH_MARK}"* ]]; then
+        success "gsd-browser rebuilt with the fragment-navigation fix ($("$gsd_bin" --version 2>/dev/null | head -1))"
+    else
+        warning "Patched gsd-browser build failed; the stock binary is still installed"
+        info "  Run scripts/build-gsd-browser.sh to see the error"
+        INSTALLATION_WARNINGS+=("gsd-browser: patched build failed; stock ${GSD_BROWSER_VERSION_PIN} still installed")
+    fi
+}
 
 install_gsd_browser() {
     echo -e "\n${CYAN}🌐 Installing gsd-browser (browser automation)...${NC}"
@@ -1512,12 +1581,14 @@ install_gsd_browser() {
     # offered a download they do not need.
     local gsd_bin="${GSD_BROWSER_BIN:-${HOME}/.gsd-browser/bin/gsd-browser}"
 
-    # Idempotent: a working binary is left exactly as it is. Deliberately not a
-    # version check — `gsd-browser update` is the supported upgrade path and is
-    # the user's call, not the installer's.
+    # Idempotent: a working binary is left as it is. Deliberately not an
+    # upgrade check — `gsd-browser update` is the supported upgrade path and is
+    # the user's call, not the installer's. The one exception is the stock pin,
+    # which ensure_gsd_browser_patched swaps for the patched build.
     if [[ -x "$gsd_bin" ]] && "$gsd_bin" --version >/dev/null 2>&1; then
         success "gsd-browser already installed ($("$gsd_bin" --version 2>/dev/null | head -1))"
         pin_gsd_browser_bundle_split
+        ensure_gsd_browser_patched "$gsd_bin"
         return 0
     fi
 
@@ -1546,6 +1617,7 @@ install_gsd_browser() {
         if [[ -x "$gsd_bin" ]] && "$gsd_bin" --version >/dev/null 2>&1; then
             success "gsd-browser installed ($("$gsd_bin" --version 2>/dev/null | head -1))"
             pin_gsd_browser_bundle_split
+            ensure_gsd_browser_patched "$gsd_bin"
         else
             # Installer exited 0 but produced nothing usable — report it rather
             # than let the first UI check fail with a bare 127 much later.
