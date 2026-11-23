@@ -920,6 +920,15 @@ member can opt in to routing by the team's verdict (`team`) in the config or in
 the dashboard's Routing / Classes view, and the Gate panel says which scope the
 floor is using. Reporting always shows both columns, whatever the scope.
 
+*Built 2026-11-23* (rapid-llm-proxy `feat/job-classes-gate-scope`): `job_classes.routing.gate_scope`
+(`local` written in `llm-routing.yaml`), `tagger.gate(tag, { scope: 'team' })` from the pooled
+counts — an unreadable pool gives no verdict, so nothing is floored rather than silently
+falling back to local — the floor's stats report the scope, `PATCH /api/llm/routing` takes
+`{ jobClasses: { routing: { gateScope } } }`, and the Gate panel has the switch ("Routing by
+class trusts the gate of: this machine | the team"), shown only where the proxy routes by
+class. Also: a pool with no checker (a member with labels but no checks yet) folds into the
+checked pool of the same labeller instead of standing apart.
+
 **5a. glass labels with Sonnet only, and samples once the gate is done
 (Q8).** glass switches to a teacher-only labeller like coding
 (`studentProcess == teacherProcess`, Sonnet), so glass and coding members
