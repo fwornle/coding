@@ -18,17 +18,23 @@ stored in glass's token DB (table `turn_job_class`), beside the turn's token row
 Not labelled: tool-loop calls (only the first call of a turn is), sub-agent calls, the
 agents' own utility calls (titles, summaries) and headless `claude -p` runs.
 
-## Student, teacher and the gate
+## Labeller, second pass and the gate
 
-| | Model | When |
+Live labels come from the **teacher** model, `claude-sonnet-5`: no cheap student model
+reached the gate in the measurement, so the label you read is the reliable one. The
+student (`claude-haiku-5.5`) is only scored by `glass job-classes measure`.
+
+| Phase | Labelled | Second pass (the teacher again) |
 |---|---|---|
-| **student** | `claude-haiku-5.5` | every turn |
-| **teacher** | `claude-sonnet-5` | a share of turns (25 % by default; 0 switches it off) |
+| **collecting** — some class has fewer than 20 checks | every turn | every turn of a class still below 20 checks; 10 % of the others |
+| **reporting** — every class has its 20 checks | 1 turn in 5 (*After the gate*), each label counted 5 times | 10 % (*Second pass*), as a drift check |
 
-The **gate** is per class: of the turns the student put in a class, the share the teacher
-put there too (its precision). A class passes at 90 % over at least 20 teacher-checked
-turns, counted over every label of one taxonomy version. The Classes tab's **Gate** panel
-shows where each class stands. Nothing acts on a label yet: they are counted and shown.
+The **gate** is per class: of a class's labels that were checked a second time, the share
+the second pass agreed with. A class passes at 90 % over at least 20 checked turns,
+counted over every label of one taxonomy version. The Classes tab's **Gate** panel shows
+where each class stands, on this machine and — with a team's classes — across the team
+(members publish their counts with `glass job-classes publish`). Nothing acts on a label
+yet: they are counted and shown.
 
 A free Copilot plan may not offer these models; **Try the account** then says so.
 

@@ -60,6 +60,8 @@ interface RecentTurn {
 interface Summary {
   days: number
   byClass: ClassRow[]
+  /** Labels made in the reporting phase (P6e), each counted `report_sample_every` times. */
+  sampledLabels?: number
   agreement?: { sampled: number; agree: number | null }
   recent?: RecentTurn[]
   error?: string
@@ -85,6 +87,8 @@ interface TaxonomyEntry {
   projects: string[]
   tag: string | null
   error: string | null
+  /** P6: collecting (label every turn, check every turn of a class below its gate) or reporting (1 turn in `every`). */
+  sampling?: { phase: 'collecting' | 'reporting' | 'off'; every: number; collecting: string[]; unreadable?: boolean }
 }
 
 const fmt = (n: number) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}K` : String(n))
@@ -147,6 +151,7 @@ export function JobClassesTab({ proxyBase, hours, controls, measureCommand }: { 
   // teacher check is a second teacher pass. Same test as GateProgress.
   const selfCheck = !!tagger?.config?.studentProcess && tagger.config.studentProcess === tagger.config.teacherProcess
   const labeller = selfCheck ? 'the labeller' : 'the student'
+  const sampling = (tagger?.taxonomies ?? []).find(x => x.tag === taxonomy)?.sampling
 
   return (
     <div className="space-y-4">
@@ -202,6 +207,16 @@ export function JobClassesTab({ proxyBase, hours, controls, measureCommand }: { 
               {controls ? ' Switch on "Label my turns" below to start.' : ' Enable job_classes in the proxy config to start.'}
             </div>
           )}
+          {tagger?.enabled && sampling && sampling.phase !== 'off' && (
+            <div className="text-muted-foreground" data-testid="sampling-phase">
+              <Badge variant="outline" className="mr-2">{sampling.phase === 'reporting' ? `reporting: 1 turn in ${sampling.every}` : 'collecting: every turn'}</Badge>
+              {sampling.phase === 'reporting'
+                ? 'Every class has its 20 checks, so a sample of turns is labelled; each label counts for the turns it stands for.'
+                : sampling.unreadable
+                  ? "The team's gate could not be read, so the configured rates apply."
+                  : <>Every turn is labelled, and checked a second time while its class has fewer than 20 checks{sampling.collecting.length ? <> ({sampling.collecting.length} classes: {sampling.collecting.join(', ')})</> : ''}.</>}
+            </div>
+          )}
           <div className="text-muted-foreground">
             {selfCheck ? 'Consistency check' : 'Teacher check'}:{' '}
             {liveRate === null
@@ -230,6 +245,7 @@ export function JobClassesTab({ proxyBase, hours, controls, measureCommand }: { 
           <CardDescription>
             A class's tokens are every call of the turns labelled with it, tool loops included. "none" is a turn {labeller}{' '}
             could not place in any class.
+            {summary?.sampledLabels ? <> {summary.sampledLabels} of these labels were sampled after the gate, each counted for the turns it stands for.</> : null}
           </CardDescription>
         </CardHeader>
         <CardContent>

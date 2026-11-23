@@ -43,8 +43,9 @@ function printView(out, v, counters) {
   const c = v.config;
   out(`labelling: ${c.enabled ? 'on' : 'off'}${c.enabled ? '' : ' (glass job-classes on)'}`);
   out(`  Copilot account  ${v.copilotApi || `none — gh is not logged in to a host with Copilot${v.host ? ` (${v.host})` : ''}`}`);
-  out(`  student          ${c.studentModel}, every turn`);
-  out(`  teacher          ${c.teacherModel}, ${pct(c.teacherSamplePct)} of turns`);
+  out(`  labeller         ${c.teacherModel} (the teacher), every turn until each class has a verdict, then 1 turn in ${c.reportSampleEvery}`);
+  out(`  second pass      every turn of a class still collecting checks, else ${pct(c.teacherSamplePct)} of turns`);
+  out(`  student          ${c.studentModel} (scored by \`glass job-classes measure\` only)`);
   out(`  taxonomy         ${c.team ? `team, from ${c.team.url}` : 'the shipped default'} (${v.taxonomy})`);
   if (counters) out(`  since the daemon started: ${counters.labelled} labelled, ${counters.teacherSampled} checked by the teacher${counters.failed ? `, ${counters.failed} failed` : ''}`);
 }
