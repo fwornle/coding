@@ -313,9 +313,9 @@ route.
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![Token Usage → Classes → Gate: the switch for whose gate routing by class trusts (this machine, the default, or the team); one row per class with turns labelled, re-checked turns against the minimum of 20, second-pass agreements and a consistency verdict for this machine, then the same for the team; below, the members who published and a pool that is not added.](images/job-classes-gate.png)](images/job-classes-gate.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![Token Usage → Classes → Gate: the switch for whose gate routing by class trusts (this machine, the default, or the team); one row per class with turns labelled, re-checked turns against the minimum of 20, second-pass agreements and a consistency verdict for this machine, then the same for the team, where status is consistent at 42 checks; below, the members (this machine's coding and glass), the Team contributions button and a pool that is not added.](images/job-classes-gate.png)](images/job-classes-gate.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
-<figcaption>The gate panel, a day after version 2 went live: every class still collecting. Today it also shows the team's pooled columns (see *Pool the gate*).</figcaption>
+<figcaption>The gate panel with the team's pooled columns beside this machine's (see <i>Pool the gate</i>). <b>status</b> is consistent at 49 checks; the rest are still collecting.</figcaption>
 </figure>
 <p class="overview-takeaway">No class acts on its label until the second pass has confirmed it enough times.</p>
 </section>
@@ -368,7 +368,7 @@ version, and **Classes** has a picker for which one to read.
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![The first member writes job-classes/taxonomy.yaml and CHANGELOG.md into their learning repo; each other member joins, which binds the team and clones the repo; a bindings index maps each project to its team's taxonomy file, and the LLM proxy labels each project with it. Each member publishes job-classes/gate/<pseudonym>.json with per-class counts and no prompts; the Gate panel adds up the members of one pool, counting this machine live and never twice.](images/job-class-team-sharing.png)](images/job-class-team-sharing.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
+[![The first member writes job-classes/taxonomy.yaml and CHANGELOG.md into their learning repo; each other member joins, which binds the team and clones the repo; a bindings index maps each project to its team's taxonomy file, and the LLM proxy labels each project with it. Each member and install (coding, glass) publishes job-classes/gate/<pseudonym>.json with per-class counts, its source and no prompts — by hand once, then on every coding sync (glass every 30 minutes); the Gate panel adds up the members of one pool, counting this machine live and never twice, and Team contributions lets this machine leave a member out.](images/job-class-team-sharing.png)](images/job-class-team-sharing.png){: target="_blank" rel="noopener" title="Open full-size diagram" }
 
 <figcaption>The shared package holds no prompts: only the taxonomy, its changelog and each member's gate counts.</figcaption>
 </figure>
@@ -406,7 +406,7 @@ version, and **Classes** has a picker for which one to read.
 
 One machine collects 20 checks per class slowly. A team adds up its members' counts.
 
-1. Each member runs `coding job-classes publish --team <id>`. It writes `job-classes/gate/<pseudonym>.json` beside `taxonomy.yaml`: per class the turns labelled, checked and agreed, and which classes the two passes confused. Never a prompt. The pseudonym is the first 10 hex characters of sha1(hostname:user), as for proposals. glass uses sha1(hostname:user:glass), so glass and coding on the same machine are two members whose counts add up; a turn glass forwards to coding's proxy is labelled by glass only, so nothing is counted twice.
+1. Each member runs `coding job-classes publish --team <id>`. It writes `job-classes/gate/<pseudonym>.json` beside `taxonomy.yaml`: per class the turns labelled, checked and agreed, and which classes the two passes confused. Never a prompt. The file is named by a pseudonym, never your name (see *See who contributed*).
 2. If the package is in your own learning repo, the file is only committed. `coding sync --push` pushes it, and asks first, because that repo also carries transcripts. A shared clone under `var/shared/` is pushed directly with `--push`.
 3. The first publish is the opt-in. After it, every `coding sync` (launch pull, 30-minute commit, `--push`) publishes again, and glass does every 30 minutes. Unchanged counts commit nothing.
 
@@ -422,14 +422,37 @@ Every member needs write access to the team repo.
 | Labels nobody has checked yet count with the checked pool of the same labeller. |
 | A file older than 14 days is greyed out and not added. An invalid file is listed, not added. |
 | This machine's own file is replaced by its live counts, so it is never counted twice. |
-| **Team contributions** lists each file's source (coding, glass) and counts. Unticking one leaves it out on this machine only. |
 
 <figcaption>Token Usage → Classes → Gate shows this machine's columns beside <b>Team: checked</b>, <b>Team agreement</b> and <b>Team</b> (from <code>GET /api/job-classes/summary?scope=team</code>), the members with the age of their file, and the Not added lines. A badge says whether labelling is still <b>collecting: every turn</b> or <b>reporting: 1 turn in N</b>.</figcaption>
 </figure>
 <p class="overview-takeaway">The team's counts decide the gate together; no prompt leaves a machine.</p>
 </section>
 
-<section class="overview-slide overview-essential" id="slide-14" aria-labelledby="jc-trial" markdown="1">
+<section class="overview-slide" id="slide-14" aria-labelledby="jc-contrib" markdown="1">
+<div class="overview-copy" markdown="1">
+
+<p class="overview-kicker">Step 5, continued · built</p>
+
+## See who contributed {#jc-contrib}
+
+**Team contributions**, under the Gate table, opens what the team's classes repo
+holds: one row per published file.
+
+- **Who**: a pseudonym, the first 10 hex characters of sha1(hostname:user). glass uses sha1(hostname:user:glass), so this machine's coding and glass are two rows whose counts add up, both named. A turn glass forwards to coding's proxy is labelled by glass only, so nothing counts twice.
+- **What**: the install that published it, its age, labelled / checked / agreed, and its pools. Click a row for its per-class counts.
+- **Untick** a row to leave it out of this machine's sums: the Gate panel, sampling and class routing. The choice stays in `<data>/job-classes/gate-exclude.json`; the repo and your teammates' views do not change.
+
+</div>
+<figure class="overview-figure" markdown="1">
+
+[![Team contributions: the files in job-classes/gate of the team repo. This machine · coding, live, 290 labelled, 122 checked, 110 agreed (90 %), in two pools, one of them not added; this machine · glass, published today, 5 labelled, 5 checked, 5 agreed. Each row has a Counted checkbox and is opened to its per-class counts.](images/job-classes-team-contributions.png)](images/job-classes-team-contributions.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+
+<figcaption>Every team number traced to a member and an install. Unticking a row changes only this machine's sums.</figcaption>
+</figure>
+<p class="overview-takeaway">You see whose counts you add up, and you decide.</p>
+</section>
+
+<section class="overview-slide overview-essential" id="slide-15" aria-labelledby="jc-trial" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Step 6 · built</p>
@@ -463,7 +486,7 @@ blind, in both orders. A class passes for that agent and model after at least
 <p class="overview-takeaway">No model gets cheaper without evidence from your own past turns.</p>
 </section>
 
-<section class="overview-slide overview-essential" id="slide-15" aria-labelledby="jc-route" markdown="1">
+<section class="overview-slide overview-essential" id="slide-16" aria-labelledby="jc-route" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Step 7 · built</p>
@@ -506,7 +529,7 @@ the evidence is a recommendation.
 <p class="overview-takeaway">The class picks which jobs to try; the evidence decides the model.</p>
 </section>
 
-<section class="overview-slide" id="slide-16" aria-labelledby="jc-glass" markdown="1">
+<section class="overview-slide" id="slide-17" aria-labelledby="jc-glass" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">In glass · built</p>
@@ -518,7 +541,7 @@ Most people will only ever run **glass**. It labels their turns the same way, op
 - Sonnet labels through **their own Copilot account** (their `gh` login); after the gate, 1 turn in 5;
 - prompts are redacted, and nothing is sent until they tick **Label my turns**;
 - `glass job-classes measure` reads the **agents' own transcripts**, so no session logs are needed;
-- `glass job-classes join <url>` takes a team's taxonomy; `publish` adds their gate counts to its pool.
+- `glass job-classes join <url>` takes a team's taxonomy; after a first `publish`, glass shares its gate counts and pulls the team's every 30 minutes.
 
 The Classes tab, the gate and the map are the same; routing by class is coding only.
 

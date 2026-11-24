@@ -156,7 +156,9 @@ What one person's sessions teach is stored **per repository**, in a learning
 checkout next to the code, and shared over **git**, with no extra server.
 
 A teammate's next launch pulls it in, and their agent gets the same insight.
-Both people changing the graph at once is merged, not a conflict.
+Both people changing the graph at once is merged, not a conflict. The
+[job-class](job-classes.md) gate counts travel the same way: every sync shares
+yours and pulls your teammates', glass's included.
 
 A **team** is a set of repositories, so knowledge stays within the repos it
 belongs to.

@@ -110,7 +110,7 @@ checked. At first every class is still collecting. With your team's classes join
 **Team** columns add up the counts your teammates publish (step 6), so a class can pass
 for the team long before it does on your machine alone:
 
-![The gate with a team's classes: this machine has checked 4 turns of fix and is still collecting; with a teammate's published counts the team has 22, 91 % agreed, so fix is consistent for the team; the members and a teammate on other models, not added, are listed below](images/ui-job-classes-gate.png)
+![The gate with a team's classes: this machine has checked only a few turns, so every class is still collecting here; with the team's published counts, status has 42 checks, 93 % agreed, and is consistent for the team. Below: the members (this machine's glass and coding), the Team contributions button, and a pool on other models that is not added](images/ui-job-classes-gate.png)
 
 Every turn of a class is checked until that class has its 20 checks, so a class needs 20
 turns of its own kind — fewer when your team publishes its counts too (step 6). Then the
@@ -147,6 +147,17 @@ your counts per class (how many turns were labelled, checked and agreed) as
 `job-classes/gate/<pseudonym>.json` and pushes them with your git login; it needs write
 access to the repo. Publishing again with unchanged counts changes nothing. Your labels
 themselves stay on your machine.
+
+Publish once and glass takes it from there: a minute after it starts and every 30 minutes
+it publishes your counts again and pulls your teammates'. To see whose counts the **Team**
+columns add up, click **Team contributions** under the Gate table:
+
+![Team contributions: the files in the team repo's job-classes/gate. This machine · glass, live, 5 turns labelled, checked and agreed; this machine · coding, published today, 288 labelled, 120 checked, 108 agreed (90 %), in two pools, one of them not added. Each row has a Counted checkbox and is opened to its counts per class.](images/ui-job-classes-team-contributions.png)
+
+One row per published file: a pseudonym (if coding runs on your machine too, its file and
+glass's are both named "this machine"), the install that published it, when, and its
+counts; click a row for its counts per class. Untick a row to leave it out of your own sums.
+That choice stays on your machine; your teammates' views don't change.
 
 ## What next
 
