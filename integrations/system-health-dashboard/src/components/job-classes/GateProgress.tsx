@@ -282,7 +282,10 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
             </div>
             {otherPools.map(p => (
               <div key={`${p.taxonomy}|${p.labeller}|${p.checker}`}>
-                Not added: {p.members.map(m => m === team.self ? 'this machine' : m).join(', ')} with {p.labeller}
+                Not added: {p.members.map(id => {
+                  const m = team.members.find(x => x.member === id)
+                  return m?.thisMachine ? memberName(m).replace(/^This machine/, 'this machine') : id
+                }).join(', ')} with {p.labeller}
                 {p.checker ? ` checked by ${p.checker}` : ''} under <span className="font-mono">{p.taxonomy}</span>
                 {' '}({Object.values(p.classes).reduce((n, c) => n + c.checked, 0)} checked turns): a different labeller or taxonomy version measures something else.
               </div>
