@@ -156,12 +156,14 @@ describe('coding job-classes publish', { skip }, () => {
  */
 async function sync(f, action) {
   const write = process.stdout.write;
-  process.stdout.write = () => true;
+  let out = '';
+  process.stdout.write = (chunk) => { out += chunk; return true; };
   try {
-    return await syncMain(['node', 'sync', action, '--json'], { ...f.opts, dataHome: join(f.base, 'data'), port: 1, timeoutMs: 200 });
+    await syncMain(['node', 'sync', action, '--json'], { ...f.opts, dataHome: join(f.base, 'data'), port: 1, timeoutMs: 200 });
   } finally {
     process.stdout.write = write;
   }
+  return JSON.parse(out);
 }
 function addLabel(f, key, cls) {
   const Database = require('better-sqlite3');
@@ -177,8 +179,12 @@ describe('coding sync publishes the gate on its own (pull, commit), once a membe
     const f = await fixture({ state: 'shared' });
     await publishTeamGate({ team: 'ui', ...f.opts }); // the opt-in, by hand; committed, not pushed
     addLabel(f, 'd', 'fix');
-    await sync(f, 'commit');
+    const doc = await sync(f, 'commit');
     assert.equal(pushedFile(f).pools[0].classes.fix.labelled, 3, 'the 30-minute commit carried the new label to the team');
+    // the table is read after the gate step: the shared clone shows pushed, nothing left to push
+    const row = doc.repos.find((r) => r.dir === f.checkout);
+    assert.ok(row, `a row for the shared clone: ${doc.repos.map((r) => r.dir).join(', ')}`);
+    assert.deepEqual([row.ahead, row.pushed], [0, true]);
   });
 
   test('commit before any publish by hand: nothing is published', async () => {
