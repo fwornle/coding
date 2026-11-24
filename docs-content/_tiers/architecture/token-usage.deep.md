@@ -546,13 +546,22 @@ mechanism, step by step, is the [job classes deck](../job-classes.md).
   (a call glass forwards to coding's proxy is task-bound, so only glass labels it). The file is a full snapshot, so unchanged counts leave it byte-identical
   and nothing is committed. In the member's own learning checkout it is only committed
   (`coding sync --push` pushes it, after asking, since that repo carries transcripts); a
-  shared clone under `var/shared/` is pushed directly with `--push`. `coding sync --push`
-  re-publishes for every team the member already published to: the first manual publish
-  is the opt-in. Every member needs write access to the team repo. Counts are added only
+  shared clone under `var/shared/` is pushed directly with `--push`. Every `coding sync`
+  (the launch `pull`, the session-end and 30-minute `commit`, and `--push`) re-publishes
+  for every team the member already published to — the first manual publish is the
+  opt-in: a shared clone (counts only) is pushed on each, the member's own learning
+  checkout is only committed. glass's daemon does the same 1 minute after start and every
+  30 minutes (publish, then pull). Each file names its `source` (`coding`, `glass`). Every member needs write access to the team repo. Counts are added only
   within a pool (taxonomy version tag, labeller model, checker model; provider prefix
   dropped, `.` ≡ `-`); a pool with no checker folds into the checked pool of the same
   labeller. Files older than 14 days are shown greyed and not added, invalid files are
   listed and not added, and this machine's own file is replaced by its live counts.
+  **Team contributions** (a dialog in the Gate panel) lists every file — source, this
+  machine's two installs named, age, totals, pools and per-class counts — with a checkbox
+  each: unticked members are left out of THIS machine's sums (Gate panel, sampling, class
+  floor), stored in `<data>/job-classes/gate-exclude.json` (glass:
+  `~/.glass/job-classes/gate-exclude.json`) per team, never published; set with
+  `PUT /api/job-classes/gate-exclude {team, exclude: [pseudonym…]}`.
 
 API on the proxy: `GET /api/job-classes` (the tagger's counters, `labelled` / `skipped`,
 `replay`: turns pending and awaiting their answer, and `routing`: how often the floor

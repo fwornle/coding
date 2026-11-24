@@ -20,6 +20,7 @@ import { pathToFileURL } from 'node:url';
 
 import { memberId } from '../../lib/job-classes/evolve.mjs';
 import { boundTeams, gateMember, hasPublished, publishTeamGate, republishGates } from '../../lib/job-classes/gate.mjs';
+import { main as syncMain } from '../../lib/history/sync.mjs';
 
 const require = createRequire(import.meta.url);
 const { proxyDir } = require('../../lib/proxy/proxy-paths.cjs');
@@ -139,5 +140,70 @@ describe('coding job-classes publish', { skip }, () => {
     const rows = await republishGates({ push: true, ...f.opts });
     assert.equal(rows.length, 1);
     assert.deepEqual([rows[0].team, rows[0].pushed, rows[0].error], ['ui', true, undefined]);
+  });
+  test('the file names its source: coding', async () => {
+    const f = await fixture({ state: 'shared' });
+    const r = await publishTeamGate({ team: 'ui', ...f.opts });
+    assert.equal(JSON.parse(readFileSync(r.file, 'utf8')).source, 'coding');
+  });
+});
+
+/**
+ * Run `coding sync <action>` against a fixture, quietly. Its own data home: a sync
+ * also writes sync-state.json and, on pull, the job-class bindings index, and
+ * without one those went to this machine's real files (and the proxy lost its
+ * team taxonomy). The obs-api reload goes nowhere.
+ */
+async function sync(f, action) {
+  const write = process.stdout.write;
+  process.stdout.write = () => true;
+  try {
+    return await syncMain(['node', 'sync', action, '--json'], { ...f.opts, dataHome: join(f.base, 'data'), port: 1, timeoutMs: 200 });
+  } finally {
+    process.stdout.write = write;
+  }
+}
+function addLabel(f, key, cls) {
+  const Database = require('better-sqlite3');
+  const db = new Database(f.opts.tokenDb);
+  db.prepare(`INSERT INTO turn_job_class (conversation_key, turn_index, taxonomy, job_class, student_model, teacher_class, teacher_model, prompt_preview, labelled_at)
+    VALUES (?, 0, 'job-classes-ui-v1', ?, 'gh-copilot/claude-sonnet-5', ?, 'gh-copilot/claude-sonnet-5', '', '2026-11-21T10:00:00Z')`).run(key, cls, cls);
+  db.close();
+}
+const pushedFile = (f) => JSON.parse(sh(f.bare, 'show', `main:job-classes/gate/${memberId({ hostname: 'host', user: 'me' })}.json`));
+
+describe('coding sync publishes the gate on its own (pull, commit), once a member opted in', { skip }, () => {
+  test('commit: re-published and pushed to a shared clone, with the new counts', async () => {
+    const f = await fixture({ state: 'shared' });
+    await publishTeamGate({ team: 'ui', ...f.opts }); // the opt-in, by hand; committed, not pushed
+    addLabel(f, 'd', 'fix');
+    await sync(f, 'commit');
+    assert.equal(pushedFile(f).pools[0].classes.fix.labelled, 3, 'the 30-minute commit carried the new label to the team');
+  });
+
+  test('commit before any publish by hand: nothing is published', async () => {
+    const f = await fixture({ state: 'shared' });
+    await sync(f, 'commit');
+    assert.equal(sh(f.bare, 'log', '-1', '--format=%s', 'main').trim(), 'package');
+  });
+
+  test('pull: publishes on top of a teammate\'s push', async () => {
+    const f = await fixture({ state: 'shared' });
+    await publishTeamGate({ team: 'ui', push: true, ...f.opts });
+    // a teammate pushes their file
+    const mate = join(f.base, 'mate');
+    sh(f.base, 'clone', '-q', f.bare, mate);
+    mkdirSync(join(mate, 'job-classes', 'gate'), { recursive: true });
+    writeFileSync(join(mate, 'job-classes', 'gate', 'aaaaaaaaaa.json'), JSON.stringify({ format: 1, member: 'aaaaaaaaaa', publishedAt: '2026-11-22T00:00:00Z',
+      pools: [{ taxonomy: 'job-classes-ui-v1', labeller: 'claude-sonnet-5', checker: 'claude-sonnet-5', classes: { fix: { labelled: 1, checked: 1, agree: 1 } }, confusions: [] }] }));
+    sh(mate, 'add', '.');
+    sh(mate, '-c', 'user.name=m', '-c', 'user.email=m@m', 'commit', '-q', '-m', 'mate');
+    sh(mate, 'push', '-q', 'origin', 'HEAD');
+    addLabel(f, 'd', 'build');
+    await sync(f, 'pull');
+    assert.ok(existsSync(join(f.checkout, 'job-classes', 'gate', 'aaaaaaaaaa.json')), 'the teammate\'s file arrived');
+    assert.equal(pushedFile(f).pools[0].classes.build.labelled, 2, 'and ours went out on top of it');
+    assert.ok(existsSync(join(f.base, 'data', 'var', 'job-classes', 'bindings.json')), 'the bindings index stayed in the sandbox');
+    assert.ok(existsSync(join(f.base, 'data', 'var', 'sync-state.json')), 'and so did the sync state');
   });
 });

@@ -32,7 +32,7 @@ import { execFile } from 'node:child_process';
 
 import { createJobClassTagger, loadTaxonomy, renderRequest, parseLabel } from '../../proxy/proxy-bridge/job-class.mjs';
 import { handleJobClassRead } from '../../proxy/proxy-bridge/job-class-api.mjs';
-import { gateDirOf, gateSnapshot, memberId, publishGate } from '../../proxy/proxy-bridge/gate-pool.mjs';
+import { excludedFor, gateDirOf, gateSnapshot, memberId, publishGate, writeGateExclude } from '../../proxy/proxy-bridge/gate-pool.mjs';
 import { runGh, loggedInHosts } from './copilot-quota.mjs';
 
 export const STUDENT_PROCESS = 'job-class-student';
@@ -244,12 +244,56 @@ export function createGlassJobClasses({
   // shared, so each install replaced the other's published counts with its own
   // (gate-pool.mjs memberId). One value for the tagger, the read API and publish.
   const member = memberId({ install: 'glass' });
-  const tagger = createJobClassTagger({ getConfig: taggerConfig, complete: ask, db, redact, log, logErr, member });
+  // Team members this machine leaves out of its gate sums: local, never published
+  // (gate-pool.mjs readGateExclude); set from the team view's checkboxes.
+  const excludeFile = path.join(home, 'job-classes', 'gate-exclude.json');
+  const gateExclude = (name) => excludedFor(excludeFile, name);
+  const tagger = createJobClassTagger({ getConfig: taggerConfig, complete: ask, db, redact, log, logErr, member, gateExclude });
 
   const view = async () => {
     const h = await host();
     return { config: store.get(), host: h, copilotApi: copilotApiBase(h), taxonomy: taggerConfig().taxonomyPath, shipped: defaultTaxonomy };
   };
+
+  /**
+   * Publish this machine's gate counts into the joined team's repo, as glass.
+   * Throws when there is nothing to publish into.
+   */
+  async function publishOwn({ push = true } = {}) {
+    const t = store.get().team;
+    if (!t || !fs.existsSync(teamTaxonomyFile(t.dir))) throw new Error('no team taxonomy: join one first (only a team pools its gate)');
+    if (!db) throw new Error('token DB unavailable');
+    const tax = loadTaxonomy(teamTaxonomyFile(t.dir));
+    const pools = gateSnapshot({ db, tax });
+    const r = await publishGate({
+      checkout: t.dir, gateDir: gateDirOf(teamTaxonomyFile(t.dir)), member, pools, source: 'glass', push,
+      git: (args) => git('git', ['-C', t.dir, ...args]),
+    });
+    log(`job classes: gate counts of ${member} for ${tax.tag}: ${r.changed ? 'updated' : 'unchanged'}${r.pushed ? ', pushed' : ''}${r.error ? ` — ${r.error}` : ''}`);
+    return { ...r, member, tag: tax.tag, pools: pools.length };
+  }
+
+  /**
+   * The daemon's sync (at start, then every 30 minutes): publish this machine's
+   * counts, then pull the team's — only once this machine has published by hand
+   * (its file is in the clone), which is the opt-in, as coding's sync. Publish
+   * goes first: it pushes, rebasing over a teammate once, so the fast-forward
+   * pull after it cannot be blocked by our own commit. Never throws.
+   */
+  async function autoSync() {
+    const t = store.get().team;
+    if (!t || !fs.existsSync(teamTaxonomyFile(t.dir))) return { skipped: 'no team' };
+    if (!fs.existsSync(path.join(gateDirOf(teamTaxonomyFile(t.dir)), `${member}.json`))) return { skipped: 'not published yet' };
+    try {
+      const published = await publishOwn({ push: true });
+      const tax = await syncTeamTaxonomy({ url: t.url, dir: t.dir, git });
+      tagger.forgetTeam?.();
+      return { published, tag: tax.tag };
+    } catch (err) {
+      logErr(`job classes: team sync: ${err?.message || err}`);
+      return { error: err?.message || String(err) };
+    }
+  }
 
   /** One labeller (teacher) call on a made-up prompt: is the account able to label at all? */
   async function test() {
@@ -273,6 +317,7 @@ export function createGlassJobClasses({
     if (url === '/api/job-classes/settings' && req.method === 'GET') { json(res, 200, await view()); return true; }
     if (req.method === 'GET' && handleJobClassRead(req, res, {
       tagger, db, referenceDir: path.join(dataDir, 'job-classes'), config: () => taggerConfig(), sinceBootMs: () => Date.now() - startedAt, member,
+      source: 'glass', gateExclude,
     })) return true;
     if (req.method === 'GET') return false;
     if (!writeAllowed(req)) { json(res, 403, { error: 'job-class settings change only from the glass UI or CLI' }); return true; }
@@ -310,18 +355,20 @@ export function createGlassJobClasses({
       return true;
     }
     if (url === '/api/job-classes/team/publish' && req.method === 'POST') {
-      const t = store.get().team;
-      if (!t || !fs.existsSync(teamTaxonomyFile(t.dir))) { json(res, 400, { error: 'no team taxonomy: join one first (only a team pools its gate)' }); return true; }
-      if (!db) { json(res, 400, { error: 'token DB unavailable' }); return true; }
       try {
-        const tax = loadTaxonomy(teamTaxonomyFile(t.dir));
-        const pools = gateSnapshot({ db, tax });
-        const r = await publishGate({
-          checkout: t.dir, gateDir: gateDirOf(teamTaxonomyFile(t.dir)), member, pools, push: body.push !== false,
-          git: (args) => git('git', ['-C', t.dir, ...args]),
-        });
-        log(`job classes: gate counts of ${member} for ${tax.tag}: ${r.changed ? 'updated' : 'unchanged'}${r.pushed ? ', pushed' : ''}${r.error ? ` — ${r.error}` : ''}`);
-        json(res, r.error ? 502 : 200, { ...r, member, tag: tax.tag, pools: pools.length });
+        const r = await publishOwn({ push: body.push !== false });
+        json(res, r.error ? 502 : 200, r);
+      } catch (err) {
+        json(res, 400, { error: err?.message || String(err) });
+      }
+      return true;
+    }
+    // Which team members this machine adds up: the team view's checkboxes. Local only.
+    if (url === '/api/job-classes/gate-exclude' && req.method === 'PUT') {
+      try {
+        const doc = writeGateExclude(excludeFile, body.team, body.exclude);
+        tagger.forgetTeam?.();
+        json(res, 200, { team: body.team, exclude: doc.teams[body.team] || [] });
       } catch (err) {
         json(res, 400, { error: err?.message || String(err) });
       }
@@ -338,5 +385,5 @@ export function createGlassJobClasses({
     return true;
   }
 
-  return { tagger, store, handle, test, view, onTurn: (t) => tagger.observe(t), taxonomyPath };
+  return { tagger, store, handle, test, view, onTurn: (t) => tagger.observe(t), taxonomyPath, autoSync, member };
 }

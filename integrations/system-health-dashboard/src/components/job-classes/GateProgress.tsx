@@ -35,15 +35,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { TeamContributions } from './TeamContributions'
+import { memberName, type Team, type TeamPoolSum as TeamPool } from './team-members'
 
 const GATE_PRECISION = 0.9
 const GATE_MIN_CHECKED = 20
 
 interface ClassCount { jobClass: string; turns: number; teacherSampled: number; teacherAgree: number }
-interface PoolCounts { labelled: number; checked: number; agree: number }
-interface TeamPool { taxonomy: string; labeller: string; checker: string; members: string[]; local: boolean; classes: Record<string, PoolCounts> }
-interface TeamMember { member: string; self?: boolean; live?: boolean; publishedAt?: string; stale?: boolean; error?: string }
-interface Team { gateDir: string | null; self: string; members: TeamMember[]; pools: TeamPool[] }
 type Verdict = 'passes' | 'below' | 'collecting'
 
 const pct = (x: number) => `${(x * 100).toFixed(0)}%`
@@ -267,15 +265,20 @@ export function GateProgress({ proxyBase, taxonomy }: { proxyBase: string; taxon
               <span className="font-mono">glass job-classes publish</span>).
               {teamPool && <> Added up: {teamPool.labeller}{teamPool.checker && teamPool.checker !== teamPool.labeller ? <> checked by {teamPool.checker}</> : teamPool.checker ? ' (checked by itself)' : ''}, <span className="font-mono">{teamPool.taxonomy}</span>.</>}
             </div>
-            <div>
-              Members:{' '}
-              {team.members.map((m, i) => (
-                <span key={m.member} className={m.error || m.stale ? 'line-through' : ''} title={m.error || (m.stale ? 'older than 14 days: not added' : '')}>
-                  {i > 0 && ', '}<span className="font-mono">{m.member}</span>
-                  {m.self ? ' (this machine, live)' : m.error ? ' (unreadable)' : m.stale ? ` (stale, ${ago(m.publishedAt)})` : ` (${ago(m.publishedAt)})`}
-                </span>
-              ))}
-              {team.members.length === 1 && team.members[0].self && '. No teammate has published yet.'}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span>
+                Members:{' '}
+                {team.members.map((m, i) => (
+                  <span key={m.member} className={m.error || m.stale || m.excluded ? 'line-through' : ''}
+                    title={m.error || (m.stale ? 'older than 14 days: not added' : m.excluded ? 'left out on this machine' : '')}>
+                    {i > 0 && ', '}{m.thisMachine ? memberName(m).replace(/^This machine/, 'this machine') : <span className="font-mono">{m.member}</span>}
+                    {m.self ? ' (live)' : m.error ? ' (unreadable)' : m.stale ? ` (stale, ${ago(m.publishedAt)})` : ` (${ago(m.publishedAt)})`}
+                    {m.excluded ? ' (left out)' : ''}
+                  </span>
+                ))}
+                {team.members.length === 1 && team.members[0].self && '. No teammate has published yet.'}
+              </span>
+              <TeamContributions team={team} addedPool={teamPool} proxyBase={proxyBase} onChanged={load} />
             </div>
             {otherPools.map(p => (
               <div key={`${p.taxonomy}|${p.labeller}|${p.checker}`}>
