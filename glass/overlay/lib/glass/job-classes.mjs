@@ -240,7 +240,11 @@ export function createGlassJobClasses({
       sampleUntilGate: true, reportSampleEvery: c.reportSampleEvery,
     };
   };
-  const tagger = createJobClassTagger({ getConfig: taggerConfig, complete: ask, db, redact, log, logErr });
+  // glass's own gate pseudonym. Beside coding on one machine the plain one was
+  // shared, so each install replaced the other's published counts with its own
+  // (gate-pool.mjs memberId). One value for the tagger, the read API and publish.
+  const member = memberId({ install: 'glass' });
+  const tagger = createJobClassTagger({ getConfig: taggerConfig, complete: ask, db, redact, log, logErr, member });
 
   const view = async () => {
     const h = await host();
@@ -268,7 +272,7 @@ export function createGlassJobClasses({
     if (!url.startsWith('/api/job-classes')) return false;
     if (url === '/api/job-classes/settings' && req.method === 'GET') { json(res, 200, await view()); return true; }
     if (req.method === 'GET' && handleJobClassRead(req, res, {
-      tagger, db, referenceDir: path.join(dataDir, 'job-classes'), config: () => taggerConfig(), sinceBootMs: () => Date.now() - startedAt,
+      tagger, db, referenceDir: path.join(dataDir, 'job-classes'), config: () => taggerConfig(), sinceBootMs: () => Date.now() - startedAt, member,
     })) return true;
     if (req.method === 'GET') return false;
     if (!writeAllowed(req)) { json(res, 403, { error: 'job-class settings change only from the glass UI or CLI' }); return true; }
@@ -311,7 +315,6 @@ export function createGlassJobClasses({
       if (!db) { json(res, 400, { error: 'token DB unavailable' }); return true; }
       try {
         const tax = loadTaxonomy(teamTaxonomyFile(t.dir));
-        const member = memberId();
         const pools = gateSnapshot({ db, tax });
         const r = await publishGate({
           checkout: t.dir, gateDir: gateDirOf(teamTaxonomyFile(t.dir)), member, pools, push: body.push !== false,

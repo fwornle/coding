@@ -52,7 +52,8 @@ Classes tab, and only with a team's classes joined: glass writes your per-class 
 — labelled, checked, agreed, and the confusions between classes — to
 `job-classes/gate/<pseudonym>.json` in your clone of the team's repo, commits it under the
 pseudonym and pushes it with your own git credentials (`--no-push` only commits). The
-pseudonym is a hash of host and user name, not your name. The file holds the models,
+pseudonym is a hash of host and user name (plus `glass`, so it differs from coding's on
+the same machine), not your name. The file holds the models,
 the taxonomy version and the counts — never a prompt, a preview or a project name.
 Nothing is published unless you run it; `glass job-classes leave` stops reading the
 team's files, and deleting your file from the repo removes your counts from the pool.

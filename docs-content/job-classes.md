@@ -406,7 +406,7 @@ version, and **Classes** has a picker for which one to read.
 
 One machine collects 20 checks per class slowly. A team adds up its members' counts.
 
-1. Each member runs `coding job-classes publish --team <id>`. It writes `job-classes/gate/<pseudonym>.json` beside `taxonomy.yaml`: per class the turns labelled, checked and agreed, and which classes the two passes confused. Never a prompt. The pseudonym is the first 10 hex characters of sha1(hostname:user), as for proposals.
+1. Each member runs `coding job-classes publish --team <id>`. It writes `job-classes/gate/<pseudonym>.json` beside `taxonomy.yaml`: per class the turns labelled, checked and agreed, and which classes the two passes confused. Never a prompt. The pseudonym is the first 10 hex characters of sha1(hostname:user), as for proposals. glass uses sha1(hostname:user:glass), so glass and coding on the same machine are two members whose counts add up; a turn glass forwards to coding's proxy is labelled by glass only, so nothing is counted twice.
 2. If the package is in your own learning repo, the file is only committed. `coding sync --push` pushes it, and asks first, because that repo also carries transcripts. A shared clone under `var/shared/` is pushed directly with `--push`.
 3. The first publish is the opt-in. After it, `coding sync --push` publishes again for that team. Unchanged counts leave the file byte for byte the same, so nothing is committed.
 
