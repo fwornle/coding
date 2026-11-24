@@ -243,7 +243,8 @@ test('copilot via interception: Anthropic wire to copilot-api.<tenant>.ghe.com, 
   assert.equal(row.subscription, '');
   assert.equal(row.input_tokens, 33);
   assert.equal((await api('GET', `/api/context-breakdown?task_id=${s.taskId}`)).status, 200);
-  assert.equal((await api('GET', `/api/context-turns?task_id=${s.taskId}`)).body.contextTurns.length, 1);
+  const turns = await eventually(async () => (await api('GET', `/api/context-turns?task_id=${s.taskId}`)).body.contextTurns, (t) => t.length >= 1);
+  assert.equal(turns.length, 1);
 });
 
 test('opencode via interception: chat SSE (usage requested) and Responses SSE', async () => {
@@ -254,11 +255,12 @@ test('opencode via interception: chat SSE (usage requested) and Responses SSE', 
   assert.deepEqual(JSON.parse(upSeen.at(-1).body).stream_options, { include_usage: true });
   await intercepted({ host: 'api.githubcopilot.com', token: s.token, route: '/responses', body: { model: 'gpt-5.1', input: [{ role: 'user', content: [{ type: 'input_text', text: 'ping' }] }] } });
   await settle();
-  const rows = await rowsFor(s.taskId);
+  const rows = await eventually(() => rowsFor(s.taskId), (r) => r.length >= 2);
   assert.equal(rows.length, 2);
   assert.ok(rows.every((r) => r.agent === 'opencode' && r.user_hash === 'opcadt'));
   assert.deepEqual(rows.map((r) => r.input_tokens).sort(), [20, 20]);
-  assert.equal((await api('GET', `/api/context-turns?task_id=${s.taskId}`)).body.contextTurns.length, 2);
+  const turns = await eventually(async () => (await api('GET', `/api/context-turns?task_id=${s.taskId}`)).body.contextTurns, (t) => t.length >= 2);
+  assert.equal(turns.length, 2);
 });
 
 test('pi via interception: chat JSON; a non-model path is forwarded but never tapped', async () => {
@@ -768,7 +770,8 @@ test('UI reads: sessions as runs (live + closed), a session\'s timeline and cont
   const tl = (await api('GET', `/api/experiments/runs/${s.taskId}/timeline`)).body;
   assert.equal(tl.timeline.length, 1);
   assert.equal(tl.timeline[0].input_tokens, 33);
-  assert.equal((await api('GET', `/api/experiments/runs/${s.taskId}/context-turns`)).body.contextTurns.length, 1);
+  const runTurns = await eventually(async () => (await api('GET', `/api/experiments/runs/${s.taskId}/context-turns`)).body.contextTurns, (t) => t.length >= 1);
+  assert.equal(runTurns.length, 1);
   assert.deepEqual((await api('GET', '/api/experiments/runs/no-such-task/context-turns')).body, { contextTurns: [] });
   assert.equal((await api('GET', '/api/experiments/runs/..%2F..%2Fetc/timeline')).status, 400);
 });
