@@ -145,13 +145,13 @@ export function TeamContributions({ team, addedPool, proxyBase, onChanged }: {
                       <TableCell className="text-right tabular-nums">{m.error ? '—' : t.labelled}</TableCell>
                       <TableCell className="text-right tabular-nums">{m.error ? '—' : t.checked}</TableCell>
                       <TableCell className="text-right tabular-nums">{m.error ? '—' : `${t.agree} (${pct(t.agree, t.checked)})`}</TableCell>
-                      <TableCell className="text-xs">
+                      <TableCell className="text-xs whitespace-normal min-w-[13rem]">
                         {m.error ? <span className="text-destructive" title={m.error}>{m.error.slice(0, 60)}</span> : (
                           <button type="button" className="underline-offset-2 hover:underline text-left" onClick={() => flip(m.member)} data-testid={`team-detail-${m.member}`}>
                             {pools.map(p => (
                               <div key={poolKey(p)}>
                                 {p.labeller}{p.checker && p.checker !== p.labeller ? ` → ${p.checker}` : ''}
-                                {poolKey(p) === addedKey ? '' : ' (not added: other pool)'}
+                                {poolKey(p) === addedKey ? '' : ' · other pool, not added'}
                               </div>
                             ))}
                             <span className="text-muted-foreground">{open ? 'hide classes' : 'per class…'}</span>
