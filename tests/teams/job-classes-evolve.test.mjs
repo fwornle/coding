@@ -170,11 +170,98 @@ describe('fold', () => {
     assert.ok(!existsSync(join(pkg, 'folded.json')), 'a refused proposal stays pending');
   });
 
-  test('only the maintainer folds: a pull-only package is refused', async () => {
-    const { opts, base } = fixture();
-    writeFileSync(join(opts.home, '.coding', 'teams.yaml'), 'teams:\n  ui:\n    repos: [https://h/mate/mate-history.git]\n    jobClasses: { repo: https://h/mate/mate-history.git }\n');
-    mkdirSync(join(base, 'shared', 'mate', 'job-classes'), { recursive: true });
-    await assert.rejects(fold({ ...opts, team: 'ui', complete: teacher().complete }), /only its maintainer folds/);
+  /** The package in a repo of its own (pull-only clone under shared/), the teammate's proposal beside it. */
+  function sharedPackage(fx) {
+    const { opts, base } = fx;
+    const clone = join(base, 'shared', 'ui-classes');
+    mkdirSync(join(clone, '.git'), { recursive: true });
+    mkdirSync(join(clone, 'job-classes'), { recursive: true });
+    writeFileSync(join(clone, 'job-classes', 'taxonomy.yaml'), TAXONOMY);
+    writeFileSync(join(clone, 'job-classes', 'CHANGELOG.md'), '# Job classes — team ui\n\n- v1: started.\n');
+    writeFileSync(join(opts.home, '.coding', 'teams.yaml'),
+      `teams:\n  ui:\n    repos: [${opts.repos[0].path}, https://h/mate/mate-history.git]\n    jobClasses: { repo: https://h/team/ui-classes.git }\n`);
+    writeProposal(join(base, 'shared', 'mate'), 'ui', { member: 'mate', createdAt: '2026-10-28T09:00:00Z', proposals: [DESIGN] });
+    return { clone, pkg: join(clone, 'job-classes') };
+  }
+
+  /** A git stub: records each call in `dir`, answers from `fail` (args joined → stderr). */
+  function gitStub(fail = {}) {
+    const calls = [];
+    const git = (dir) => async (args) => {
+      calls.push([dir, args.join(' ')]);
+      const k = args.join(' ');
+      return fail[k] ? { ok: false, stdout: '', stderr: fail[k] } : { ok: true, stdout: '', stderr: '' };
+    };
+    return { git, calls };
+  }
+
+  const MERGE_AT_CAP = { agreed: { fix: 12, build: 6, cleanup: 3 }, confused: [['build', 'cleanup', 4], ['fix', 'build', 1]] };
+
+  test('a package in a repo of its own: pulled first, folded in the clone, committed and pushed', async () => {
+    const fx = fixture({ reference: reference(MERGE_AT_CAP) });
+    const { clone, pkg } = sharedPackage(fx);
+    const { git, calls } = gitStub();
+    const commits = [];
+    const r = await fold({ ...fx.opts, team: 'ui', complete: teacher().complete, push: true, git,
+      commit: (dir, msg) => { commits.push([dir, msg]); return { committed: true }; } });
+
+    assert.equal(r.to, 'job-classes-ui-v2');
+    assert.equal(readTaxonomy(join(pkg, 'taxonomy.yaml')).version, 2, 'written into the shared clone');
+    assert.equal(readTaxonomy(join(fx.pkg, 'taxonomy.yaml')).version, 1, 'the own learning checkout is not touched');
+    assert.deepEqual(commits, [[clone, 'coding: job classes for team ui → job-classes-ui-v2']]);
+    assert.deepEqual(calls, [[clone, 'pull --ff-only -q'], [clone, 'push -q origin HEAD']]);
+    assert.equal(r.state, 'shared');
+    assert.equal(r.pushed, true);
+  });
+
+  test('a teammate pushed first: rebased once and pushed; a conflict is aborted and reported, not pushed', async () => {
+    const fx = fixture({ reference: reference(MERGE_AT_CAP) });
+    sharedPackage(fx);
+    let pushes = 0;
+    const calls = [];
+    const git = () => async (args) => {
+      const k = args.join(' ');
+      calls.push(k);
+      if (k.startsWith('push')) pushes += 1;
+      return { ok: !(k.startsWith('push') && pushes === 1), stdout: '', stderr: 'rejected (fetch first)' };
+    };
+    const r = await fold({ ...fx.opts, team: 'ui', complete: teacher().complete, push: true, git, commit: () => ({ committed: true }) });
+    assert.deepEqual(calls, ['pull --ff-only -q', 'push -q origin HEAD', 'pull --rebase -q', 'push -q origin HEAD']);
+    assert.equal(r.pushed, true);
+
+    const fx2 = fixture({ reference: reference(MERGE_AT_CAP) });
+    sharedPackage(fx2);
+    const conflict = gitStub({ 'push -q origin HEAD': 'rejected', 'pull --rebase -q': 'CONFLICT (content): Merge conflict in job-classes/taxonomy.yaml' });
+    const r2 = await fold({ ...fx2.opts, team: 'ui', complete: teacher().complete, push: true, git: conflict.git, commit: () => ({ committed: true }) });
+    assert.deepEqual(conflict.calls.map(([, a]) => a), ['pull --ff-only -q', 'push -q origin HEAD', 'pull --rebase -q', 'rebase --abort']);
+    assert.equal(r2.pushed, false);
+    assert.match(r2.error, /git pull --rebase: CONFLICT/);
+  });
+
+  test('without push the fold stays a local commit in the clone', async () => {
+    const fx = fixture({ reference: reference(MERGE_AT_CAP) });
+    sharedPackage(fx);
+    const { git, calls } = gitStub();
+    const r = await fold({ ...fx.opts, team: 'ui', complete: teacher().complete, git, commit: () => ({ committed: true }) });
+    assert.equal(r.written, true);
+    assert.equal(r.pushed, undefined);
+    assert.deepEqual(calls.map(([, a]) => a), ['pull --ff-only -q']);
+  });
+
+  test('a clone that cannot be updated is not folded: nothing is written', async () => {
+    const fx = fixture({ reference: reference(MERGE_AT_CAP) });
+    const { pkg } = sharedPackage(fx);
+    const before = readFileSync(join(pkg, 'taxonomy.yaml'), 'utf8');
+    const { git } = gitStub({ 'pull --ff-only -q': 'fatal: Not possible to fast-forward, aborting.' });
+    await assert.rejects(fold({ ...fx.opts, team: 'ui', complete: teacher().complete, push: true, git }), /could not update .* before folding \(git pull --ff-only: fatal: Not possible to fast-forward/);
+    assert.equal(readFileSync(join(pkg, 'taxonomy.yaml'), 'utf8'), before);
+    assert.ok(!existsSync(join(pkg, 'folded.json')));
+  });
+
+  test('a package that is not on this machine is refused, naming the join', async () => {
+    const { opts } = fixture();
+    writeFileSync(join(opts.home, '.coding', 'teams.yaml'), 'teams:\n  ui:\n    repos: [https://h/mate/mate-history.git]\n    jobClasses: { repo: https://h/team/ui-classes.git }\n');
+    await assert.rejects(fold({ ...opts, team: 'ui', complete: teacher().complete }), /not on this machine: coding job-classes join --team ui --repo https:\/\/h\/team\/ui-classes\.git/);
   });
 });
 

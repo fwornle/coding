@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { ensureDaemon } from './client.mjs';
+import { createEgressFetch } from './egress.mjs';
 import { glassHome, glassPaths, glassPort, PKG_ROOT } from './home.mjs';
 import { loadRawBodyRedactionPatterns, makeRedactRawBody } from '../../proxy/proxy-bridge/raw-bodies.mjs';
 import { createCopilotCompleter, STUDENT_PROCESS, TEACHER_PROCESS } from './job-classes.mjs';
@@ -143,6 +144,9 @@ export async function jobClassesCmd(argv, { out, err }) {
       out(`${rows.length * 3} calls on ${v.copilotApi} (${v.config.teacherModel} twice, ${v.config.studentModel} once), each prompt redacted first`);
       const version = JSON.parse(fs.readFileSync(path.join(PKG_ROOT, 'package.json'), 'utf8')).version;
       const complete = createCopilotCompleter({
+        // Node's built-in fetch ignores HTTPS_PROXY: go out the way the daemon does,
+        // or a corporate network times out with a bare "fetch failed".
+        fetch: createEgressFetch(process.env, port),
         host: async () => v.host, version, models: () => ({ student: v.config.studentModel, teacher: v.config.teacherModel }),
       });
       const redact = makeRedactRawBody(loadRawBodyRedactionPatterns(PKG_ROOT, process.env.LLM_PROXY_REDACTION_CONFIG));
@@ -158,7 +162,9 @@ export async function jobClassesCmd(argv, { out, err }) {
     err(`unknown: glass job-classes ${sub} (status | on | off | join <url> | pull | leave | publish [--no-push] | measure [--days N] [--max N])`);
     return 2;
   } catch (e) {
-    err(`glass job-classes ${sub}: ${e?.message || e}`);
+    // undici hides why behind "fetch failed"; its cause names the host and the reason.
+    const why = e?.cause?.message ? ` (${e.cause.message})` : '';
+    err(`glass job-classes ${sub}: ${e?.message || e}${why}`);
     return 1;
   }
 }
