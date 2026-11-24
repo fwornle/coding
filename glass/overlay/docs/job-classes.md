@@ -66,6 +66,12 @@ labelled in the background with your own Copilot account. Opt-in, off by default
     classes. A teammate on other models is named below the table, not added. Publishing
     again with unchanged counts changes nothing; a file older than 14 days is left out.
 
+    After your first publish, glass keeps it current by itself: a minute after it starts and
+    every 30 minutes it publishes your counts and pulls your teammates'. **Team
+    contributions**, under the Gate table, lists every published file — who (a pseudonym;
+    this machine's coding and glass are named), which install, when, and its counts — with a
+    checkbox to leave one out of your own sums. That choice stays on your machine.
+
     ## glass and coding
 
     Most people only install glass, and it labels, measures and shows on its own. Building

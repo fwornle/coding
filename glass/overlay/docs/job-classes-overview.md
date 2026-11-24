@@ -256,9 +256,9 @@ counts your teammates published, added up with yours.
 </div>
 <figure class="overview-figure" markdown="1">
 
-[![The gate with a team's classes: this machine has checked 4 turns of fix and is still collecting; with a teammate's published counts the team has 22, 91 % agreed, so fix is consistent for the team; the members and a teammate on other models, not added, are listed below](images/ui-job-classes-gate.png)](images/ui-job-classes-gate.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+[![The gate with a team's classes: this machine has checked only a few turns, so every class is still collecting here; with the team's published counts, status has 42 checks, 93 % agreed, and is consistent for the team. Below: the members (this machine's glass and coding), the Team contributions button, and a pool on other models that is not added](images/ui-job-classes-gate.png)](images/ui-job-classes-gate.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
 
-<figcaption>Right after switching on, every class is still collecting.</figcaption>
+<figcaption>Soon after switching on, this machine is still collecting; the team's counts already pass for status.</figcaption>
 </figure>
 <p class="overview-takeaway">A class is trusted only after the teacher has confirmed it enough times.</p>
 </section>
@@ -334,12 +334,42 @@ Counts only (labelled / checked / agreed per class); no prompt leaves this machi
 | **collecting**: some class below 20 checks, team included | every turn | every turn of a class below 20 checks |
 | **reporting**: every class has its 20 checks | 1 turn in 5, each label counted 5 times | 10 % of turns |
 
-<figcaption>Nothing is published until you run it once. After that glass publishes again by itself (a minute after it starts, then every 30 minutes) and pulls your teammates' counts. Unchanged counts change nothing; a new taxonomy version starts collecting again. <b>Team contributions</b> in the Gate panel shows each published file (coding or glass, and its counts); untick one to leave it out of your own sums only.</figcaption>
+<figcaption>Nothing is published until you run it once. After that glass publishes again by itself (a minute after it starts, then every 30 minutes) and pulls your teammates' counts. Unchanged counts change nothing; a new taxonomy version starts collecting again.</figcaption>
 </figure>
 <p class="overview-takeaway">The team reaches the gate sooner; prompts still stay on each machine.</p>
 </section>
 
-<section class="overview-slide overview-essential" id="slide-11" aria-labelledby="gjc-split" markdown="1">
+<section class="overview-slide" id="slide-11" aria-labelledby="gjc-contrib" markdown="1">
+<div class="overview-copy" markdown="1">
+
+<p class="overview-kicker">Share, continued · in glass</p>
+
+## See who contributed {#gjc-contrib}
+
+**Team contributions**, under the Gate table, shows what the team's repo holds:
+one row per published file.
+
+- **Who**: a pseudonym, never a name. On a machine that also runs coding, its
+  coding and glass are two rows, both named "this machine", and their counts add
+  up. A turn reaches only one of them, so nothing counts twice.
+- **What**: which install published it (coding or glass), when, how many turns
+  were labelled, checked and agreed, and on which models. Click a row for its
+  counts per class.
+- **Untick** a row to leave it out of **your** sums: the Gate panel and how often
+  glass checks a turn. Your choice stays on your machine
+  (`~/.glass/job-classes/gate-exclude.json`); nobody else's view changes.
+
+</div>
+<figure class="overview-figure" markdown="1">
+
+[![Team contributions: the files in the team repo's job-classes/gate. This machine · glass, live, 5 turns labelled, checked and agreed; this machine · coding, published today, 288 labelled, 120 checked, 108 agreed (90 %), in two pools, one of them not added. Each row has a Counted checkbox and is opened to its counts per class.](images/ui-job-classes-team-contributions.png)](images/ui-job-classes-team-contributions.png){: target="_blank" rel="noopener" title="Open full-size screenshot" }
+
+<figcaption>Every team number, traced to the member and the install it came from.</figcaption>
+</figure>
+<p class="overview-takeaway">You see whose counts you add up, and you decide.</p>
+</section>
+
+<section class="overview-slide overview-essential" id="slide-12" aria-labelledby="gjc-split" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">glass and coding</p>
@@ -369,7 +399,7 @@ Most people only install glass. It labels, measures and shows on its own.
 <p class="overview-takeaway">glass sorts and shows; coding proves and routes; the team shares both.</p>
 </section>
 
-<section class="overview-slide" id="slide-12" aria-labelledby="gjc-why" markdown="1">
+<section class="overview-slide" id="slide-13" aria-labelledby="gjc-why" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">glass and coding, continued</p>
@@ -414,7 +444,7 @@ glass doesn't do this, for two reasons:
 <p class="overview-takeaway">No model gets cheaper without evidence from real past turns.</p>
 </section>
 
-<section class="overview-slide" id="slide-13" aria-labelledby="gjc-trials" markdown="1">
+<section class="overview-slide" id="slide-14" aria-labelledby="gjc-trials" markdown="1">
 <div class="overview-copy" markdown="1">
 
 <p class="overview-kicker">Next to classes</p>

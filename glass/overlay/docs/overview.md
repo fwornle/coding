@@ -363,7 +363,8 @@ each turn and checks some a second time; once every class is trusted, it labels 
 
 A team shares its own classes from a git repo: `glass job-classes join <url>`. With
 `glass job-classes publish` each member adds their gate counts (never a prompt), so the
-team reaches the gate sooner.
+team reaches the gate sooner; after that first publish glass keeps them current itself,
+and **Team contributions** shows whose counts are added up.
 
 </div>
 <figure class="overview-figure" markdown="1">
