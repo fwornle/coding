@@ -541,7 +541,9 @@ mechanism, step by step, is the [job classes deck](../job-classes.md).
   `job-classes/gate/<pseudonym>.json` beside `taxonomy.yaml` in the team package: per
   class the counts labelled, checked and agreed, plus confusions (labeller class, teacher
   class, n), never a prompt. The pseudonym is the first 10 hex of sha1(hostname:user), as
-  for proposals. The file is a full snapshot, so unchanged counts leave it byte-identical
+  for proposals; glass hashes hostname:user:glass, so glass beside coding on one machine
+  publishes a second file and the two add up instead of replacing each other's counts
+  (a call glass forwards to coding's proxy is task-bound, so only glass labels it). The file is a full snapshot, so unchanged counts leave it byte-identical
   and nothing is committed. In the member's own learning checkout it is only committed
   (`coding sync --push` pushes it, after asking, since that repo carries transcripts); a
   shared clone under `var/shared/` is pushed directly with `--push`. `coding sync --push`

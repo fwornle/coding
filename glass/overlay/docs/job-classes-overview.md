@@ -312,7 +312,8 @@ glass job-classes publish            # or: Publish my gate counts
 This writes your **counts** — per class: labelled, checked, agreed, and which
 classes were confused — to `job-classes/gate/<pseudonym>.json` in the team's
 repo, and pushes it with your own git login. The pseudonym is a hash of host
-and user name, not your name. No prompt is in it. You need write access to the
+and user name, not your name. If coding runs on the same machine, it publishes
+its own file and the two add up. No prompt is in it. You need write access to the
 repo; `--no-push` only commits.
 
 The Gate panel adds up the members on the **same models and taxonomy
