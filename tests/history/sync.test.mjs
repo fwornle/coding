@@ -185,3 +185,48 @@ describe('two users share a learning repo', () => {
     assert.deepEqual(mergeRows(ours, theirs).map((r) => `${r.id}:${r.summary}`), ['a:new', 'b:b', 'c:c']);
   });
 });
+
+describe('ensureMergeDriver: the attribute is local, never in the work tree', () => {
+  const LINE = `kb/**/*.json merge=${sync.MERGE_DRIVER}`;
+  const repo = (name) => {
+    const dir = join(root, 'attrs', name);
+    mkdirSync(dir, { recursive: true });
+    sh(dir, 'init', '-q');
+    writeFileSync(join(dir, 'README'), 'x\n');
+    sh(dir, 'add', '.');
+    sh(dir, 'commit', '-q', '-m', 'init');
+    return dir;
+  };
+  const infoAttrs = (dir) => readFileSync(join(dir, '.git', 'info', 'attributes'), 'utf8');
+
+  test('writes .git/info/attributes once, leaves the tree clean, and git routes kb JSON to the driver', () => {
+    const dir = repo('fresh');
+    sync.ensureMergeDriver(dir);
+    sync.ensureMergeDriver(dir);
+    assert.equal(infoAttrs(dir).split('\n').filter((l) => l === LINE).length, 1);
+    assert.ok(!existsSync(join(dir, '.gitattributes')));
+    assert.equal(sh(dir, 'status', '--porcelain'), '', 'nothing for git add -A to pick up');
+    assert.match(sh(dir, 'check-attr', 'merge', '--', 'kb/knowledge-graph/x.json'), /merge: coding-kb/);
+  });
+
+  test('removes the untracked .gitattributes an earlier sync wrote', () => {
+    const dir = repo('legacy');
+    writeFileSync(join(dir, '.gitattributes'), `${LINE}\n`);
+    sync.ensureMergeDriver(dir);
+    assert.ok(!existsSync(join(dir, '.gitattributes')));
+    assert.equal(sh(dir, 'status', '--porcelain'), '');
+  });
+
+  test('keeps a .gitattributes that is committed, or that says anything else', () => {
+    const tracked = repo('tracked');
+    writeFileSync(join(tracked, '.gitattributes'), `${LINE}\n`);
+    sh(tracked, 'add', '.gitattributes');
+    sh(tracked, 'commit', '-q', '-m', 'attrs');
+    sync.ensureMergeDriver(tracked);
+    assert.ok(existsSync(join(tracked, '.gitattributes')), 'committed: removing it would be a commit teammates pull');
+    const custom = repo('custom');
+    writeFileSync(join(custom, '.gitattributes'), `*.png binary\n${LINE}\n`);
+    sync.ensureMergeDriver(custom);
+    assert.equal(readFileSync(join(custom, '.gitattributes'), 'utf8'), `*.png binary\n${LINE}\n`);
+  });
+});
