@@ -716,6 +716,14 @@ export async function startDaemon({
   checkUpdate();
   const updateTimer = setInterval(checkUpdate, UPDATE_CHECK_MS);
   updateTimer.unref();
+  // The team's job-class gate, kept current without anyone running publish: this
+  // machine's counts out, the team's in (job-classes.mjs autoSync; only once
+  // published by hand). Shortly after start, then every 30 minutes, as coding's sync.
+  const teamSync = () => jobClasses.autoSync().catch((err) => logErr(`job classes: team sync: ${err.message}`));
+  const teamSyncFirst = setTimeout(teamSync, 60_000);
+  teamSyncFirst.unref();
+  const teamSyncTimer = setInterval(teamSync, 30 * 60_000);
+  teamSyncTimer.unref();
   const idleTimer = setInterval(() => {
     // A `glass <agent>` that was killed never closes its session: reap it, or
     // the daemon would never go idle.
@@ -734,6 +742,8 @@ export async function startDaemon({
     cluster.stop();
     clearInterval(observeTimer);
     clearInterval(updateTimer);
+    clearTimeout(teamSyncFirst);
+    clearInterval(teamSyncTimer);
     await updateCheck.settled();
     await copilotQuota.settled(); // a gh still running would write into the home after exit
     netMonitor.stop();

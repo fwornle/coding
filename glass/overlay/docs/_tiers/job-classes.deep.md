@@ -65,7 +65,7 @@ last one stopped.
 | `glass job-classes measure [--days N] [--max N]` | label your recent prompts; the reference set |
 | `glass job-classes join <git URL>` | use a team's taxonomy (its learning repo's `job-classes/`) |
 | `glass job-classes pull` / `leave` | update the team's taxonomy / go back to the shipped default |
-| `glass job-classes publish [--no-push]` | share your gate counts (per class: labelled, checked, agreed; never a prompt) as `job-classes/gate/<pseudonym>.json` in the team's repo, and push them; `--no-push` only commits |
+| `glass job-classes publish [--no-push]` | share your gate counts (per class: labelled, checked, agreed; never a prompt) as `job-classes/gate/<pseudonym>.json` in the team's repo, and push them; `--no-push` only commits. The first publish is the opt-in: after it the daemon publishes and pulls by itself (1 minute after start, then every 30 minutes). The file names its source (`glass`) |
 
 ## For a team's maintainer
 

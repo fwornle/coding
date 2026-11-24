@@ -408,7 +408,7 @@ One machine collects 20 checks per class slowly. A team adds up its members' cou
 
 1. Each member runs `coding job-classes publish --team <id>`. It writes `job-classes/gate/<pseudonym>.json` beside `taxonomy.yaml`: per class the turns labelled, checked and agreed, and which classes the two passes confused. Never a prompt. The pseudonym is the first 10 hex characters of sha1(hostname:user), as for proposals. glass uses sha1(hostname:user:glass), so glass and coding on the same machine are two members whose counts add up; a turn glass forwards to coding's proxy is labelled by glass only, so nothing is counted twice.
 2. If the package is in your own learning repo, the file is only committed. `coding sync --push` pushes it, and asks first, because that repo also carries transcripts. A shared clone under `var/shared/` is pushed directly with `--push`.
-3. The first publish is the opt-in. After it, `coding sync --push` publishes again for that team. Unchanged counts leave the file byte for byte the same, so nothing is committed.
+3. The first publish is the opt-in. After it, every `coding sync` (launch pull, 30-minute commit, `--push`) publishes again, and glass does every 30 minutes. Unchanged counts commit nothing.
 
 Every member needs write access to the team repo.
 
@@ -422,6 +422,7 @@ Every member needs write access to the team repo.
 | Labels nobody has checked yet count with the checked pool of the same labeller. |
 | A file older than 14 days is greyed out and not added. An invalid file is listed, not added. |
 | This machine's own file is replaced by its live counts, so it is never counted twice. |
+| **Team contributions** lists each file's source (coding, glass) and counts. Unticking one leaves it out on this machine only. |
 
 <figcaption>Token Usage → Classes → Gate shows this machine's columns beside <b>Team: checked</b>, <b>Team agreement</b> and <b>Team</b> (from <code>GET /api/job-classes/summary?scope=team</code>), the members with the age of their file, and the Not added lines. A badge says whether labelling is still <b>collecting: every turn</b> or <b>reporting: 1 turn in N</b>.</figcaption>
 </figure>

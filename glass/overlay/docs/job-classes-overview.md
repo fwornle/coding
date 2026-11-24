@@ -334,7 +334,7 @@ Counts only (labelled / checked / agreed per class); no prompt leaves this machi
 | **collecting**: some class below 20 checks, team included | every turn | every turn of a class below 20 checks |
 | **reporting**: every class has its 20 checks | 1 turn in 5, each label counted 5 times | 10 % of turns |
 
-<figcaption>Nothing is published until you run it. Publishing unchanged counts changes nothing; a new taxonomy version starts collecting again.</figcaption>
+<figcaption>Nothing is published until you run it once. After that glass publishes again by itself (a minute after it starts, then every 30 minutes) and pulls your teammates' counts. Unchanged counts change nothing; a new taxonomy version starts collecting again. <b>Team contributions</b> in the Gate panel shows each published file (coding or glass, and its counts); untick one to leave it out of your own sums only.</figcaption>
 </figure>
 <p class="overview-takeaway">The team reaches the gate sooner; prompts still stay on each machine.</p>
 </section>
