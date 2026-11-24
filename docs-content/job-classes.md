@@ -383,7 +383,7 @@ version, and **Classes** has a picker for which one to read.
 ## Grow the taxonomy {#jc-grow}
 
 1. Any member runs `coding job-classes propose --team <id>`. The teacher reads the prompts no class could place and drafts new classes, with examples it writes itself. The proposal goes into the member's own repo, and `coding sync --push` shares it.
-2. The maintainer runs `coding job-classes fold --team <id>` (`--dry-run` first).
+2. The maintainer runs `coding job-classes fold --team <id>` (`--dry-run` first). In the maintainer's own learning repo the fold is committed and `coding sync --push` shares it. When the classes are in a repo of their own, joined with `coding job-classes join`, the fold pulls that repo first and pushes the new version itself (`--no-push` keeps it local), so anyone with write access can fold.
 3. A proposal an existing class already holds is **absorbed**. A new kind of job is **added**. At the class cap, the two classes the teacher confuses most **merge** to make room.
 4. Before anything is written, the **stability check** labels reference prompts under the old and the new version. A version that moves the untouched classes is refused.
 

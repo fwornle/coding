@@ -82,6 +82,11 @@ member's shared learning in, under `job-classes/`. Someone who runs coding sets 
    `--dry-run` first) and pushes it. glass users get it with `glass job-classes pull` or
    **Update**.
 
+The classes can also live in a repo of their own, so the rest of the maintainer's learning
+repo stays private: push a `job-classes/` folder to it and join it with
+`coding job-classes join --team <id> --repo <url>`. `fold` then pulls that repo first and
+pushes the new version itself, so anyone with write access to it can fold.
+
 The repo never holds prompts: only the classes, their changelog, proposals (classes the
 teacher drafted, with examples it wrote itself) and, from replays, evidence files with
 counts and model names.
