@@ -1,5 +1,8 @@
 # CLAUDE.md - Project Development Guidelines
 
+<!-- coding:no-skill-catalog -->
+<!-- glass is published: keep coding's private skill catalog out of this file (scripts/generate-agent-instructions.sh). -->
+
 ## 🚨🚨🚨 CRITICAL GLOBAL RULE: NO PARALLEL VERSIONS EVER 🚨🚨🚨
 
 **This rule applies to ALL projects and must NEVER be violated.**
