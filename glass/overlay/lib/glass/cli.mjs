@@ -500,11 +500,28 @@ async function uninstall(argv) {
   return 0;
 }
 
+/**
+ * Whether a glass subcommand's arguments ask for help: `--help` or `-h` anywhere
+ * before a `--`. Checked before dispatch because the subcommands do not parse it
+ * themselves — `glass update --help` installed a release, `glass uninstall --help`
+ * stopped the daemon and offered to delete GLASS_HOME. An agent's own arguments
+ * (`glass claude --help`) are the agent's and never reach this.
+ */
+export function wantsHelp(rest) {
+  const end = rest.indexOf('--');
+  return (end < 0 ? rest : rest.slice(0, end)).some((a) => a === '--help' || a === '-h');
+}
+
 export async function main(argv) {
   const [cmd, ...rest] = argv;
   // A reader that went away (`glass status | head`) ends the output, not with a crash.
   process.stdout.on('error', (e) => { if (e.code === 'EPIPE') process.exit(0); });
   if (AGENTS.includes(cmd)) return runMeasured(cmd, rest);
+  if (cmd !== undefined && wantsHelp(rest)) {
+    if (cmd === 'ab') return abCmd(['help'], { out, err, daemonFor, agentBin, whichBin, projectOf, piExtension: PI_RELAY_EXTENSION });
+    out(HELP);
+    return 0;
+  }
   switch (cmd) {
     case 'ui': return ui();
     case 'browser': return browserCmd(rest);
