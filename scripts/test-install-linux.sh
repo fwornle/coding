@@ -81,6 +81,10 @@ if [[ "${1:-}" == "--in-container" ]]; then
     if [[ -n "${UPDATE_E2E:-}" ]]; then
         exec bash scripts/release/update-e2e.sh "$PWD/_release.tarball" "$PWD/_update-to.tarball"
     fi
+    # shape `bootstrap`: a fresh user installs the release with coding-install.sh.
+    if [[ -n "${BOOTSTRAP_E2E:-}" ]]; then
+        exec bash scripts/release/bootstrap-e2e.sh "$PWD/_release.tarball"
+    fi
     echo "=== container: $(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME") $(uname -m) ==="
     echo "=== node $(node --version 2>/dev/null) npm $(npm --version 2>/dev/null) ==="
     echo "=== deliberately absent: $(for t in plantuml tmux jq; do command -v $t >/dev/null 2>&1 || printf '%s ' "$t"; done) ==="
@@ -123,7 +127,7 @@ for ((i = 0; i < ${#args[@]}; i++)); do
                    [[ -f "$UPDATE_TARBALL" ]] || { echo "--update-to: no such tarball: $UPDATE_TARBALL"; exit 2; } ;;
         --arm64)  PLATFORM_FLAG="--platform=linux/arm64" ;;
         --amd64)  PLATFORM_FLAG="--platform=linux/amd64" ;;
-        direct|proxy-only|no-egress|arch|update) SHAPES+=("$arg") ;;
+        direct|proxy-only|no-egress|arch|update|bootstrap) SHAPES+=("$arg") ;;
         -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
         *) echo "unknown argument: $arg"; exit 2 ;;
     esac
@@ -157,11 +161,10 @@ prepare_context() {
         tar -xzf "$RELEASE_TARBALL" -C "$CTX" --strip-components=1
         [[ -f "$CTX/release.json" ]] || { echo "${RED}not a release tarball (no release.json)${NC}"; exit 2; }
         cp "$CTX/docker/Dockerfile.install-test" "$CTX/Dockerfile.install-test"
-        if [[ -n "$UPDATE_TARBALL" ]]; then
-            # Not *.tgz / *.tar.gz: .dockerignore drops those from the image.
-            cp "$RELEASE_TARBALL" "$CTX/_release.tarball"
-            cp "$UPDATE_TARBALL" "$CTX/_update-to.tarball"
-        fi
+        # The tarballs too: shapes update and bootstrap install FROM them.
+        # Not *.tgz / *.tar.gz: .dockerignore drops those from the image.
+        cp "$RELEASE_TARBALL" "$CTX/_release.tarball"
+        [[ -n "$UPDATE_TARBALL" ]] && cp "$UPDATE_TARBALL" "$CTX/_update-to.tarball"
         info "  context: $(du -sh "$CTX" | cut -f1), $(find "$CTX" -type f | wc -l | tr -d ' ') files"
         return
     fi
@@ -519,6 +522,27 @@ shape_update() {
     grep -q "^UPDATE_E2E_DONE" <<<"$out" || fail "update: the e2e script did not finish (see /tmp/coding-install-update.log)"
 }
 
+# ── shape: bootstrap ─────────────────────────────────────────────────────────
+# A fresh user installs the release with coding-install.sh, once per tier
+# (BOOTSTRAP_TIERS, default all four), in a new container each time
+# (scripts/release/bootstrap-e2e.sh).
+shape_bootstrap() {
+    if [[ -z "$RELEASE_TARBALL" ]]; then fail "bootstrap: needs --release <tgz>"; return; fi
+    local tier out line
+    for tier in ${BOOTSTRAP_TIERS:-harness learning learning-perf everything}; do
+        echo; info "── shape: bootstrap ($tier) ──"
+        out="$(HARNESS_TIMEOUT_S=1500 run_installer "-e BOOTSTRAP_E2E=1 -e BOOTSTRAP_TIER=$tier")"
+        echo "$out" > "/tmp/coding-install-bootstrap-$tier.log"
+        while IFS= read -r line; do
+            case "$line" in
+                "BOOTSTRAP_E2E=pass "*) pass "bootstrap: ${line#BOOTSTRAP_E2E=pass }" ;;
+                "BOOTSTRAP_E2E=fail "*) fail "bootstrap: ${line#BOOTSTRAP_E2E=fail }" ;;
+            esac
+        done <<<"$out"
+        grep -q "^BOOTSTRAP_E2E_DONE" <<<"$out" || fail "bootstrap ($tier): the e2e script did not finish (see /tmp/coding-install-bootstrap-$tier.log)"
+    done
+}
+
 for shape in "${SHAPES[@]}"; do
     case "$shape" in
         direct)     shape_direct ;;
@@ -526,6 +550,7 @@ for shape in "${SHAPES[@]}"; do
         no-egress)  shape_no_egress ;;
         arch)       shape_arch ;;
         update)     shape_update ;;
+        bootstrap)  shape_bootstrap ;;
     esac
 done
 
