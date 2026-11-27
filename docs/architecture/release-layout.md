@@ -105,6 +105,36 @@ previous `v8+` release; the first release counts from the last milestone tag.
 Breaking changes come first, then features, fixes and performance, and long lists
 are capped.
 
+## Installing a release
+
+```
+curl -fsSL https://github.com/fwornle/coding/releases/latest/download/coding-install.sh | bash
+```
+
+`coding-install.sh` is `scripts/release/bootstrap.sh`. Every release attaches it
+under that same name, so `latest/download/coding-install.sh` is always the newest
+one. It does only what has to happen before any of coding's own code is on the
+machine:
+
+1. checks curl, tar, a sha256 tool and Node.js >= 22
+2. finds the latest release from the `releases/latest` redirect (`CODING_VERSION`
+   pins one)
+3. downloads the tarball and checksum, verifies them, unpacks with
+   `scripts/releases.mjs adopt` and switches `current` to it
+4. runs **that release's** `install.sh` through `current`, passing on its options
+   (`--features=<tier>`, `--ci`, and so on), and gives it the terminal when it was
+   started from a pipe, so the tier menu can still ask
+
+The installer itself stays where it was. The tier menu, prerequisites, service
+registration and image pulls all live in the release's `install.sh`, and
+`coding update` re-runs the parts a new release needs (`--update=build|register`).
+Because the installer runs from `current`, everything it stores names `current`:
+the shell rc, `~/bin/coding`, agent settings and daemons.
+
+Checked by `scripts/test-install-linux.sh --release <tgz> bootstrap`, which runs
+one clean Ubuntu container per tier through `scripts/release/bootstrap-e2e.sh`.
+The release workflow gates on the harness and learning tiers.
+
 ## `coding update`
 
 ```

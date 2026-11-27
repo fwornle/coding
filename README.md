@@ -9,8 +9,15 @@ View the published online documentation [here](https://fwornle.github.io/coding/
 ## 🚀 Quick Start
 
 ```bash
-# Install the system (safe - prompts before any system changes)
-./install.sh
+# Install the latest release (prompts before any system changes; options such as
+# --features=learning pass through to the installer)
+curl -fsSL https://github.com/fwornle/coding/releases/latest/download/coding-install.sh | bash
+
+# Keep it current: `coding update` (the status line shows ⬆ when a release is out)
+coding update
+
+# Developing coding itself instead: clone it and run the installer from the checkout
+#   git clone --recurse-submodules https://github.com/fwornle/coding && cd coding && ./install.sh
 
 # Start Claude Code with all features
 coding

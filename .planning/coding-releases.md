@@ -240,19 +240,40 @@ developer — no PRs in coding).
   the title; `notes.mjs` picked the milestone by `git describe` distance (v7.3
   for 8.0.0) — now the highest `v*` merged into HEAD.
 
-### P6 — Installer becomes a thin bootstrap  `status: not started`
+### P6 — Installer becomes a thin bootstrap  `status: done (Linux); macOS fresh user + WSL pending the user`
 
-- [ ] `install.sh` downloads the latest release and keeps only the tier menu,
-  prerequisites, service registration and optional image pull.
-- [ ] The rest of its 5.5k lines moves into re-runnable steps of
-  `coding update`.
-- [ ] Completes the open T8 fresh-machine test (`per-repo-tenancy.md`) with a
-  release as the input instead of a clone.
-- Accept: fresh macOS user account and WSL install from a release, per tier.
+- [x] `coding-install.sh` (`scripts/release/bootstrap.sh`, attached to every
+  release under that fixed name → `releases/latest/download/coding-install.sh`):
+  prerequisites (curl, tar, sha256, Node ≥ 22) → latest via the redirect (or
+  `CODING_VERSION`) → download + verify → `adopt` + `use` → `exec` the
+  release's own `install.sh` through `current` with the options passed on
+  (tier menu, prerequisites, service registration, image pull stay there);
+  given /dev/tty when piped from curl.
+- [x] Scope decision (2026-11-27): the "rest of install.sh moves into steps of
+  `coding update`" is already met by `install.sh --update=build|register`
+  (P4), which reuses the installer's own functions — moving 5.5k lines into
+  another file would be churn without a behaviour change. Not done.
+- [x] Fresh-machine test per tier (`scripts/release/bootstrap-e2e.sh`, harness
+  shape `bootstrap`): clean Ubuntu per tier, release from a file:// server →
+  installer exit 0, `current`, release-channel install.json, deps, no
+  submodule fetch, `~/bin/coding` → current, shell rc (or, under `--ci`
+  without consent, the suggested export) names current, no version path
+  stored, `coding releases status` root = current, features.yaml = tier.
+  41/41 across harness, learning, learning-perf, everything. Release CI gates
+  on harness + learning.
+- [ ] Accept, remaining (needs the user): fresh macOS user account and WSL
+  install from a release (`curl … | bash`), per tier. Closes T8 of
+  `per-repo-tenancy.md` with a release as the input.
 
 ---
 
 ## Session log
+
+- **2026-11-27 (P6 done on Linux)** — `coding-install.sh` bootstrap, published
+  per release; fresh-machine e2e 41/41 over all four tiers (first run 37/41:
+  under `--ci` the installer rightly declines the shell rc without consent —
+  the check now accepts that when the suggested export names `current`).
+  Remaining: macOS fresh user + WSL by the user.
 
 - **2026-11-27 (P5 done)** — release check + coordinator routes + status line
   badge + dashboard banner; verified with faked state in the browser and via

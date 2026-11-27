@@ -8,7 +8,8 @@
 # Nothing is published unless every gate passed:
 #   tarball       builds, unpacks, installs as a release folder and runs from it
 #   install-test  scripts/test-install-linux.sh --release on the tarball (Docker),
-#                 then `coding update` from it to a next-patch tarball and back
+#                 a fresh-machine install through coding-install.sh, then
+#                 `coding update` from it to a next-patch tarball and back
 #   lite          cross-platform-lite on ubuntu / macOS / Windows
 #   images        both architectures build
 # The images are pushed UNTAGGED (by digest) while building; only the publish job,
@@ -119,7 +120,7 @@ jobs:
   install-test:
     needs: [plan, tarball]
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 110
     env:
       ONNXRUNTIME_NODE_INSTALL_CUDA: skip
     steps:
@@ -134,6 +135,10 @@ jobs:
         with:
           name: update-target
           path: dist-e2e
+      - name: Fresh-machine install with coding-install.sh (harness + learning tiers)
+        env:
+          BOOTSTRAP_TIERS: harness learning
+        run: bash scripts/test-install-linux.sh --release "dist/coding-${{ needs.plan.outputs.version }}.tar.gz" bootstrap
       - name: coding update from the tarball to the next patch, then rollback
         shell: bash
         run: |
@@ -211,6 +216,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       VERSION: ${{ needs.plan.outputs.version }}
     steps:
+      - uses: actions/checkout@v4   # scripts/release/bootstrap.sh → coding-install.sh
       - uses: actions/download-artifact@v4
         with:
           name: release-dist
@@ -240,6 +246,9 @@ jobs:
           # The notes also as an asset: the dashboard's release banner reads them
           # from the download path (not the API, which is rate-limited).
           cp dist/notes.md "dist/coding-$VERSION-notes.md"
-          gh release create "v$VERSION" "dist/coding-$VERSION.tar.gz" "dist/coding-$VERSION.tar.gz.sha256" "dist/coding-$VERSION-notes.md" \
+          # The bootstrap, under a FIXED name, so
+          # releases/latest/download/coding-install.sh always is the newest one.
+          cp scripts/release/bootstrap.sh dist/coding-install.sh
+          gh release create "v$VERSION" "dist/coding-$VERSION.tar.gz" "dist/coding-$VERSION.tar.gz.sha256" "dist/coding-$VERSION-notes.md" dist/coding-install.sh \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "coding $VERSION" --notes-file dist/notes.md
