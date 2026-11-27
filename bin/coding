@@ -179,6 +179,20 @@ done
 SCRIPT_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
 # shellcheck source=scripts/lib/port-pids.sh
 source "$SCRIPT_DIR/../scripts/lib/port-pids.sh"
+# shellcheck source=scripts/lib/code-root.sh
+source "$SCRIPT_DIR/../scripts/lib/code-root.sh"
+# The root this session exports (CODING_REPO) — hooks, compose mounts and any
+# daemon registered from here persist it. A release started through
+# ~/.coding/releases/current exports `current`, not its version folder, so an
+# update's flip does not strand those paths (lib/install/layout.cjs). A dev
+# checkout keeps its own path, exactly as before.
+CODE_ROOT="$(coding_code_root "$SCRIPT_DIR/..")"
+
+# `coding releases …` — installed releases: status, use <ver>, rollback (scripts/releases.mjs).
+if [[ "${1:-}" == "releases" ]]; then
+  shift
+  exec node "$SCRIPT_DIR/../scripts/releases.mjs" "$@"
+fi
 
 # `coding sync …` — learning-repo sync (lib/history/sync.mjs). A subcommand
 # only as the FIRST word, so an agent argument that happens to be "sync"
@@ -449,8 +463,8 @@ export CODING_FORCE_CLEAN="$FORCE_CLEAN"
 
 # Set environment variables for agent adapter system
 export CODING_AGENT="$AGENT"
-export CODING_TOOLS_PATH="$SCRIPT_DIR/.."
-export CODING_REPO="$SCRIPT_DIR/.."
+export CODING_TOOLS_PATH="$CODE_ROOT"
+export CODING_REPO="$CODE_ROOT"
 export CODING_PROJECT_DIR="$PROJECT_DIR"
 
 # Set up the tools repo's own learning checkout (<coding>/.coding/, the

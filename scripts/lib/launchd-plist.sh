@@ -25,6 +25,9 @@
 #   source "$(dirname "${BASH_SOURCE[0]}")/lib/launchd-plist.sh"
 #   render_plist "launchd/com.coding.foo.plist" "$tmp" "$REPO_ROOT"
 
+# shellcheck source=scripts/lib/code-root.sh
+source "$(dirname "${BASH_SOURCE[0]}")/code-root.sh"
+
 # The placeholder every checked-in plist uses in place of the repo root.
 LAUNCHD_REPO_TOKEN='__CODING_REPO__'
 
@@ -33,12 +36,16 @@ LAUNCHD_REPO_TOKEN='__CODING_REPO__'
 # Honours CODING_REPO when set — the wrapper exports it, and tests need to point an
 # installer at a fixture tree — then falls back to the installer's own location. Same idiom
 # as the prompt-classifier's old installer, which was already doing this correctly.
+# Either way the result goes through coding_code_root: a plist must name
+# ~/.coding/releases/current, never a version folder an update will retire.
 launchd_repo_root() {
+    local root
     if [[ -n "${CODING_REPO:-}" ]]; then
-        printf '%s' "${CODING_REPO}"
+        root="${CODING_REPO}"
     else
-        (cd "$(dirname "${BASH_SOURCE[1]}")/.." && pwd)
+        root="$(cd "$(dirname "${BASH_SOURCE[1]}")/.." && pwd)"
     fi
+    coding_code_root "$root"
 }
 
 # Render a source plist to `out`, substituting the repo root, then validate it.

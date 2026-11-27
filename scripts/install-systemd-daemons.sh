@@ -42,7 +42,10 @@ if ! systemd_user_available; then
   exit 3
 fi
 
-REPO_ROOT="${CODING_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# shellcheck source=scripts/lib/code-root.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/code-root.sh"
+# A unit names ~/.coding/releases/current, never a version folder (lib/install/layout.cjs).
+REPO_ROOT="$(coding_code_root "${CODING_REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}")"
 NODE_DIR=""
 if command -v node >/dev/null 2>&1; then
   NODE_DIR="$(dirname "$(command -v node)")"

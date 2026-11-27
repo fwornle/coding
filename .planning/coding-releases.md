@@ -139,17 +139,38 @@ developer — no PRs in coding).
   core (test asserts it); run mode and agents round-trip through the dashboard
   and `coding-features`.
 
-### P2 — Separate the code from the install (release layout)  `status: not started`
+### P2 — Separate the code from the install (release layout)  `status: done`
 
-- [ ] Releases install into versioned folders `~/.coding/releases/<ver>/` plus
-  a `current` symlink — atomic switch, one-step rollback.
-- [ ] `~/.coding/install.json`: `{channel: release|dev, version, source}`.
-- [ ] A developer checkout stays a git checkout (`channel: dev`).
-- [ ] `bin/coding` resolves its code root from `install.json` instead of its own
-  location; daemons registered against `current`, not a versioned path.
-- Accept: two release folders side by side, flipping `current` switches the
-  running version after an `apply-features` + daemon restart; data in
-  `~/.coding/` is untouched by the flip.
+- [x] Releases install into versioned folders `~/.coding/releases/<ver>/` plus
+  a relative `current` symlink (junction on Windows) — flip by rename(2) over
+  `current` (atomic), `previous` recorded for one-step rollback.
+  `lib/install/layout.cjs`; a folder counts only once its `release.json`
+  (written last; P3's tarball must carry it) names the same version.
+- [x] `~/.coding/install.json`: `{channel: release|dev, version, source,
+  previous, activatedAt}`; malformed → throws (start paths fail closed),
+  `status()` reports it (display fails open).
+- [x] A developer checkout stays a git checkout: no install.json = implicit
+  `dev` of the checkout the code runs from — this machine is unchanged.
+- [x] `bin/coding` exports `CODING_REPO`/`CODING_TOOLS_PATH` as the stable root
+  (`scripts/lib/code-root.sh` `coding_code_root`, bash mirror of
+  `stableRoot()`): a release started through `current` exports `current`, a dev
+  checkout or an explicitly started older release keeps its own path. Same
+  helper in `launchd_repo_root`, the systemd installer and the schtasks
+  installer, so a plist/unit/task names `current`, never a version folder.
+- [x] `coding releases status|list|root|use|rollback|adopt|remove`
+  (`scripts/releases.mjs`); `adopt` copies to `<ver>.<pid>.partial` and renames.
+  Docs: `docs/architecture/release-layout.md`.
+- Accept: met. `tests/install/layout.test.mjs` (14): two releases side by side,
+  flip + rollback switch what a started process runs, `~/.coding` outside
+  `releases/` byte-identical across flips, plist rendered from a release names
+  `current`, bash and node roots agree. Live: a throwaway launchd job
+  registered once against `current` ran 8.0.0 → 8.1.0 → 8.0.0 across
+  `use`/`rollback` + `kickstart -k`, then was booted out.
+- Left for P4: containers bind-mount the resolved path at creation → an update
+  must recreate them; gitignored machine files inside the code tree (e.g. the
+  proxy's `config/llm-routing.machine.yaml`) must be carried across a flip or
+  moved to the data home; the shell rc's `CODING_REPO` is still written by
+  install.sh as the checkout (P6).
 
 ### P3 — Release pipeline  `status: not started`
 
@@ -198,6 +219,11 @@ developer — no PRs in coding).
 ---
 
 ## Session log
+
+- **2026-11-27 (P2 done)** — deleted the broken `bin/ckb` symlink (registry,
+  docs, test updated). Release layout + install record + stable code root +
+  `coding releases` CLI; 14 tests; live launchd flip/rollback probe. Branch
+  `feat/release-layout`. Next: P3 — still needs the four open decisions.
 
 - **2026-11-27 (P1 done)** — proxy PR #103 merged after green checks, proxy
   restarted; labelling toggled off and back to "follow the team" from the

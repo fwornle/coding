@@ -48,8 +48,7 @@ or when an item below goes missing.
 
 Commands that belong to a feature but do not refuse while it is off say why in the
 registry: `bin/init-history.sh` (lsl — run by install.sh only with lsl on),
-`bin/statusline-click` (statusline — only tmux calls it). `bin/ckb` is a broken
-tracked symlink (its target is the text of a script).
+`bin/statusline-click` (statusline — only tmux calls it).
 
 ## Dependencies
 
