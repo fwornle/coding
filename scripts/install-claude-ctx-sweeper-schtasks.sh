@@ -24,7 +24,10 @@
 set -euo pipefail
 
 TASK_NAME='\coding\claude-ctx-sweeper'
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/lib/code-root.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/code-root.sh"
+# The task names ~/.coding/releases/current, never a version folder (lib/install/layout.cjs).
+REPO_ROOT="$(coding_code_root "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)")"
 SWEEPER="${REPO_ROOT}/scripts/claude-ctx-sweeper.mjs"
 
 DRY_RUN=false
