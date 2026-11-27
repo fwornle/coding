@@ -104,3 +104,41 @@ and no submodule clone. `install.sh` checks `submodule_vendored` and skips fetch
 previous `v8+` release; the first release counts from the last milestone tag.
 Breaking changes come first, then features, fixes and performance, and long lists
 are capped.
+
+## `coding update`
+
+```
+coding update             install the latest release beside this one and switch to it
+coding update --check     report whether a newer release exists; install nothing
+coding update --rollback  switch back to the previous release and restart
+coding update --pull      dev checkout only: git pull --ff-only + submodule update
+```
+
+Implementation: `lib/install/update.mjs`. Steps on the release channel, in order:
+
+| step | what | if it fails |
+|---|---|---|
+| 1 | `GET releases/latest` from the GitHub API (anonymous; `curl`, so the proxy variables apply) | exit 1, nothing changed |
+| 2 | download the tarball and `.sha256`, verify, unpack, `adopt` as `releases/<ver>` | nothing switched |
+| 3 | carry the machine files (`CARRY`: `.env`, `.npmrc`, `.coding`, `.data`) from `current`; anything the new release ships wins | nothing switched |
+| 4 | `<ver>/install.sh --update=build`: npm installs and builds inside the new folder only | nothing switched |
+| 5 | when a Docker feature is on: `docker pull ghcr.io/fwornle/coding-services:<ver>`, tagged as the name compose uses for the built image | nothing switched |
+| 6 | switch `current` | |
+| 7 | `current/install.sh --update=register`: MCP config, agent settings, hooks, daemons, `.activate`, run through `current` so every stored path names it | switch back, restart |
+| 8 | `apply-features`, restart the installed daemons, recreate the `coding-services` container | switch back, restart |
+
+`install.sh --update=…` runs a fixed subset of the installer (`run_update_phase`).
+It never runs the one-time or prompting steps, and never the ones that are
+destructive when unattended: cleanup of stale global artifacts, API admin keys,
+history repo setup, plantuml, gsd-browser, the docs toolchain, the local LLM, the
+LLM proxy, the shell rc and `~/bin`. The first install already set those up
+against `current`.
+
+On a dev checkout, `coding update` changes nothing. It prints the git commands,
+and `--pull` runs them.
+
+Checks: `tests/install/update.test.mjs` (order of steps, what each failure
+leaves behind, data and the previous release survive), and
+`scripts/release/update-e2e.sh` run through `scripts/test-install-linux.sh
+--release A --update-to B update` on a clean Ubuntu. The release workflow runs
+the latter as a gate, updating to a next-patch tarball built from the same commit.
