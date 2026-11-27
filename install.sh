@@ -1048,6 +1048,17 @@ check_dependencies() {
     fi
 }
 
+# A release tarball (lib/install/layout.cjs, scripts/release/build-tarball.mjs)
+# carries every submodule VENDORED at its pinned SHA and has no .git anywhere, so
+# "is it a git checkout?" is the wrong question there: the code is present and
+# must not be pulled, initialised or re-cloned. release.json at the root is what
+# marks a release tree; a non-empty package.json in the submodule is what marks
+# it present.
+is_release_tree() { [[ -f "$CODING_REPO/release.json" ]]; }
+submodule_vendored() {
+    is_release_tree && [[ -f "$1/package.json" || -f "$1/pyproject.toml" ]]
+}
+
 # Install memory-visualizer (git submodule)
 # The knowledge viewer (integrations/unified-viewer, part of this repo): its
 # dependencies and a production build, which obs-api serves under /viewer/
@@ -1074,7 +1085,9 @@ install_memory_visualizer() {
     cd "$CODING_REPO"
 
     # Check for both .git directory and .git file (for submodules)
-    if [[ -d "$MEMORY_VISUALIZER_DIR/.git" ]] || [[ -f "$MEMORY_VISUALIZER_DIR/.git" ]]; then
+    if submodule_vendored "$MEMORY_VISUALIZER_DIR"; then
+        info "memory-visualizer is vendored in this release — nothing to fetch"
+    elif [[ -d "$MEMORY_VISUALIZER_DIR/.git" ]] || [[ -f "$MEMORY_VISUALIZER_DIR/.git" ]]; then
         info "Memory visualizer submodule already exists, updating..."
         cd "$MEMORY_VISUALIZER_DIR"
         if run_with_timeout 10 git pull origin main 2>/dev/null; then
@@ -1142,7 +1155,9 @@ install_semantic_analysis() {
     cd "$CODING_REPO"
 
     # Check for both .git directory and .git file (for submodules)
-    if [[ -d "$SEMANTIC_ANALYSIS_DIR/.git" ]] || [[ -f "$SEMANTIC_ANALYSIS_DIR/.git" ]]; then
+    if submodule_vendored "$SEMANTIC_ANALYSIS_DIR"; then
+        info "semantic-analysis is vendored in this release — nothing to fetch"
+    elif [[ -d "$SEMANTIC_ANALYSIS_DIR/.git" ]] || [[ -f "$SEMANTIC_ANALYSIS_DIR/.git" ]]; then
         info "semantic-analysis submodule already exists, updating..."
         cd "$SEMANTIC_ANALYSIS_DIR"
         if run_with_timeout 10 git pull origin main 2>/dev/null; then
@@ -1256,7 +1271,9 @@ install_constraint_monitor() {
     local constraint_monitor_dir="$CODING_REPO/integrations/constraint-monitor"
 
     # Initialize or update submodule (check for both .git directory and .git file)
-    if [[ -d "$constraint_monitor_dir/.git" ]] || [[ -f "$constraint_monitor_dir/.git" ]]; then
+    if submodule_vendored "$constraint_monitor_dir"; then
+        info "constraint-monitor is vendored in this release — nothing to fetch"
+    elif [[ -d "$constraint_monitor_dir/.git" ]] || [[ -f "$constraint_monitor_dir/.git" ]]; then
         info "constraint-monitor submodule already exists, updating..."
         cd "$constraint_monitor_dir"
         if run_with_timeout 10 git pull origin main 2>/dev/null; then
@@ -1697,8 +1714,9 @@ install_graphify() {
     cd "$CODING_REPO"
 
     # Ensure the graphify submodule is initialized (best-effort)
-    info "Initializing graphify submodule..."
-    if git submodule update --init integrations/graphify 2>/dev/null; then
+    if submodule_vendored "$CODING_REPO/integrations/graphify"; then
+        info "graphify is vendored in this release — nothing to fetch"
+    elif info "Initializing graphify submodule..." && git submodule update --init integrations/graphify 2>/dev/null; then
         success "graphify submodule initialized"
     else
         warning "Could not initialize graphify submodule (integrations/graphify)"
