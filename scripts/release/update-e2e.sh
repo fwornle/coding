@@ -21,6 +21,10 @@ bad() { echo "UPDATE_E2E=fail $*"; FAILED=1; }
 FAILED=0
 ver() { tar -xzf "$1" -O --wildcards '*/release.json' | node -p 'JSON.parse(require("fs").readFileSync(0)).version'; }
 A="$(ver "$A_TGZ")"; B="$(ver "$B_TGZ")"
+if [[ -z "$A" || -z "$B" ]]; then
+    echo "UPDATE_E2E=fail could not read the release versions from $A_TGZ / $B_TGZ"
+    echo "UPDATE_E2E_DONE failed=1"; exit 0
+fi
 echo "=== update e2e: $A -> $B ==="
 
 REL="$HOME/.coding/releases"

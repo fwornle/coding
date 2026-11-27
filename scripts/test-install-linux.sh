@@ -79,7 +79,7 @@ info() { echo "${CYAN}ℹ️  $*${NC}"; }
 if [[ "${1:-}" == "--in-container" ]]; then
     # shape `update`: not one install but install A + `coding update` to B.
     if [[ -n "${UPDATE_E2E:-}" ]]; then
-        exec bash scripts/release/update-e2e.sh "$PWD/_release.tgz" "$PWD/_update-to.tgz"
+        exec bash scripts/release/update-e2e.sh "$PWD/_release.tarball" "$PWD/_update-to.tarball"
     fi
     echo "=== container: $(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME") $(uname -m) ==="
     echo "=== node $(node --version 2>/dev/null) npm $(npm --version 2>/dev/null) ==="
@@ -158,8 +158,9 @@ prepare_context() {
         [[ -f "$CTX/release.json" ]] || { echo "${RED}not a release tarball (no release.json)${NC}"; exit 2; }
         cp "$CTX/docker/Dockerfile.install-test" "$CTX/Dockerfile.install-test"
         if [[ -n "$UPDATE_TARBALL" ]]; then
-            cp "$RELEASE_TARBALL" "$CTX/_release.tgz"
-            cp "$UPDATE_TARBALL" "$CTX/_update-to.tgz"
+            # Not *.tgz / *.tar.gz: .dockerignore drops those from the image.
+            cp "$RELEASE_TARBALL" "$CTX/_release.tarball"
+            cp "$UPDATE_TARBALL" "$CTX/_update-to.tarball"
         fi
         info "  context: $(du -sh "$CTX" | cut -f1), $(find "$CTX" -type f | wc -l | tr -d ' ') files"
         return
