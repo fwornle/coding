@@ -187,7 +187,8 @@ developer — no PRs in coding).
 ### P4 — `coding update`  `status: done`
 
 - [x] Release channel (`lib/install/update.mjs`, `coding update`): latest via
-  the GitHub API (curl) → download + sha256 → adopt beside → carry `.env`,
+  the `releases/latest` redirect (curl; NOT the API — its 60/h anonymous limit
+  was already exhausted on the corporate egress IP) → download + sha256 → adopt beside → carry `.env`,
   `.npmrc`, `.coding`, `.data` (shipped entries win) → `install.sh
   --update=build` in the new folder → pull + tag the GHCR image when a Docker
   feature is on → flip → `current/install.sh --update=register` (stored paths

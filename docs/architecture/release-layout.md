@@ -118,7 +118,7 @@ Implementation: `lib/install/update.mjs`. Steps on the release channel, in order
 
 | step | what | if it fails |
 |---|---|---|
-| 1 | `GET releases/latest` from the GitHub API (anonymous; `curl`, so the proxy variables apply) | exit 1, nothing changed |
+| 1 | read the redirect of `github.com/fwornle/coding/releases/latest` (not the API: 60 anonymous calls an hour per IP, used up behind a shared corporate egress); `curl`, so the proxy variables apply | exit 1, nothing changed |
 | 2 | download the tarball and `.sha256`, verify, unpack, `adopt` as `releases/<ver>` | nothing switched |
 | 3 | carry the machine files (`CARRY`: `.env`, `.npmrc`, `.coding`, `.data`) from `current`; anything the new release ships wins | nothing switched |
 | 4 | `<ver>/install.sh --update=build`: npm installs and builds inside the new folder only | nothing switched |

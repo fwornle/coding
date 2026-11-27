@@ -32,20 +32,13 @@ function publish(version, { corrupt = false } = {}) {
   fs.mkdirSync(path.join(root, 'bin'), { recursive: true });
   fs.writeFileSync(path.join(root, 'bin', 'probe'), `#!/bin/sh\necho ${version}\n`, { mode: 0o755 });
   fs.writeFileSync(path.join(root, layout.MARKER), JSON.stringify({ version }));
-  const tgz = path.join(server, `coding-${version}.tar.gz`);
+  const dl = path.join(server, 'download', `v${version}`);
+  fs.mkdirSync(dl, { recursive: true });
+  const tgz = path.join(dl, `coding-${version}.tar.gz`);
   execFileSync('tar', ['-czf', tgz, '-C', stage, `coding-${version}`]);
   const sum = corrupt ? '0'.repeat(64) : createHash('sha256').update(fs.readFileSync(tgz)).digest('hex');
   fs.writeFileSync(`${tgz}.sha256`, `${sum}  coding-${version}.tar.gz\n`);
-  fs.writeFileSync(
-    path.join(server, 'latest'),
-    JSON.stringify({
-      tag_name: `v${version}`,
-      assets: [
-        { name: `coding-${version}.tar.gz`, browser_download_url: `file://${tgz}` },
-        { name: `coding-${version}.tar.gz.sha256`, browser_download_url: `file://${tgz}.sha256` },
-      ],
-    }),
-  );
+  fs.writeFileSync(path.join(server, 'latest'), `v${version}\n`);
 }
 
 /** Install `version` the way a first install would: adopt + activate, plus machine files. */
@@ -54,7 +47,7 @@ function installed(version) {
   const r = latestRelease({ env });
   const dir = path.join(home, 'first');
   fs.mkdirSync(dir);
-  execFileSync('tar', ['-xzf', path.join(server, `coding-${version}.tar.gz`), '-C', dir]);
+  execFileSync('tar', ['-xzf', path.join(server, 'download', `v${version}`, `coding-${version}.tar.gz`), '-C', dir]);
   layout.adopt(path.join(dir, `coding-${version}`), opts);
   layout.activate(version, opts);
   fs.writeFileSync(path.join(layout.releaseDir(version, opts), '.env'), 'CODING_HISTORY_REPO=git@x:me/h.git\n');
@@ -86,7 +79,7 @@ beforeEach(() => {
   server = path.join(home, 'server');
   fs.mkdirSync(server);
   opts = { homeDir: home };
-  env = { ...process.env, CODING_RELEASE_API: `file://${server}` };
+  env = { ...process.env, CODING_RELEASE_URL: `file://${server}` };
   log = [];
 });
 afterEach(() => fs.rmSync(home, { recursive: true, force: true }));
@@ -170,7 +163,7 @@ describe('coding update — release channel', () => {
   test('no network: one clear error, exit 1', async () => {
     installed('8.0.0');
     const t = lines();
-    const bad = { ...env, CODING_RELEASE_API: `file://${home}/nowhere` };
+    const bad = { ...env, CODING_RELEASE_URL: `file://${home}/nowhere` };
     assert.equal(await update({ opts, env: bad, steps: stubs(), ...t }), 1);
     assert.match(t.o.join('\n'), /could not read the latest release/);
   });
@@ -195,6 +188,25 @@ describe('coding update — release channel', () => {
     assert.equal(fs.readFileSync(path.join(b, '.env'), 'utf8'), 'new');
     assert.equal(fs.readFileSync(path.join(b, '.coding', 'x'), 'utf8'), 'cfg');
     for (const [p, why] of CARRY) assert.ok(p && why);
+  });
+});
+
+describe('latest release lookup', () => {
+  const fake = (stdout, ok = true) => () => ({ ok, status: ok ? 0 : 22, stdout, stderr: ok ? '' : 'curl: (22) 404' });
+  test('github: the tag comes from the redirect target, not the HTML body', async () => {
+    const { latestTag } = await import('../../lib/install/update.mjs');
+    const html = '<html>…v9.9.9…</html>\nhttps://github.com/fwornle/coding/releases/tag/v8.0.0'; // body, then the redirect target
+    assert.equal(latestTag('https://github.com/fwornle/coding/releases', { exec: fake(html) }), '8.0.0');
+  });
+  test('no release yet (github answers the releases page itself): a clear error', async () => {
+    const { latestTag } = await import('../../lib/install/update.mjs');
+    const page = '<html></html>\n'; // a 200 with no redirect
+    assert.throws(() => latestTag('https://github.com/fwornle/coding/releases', { exec: fake(page) }), /no usable tag/);
+  });
+  test('asset URLs are the download paths', () => {
+    const r = latestRelease({ exec: fake('v8.1.0\n'), env: { CODING_RELEASE_URL: 'https://github.com/fwornle/coding/releases/' } });
+    assert.equal(r.tarballUrl, 'https://github.com/fwornle/coding/releases/download/v8.1.0/coding-8.1.0.tar.gz');
+    assert.equal(r.shaUrl, 'https://github.com/fwornle/coding/releases/download/v8.1.0/coding-8.1.0.tar.gz.sha256');
   });
 });
 

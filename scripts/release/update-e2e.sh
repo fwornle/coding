@@ -41,15 +41,11 @@ echo 'CODING_E2E_MARKER=kept' >> "$CUR/.env"
 cp "$HOME/.coding/features.yaml" /tmp/features.before 2>/dev/null || true
 
 # 2. the release server
-SRV=/tmp/release-server; mkdir -p "$SRV"
-cp "$B_TGZ" "$SRV/coding-$B.tar.gz"
-(cd "$SRV" && sha256sum "coding-$B.tar.gz" > "coding-$B.tar.gz.sha256")
-cat > "$SRV/latest" <<EOF
-{"tag_name":"v$B","assets":[
- {"name":"coding-$B.tar.gz","browser_download_url":"file://$SRV/coding-$B.tar.gz"},
- {"name":"coding-$B.tar.gz.sha256","browser_download_url":"file://$SRV/coding-$B.tar.gz.sha256"}]}
-EOF
-export CODING_RELEASE_API="file://$SRV"
+SRV=/tmp/release-server; mkdir -p "$SRV/download/v$B"
+cp "$B_TGZ" "$SRV/download/v$B/coding-$B.tar.gz"
+(cd "$SRV/download/v$B" && sha256sum "coding-$B.tar.gz" > "coding-$B.tar.gz.sha256")
+echo "v$B" > "$SRV/latest"
+export CODING_RELEASE_URL="file://$SRV"
 
 # 3. update
 "$CUR/bin/coding" update --check > /tmp/check.log 2>&1
