@@ -102,7 +102,7 @@ riskiest. Each phase ends green on `npm test` with its own acceptance checks;
 commit per phase on a topic branch, `merge --no-ff` to main, push (sole
 developer — no PRs in coding).
 
-### P1 — Close the composability gaps  `status: in progress`
+### P1 — Close the composability gaps  `status: done`
 
 - [x] **Run mode** setting `run: auto | box | strict-box | host` in
   `features.yaml`, the Features tab ("Run agents in") and `coding-features run`.
@@ -124,14 +124,17 @@ developer — no PRs in coding).
   → own project when off), job-class gate publishing to the team. NOT the
   repo→project mapping (attribution, kb layout: core) and NOT `coding sync` of
   your own learning repo (that is `lsl`'s plumbing).
-- [ ] **Job-class labelling** stays under `llm-proxy`, with its on/off on the
-  Features tab (decided 2026-11-27). coding side done (LLM Proxy row; shows
-  "update rapid-llm-proxy" until the endpoint exists). Proxy side: PR
-  adpnext-apps/rapid-llm-proxy#103 — gitignored `config/llm-routing.machine.yaml`
-  (only `job_classes.enabled`) + `GET/PUT /api/job-classes/enabled`. Open, NOT
-  merged; then restart the proxy and check the toggle end to end.
-- [ ] Write **core** down as a list in `docs/architecture/features.md`, and let
-  the drift tests cover it.
+- [x] **Job-class labelling** stays under `llm-proxy`, with its on/off on the
+  Features tab (LLM Proxy row). Proxy side merged as
+  adpnext-apps/rapid-llm-proxy#103 (81ce522): gitignored
+  `config/llm-routing.machine.yaml` (only `job_classes.enabled`) +
+  `GET/PUT /api/job-classes/enabled`. Verified end to end.
+- [x] **Core** written down: `lib/features/surfaces.cjs` (`CORE`, `CLIS`,
+  `ROUTES`) + the "Core" section of `docs/architecture/features.md`;
+  `tests/features/surface-registry.test.mjs` fails on an unmapped `bin/*` or
+  route, a mapping that disagrees with the code's gate, or a core item missing
+  from the docs. It caught the ungated `/performance/timeline/:taskId` (now
+  gated). Open: `bin/ckb` is a broken tracked symlink — delete or restore.
 - Accept: every dashboard tab and every `bin/*` CLI maps to a feature or to
   core (test asserts it); run mode and agents round-trip through the dashboard
   and `coding-features`.
@@ -195,6 +198,12 @@ developer — no PRs in coding).
 ---
 
 ## Session log
+
+- **2026-11-27 (P1 done)** — proxy PR #103 merged after green checks, proxy
+  restarted; labelling toggled off and back to "follow the team" from the
+  Features tab (UI → endpoint → live tagger → gitignored file → removed).
+  Surface registry + core list + drift test. P1 complete. Next: P2 (release
+  layout) — the four open decisions above still need answers before P3.
 
 - **2026-11-27 (P1, slice 3)** — `teams` feature (requires `lsl`, live; in
   learning, learning-perf, everything, full): Teams tab/icon gated; `sync.mjs`

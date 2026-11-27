@@ -28,6 +28,7 @@ const GatedCoverage = gated('knowledge', 'Coverage is computed from the knowledg
 const GatedTokenUsage = gated('llm-proxy', 'Token accounting comes from the LLM proxy, which is not running.', TokenUsagePage)
 const GatedTeams = gated('teams', 'Sharing learning with a team is switched off on this machine (it also needs session logging).', TeamsPage)
 const GatedPerformance = gated('performance', 'Measurement, experiments and benchmarks are not running.', PerformancePage)
+const GatedTimeline = gated('performance', 'Measurement, experiments and benchmarks are not running.', TimelineFullscreen)
 const GatedCluster = gated('cluster', 'The Cluster tab is switched off on this machine.', ClusterPage)
 
 function AppContent() {
@@ -59,7 +60,7 @@ function AppContent() {
         <Route path="/features" element={<FeaturesPage />} />
         <Route path="/teams" element={<GatedTeams />} />
         {/* Fullscreen whole-run timeline (D-02) — routed child of Performance. */}
-        <Route path="/performance/timeline/:taskId" element={<TimelineFullscreen />} />
+        <Route path="/performance/timeline/:taskId" element={<GatedTimeline />} />
       </Routes>
     </>
   )
