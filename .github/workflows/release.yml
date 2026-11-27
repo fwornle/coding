@@ -7,7 +7,8 @@
 #
 # Nothing is published unless every gate passed:
 #   tarball       builds, unpacks, installs as a release folder and runs from it
-#   install-test  scripts/test-install-linux.sh --release on the tarball (Docker)
+#   install-test  scripts/test-install-linux.sh --release on the tarball (Docker),
+#                 then `coding update` from it to a next-patch tarball and back
 #   lite          cross-platform-lite on ubuntu / macOS / Windows
 #   images        both architectures build
 # The images are pushed UNTAGGED (by digest) while building; only the publish job,
@@ -101,11 +102,24 @@ jobs:
           name: release-dist
           path: dist/
           if-no-files-found: error
+      # A second tarball one patch above, from the same commit: the target of
+      # the `coding update` gate. Never published.
+      - name: Update target (next patch, gate only)
+        shell: bash
+        run: |
+          next="$(node -p 'const [a,b,c]=require("./package.json").version.split("-")[0].split(".").map(Number); `${a}.${b}.${c+1}`')"
+          node scripts/release/build-tarball.mjs --out dist-e2e --version "$next"
+          echo "$next" > dist-e2e/next-version
+      - uses: actions/upload-artifact@v4
+        with:
+          name: update-target
+          path: dist-e2e/
+          if-no-files-found: error
 
   install-test:
     needs: [plan, tarball]
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 75
     env:
       ONNXRUNTIME_NODE_INSTALL_CUDA: skip
     steps:
@@ -116,6 +130,16 @@ jobs:
           path: dist
       - name: Install from the tarball on a clean Ubuntu (direct + arch shapes)
         run: bash scripts/test-install-linux.sh --release "dist/coding-${{ needs.plan.outputs.version }}.tar.gz" direct arch
+      - uses: actions/download-artifact@v4
+        with:
+          name: update-target
+          path: dist-e2e
+      - name: coding update from the tarball to the next patch, then rollback
+        shell: bash
+        run: |
+          next="$(cat dist-e2e/next-version)"
+          bash scripts/test-install-linux.sh --release "dist/coding-${{ needs.plan.outputs.version }}.tar.gz" \
+            --update-to "dist-e2e/coding-$next.tar.gz" update
 
   lite:
     needs: plan

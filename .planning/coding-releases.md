@@ -184,17 +184,33 @@ developer — no PRs in coding).
 - Accept: pending the first real publish (merging to main publishes v8.0.0).
   After it, the GHCR package may need setting to public once (Package settings).
 
-### P4 — `coding update`  `status: not started`
+### P4 — `coding update`  `status: done`
 
-- [ ] Release channel: download → verify → unpack beside the current version →
-  migrations (`features.yaml` schema, data home, project hook settings — e.g.
-  `scripts/strip-project-hooks.mjs`) → pull images for enabled features →
-  `apply-features` → restart daemons → flip `current`. `coding update
-  --rollback` flips back.
-- [ ] Dev channel: say so, offer `git pull` + submodule update.
-- [ ] `--check` reports only, installs nothing (like `glass update --check`).
-- Accept: update from N-1 to N on a release install leaves features, teams and
-  learned data intact; rollback returns to N-1.
+- [x] Release channel (`lib/install/update.mjs`, `coding update`): latest via
+  the `releases/latest` redirect (curl; NOT the API — its 60/h anonymous limit
+  was already exhausted on the corporate egress IP) → download + sha256 → adopt beside → carry `.env`,
+  `.npmrc`, `.coding`, `.data` (shipped entries win) → `install.sh
+  --update=build` in the new folder → pull + tag the GHCR image when a Docker
+  feature is on → flip → `current/install.sh --update=register` (stored paths
+  name `current`) → apply-features + daemon restarts + container recreate.
+  Failure before the flip: nothing switched; after: flips back and restarts.
+  `--rollback` flips back and restarts.
+- [x] `install.sh --update=build|register` (`run_update_phase`): a fixed subset;
+  never the prompting/destructive/one-time steps (audit of every main() step,
+  2026-11-27: `cleanup_stale_global_artifacts` deletes by default under NI,
+  `setup_api_admin_keys` reads stdin even with `--yes`, the script ignores an
+  inherited `CODING_REPO` and uses its own logical location).
+- [x] Dev channel: prints the git commands; `--pull` runs them.
+- [x] `--check` reports only.
+- Accept: met on Linux — `update-e2e.sh` in the install-test container: 8.0.0
+  installed as a release → `coding update` to 8.0.1 (build + register ran, deps
+  in 8.0.1, `.env` carried, `.activate` names `current`, features.yaml
+  unchanged, no version path stored) → rollback to 8.0.0: 13/13. Release CI now
+  gates on it. macOS: the launchd flip/restart was proven in P2; a full macOS
+  update runs with the first real 8.0.x → 8.0.y release.
+- Not done: the LLM proxy (separate repo) is not updated by `coding update`;
+  `initialize_knowledge_databases` and the `.data` carry are a stopgap until
+  that data moves to the data home.
 
 ### P5 — Release notification  `status: not started`
 
@@ -219,6 +235,11 @@ developer — no PRs in coding).
 ---
 
 ## Session log
+
+- **2026-11-27 (P3 published, P4 done)** — dry run green, merged, v8.0.0
+  publish run started. P4: `coding update` + install.sh update phases + e2e
+  (13/13 on Ubuntu after two fixes: `.dockerignore` dropped `*.tgz` from the
+  harness image; `cpSync` threw EEXIST on a shipped symlink in `.data`).
 
 - **2026-11-27 (P3 built)** — decisions recorded. Tarball builder + notes +
   vendored-submodule install path + release workflow + tests (8). Local:

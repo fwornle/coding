@@ -54,6 +54,7 @@ SKIPPED_SYSTEM_DEPS=()
 #   DRY_RUN          — print the mutation manifest and exit 0 without touching
 #                      anything (--dry-run).
 NON_INTERACTIVE=false
+UPDATE_PHASE=""
 ASSUME_YES=false
 CI_LITE=false
 DRY_RUN=false
@@ -4370,6 +4371,12 @@ parse_args() {
             --features)                  shift; CODING_INSTALL_FEATURES="${1:-harness}" ;;
             -h|--help)                   show_usage; exit 0 ;;
             --skip-hooks)                : ;;  # accepted, no-op at root level
+            # Run by `coding update` (lib/install/update.mjs), never by hand:
+            # build = dependencies/builds in a release folder, before the flip;
+            # register = paths stored outside the tree, from releases/current,
+            # after it. See run_update_phase.
+            --update=build|--update=register)
+                                         UPDATE_PHASE="${1#*=}"; NON_INTERACTIVE=true ;;
             # Fatal, never "ignored": an ignored typo used to fall through to a FULL
             # unattended install — test-coding.sh's "check-only" mode called
             # `install.sh --update-mcp-config` and reinstalled the machine.
@@ -4915,8 +4922,86 @@ cleanup_stale_global_artifacts() {
     success "Global leftovers removed — bare agents now behave as they did before this project"
 }
 
+write_activate_script() {
+    cat > "$CODING_REPO/.activate" << EOF
+#!/bin/bash
+# Activate Agent-Agnostic Coding Tools environment
+export CODING_REPO="$CODING_REPO"
+export PATH="$CODING_REPO/bin:\$PATH"
+echo "✅ Agent-Agnostic Coding Tools environment activated!"
+echo "Command 'coding' is now available."
+echo ""
+echo "Usage:"
+echo "  coding           # Use best available agent"
+echo "  coding --copilot # Force CoPilot"
+echo "  coding --claude  # Force Claude Code"
+EOF
+    chmod +x "$CODING_REPO/.activate"
+}
+
+# ── coding update phases ────────────────────────────────────────────────────
+# `coding update` re-runs only what a NEW release needs, in two halves split by
+# the flip of ~/.coding/releases/current (docs/architecture/release-layout.md):
+#
+#   build     run as <releases>/<ver>/install.sh BEFORE the flip. Only steps that
+#             write inside this tree (npm installs, builds). Nothing outside the
+#             tree changes, so a failure needs no undo — the old release runs on.
+#   register  run as <releases>/current/install.sh AFTER the flip. CODING_REPO is
+#             then the `current` path (this script keeps the logical pwd), so
+#             every path the steps store — MCP config, agent settings, hooks,
+#             daemons, .activate — names `current`, never a version folder.
+#
+# Left out on purpose — one-time machine setup the first install did, steps that
+# prompt, and steps that are destructive unattended: cleanup_stale_global_
+# artifacts (deletes by default under NI), setup_api_admin_keys (reads stdin
+# even with --yes), setup_history_repo (the learning checkout is carried over),
+# plantuml/gsd-browser/docs toolchain/local LLM, the LLM proxy (its own repo),
+# shell rc and ~/bin (they already name `current`), guard enrolment.
+run_update_phase() {
+    is_release_tree || error_exit "--update=$UPDATE_PHASE runs inside a release folder (no release.json in $CODING_REPO)"
+    info "coding update: $UPDATE_PHASE phase in $CODING_REPO"
+    CODING_INSTALL_FEATURES=keep
+    ask_agent_scope           # reads the carried .env; NI never prompts
+    ask_feature_selection     # keep: the existing ~/.coding/features.yaml
+    case "$UPDATE_PHASE" in
+        build)
+            configure_proxy_for_install
+            preflight_network
+            check_dependencies
+            run_step install_node_dependencies
+            install_memory_visualizer
+            install_unified_viewer
+            run_step install_semantic_analysis
+            run_step install_constraint_monitor
+            run_step install_system_health_dashboard
+            install_graphify
+            create_example_configs
+            run_step verify_host_embeddings
+            ;;
+        register)
+            setup_mcp_config
+            run_step install_compaction_guard
+            run_step install_knowledge_injection
+            run_step install_copilot_file_hooks
+            install_skills
+            create_project_local_settings
+            run_step install_feature_daemons
+            run_step install_constraint_monitor_hooks
+            write_activate_script
+            ;;
+    esac
+    install_exit_status
+}
+
 main() {
     parse_args "$@"
+    if [[ -n "${UPDATE_PHASE:-}" ]]; then
+        INSTALL_LOG="$CODING_REPO/install-update.log"
+        detect_platform
+        detect_sandbox_mode
+        run_update_phase
+        return
+    fi
     echo -e "${PURPLE}🚀 Agent-Agnostic Coding Tools - Universal Installer${NC}"
     echo -e "${PURPLE}=====================================================${NC}"
     echo ""
@@ -5015,20 +5100,7 @@ main() {
     setup_api_admin_keys
 
     # Create activation script for immediate use
-    cat > "$CODING_REPO/.activate" << EOF
-#!/bin/bash
-# Activate Agent-Agnostic Coding Tools environment
-export CODING_REPO="$CODING_REPO"
-export PATH="$CODING_REPO/bin:\$PATH"
-echo "✅ Agent-Agnostic Coding Tools environment activated!"
-echo "Command 'coding' is now available."
-echo ""
-echo "Usage:"
-echo "  coding           # Use best available agent"
-echo "  coding --copilot # Force CoPilot"
-echo "  coding --claude  # Force Claude Code"
-EOF
-    chmod +x "$CODING_REPO/.activate"
+    write_activate_script
     
     # Installation status report
     show_installation_status
