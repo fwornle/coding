@@ -90,6 +90,7 @@ import { writeProjectUsage } from '../lib/usage/project-usage.mjs';
 import UserHashGenerator from '../src/live-logging/user-hash-generator.js';
 import { registerKgbenchRoutes } from '../lib/experiments/kgbench-routes.mjs';
 import { registerClusterRoutes } from '../lib/cluster/cluster-routes.mjs';
+import { loadFeatures } from '../lib/features/index.mjs';
 // One derivation, two drivers — the CLI at scripts/enrich-entity-sources.mjs
 // drives these same pure helpers over HTTP. Importing is side-effect-free: the
 // script's main() is behind an argv guard.
@@ -2252,7 +2253,15 @@ registerKgbenchRoutes(app, {
 });
 process.stderr.write('[obs-api] /api/experiments + /api/kgbench routes mounted\n');
 // The Cluster tab: polled from here because the nodes are reached from the host, not the container.
-registerClusterRoutes(app, { log: (line) => process.stderr.write(`[obs-api] ${line}\n`) });
+registerClusterRoutes(app, {
+  log: (line) => process.stderr.write(`[obs-api] ${line}\n`),
+  // Per request: the feature's apply tier is `live`. Fails OPEN on a broken
+  // config — this only displays, and a tab that silently empties looks like a
+  // broken build (CLAUDE.md, fail-open vs fail-closed).
+  enabled: () => {
+    try { return loadFeatures().features.cluster?.enabled !== false; } catch { return true; }
+  },
+});
 process.stderr.write('[obs-api] /api/cluster + /api/routing routes mounted\n');
 
 // ── Insight documents ──────────────────────────────────────────────────────

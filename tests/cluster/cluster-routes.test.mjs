@@ -73,3 +73,23 @@ test('the cluster is configured where glass keeps it, GLASS_HOME moving it', () 
   assert.equal(clusterHome({ GLASS_HOME: '/x/glass' }), '/x/glass');
   assert.equal(clusterHome({}), path.join(os.homedir(), '.glass'));
 });
+
+test("the 'cluster' feature off: both routes answer disabled and no node is polled, asked per request", async () => {
+  const calls = [];
+  const cluster = { peek: () => { calls.push('peek'); return { configured: true }; }, read: async () => { calls.push('read'); return { configured: true, nodes: [] }; } };
+  let on = false;
+  const app = express();
+  registerClusterRoutes(app, { cluster, dbPath: () => '/nonexistent', enabled: () => on });
+  const s = await serve(app);
+  try {
+    for (const p of ['/api/cluster', '/api/cluster?peek=1', '/api/routing?hours=1']) {
+      const r = await s.get(p);
+      assert.equal(r.status, 200, p);
+      assert.equal(r.body.disabled, true, p);
+      assert.equal(r.body.configured, false, p);
+    }
+    assert.deepEqual(calls, [], 'nothing polled while off');
+    on = true; // live: the next request sees the change, no restart
+    assert.deepEqual((await s.get('/api/cluster?peek=1')).body, { configured: true });
+  } finally { s.close(); }
+});
