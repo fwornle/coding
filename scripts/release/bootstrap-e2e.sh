@@ -34,8 +34,14 @@ grep -q '"channel": "release"' "$HOME/.coding/install.json" 2>/dev/null && ok "i
 grep -q "Node.js dependencies installed" /tmp/bootstrap.log && ok "dependencies installed" || bad "npm install did not succeed"
 grep -qE "Initializing [a-z-]+ submodule|git submodule update" /tmp/bootstrap.log && bad "tried to fetch a submodule" || ok "no submodule fetched"
 [[ "$(readlink "$HOME/bin/coding" 2>/dev/null)" == "$CUR/bin/coding" ]] && ok "~/bin/coding -> current" || bad "~/bin/coding -> $(readlink "$HOME/bin/coding" 2>/dev/null)"
+# Unattended (--ci, no --yes) the installer declines to edit the shell rc — that
+# needs consent — and prints the line to add instead. Either way the path must
+# be `current`: written to the rc, or in the suggested line.
 rc_hit="$(grep -h 'export CODING_REPO=' "$HOME/.bashrc" "$HOME/.profile" "$HOME/.zshrc" 2>/dev/null | head -1)"
-[[ "$rc_hit" == *"$CUR"* ]] && ok "shell rc names current" || bad "shell rc: ${rc_hit:-no CODING_REPO export}"
+suggested="$(sed 's/\x1b\[[0-9;]*m//g' /tmp/bootstrap.log | grep -A3 'Skipped shell configuration modification' | grep 'export CODING_REPO=' | head -1)"
+if [[ "$rc_hit" == *"$CUR"* ]]; then ok "shell rc names current"
+elif [[ -z "$rc_hit" && "$suggested" == *"\"$CUR\""* ]]; then ok "shell rc left alone (no consent under --ci); the suggested export names current"
+else bad "shell rc: ${rc_hit:-none}; suggested: ${suggested:-none}"; fi
 if grep -rqs "$HOME/.coding/releases/$V" "$CUR/.activate" "$CUR/.claude/settings.local.json" "$CUR/claude-code-mcp-processed.json" "$HOME/.bashrc"; then
   bad "a version folder path was stored"
 else
