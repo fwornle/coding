@@ -183,7 +183,15 @@ describe('coding update — release channel', () => {
     fs.writeFileSync(path.join(a, '.env'), 'old');
     fs.writeFileSync(path.join(a, '.coding', 'x'), 'cfg');
     fs.writeFileSync(path.join(b, '.env'), 'new');
-    assert.deepEqual(carry(a, b), ['.env', '.coding']);
+    // A symlink present in both trees (the shipped .data/ontologies has some) must not throw.
+    fs.mkdirSync(path.join(a, '.data', 'ontologies'), { recursive: true });
+    fs.mkdirSync(path.join(b, '.data', 'ontologies'), { recursive: true });
+    fs.symlinkSync('../x', path.join(a, '.data', 'ontologies', 'obs-api'));
+    fs.symlinkSync('../y', path.join(b, '.data', 'ontologies', 'obs-api'));
+    fs.writeFileSync(path.join(a, '.data', 'knowledge.db'), 'db');
+    assert.deepEqual(carry(a, b), ['.env', '.coding', '.data']);
+    assert.equal(fs.readlinkSync(path.join(b, '.data', 'ontologies', 'obs-api')), '../y', 'the shipped link wins');
+    assert.equal(fs.readFileSync(path.join(b, '.data', 'knowledge.db'), 'utf8'), 'db');
     assert.equal(fs.readFileSync(path.join(b, '.env'), 'utf8'), 'new');
     assert.equal(fs.readFileSync(path.join(b, '.coding', 'x'), 'utf8'), 'cfg');
     for (const [p, why] of CARRY) assert.ok(p && why);
