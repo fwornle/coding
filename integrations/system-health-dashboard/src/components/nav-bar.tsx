@@ -65,8 +65,8 @@ export function NavBar() {
     { label: 'Coverage', path: '/coverage', feature: 'knowledge' },
     { label: 'Token Usage', path: '/token-usage', feature: 'llm-proxy' },
     { label: 'Performance', path: '/performance', testId: 'performance-tab', feature: 'performance' },
-    // No feature: the page itself says when no cluster is configured or none can be reached.
-    { label: 'Cluster', path: '/cluster', testId: 'cluster-nav-tab' },
+    // The page itself still says when no cluster is configured or none can be reached.
+    { label: 'Cluster', path: '/cluster', testId: 'cluster-nav-tab', feature: 'cluster' },
   ]
 
   const tabs = allTabs.filter(tab => !tab.feature || features[tab.feature]?.enabled !== false)

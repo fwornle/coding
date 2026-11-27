@@ -71,8 +71,8 @@ profiles:
 
   everything:
     description: >-
-      learning-perf + constraints (guardrails) + the code graph (graphify).
-      Needs Docker.
+      learning-perf + constraints (guardrails) + the code graph (graphify) +
+      the on-prem cluster tab. Needs Docker.
     features:
       llm-proxy: on
       health: on
@@ -83,6 +83,7 @@ profiles:
       performance: on
       constraints: on
       codegraph: on
+      cluster: on
 
   # ── developer ─────────────────────────────────────────────────────────────
   full:
@@ -99,6 +100,7 @@ profiles:
       constraints: on
       llm-proxy: on
       performance: on
+      cluster: on
       health: on
       statusline: on
 

@@ -28,6 +28,7 @@ const GatedCoverage = gated('knowledge', 'Coverage is computed from the knowledg
 const GatedTokenUsage = gated('llm-proxy', 'Token accounting comes from the LLM proxy, which is not running.', TokenUsagePage)
 const GatedTeams = gated('lsl', 'Teams group the repos whose sessions are learned from, and session logging is not running.', TeamsPage)
 const GatedPerformance = gated('performance', 'Measurement, experiments and benchmarks are not running.', PerformancePage)
+const GatedCluster = gated('cluster', 'The Cluster tab is switched off on this machine.', ClusterPage)
 
 function AppContent() {
   useEffect(() => {
@@ -54,7 +55,7 @@ function AppContent() {
         <Route path="/coverage" element={<GatedCoverage />} />
         <Route path="/token-usage" element={<GatedTokenUsage />} />
         <Route path="/performance" element={<GatedPerformance />} />
-        <Route path="/cluster" element={<ClusterPage />} />
+        <Route path="/cluster" element={<GatedCluster />} />
         <Route path="/features" element={<FeaturesPage />} />
         <Route path="/teams" element={<GatedTeams />} />
         {/* Fullscreen whole-run timeline (D-02) — routed child of Performance. */}

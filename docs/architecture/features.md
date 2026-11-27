@@ -1,6 +1,6 @@
 # Feature Modularity
 
-`coding` composes from nine independently switchable features. This document is the
+`coding` composes from eleven independently switchable features. This document is the
 **contract**: for every feature it names every artifact that must be gated — daemons,
 container programs, ports, hooks, dashboard surfaces, status-line badges and CLIs.
 
@@ -11,7 +11,7 @@ the checklist a reviewer uses.
 **Default is all-on.** With no `features.yaml` anywhere, the resolved set is identical to
 the historical single-stack behaviour. Upgrading changes nothing until the user opts in.
 
-## The ten features
+## The eleven features
 
 | id | what the user calls it |
 |----|------------------------|
@@ -23,6 +23,7 @@ the historical single-stack behaviour. Upgrading changes nothing until the user 
 | `constraints` | constraint monitoring / guardrails |
 | `llm-proxy` | rapid-llm-proxy, routing and token accounting |
 | `performance` | measurement, experiments, kgbench |
+| `cluster` | the on-prem GPU cluster tab (nodes, models, jobs, routing decisions) |
 | `health` | health coordinator and the monitoring dashboard |
 | `statusline` | the tmux / agent status line |
 
@@ -40,6 +41,7 @@ graph TD
     lsl --> observations
     observations --> knowledge
     llmproxy["llm-proxy"] --> performance
+    observations --> cluster
     codegraph
     constraints
     health
@@ -52,6 +54,7 @@ graph TD
 | `observations` | `lsl` | the observation tap lives inside the enhanced transcript monitor; nothing else produces observations |
 | `knowledge` | `observations` | UKB wave-analysis consumes observations and digests |
 | `performance` | `llm-proxy` | token attribution is read off the proxy's usage tap |
+| `cluster` | `observations` | `/api/cluster` and `/api/routing` are served by obs-api (the `observations` daemon), which runs on the host because the nodes answer only on the corporate network |
 
 `health` has no dependencies, but disabling it removes the dashboard — which is also the
 feature editor. The CLI says so rather than refusing the choice; `bin/coding-features`
@@ -388,6 +391,7 @@ explains itself. The Features entry is always present, so there is always a way 
 | Coverage | `/coverage` | `knowledge` |
 | Token Usage | `/token-usage` | `llm-proxy` |
 | Performance | `/performance` | `performance` |
+| Cluster | `/cluster` | `cluster` — and obs-api's `/api/cluster`, `/api/routing` answer `{disabled: true}` while it is off, asked per request (apply tier `live`, fails open on a broken config) |
 
 Health-page tiles (`src/components/system-health-dashboard.tsx`) are **greyed** when
 disabled, carrying a `Disabled` chip whose tooltip is the resolver's reason string.

@@ -54,14 +54,14 @@ const MATRIX = {
   },
   everything: {
     docker: true,
-    features: ['llm-proxy', 'health', 'statusline', 'lsl', 'observations', 'knowledge', 'performance', 'constraints', 'codegraph'],
+    features: ['llm-proxy', 'health', 'statusline', 'lsl', 'observations', 'knowledge', 'performance', 'constraints', 'codegraph', 'cluster'],
     mcpServers: ['graphify'],
     hooks: ['PreToolUse', 'PostToolUse', 'UserPromptSubmit'],
   },
   // The developer profile: everything + lsl-redirect.
   full: {
     docker: true,
-    features: ['lsl', 'lsl-redirect', 'observations', 'knowledge', 'codegraph', 'constraints', 'llm-proxy', 'performance', 'health', 'statusline'],
+    features: ['lsl', 'lsl-redirect', 'observations', 'knowledge', 'codegraph', 'constraints', 'llm-proxy', 'performance', 'cluster', 'health', 'statusline'],
     mcpServers: ['graphify'],
     hooks: ['PreToolUse', 'PostToolUse', 'UserPromptSubmit'],
   },

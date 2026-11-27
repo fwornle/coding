@@ -115,8 +115,20 @@ developer — no PRs in coding).
   out; plain `coding` → claude while offered, else the first offered.
   `config/agents/*.sh` stays the registry. **Installer side not done** — the
   installer still sets up every agent; moves to P6.
-- [ ] Gate **Cluster**, **Teams / sync** and **job-classes** — a feature each,
-  or explicit sub-switches of an existing one.
+- [x] **Cluster** → feature `cluster` (requires `observations`: obs-api serves
+  `/api/cluster` + `/api/routing`; apply tier `live`, asked per request, fails
+  open). In `everything` and `full`.
+- [ ] **Teams** → feature `teams` (decided 2026-11-27). Scope: the sharing
+  layer only — Teams tab + `/teams` discovery, teammates' shared clones
+  (`<data home>/var/shared`), team filters in retrieval (`lib/teams/scope.mjs`
+  → own project when off), job-class gate publishing to the team. NOT the
+  repo→project mapping (attribution, kb layout: core) and NOT `coding sync` of
+  your own learning repo (that is `lsl`'s plumbing).
+- [ ] **Job-class labelling** stays under `llm-proxy`, with its on/off on the
+  Features tab (decided 2026-11-27). Blocked on rapid-llm-proxy: labelling is
+  `job_classes.enabled` in the proxy's committed `config/llm-routing.yaml`, and
+  `llm-routing.local.yaml` only accepts extra providers — a per-machine
+  override needs a proxy change (PR) first.
 - [ ] Write **core** down as a list in `docs/architecture/features.md`, and let
   the drift tests cover it.
 - Accept: every dashboard tab and every `bin/*` CLI maps to a feature or to
@@ -182,6 +194,14 @@ developer — no PRs in coding).
 ---
 
 ## Session log
+
+- **2026-11-27 (P1, slice 2)** — `cluster` feature: catalogue + profiles
+  (`everything`, `full`) + installer fail-open list; obs-api routes gated per
+  request; nav tab + gated route; FeatureId type (+ the missing
+  `lsl-redirect`); docs. Verified live: toggled off on the Features tab → tab
+  gone, `/api/cluster` `{disabled: true}`, `/cluster` explains; back on;
+  `~/.coding/features.yaml` restored byte-identical. Teams and job-class
+  labelling scoped (see P1 items). Next: `teams`.
 
 - **2026-11-27 (P1, slice 1)** — run mode + agents settings: resolver
   (`settings` in the resolved state), `setSettings()` writer (validates agents
