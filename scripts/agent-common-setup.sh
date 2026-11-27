@@ -463,6 +463,27 @@ ensure_statusline_config() {
   fi
 }
 
+# coding's hooks arrive per launch via --settings (build-claude-runtime-config.mjs),
+# filtered by feature. A copy left in the project's settings.local.json by an old
+# install runs regardless of features, doubles the guard, and — after the
+# mcp-constraint-monitor rename — fails with "Cannot find module" on every prompt
+# and tool call of a host session. Strip coding's own hook entries; keep the rest.
+strip_stale_project_hooks() {
+  local target_project="$1"
+  local coding_repo="$2"
+  local settings_file="$target_project/.claude/settings.local.json"
+
+  [ -f "$settings_file" ] || return 0
+  grep -q '"hooks"' "$settings_file" 2>/dev/null || return 0
+  local out
+  if out="$(node "$coding_repo/scripts/strip-project-hooks.mjs" "$settings_file" 2>&1)"; then
+    [ -n "$out" ] && log "$out"
+  else
+    log "Warning: could not check $settings_file for stale coding hooks: $out"
+  fi
+  return 0
+}
+
 # ==============================================================================
 # UNIFIED HOOKS INITIALIZATION
 # ==============================================================================
@@ -549,6 +570,9 @@ agent_common_init() {
   # Ensure statusLine config is present (Claude-specific but harmless for others)
   ensure_statusline_config "$target_project_dir" "$coding_repo"
 
+  # Old installs left coding's hooks in the project's settings.local.json
+  strip_stale_project_hooks "$target_project_dir" "$coding_repo"
+
   # Show session summary for continuity
   show_session_reminder "$target_project_dir" "$coding_repo"
 
@@ -565,6 +589,7 @@ export -f start_statusline_health_monitor
 export -f ensure_claude_md_with_skill_instruction
 export -f ensure_agent_instructions
 export -f ensure_statusline_config
+export -f strip_stale_project_hooks
 export -f initialize_unified_hooks
 export -f detect_corporate_network
 export -f test_proxy_connectivity
