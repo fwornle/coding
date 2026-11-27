@@ -188,6 +188,11 @@ source "$SCRIPT_DIR/../scripts/lib/code-root.sh"
 # checkout keeps its own path, exactly as before.
 CODE_ROOT="$(coding_code_root "$SCRIPT_DIR/..")"
 
+# `coding update [--check|--rollback|--pull]` — install the latest release (scripts/update.mjs).
+if [[ "${1:-}" == "update" ]]; then
+  shift
+  exec node "$SCRIPT_DIR/../scripts/update.mjs" "$@"
+fi
 # `coding releases …` — installed releases: status, use <ver>, rollback (scripts/releases.mjs).
 if [[ "${1:-}" == "releases" ]]; then
   shift

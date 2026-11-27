@@ -77,6 +77,10 @@ info() { echo "${CYAN}ℹ️  $*${NC}"; }
 # Invoked by Dockerfile.install-test's CMD. Deliberately dumb: all assertions
 # are made by the host side against the captured output and exit code.
 if [[ "${1:-}" == "--in-container" ]]; then
+    # shape `update`: not one install but install A + `coding update` to B.
+    if [[ -n "${UPDATE_E2E:-}" ]]; then
+        exec bash scripts/release/update-e2e.sh "$PWD/_release.tgz" "$PWD/_update-to.tgz"
+    fi
     echo "=== container: $(. /etc/os-release 2>/dev/null && echo "$PRETTY_NAME") $(uname -m) ==="
     echo "=== node $(node --version 2>/dev/null) npm $(npm --version 2>/dev/null) ==="
     echo "=== deliberately absent: $(for t in plantuml tmux jq; do command -v $t >/dev/null 2>&1 || printf '%s ' "$t"; done) ==="
@@ -104,6 +108,7 @@ fi
 
 # ── argument parsing ─────────────────────────────────────────────────────────
 RELEASE_TARBALL=""
+UPDATE_TARBALL=""
 args=("$@")
 for ((i = 0; i < ${#args[@]}; i++)); do
     arg="${args[$i]}"
@@ -113,9 +118,12 @@ for ((i = 0; i < ${#args[@]}; i++)); do
         # workflow runs before it publishes.
         --release) i=$((i + 1)); RELEASE_TARBALL="${args[$i]:-}"
                    [[ -f "$RELEASE_TARBALL" ]] || { echo "--release: no such tarball: $RELEASE_TARBALL"; exit 2; } ;;
+        # With shape `update`: the newer release `coding update` installs.
+        --update-to) i=$((i + 1)); UPDATE_TARBALL="${args[$i]:-}"
+                   [[ -f "$UPDATE_TARBALL" ]] || { echo "--update-to: no such tarball: $UPDATE_TARBALL"; exit 2; } ;;
         --arm64)  PLATFORM_FLAG="--platform=linux/arm64" ;;
         --amd64)  PLATFORM_FLAG="--platform=linux/amd64" ;;
-        direct|proxy-only|no-egress|arch) SHAPES+=("$arg") ;;
+        direct|proxy-only|no-egress|arch|update) SHAPES+=("$arg") ;;
         -h|--help) sed -n '2,32p' "$0"; exit 0 ;;
         *) echo "unknown argument: $arg"; exit 2 ;;
     esac
@@ -149,6 +157,10 @@ prepare_context() {
         tar -xzf "$RELEASE_TARBALL" -C "$CTX" --strip-components=1
         [[ -f "$CTX/release.json" ]] || { echo "${RED}not a release tarball (no release.json)${NC}"; exit 2; }
         cp "$CTX/docker/Dockerfile.install-test" "$CTX/Dockerfile.install-test"
+        if [[ -n "$UPDATE_TARBALL" ]]; then
+            cp "$RELEASE_TARBALL" "$CTX/_release.tgz"
+            cp "$UPDATE_TARBALL" "$CTX/_update-to.tgz"
+        fi
         info "  context: $(du -sh "$CTX" | cut -f1), $(find "$CTX" -type f | wc -l | tr -d ' ') files"
         return
     fi
@@ -194,7 +206,7 @@ run_installer() {
     local waited=0
     while [[ "$(docker inspect -f '{{.State.Running}}' "$name" 2>/dev/null)" == "true" ]]; do
         sleep 3; waited=$((waited+3))
-        if [[ $waited -gt 900 ]]; then
+        if [[ $waited -gt ${HARNESS_TIMEOUT_S:-900} ]]; then
             docker kill "$name" >/dev/null 2>&1 || true
             echo "HARNESS_TIMEOUT after ${waited}s"
             break
@@ -486,12 +498,33 @@ shape_arch() {
     fi
 }
 
+# ── shape: update ────────────────────────────────────────────────────────────
+# Install release A as a release folder, then `coding update` to release B from
+# a file:// release server, then roll back (scripts/release/update-e2e.sh).
+shape_update() {
+    echo; info "── shape: update (release A → B, then rollback) ──"
+    if [[ -z "$RELEASE_TARBALL" || -z "$UPDATE_TARBALL" ]]; then
+        fail "update: needs --release <A.tgz> --update-to <B.tgz>"; return
+    fi
+    local out; out="$(HARNESS_TIMEOUT_S=2400 run_installer "-e UPDATE_E2E=1")"
+    echo "$out" > /tmp/coding-install-update.log
+    local line
+    while IFS= read -r line; do
+        case "$line" in
+            "UPDATE_E2E=pass "*) pass "update: ${line#UPDATE_E2E=pass }" ;;
+            "UPDATE_E2E=fail "*) fail "update: ${line#UPDATE_E2E=fail }" ;;
+        esac
+    done <<<"$out"
+    grep -q "^UPDATE_E2E_DONE" <<<"$out" || fail "update: the e2e script did not finish (see /tmp/coding-install-update.log)"
+}
+
 for shape in "${SHAPES[@]}"; do
     case "$shape" in
         direct)     shape_direct ;;
         proxy-only) shape_proxy_only ;;
         no-egress)  shape_no_egress ;;
         arch)       shape_arch ;;
+        update)     shape_update ;;
     esac
 done
 
