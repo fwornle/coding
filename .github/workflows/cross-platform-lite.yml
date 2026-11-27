@@ -11,6 +11,8 @@ name: cross-platform-lite
 on:
   pull_request: {}
   workflow_dispatch: {}
+  # The release workflow gates publishing on this (.github/workflows/release.yml).
+  workflow_call: {}
   # push:
   #   branches: [ main ]   # ← uncomment to also run on every push to main
 

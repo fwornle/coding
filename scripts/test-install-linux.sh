@@ -284,14 +284,19 @@ shape_direct() {
     else
         pass "direct: no ENOTFOUND"
     fi
-    # From a release, every submodule is vendored: nothing may be cloned.
+    # From a release, every submodule is vendored: nothing may be cloned. The
+    # default (harness) tier skips the knowledge/codegraph submodules, so the
+    # one that must work from the vendored copy here is km-core (LSL needs it).
     if [[ -n "$RELEASE_TARBALL" ]]; then
         if grep -qE "Initializing [a-z-]+ submodule|git submodule update" <<<"$out"; then
             fail "direct: a release install still tried to fetch a submodule"
-        elif grep -q "vendored in this release" <<<"$out"; then
-            pass "direct: release install used the vendored submodules"
         else
-            fail "direct: release install never reported the vendored submodules"
+            pass "direct: release install fetched no submodule"
+        fi
+        if grep -q "@fwornle/km-core linked and resolvable" <<<"$out"; then
+            pass "direct: vendored km-core built and linked"
+        else
+            fail "direct: vendored km-core was not built and linked"
         fi
     fi
     # And no host browser download.

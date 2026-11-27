@@ -80,17 +80,12 @@ Do not split the download per feature.
 - Submodules are vendored into the tarball at their pinned SHAs, so an install
   needs neither git nor submodules (the same idea as glass bundling its deps).
 
-## Open decisions (need the user)
+## Decisions (2026-11-27, user)
 
-1. **Targets** — release only from `github.com/fwornle/coding`, or also
-   `bmw.ghe.com` like glass (reuse the `targets/` split for content and repo
-   names)?
-2. **Image registry** — GHCR (public) or the GHE registry? Decides whether a
-   corporate machine pulls without the proxy.
-3. **Version numbering** — continue from the `v7.x` milestone tags (e.g.
-   `8.0.0`), or start releases on their own line, separate from milestones?
-4. **Update approval** — automatic, or notify and update on one click?
-   Recommendation: notify + one click, like glass.
+1. **Targets** — GitHub only (`github.com/fwornle/coding`).
+2. **Image registry** — GHCR (`ghcr.io/fwornle/coding-services`).
+3. **Version numbering** — releases start fresh at **8.0.0**; `v7.x` stay milestones.
+4. **Update approval** — notify + one click.
 
 ---
 
@@ -172,17 +167,22 @@ developer — no PRs in coding).
   moved to the data home; the shell rc's `CODING_REPO` is still written by
   install.sh as the checkout (P6).
 
-### P3 — Release pipeline  `status: not started`
+### P3 — Release pipeline  `status: built, awaiting first publish`
 
-- [ ] Version bump merged to `main` → CI builds the tarball (exclusion list,
-  submodules vendored at pinned SHAs).
-- [ ] CI builds and pushes the service images to the chosen registry, tagged
-  with the release version.
-- [ ] Gate on `docker/Dockerfile.install-test` + `cross-platform-lite` before
-  publishing.
-- [ ] Release notes from the conventional commits since the last release.
-- Accept: a version bump produces a release with the tarball + images; an
-  install from that tarball passes the install test on macOS and Linux.
+- [x] Version bump merged to `main` → CI builds the tarball
+  (`scripts/release/build-tarball.mjs`: tracked files minus `EXCLUDE`, submodules
+  vendored at pinned SHAs via `git archive`, `release.json` last; 18.6 MB).
+  `install.sh` skips fetching a vendored submodule (`submodule_vendored`).
+- [x] CI builds the service image for amd64 + arm64 (native arm runner), pushes
+  by digest; tags `:<ver>` + `:latest` only after the gates.
+- [x] Gates: tarball smoke (adopt → use → run `coding` from `current`),
+  `scripts/test-install-linux.sh --release <tgz> direct arch`, and
+  `cross-platform-lite` (now `workflow_call`).
+- [x] Release notes (`scripts/release/notes.mjs`), first release since `v7.6`.
+- [x] `package.json` → 8.0.0. `.github/workflows/release.yml`; `feat/release-*`
+  pushes are dry runs.
+- Accept: pending the first real publish (merging to main publishes v8.0.0).
+  After it, the GHCR package may need setting to public once (Package settings).
 
 ### P4 — `coding update`  `status: not started`
 
@@ -219,6 +219,11 @@ developer — no PRs in coding).
 ---
 
 ## Session log
+
+- **2026-11-27 (P3 built)** — decisions recorded. Tarball builder + notes +
+  vendored-submodule install path + release workflow + tests (8). Local:
+  tarball smoke passes; release install test run. Dry run on
+  `feat/release-pipeline`. Merging to main = publishing v8.0.0 (asked first).
 
 - **2026-11-27 (P2 done)** — deleted the broken `bin/ckb` symlink (registry,
   docs, test updated). Release layout + install record + stable code root +
