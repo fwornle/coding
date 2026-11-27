@@ -27,11 +27,20 @@ function decisionBlock() {
   return SOURCE.slice(start, end + 'export CODING_BOX_SOURCE'.length);
 }
 
-function decide({ agent, env = {}, source = '', constraints = true, showDefault = false }) {
-  // SCRIPT_DIR points at a stub coding-features that answers for `constraints`.
+/**
+ * @param {object} o
+ * @param {boolean} [o.constraints]  shorthand for the `auto` answer: box when on, host when off
+ * @param {string} [o.mode]          what `coding-features run` prints (overrides `constraints`)
+ * @param {boolean} [o.broken]       `coding-features run` fails (unreadable config)
+ */
+function decide({ agent, env = {}, source = '', constraints = true, mode, broken = false, showDefault = false, showStrict = false }) {
+  // SCRIPT_DIR points at a stub coding-features that answers `run` with the mode.
   const stubDir = mkdtempSync(join(tmpdir(), 'box-default-'));
-  writeFileSync(join(stubDir, 'coding-features'), `process.exit(${constraints ? 0 : 1});\n`);
-  const script = `SCRIPT_DIR=${stubDir}; AGENT=${agent}; CODING_BOX_SOURCE=${source}\n${decisionBlock()}\necho "$CODING_BOX $CODING_BOX_SOURCE${showDefault ? ' $CODING_BOX_DEFAULT' : ''}"`;
+  const answer = mode ?? (constraints ? 'box' : 'host');
+  writeFileSync(join(stubDir, 'coding-features'), broken
+    ? 'process.exit(2);\n'
+    : `if (process.argv[2] === 'run') process.stdout.write(${JSON.stringify(`${answer}\n`)});\n`);
+  const script = `SCRIPT_DIR=${stubDir}; AGENT=${agent}; CODING_BOX_SOURCE=${source}\n${decisionBlock()}\necho "$CODING_BOX $CODING_BOX_SOURCE${showDefault ? ' $CODING_BOX_DEFAULT' : ''}${showStrict ? ' $CODING_BOX_STRICT' : ''}"`;
   const clean = Object.fromEntries(Object.entries(process.env).filter(([k]) => !k.startsWith('CODING_BOX')));
   return execFileSync('bash', ['-c', script], { env: { ...clean, ...env }, encoding: 'utf8' }).trim();
 }
@@ -49,6 +58,29 @@ describe('box mode default', () => {
     for (const agent of ['claude', 'copilot', 'opencode', 'pi']) {
       assert.equal(decide({ agent, constraints: false }), 'false default', agent);
     }
+  });
+
+  test('the run setting decides the default: strict-box keeps the host UIs hidden', () => {
+    assert.equal(decide({ agent: 'claude', mode: 'strict-box', showDefault: true, showStrict: true }), 'true default true true');
+    assert.equal(decide({ agent: 'claude', mode: 'box', showStrict: true }), 'true default false');
+  });
+
+  test('run: host keeps every agent on the host — and that is the default, so it is not a bypass', () => {
+    for (const agent of ['claude', 'copilot', 'opencode', 'pi']) {
+      assert.equal(decide({ agent, mode: 'host', showDefault: true }), 'false default false', agent);
+    }
+  });
+
+  test('an agent with no box support stays on the host whatever the run setting says', () => {
+    assert.equal(decide({ agent: 'someagent', mode: 'strict-box' }), 'false default');
+  });
+
+  test('an unreadable feature config answers host (the launch then stops in _resolve_features)', () => {
+    assert.equal(decide({ agent: 'claude', broken: true }), 'false default');
+  });
+
+  test('a flag still wins over the run setting', () => {
+    assert.equal(decide({ agent: 'claude', mode: 'host', env: { CODING_BOX: 'true' }, source: 'flag' }), 'true flag');
   });
 
   test('opencode can still leave the box (--no-box), which is recorded like any other agent', () => {
