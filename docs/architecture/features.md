@@ -1,6 +1,6 @@
 # Feature Modularity
 
-`coding` composes from eleven independently switchable features. This document is the
+`coding` composes from twelve independently switchable features. This document is the
 **contract**: for every feature it names every artifact that must be gated — daemons,
 container programs, ports, hooks, dashboard surfaces, status-line badges and CLIs.
 
@@ -11,7 +11,7 @@ the checklist a reviewer uses.
 **Default is all-on.** With no `features.yaml` anywhere, the resolved set is identical to
 the historical single-stack behaviour. Upgrading changes nothing until the user opts in.
 
-## The eleven features
+## The twelve features
 
 | id | what the user calls it |
 |----|------------------------|
@@ -23,6 +23,7 @@ the historical single-stack behaviour. Upgrading changes nothing until the user 
 | `constraints` | constraint monitoring / guardrails |
 | `llm-proxy` | rapid-llm-proxy, routing and token accounting |
 | `performance` | measurement, experiments, kgbench |
+| `teams` | sharing learning with a team: the Teams tab, teammates' shared repos, team-wide injection, gate counts |
 | `cluster` | the on-prem GPU cluster tab (nodes, models, jobs, routing decisions) |
 | `health` | health coordinator and the monitoring dashboard |
 | `statusline` | the tmux / agent status line |
@@ -42,6 +43,7 @@ graph TD
     observations --> knowledge
     llmproxy["llm-proxy"] --> performance
     observations --> cluster
+    lsl --> teams
     codegraph
     constraints
     health
@@ -54,11 +56,38 @@ graph TD
 | `observations` | `lsl` | the observation tap lives inside the enhanced transcript monitor; nothing else produces observations |
 | `knowledge` | `observations` | UKB wave-analysis consumes observations and digests |
 | `performance` | `llm-proxy` | token attribution is read off the proxy's usage tap |
+| `teams` | `lsl` | what is shared is what the learning checkouts (`<repo>/.coding/`) hold |
 | `cluster` | `observations` | `/api/cluster` and `/api/routing` are served by obs-api (the `observations` daemon), which runs on the host because the nodes answer only on the corporate network |
 
 `health` has no dependencies, but disabling it removes the dashboard — which is also the
 feature editor. The CLI says so rather than refusing the choice; `bin/coding-features`
 remains fully capable on its own.
+
+## What `teams` switches off
+
+Only the **sharing layer**. Which repo a turn belongs to (`projectIdFor`,
+attribution, the kb layout) is core and stays; `coding sync` of your own learning
+checkout is part of `lsl`.
+
+| part | `teams` off |
+|------|-------------|
+| Teams tab (`/teams`) and its nav icon | hidden; the route explains |
+| teammates' shared clones (`<data home>/var/shared/`) | not listed or pulled by `coding sync` (`lib/history/sync.mjs` `checkouts()`) |
+| job-class gate counts | not republished to a team on sync |
+| insight injection (`POST /api/retrieve`) | the session's own project, not its teams' repos (`lib/teams/scope.mjs` `retrievalScope`); with no repo to name, the request's own filter is kept — off never injects more |
+| viewer read filters (`?teams=`) | unchanged — a view of your own data |
+
+`sync.mjs` resolves closed (it pulls and publishes); injection fails open, as before
+the feature existed.
+
+## Job-class labelling (a sub-switch of `llm-proxy`)
+
+Shown on the LLM Proxy row of the Features tab. Labelling is
+`job_classes.enabled` in rapid-llm-proxy's committed `config/llm-routing.yaml` (the
+team's choice); this machine's choice goes to the proxy's gitignored
+`config/llm-routing.machine.yaml` through `GET/PUT /api/job-classes/enabled`
+(`{enabled: true|false|null}`, null = follow the team). Live: the tagger re-reads its
+config every turn. A proxy without that endpoint shows "update rapid-llm-proxy".
 
 ## Settings: where agents run, which agents are offered
 
@@ -391,6 +420,7 @@ explains itself. The Features entry is always present, so there is always a way 
 | Coverage | `/coverage` | `knowledge` |
 | Token Usage | `/token-usage` | `llm-proxy` |
 | Performance | `/performance` | `performance` |
+| Teams (nav icon) | `/teams` | `teams` |
 | Cluster | `/cluster` | `cluster` — and obs-api's `/api/cluster`, `/api/routing` answer `{disabled: true}` while it is off, asked per request (apply tier `live`, fails open on a broken config) |
 
 Health-page tiles (`src/components/system-health-dashboard.tsx`) are **greyed** when

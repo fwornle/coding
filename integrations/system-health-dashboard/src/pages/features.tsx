@@ -6,6 +6,7 @@ import {
   type FeatureId, type FeatureState, type RunMode, type SettingsPatch,
 } from '@/store/slices/featuresSlice'
 import { Badge } from '@/components/ui/badge'
+import { PROXY_BASE } from '@/lib/llm-proxy'
 
 /**
  * Features — choose which parts of `coding` are active.
@@ -30,6 +31,27 @@ const RUN_COPY: Record<RunMode, { label: string; hint: string }> = {
   box: { label: 'Agent box', hint: 'An isolated container, under the guard.' },
   'strict-box': { label: 'Strict box', hint: 'The agent box, and the dashboard and viewer stay hidden from it.' },
   host: { label: 'This machine', hint: 'Directly on the host, no isolation.' },
+}
+
+/**
+ * Job-class labelling, read and written on the PROXY (rapid-llm-proxy
+ * GET/PUT /api/job-classes/enabled → its gitignored llm-routing.machine.yaml).
+ * `unsupported` = a proxy from before that endpoint; `unreachable` = no proxy.
+ */
+type Labelling =
+  | { state: 'loading' | 'unsupported' | 'unreachable' }
+  | { state: 'ok'; enabled: boolean; team: boolean; override: boolean | null }
+
+async function readLabelling(): Promise<Labelling> {
+  try {
+    const r = await fetch(`${PROXY_BASE}/api/job-classes/enabled`)
+    if (r.status === 404) return { state: 'unsupported' }
+    if (!r.ok) return { state: 'unreachable' }
+    const b = await r.json()
+    return { state: 'ok', enabled: !!b.enabled, team: !!b.team, override: b.override ?? null }
+  } catch {
+    return { state: 'unreachable' }
+  }
 }
 
 type SavePayload = { features?: Record<string, boolean>; profile?: string; settings?: SettingsPatch }
@@ -57,6 +79,59 @@ function Toggle({ checked, disabled, onChange, label }: {
   )
 }
 
+/** Job-class labelling, a sub-switch of LLM Proxy: this machine's choice over the team's. */
+function LabellingRow({ labelling, draft, error, disabled, onChange }: {
+  labelling: Labelling
+  draft: boolean | null | undefined
+  error: string | null
+  disabled: boolean
+  onChange: (v: boolean | null | undefined) => void
+}) {
+  if (labelling.state === 'loading') return null
+  if (labelling.state !== 'ok') {
+    return (
+      <div className="text-xs text-muted-foreground mt-2" data-testid="features-labelling">
+        Job-class labelling: {labelling.state === 'unsupported'
+          ? 'this proxy cannot be switched per machine yet — update rapid-llm-proxy (llm-routing.machine.yaml).'
+          : 'the proxy is not reachable.'}
+      </div>
+    )
+  }
+  const override = draft === undefined ? labelling.override : draft
+  const value = override ?? labelling.team
+  const teamWord = labelling.team ? 'on' : 'off'
+  return (
+    <div className="mt-2 flex items-start gap-2 text-xs" data-testid="features-labelling">
+      <Toggle
+        checked={value}
+        disabled={disabled}
+        // Back to what is saved = no change at all, so no "unsaved" badge.
+        onChange={v => onChange(
+          (labelling.override === null && v === labelling.team) || labelling.override === v ? undefined : v,
+        )}
+        label="Job-class labelling"
+      />
+      <div className="min-w-0">
+        <span className="text-sm">Job-class labelling</span>{' '}
+        <Badge variant="secondary" className="text-[10px]" title={TIER_COPY.live.hint}>{TIER_COPY.live.label}</Badge>
+        {draft !== undefined && <Badge className="text-[10px] ml-1">unsaved</Badge>}
+        <div className="text-muted-foreground mt-0.5">
+          Label each turn with its job class (Token Usage → Classes).{' '}
+          {override === null
+            ? <>Follows the team setting ({teamWord}).</>
+            : <>Set on this machine; the team setting is {teamWord}.{' '}
+                <button type="button" className="underline hover:text-foreground" disabled={disabled}
+                  onClick={() => onChange(labelling.override === null ? undefined : null)}>
+                  Follow the team setting
+                </button>
+              </>}
+        </div>
+        {error && <div className="text-destructive mt-0.5">{error}</div>}
+      </div>
+    </div>
+  )
+}
+
 export function FeaturesPage() {
   const dispatch = useAppDispatch()
   const {
@@ -68,6 +143,11 @@ export function FeaturesPage() {
   const [draft, setDraft] = useState<Record<string, boolean>>({})
   /** Pending run-mode / agents change, saved with the same button. */
   const [settingsDraft, setSettingsDraft] = useState<SettingsPatch>({})
+  const [labelling, setLabelling] = useState<Labelling>({ state: 'loading' })
+  /** Pending labelling change: true/false = this machine's override; null = follow the team file. */
+  const [labellingDraft, setLabellingDraft] = useState<boolean | null | undefined>(undefined)
+  const [labellingError, setLabellingError] = useState<string | null>(null)
+  useEffect(() => { readLabelling().then(setLabelling) }, [])
 
   /**
    * A save that would switch off `health` is held here until confirmed.
@@ -90,7 +170,9 @@ export function FeaturesPage() {
 
   const ids = Object.keys(features) as FeatureId[]
   const settingsDirty = Object.keys(settingsDraft).length > 0
-  const dirty = Object.keys(draft).length > 0 || settingsDirty
+  const labellingDirty = labellingDraft !== undefined
+  const featuresDirty = Object.keys(draft).length > 0 || settingsDirty
+  const dirty = featuresDirty || labellingDirty
   const valueOf = (id: FeatureId) => draft[id] ?? features[id]?.enabled ?? true
 
   /**
@@ -155,10 +237,32 @@ export function FeaturesPage() {
     dispatch(saveFeatures(payload))
   }
 
-  const onSave = () => submit({
-    ...(Object.keys(draft).length ? { features: draft } : {}),
-    ...(settingsDirty ? { settings: settingsDraft } : {}),
-  }, 'this change')
+  const onSave = async () => {
+    if (labellingDirty) {
+      // Its own store (the proxy's machine overlay), written first: it is live
+      // and has nothing to apply, so it cannot leave the features half-saved.
+      try {
+        const r = await fetch(`${PROXY_BASE}/api/job-classes/enabled`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled: labellingDraft }),
+        })
+        const b = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(b.error || `HTTP ${r.status}`)
+        setLabelling({ state: 'ok', enabled: !!b.enabled, team: !!b.team, override: b.override ?? null })
+        setLabellingDraft(undefined)
+        setLabellingError(null)
+      } catch (err) {
+        setLabellingError(`Labelling not saved: ${(err as Error).message}`)
+        return
+      }
+    }
+    if (featuresDirty) {
+      submit({
+        ...(Object.keys(draft).length ? { features: draft } : {}),
+        ...(settingsDirty ? { settings: settingsDraft } : {}),
+      }, 'this change')
+    }
+  }
 
   // ── run mode and agents (draft-aware) ──
   const runValue: RunMode = settingsDraft.run ?? settings?.run.value ?? 'auto'
@@ -227,7 +331,7 @@ export function FeaturesPage() {
           {dirty && (
             <button
               type="button"
-              onClick={() => { setDraft({}); setSettingsDraft({}) }}
+              onClick={() => { setDraft({}); setSettingsDraft({}); setLabellingDraft(undefined) }}
               className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-border text-muted-foreground hover:text-foreground"
             >
               <RotateCcw className="h-3.5 w-3.5" /> Discard
@@ -495,6 +599,15 @@ export function FeaturesPage() {
                   <div className="text-xs text-amber-600 dark:text-amber-500 mt-1">
                     Forced off by an environment variable — this toggle cannot override it.
                   </div>
+                )}
+                {id === 'llm-proxy' && value && (
+                  <LabellingRow
+                    labelling={labelling}
+                    draft={labellingDraft}
+                    error={labellingError}
+                    disabled={saving}
+                    onChange={setLabellingDraft}
+                  />
                 )}
               </div>
             </div>

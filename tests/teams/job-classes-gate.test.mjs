@@ -86,7 +86,7 @@ async function fixture({ state }) {
   db.close();
 
   const opts = {
-    repoRoot, home, env: {}, codingRoot: repoRoot, sharedRoot, tokenDb,
+    repoRoot, home, env: {}, codingRoot: repoRoot, sharedRoot, tokenDb, teams: true,
     repos: state === 'linked' ? [{ path: repo, name: 'timeline', learningRemote: bare, markers: ['coding'] }] : [{ path: repo, name: 'timeline', markers: ['coding'] }],
     hostname: 'host', user: 'me', now: () => Date.parse('2026-11-23T10:00:00Z'),
   };

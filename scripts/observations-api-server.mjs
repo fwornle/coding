@@ -53,7 +53,7 @@ import { loadRegistry } from '../lib/teams/registry.mjs';
 import { kbLayout } from '../lib/kb/layout.mjs';
 import { createIndexScheduler } from '../lib/kb/embed-index.mjs';
 import { recordEndpoint } from '../lib/kb/obs-api-endpoint.mjs';
-import { parseTeams, projectsOfTeams, teamPredicate, projectOf, defaultTeamsFor } from '../lib/teams/scope.mjs';
+import { parseTeams, projectsOfTeams, teamPredicate, projectOf, retrievalScope } from '../lib/teams/scope.mjs';
 import { discoveredProjects } from '../lib/teams/discover.mjs';
 import { createRequire as _createRequireT6 } from 'node:module';
 
@@ -2189,13 +2189,16 @@ function writeRetrievalCapture(taskId, result) {
  * no repo).
  */
 function retrievalTeams(body) {
-  const explicit = body?.teams ?? body?.context?.teams;
-  if (explicit !== undefined && explicit !== null) return parseTeams(explicit);
-  try {
-    return defaultTeamsFor(body?.context?.cwd || null);
-  } catch {
-    return [];
-  }
+  // `teams` feature off: only the session's own project is injected, whatever
+  // teams the request names. Fails OPEN (teams on) on a broken config, which is
+  // what injection did before the feature existed.
+  let teamsOn = true;
+  try { teamsOn = loadFeatures().features.teams?.enabled !== false; } catch { /* fail open */ }
+  return retrievalScope({
+    explicit: body?.teams ?? body?.context?.teams,
+    cwd: body?.context?.cwd || null,
+    teams: teamsOn,
+  });
 }
 
 app.post('/api/retrieve', async (req, res) => {
@@ -2215,8 +2218,10 @@ app.post('/api/retrieve', async (req, res) => {
 
   try {
     await ensureWriter(); // ensure db is open for keyword search
-    const teams = retrievalTeams(req.body);
-    const projects = teams.length ? [...projectsOfTeams(teams, { codingRoot: REPO_ROOT }).projects] : null;
+    const scope = retrievalTeams(req.body);
+    const teams = scope.teams;
+    const projects = scope.projects
+      || (teams.length ? [...projectsOfTeams(teams, { codingRoot: REPO_ROOT }).projects] : null);
     const result = await ensureRetrieval().retrieve(query, {
       budget: parsedBudget,
       threshold: Number(threshold) || 0.75,

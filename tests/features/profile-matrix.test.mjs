@@ -42,26 +42,26 @@ const MATRIX = {
   },
   learning: {
     docker: true,
-    features: ['llm-proxy', 'health', 'statusline', 'lsl', 'observations', 'knowledge'],
+    features: ['llm-proxy', 'health', 'statusline', 'lsl', 'observations', 'knowledge', 'teams'],
     mcpServers: [],
     hooks: ['PostToolUse', 'UserPromptSubmit'],
   },
   'learning-perf': {
     docker: true,
-    features: ['llm-proxy', 'health', 'statusline', 'lsl', 'observations', 'knowledge', 'performance'],
+    features: ['llm-proxy', 'health', 'statusline', 'lsl', 'observations', 'knowledge', 'teams', 'performance'],
     mcpServers: [],
     hooks: ['PostToolUse', 'UserPromptSubmit'],
   },
   everything: {
     docker: true,
-    features: ['llm-proxy', 'health', 'statusline', 'lsl', 'observations', 'knowledge', 'performance', 'constraints', 'codegraph', 'cluster'],
+    features: ['llm-proxy', 'health', 'statusline', 'lsl', 'observations', 'knowledge', 'teams', 'performance', 'constraints', 'codegraph', 'cluster'],
     mcpServers: ['graphify'],
     hooks: ['PreToolUse', 'PostToolUse', 'UserPromptSubmit'],
   },
   // The developer profile: everything + lsl-redirect.
   full: {
     docker: true,
-    features: ['lsl', 'lsl-redirect', 'observations', 'knowledge', 'codegraph', 'constraints', 'llm-proxy', 'performance', 'cluster', 'health', 'statusline'],
+    features: ['lsl', 'lsl-redirect', 'observations', 'knowledge', 'codegraph', 'constraints', 'llm-proxy', 'performance', 'teams', 'cluster', 'health', 'statusline'],
     mcpServers: ['graphify'],
     hooks: ['PreToolUse', 'PostToolUse', 'UserPromptSubmit'],
   },
@@ -76,7 +76,7 @@ const MATRIX = {
   // launching, now as its tier.
   km: {
     docker: true,
-    features: ['llm-proxy', 'health', 'statusline', 'lsl', 'observations', 'knowledge'],
+    features: ['llm-proxy', 'health', 'statusline', 'lsl', 'observations', 'knowledge', 'teams'],
     mcpServers: [],
     hooks: ['PostToolUse', 'UserPromptSubmit'],
   },

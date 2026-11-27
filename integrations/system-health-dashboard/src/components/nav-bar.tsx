@@ -98,7 +98,7 @@ export function NavBar() {
           )
         })}
         <div className="ml-auto flex items-center gap-1">
-          {features.lsl?.enabled !== false && (
+          {features.teams?.enabled !== false && (
             <Link
               to="/teams"
               data-testid="teams-tab"

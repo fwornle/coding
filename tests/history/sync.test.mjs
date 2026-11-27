@@ -57,7 +57,8 @@ function user(name, bare) {
   writeFileSync(join(project, 'README'), 'raas\n');
   sh(project, 'add', '.');
   sh(project, 'commit', '-q', '-m', 'init');
-  const opts = { home, env: {}, dataHome: join(base, 'data'), teamsDoc: NO_TEAMS, sharedRoot: join(base, 'data', 'var', 'shared') };
+  // teams: true — the sandbox decides, not this machine's features.yaml.
+  const opts = { home, env: {}, dataHome: join(base, 'data'), teamsDoc: NO_TEAMS, sharedRoot: join(base, 'data', 'var', 'shared'), teams: true };
   const r = link.linkRemote(project, bare, { ...opts, toolsRepo: join(base, 'tools') });
   assert.equal(r.ok, true, JSON.stringify(r));
   link.record(project, { remote: bare }, opts);
@@ -228,5 +229,24 @@ describe('ensureMergeDriver: the attribute is local, never in the work tree', ()
     writeFileSync(join(custom, '.gitattributes'), `*.png binary\n${LINE}\n`);
     sync.ensureMergeDriver(custom);
     assert.equal(readFileSync(join(custom, '.gitattributes'), 'utf8'), `*.png binary\n${LINE}\n`);
+  });
+});
+
+describe("the 'teams' feature off: teammates' shared clones are left alone", () => {
+  let base;
+  before(() => { base = realpathSync(mkdtempSync(join(tmpdir(), 'sync-teams-off-'))); });
+  after(() => rmSync(base, { recursive: true, force: true }));
+
+  test('checkouts() lists a shared clone only while teams is on', () => {
+    const sharedRoot = join(base, 'shared');
+    mkdirSync(join(sharedRoot, 'raas', '.git'), { recursive: true });
+    const opts = { home: join(base, 'home'), env: {}, dataHome: join(base, 'data'), sharedRoot };
+    assert.deepEqual(sync.checkouts({ ...opts, teams: true }).map((c) => c.kind), ['shared']);
+    assert.deepEqual(sync.checkouts({ ...opts, teams: false }), []);
+  });
+
+  test('teamsEnabled: an explicit option wins over the resolver', () => {
+    assert.equal(sync.teamsEnabled({ teams: false }), false);
+    assert.equal(sync.teamsEnabled({ teams: true }), true);
   });
 });

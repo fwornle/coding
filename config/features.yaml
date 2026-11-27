@@ -45,6 +45,7 @@
 #   observations requires lsl
 #   knowledge    requires observations
 #   performance  requires llm-proxy
+#   teams        requires lsl
 #   cluster      requires observations (its API is served by obs-api)
 #
 # features:
@@ -60,6 +61,7 @@
 #   constraints:  on   # guardrail rules checked before every tool call
 #   llm-proxy:    on   # provider routing, fallback, token accounting
 #   performance:  on   # measurement, experiments, benchmarks
+#   teams:        on   # share learning with a team (tab, shared repos, injection)
 #   cluster:      on   # the on-prem GPU cluster tab
 #   health:       on   # health coordinator and the monitoring dashboard
 #   statusline:   on   # the tmux / agent status line

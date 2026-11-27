@@ -118,17 +118,18 @@ developer — no PRs in coding).
 - [x] **Cluster** → feature `cluster` (requires `observations`: obs-api serves
   `/api/cluster` + `/api/routing`; apply tier `live`, asked per request, fails
   open). In `everything` and `full`.
-- [ ] **Teams** → feature `teams` (decided 2026-11-27). Scope: the sharing
+- [x] **Teams** → feature `teams` (decided 2026-11-27). Scope: the sharing
   layer only — Teams tab + `/teams` discovery, teammates' shared clones
   (`<data home>/var/shared`), team filters in retrieval (`lib/teams/scope.mjs`
   → own project when off), job-class gate publishing to the team. NOT the
   repo→project mapping (attribution, kb layout: core) and NOT `coding sync` of
   your own learning repo (that is `lsl`'s plumbing).
 - [ ] **Job-class labelling** stays under `llm-proxy`, with its on/off on the
-  Features tab (decided 2026-11-27). Blocked on rapid-llm-proxy: labelling is
-  `job_classes.enabled` in the proxy's committed `config/llm-routing.yaml`, and
-  `llm-routing.local.yaml` only accepts extra providers — a per-machine
-  override needs a proxy change (PR) first.
+  Features tab (decided 2026-11-27). coding side done (LLM Proxy row; shows
+  "update rapid-llm-proxy" until the endpoint exists). Proxy side: PR
+  adpnext-apps/rapid-llm-proxy#103 — gitignored `config/llm-routing.machine.yaml`
+  (only `job_classes.enabled`) + `GET/PUT /api/job-classes/enabled`. Open, NOT
+  merged; then restart the proxy and check the toggle end to end.
 - [ ] Write **core** down as a list in `docs/architecture/features.md`, and let
   the drift tests cover it.
 - Accept: every dashboard tab and every `bin/*` CLI maps to a feature or to
@@ -194,6 +195,18 @@ developer — no PRs in coding).
 ---
 
 ## Session log
+
+- **2026-11-27 (P1, slice 3)** — `teams` feature (requires `lsl`, live; in
+  learning, learning-perf, everything, full): Teams tab/icon gated; `sync.mjs`
+  skips shared clones and gate republishing when off (resolves closed);
+  injection → `retrievalScope()` returns `{teams, projects}`, off = own project
+  as a PROJECT list (a project named like a team — `coding` — expanded to the
+  team's four repos until this was caught live). Labelling sub-switch on the
+  LLM Proxy row; proxy PR #103 opened (merge was not authorised — left to the
+  user). Verified live: teams off → icon gone, injection `['coding']`; on →
+  four team projects; features.yaml restored. Known gap: working memory passes
+  projects back as `?teams=`, so a project named like a team still expands
+  there. Next: P1 core list + coverage test.
 
 - **2026-11-27 (P1, slice 2)** — `cluster` feature: catalogue + profiles
   (`everything`, `full`) + installer fail-open list; obs-api routes gated per
