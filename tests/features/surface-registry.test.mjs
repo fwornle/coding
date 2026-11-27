@@ -9,7 +9,7 @@
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, lstatSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
 
@@ -38,7 +38,6 @@ describe('CLIs', () => {
   test('a guarded command guards on its own feature; core never refuses', () => {
     for (const [cli, e] of Object.entries(CLIS)) {
       const path = join(REPO, cli);
-      if (lstatSync(path).isSymbolicLink()) continue; // bin/ckb: dangling, see its `why`
       const src = readFileSync(path, 'utf8');
       if (e.guard) assert.match(src, new RegExp(`require_feature ${e.feature}\\b`), `${cli} does not guard on ${e.feature}`);
       else assert.doesNotMatch(src, /require_feature /, `${cli} guards, but the registry says it does not`);
