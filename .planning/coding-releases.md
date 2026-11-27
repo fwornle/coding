@@ -102,14 +102,19 @@ riskiest. Each phase ends green on `npm test` with its own acceptance checks;
 commit per phase on a topic branch, `merge --no-ff` to main, push (sole
 developer — no PRs in coding).
 
-### P1 — Close the composability gaps  `status: not started`
+### P1 — Close the composability gaps  `status: in progress`
 
-- [ ] **Run mode** setting `box | strict-box | host` in `features.yaml` and on
-  the Features tab. Requires Docker. `constraints` on makes `box` the
-  *default* (moves the rule out of `bin/coding`'s `box_default_feature`); the
-  CLI flags stay as one-off overrides and still go to the guard audit log.
-- [ ] **Agents** as an enabled-agents list; the launcher and installer offer
-  only those (`config/agents/*.sh` stays the registry).
+- [x] **Run mode** setting `run: auto | box | strict-box | host` in
+  `features.yaml`, the Features tab ("Run agents in") and `coding-features run`.
+  `auto` = box iff `constraints` on (the rule moved out of `bin/coding`, which
+  now asks `coding-features run`). An explicit box with `constraints` off
+  resolves to host with a warning (the box runs under the guard). CLI flags
+  stay one-off overrides and still go to the guard audit log.
+- [x] **Agents** list `agents: [...]` (Features tab "Offered agents",
+  `coding-features agents [set a,b|all]`). The launcher refuses an agent left
+  out; plain `coding` → claude while offered, else the first offered.
+  `config/agents/*.sh` stays the registry. **Installer side not done** — the
+  installer still sets up every agent; moves to P6.
 - [ ] Gate **Cluster**, **Teams / sync** and **job-classes** — a feature each,
   or explicit sub-switches of an existing one.
 - [ ] Write **core** down as a list in `docs/architecture/features.md`, and let
@@ -177,6 +182,18 @@ developer — no PRs in coding).
 ---
 
 ## Session log
+
+- **2026-11-27 (P1, slice 1)** — run mode + agents settings: resolver
+  (`settings` in the resolved state), `setSettings()` writer (validates agents
+  before writing), CLI verbs, `bin/coding` (box default from `run`, agent
+  gate), coordinator `PUT /features {settings}`, dashboard "Agents" card,
+  `docs/architecture/features.md` section. Tests: resolve + write-settings +
+  launcher (gate tested under `set -e` — the first version died silently there).
+  Verified in the browser (draft, blocking, save round-trip) and with
+  `bin/coding --dry-run`. Found, not fixed: dashboard writes are not audited
+  (coordinator has no `CODING_REPO`, so `features-audit.log` is skipped); a
+  nested launch inherits `CODING_BOX*` from the parent session. Next: gate
+  Cluster, Teams/sync, job-classes; then the core list.
 
 - **2026-11-27** — Plan written from a survey of the feature system, the
   launcher's box handling, dashboard tab gating, install/distribution and the

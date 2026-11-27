@@ -3,7 +3,7 @@ import { AlertTriangle, Check, Info, Loader2, RotateCcw, Terminal } from 'lucide
 import { useAppDispatch, useAppSelector } from '@/store'
 import {
   fetchFeatures, saveFeatures, dismissRestartNotice,
-  type FeatureId, type FeatureState,
+  type FeatureId, type FeatureState, type RunMode, type SettingsPatch,
 } from '@/store/slices/featuresSlice'
 import { Badge } from '@/components/ui/badge'
 
@@ -23,6 +23,16 @@ const TIER_COPY: Record<FeatureState['applyTier'], { label: string; hint: string
   apply: { label: 'on save', hint: 'Services are started or stopped when you save.' },
   session: { label: 'new sessions', hint: 'Agent hooks are fixed at launch, so this applies to sessions started after the change.' },
 }
+
+/** Where agents run — one line each, in the order offered. */
+const RUN_COPY: Record<RunMode, { label: string; hint: string }> = {
+  auto: { label: 'Automatic', hint: 'The agent box while Constraint Monitoring is on, otherwise this machine.' },
+  box: { label: 'Agent box', hint: 'An isolated container, under the guard.' },
+  'strict-box': { label: 'Strict box', hint: 'The agent box, and the dashboard and viewer stay hidden from it.' },
+  host: { label: 'This machine', hint: 'Directly on the host, no isolation.' },
+}
+
+type SavePayload = { features?: Record<string, boolean>; profile?: string; settings?: SettingsPatch }
 
 function Toggle({ checked, disabled, onChange, label }: {
   checked: boolean; disabled?: boolean; onChange: (v: boolean) => void; label: string
@@ -50,12 +60,14 @@ function Toggle({ checked, disabled, onChange, label }: {
 export function FeaturesPage() {
   const dispatch = useAppDispatch()
   const {
-    features, profile, profiles, enabled, needsDocker, warnings, snapshot,
+    features, profile, profiles, enabled, needsDocker, warnings, snapshot, settings,
     loading, saving, error, loaded, restartNotice,
   } = useAppSelector(state => state.features)
 
   /** Local edits, applied on Save. Null means "no pending change for this id". */
   const [draft, setDraft] = useState<Record<string, boolean>>({})
+  /** Pending run-mode / agents change, saved with the same button. */
+  const [settingsDraft, setSettingsDraft] = useState<SettingsPatch>({})
 
   /**
    * A save that would switch off `health` is held here until confirmed.
@@ -68,16 +80,17 @@ export function FeaturesPage() {
    * exactly right and entirely avoidable: the resolver already knows, we just
    * were not asking first.
    */
-  const [confirm, setConfirm] = useState<{ payload: { features?: Record<string, boolean>; profile?: string }; label: string } | null>(null)
+  const [confirm, setConfirm] = useState<{ payload: SavePayload; label: string } | null>(null)
 
   useEffect(() => { dispatch(fetchFeatures()) }, [dispatch])
   // A save returns the newly resolved set, so any pending edit is now redundant
   // — and keeping it would make the UI disagree with the resolver about
   // dependency-disabled features.
-  useEffect(() => { if (!saving) setDraft({}) }, [saving])
+  useEffect(() => { if (!saving) { setDraft({}); setSettingsDraft({}) } }, [saving])
 
   const ids = Object.keys(features) as FeatureId[]
-  const dirty = Object.keys(draft).length > 0
+  const settingsDirty = Object.keys(settingsDraft).length > 0
+  const dirty = Object.keys(draft).length > 0 || settingsDirty
   const valueOf = (id: FeatureId) => draft[id] ?? features[id]?.enabled ?? true
 
   /**
@@ -125,13 +138,13 @@ export function FeaturesPage() {
   }
 
   /** Would this change leave `health` off? */
-  const disablesHealth = (payload: { features?: Record<string, boolean>; profile?: string }) => {
+  const disablesHealth = (payload: SavePayload) => {
     if (payload.profile) return !(profiles[payload.profile] ?? []).includes('health')
     if (payload.features && 'health' in payload.features) return payload.features.health === false
     return false
   }
 
-  const submit = (payload: { features?: Record<string, boolean>; profile?: string }, label: string) => {
+  const submit = (payload: SavePayload, label: string) => {
     // Only ask when health is actually ON right now — re-confirming a change
     // that takes an already-off feature off again would be noise.
     if (disablesHealth(payload) && features.health?.enabled) {
@@ -142,7 +155,39 @@ export function FeaturesPage() {
     dispatch(saveFeatures(payload))
   }
 
-  const onSave = () => submit({ features: draft }, 'this change')
+  const onSave = () => submit({
+    ...(Object.keys(draft).length ? { features: draft } : {}),
+    ...(settingsDirty ? { settings: settingsDraft } : {}),
+  }, 'this change')
+
+  // ── run mode and agents (draft-aware) ──
+  const runValue: RunMode = settingsDraft.run ?? settings?.run.value ?? 'auto'
+  const agentsValue: string[] = settingsDraft.agents === null
+    ? (settings?.agents.available ?? [])
+    : (settingsDraft.agents ?? settings?.agents.enabled ?? [])
+  const constraintsOn = effective.constraints !== false
+  /** What a launch would do with the draft: mirrors resolveRun() in lib/features/resolve.cjs. */
+  const runEffective: Exclude<RunMode, 'auto'> = runValue === 'auto'
+    ? (constraintsOn ? 'box' : 'host')
+    : (runValue !== 'host' && !constraintsOn ? 'host' : runValue)
+  const defaultAgent = agentsValue.includes('claude') ? 'claude' : (settings?.agents.available.find(a => agentsValue.includes(a)) ?? null)
+
+  const onRun = (mode: RunMode) => setSettingsDraft(prev => {
+    const next = { ...prev }
+    if ((settings?.run.value ?? 'auto') === mode) delete next.run
+    else next.run = mode
+    return next
+  })
+  const onAgent = (agent: string, on: boolean) => setSettingsDraft(prev => {
+    const current = prev.agents === null ? (settings?.agents.available ?? []) : (prev.agents ?? settings?.agents.enabled ?? [])
+    const list = (settings?.agents.available ?? []).filter(a => (a === agent ? on : current.includes(a)))
+    const next = { ...prev }
+    const saved = settings?.agents.enabled ?? []
+    if (list.length === saved.length && list.every(a => saved.includes(a))) delete next.agents
+    // Every agent ticked = no list at all, so a newly added agent is offered too.
+    else next.agents = list.length === (settings?.agents.available.length ?? 0) ? null : list
+    return next
+  })
   const onProfile = (name: string) => submit({ profile: name }, `the '${name}' profile`)
 
   const confirmProceed = () => {
@@ -182,7 +227,7 @@ export function FeaturesPage() {
           {dirty && (
             <button
               type="button"
-              onClick={() => setDraft({})}
+              onClick={() => { setDraft({}); setSettingsDraft({}) }}
               className="flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-md border border-border text-muted-foreground hover:text-foreground"
             >
               <RotateCcw className="h-3.5 w-3.5" /> Discard
@@ -297,6 +342,95 @@ export function FeaturesPage() {
           Choosing a profile is a reset — it clears any individual overrides below.
         </p>
       </div>
+
+      {/* Agents: where they run, which are offered */}
+      {settings && (
+        <div className="mt-6 rounded-md border border-border divide-y divide-border" data-testid="features-agents">
+          <div className="p-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-medium">Run agents in</span>
+              <Badge variant="secondary" className="text-[10px]" title={TIER_COPY.session.hint}>
+                {TIER_COPY.session.label}
+              </Badge>
+              {settingsDraft.run !== undefined && <Badge className="text-[10px]">unsaved</Badge>}
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2" role="radiogroup" aria-label="Run agents in">
+              {(settings.run.choices ?? (Object.keys(RUN_COPY) as RunMode[])).map(mode => {
+                const needsGuard = mode === 'box' || mode === 'strict-box'
+                const blocked = needsGuard && !constraintsOn
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="radio"
+                    aria-checked={runValue === mode}
+                    data-testid={`features-run-${mode}`}
+                    disabled={saving || blocked}
+                    onClick={() => onRun(mode)}
+                    title={blocked ? 'Needs Constraint Monitoring — the box runs under its guard.' : RUN_COPY[mode].hint}
+                    className={`text-sm px-3 py-1.5 rounded-md border transition-colors
+                      ${runValue === mode
+                        ? 'border-primary text-foreground bg-primary/10'
+                        : 'border-border text-muted-foreground hover:text-foreground'}
+                      ${blocked ? 'opacity-40 cursor-not-allowed' : ''}`}
+                  >
+                    {RUN_COPY[mode].label}
+                  </button>
+                )
+              })}
+            </div>
+            <div className="text-xs text-muted-foreground mt-2" data-testid="features-run-effective">
+              {RUN_COPY[runValue].hint}{' '}
+              {runValue === 'auto' || runEffective !== runValue
+                ? <>Now: <span className="text-foreground">{RUN_COPY[runEffective].label.toLowerCase()}</span>.</>
+                : null}
+              {!constraintsOn && runValue !== 'host' && (
+                <span className="text-amber-600 dark:text-amber-500"> Constraint Monitoring is off, so agents run on this machine.</span>
+              )}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Only {settings.run.boxAgents.join(', ')} can run in the box. <code>--box</code>, <code>--strict-box</code> and{' '}
+              <code>--no-box</code> still override this for one launch.
+            </div>
+          </div>
+
+          <div className="p-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-medium">Offered agents</span>
+              <Badge variant="secondary" className="text-[10px]" title={TIER_COPY.session.hint}>
+                {TIER_COPY.session.label}
+              </Badge>
+              {settingsDraft.agents !== undefined && <Badge className="text-[10px]">unsaved</Badge>}
+            </div>
+            <div className="flex flex-wrap gap-3 mt-2">
+              {settings.agents.available.map(agent => {
+                const on = agentsValue.includes(agent)
+                const last = on && agentsValue.length === 1
+                return (
+                  <label
+                    key={agent}
+                    data-testid={`features-agent-${agent}`}
+                    className={`flex items-center gap-2 text-sm ${last ? 'opacity-60' : 'cursor-pointer'}`}
+                    title={last ? 'At least one agent must stay enabled.' : undefined}
+                  >
+                    <Toggle
+                      checked={on}
+                      disabled={saving || last}
+                      onChange={v => onAgent(agent, v)}
+                      label={agent}
+                    />
+                    <span className={on ? '' : 'text-muted-foreground'}>{agent}</span>
+                  </label>
+                )
+              })}
+            </div>
+            <div className="text-xs text-muted-foreground mt-2">
+              Plain <code>coding</code> launches <span className="text-foreground">{defaultAgent ?? '—'}</span>; an agent switched
+              off here is refused by the launcher.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Feature list */}
       <div className="mt-6 rounded-md border border-border divide-y divide-border">

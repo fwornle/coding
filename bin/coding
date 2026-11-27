@@ -320,10 +320,14 @@ if [ -n "$FORCE_AGENT" ]; then
   AGENT="$FORCE_AGENT"
   log "Using agent: $AGENT"
 else
-  # No agent named → Claude Code. Deliberately NOT auto-detected: falling back to
-  # whichever agent happens to be installed launched a different agent than the
-  # one `coding` is documented to start, with nothing but a log line to say so.
-  AGENT="claude"
+  # No agent named → Claude Code, unless the `agents` setting leaves claude out,
+  # in which case the first agent it offers (coding-features default-agent).
+  # Deliberately NOT auto-detected: falling back to whichever agent happens to
+  # be installed launched a different agent than the one `coding` is documented
+  # to start, with nothing but a log line to say so. A broken config falls back
+  # to claude here; _resolve_features stops the launch with the real error.
+  AGENT="$(node "$SCRIPT_DIR/coding-features" default-agent 2>/dev/null)" || AGENT=""
+  AGENT="${AGENT:-claude}"
   log "Using default agent: $AGENT"
 fi
 
@@ -336,22 +340,29 @@ fi
 # Docker-free `harness` tier) the default is the host.
 # CODING_BOX_DEFAULT tells launch-agent-common.sh whether running on the host
 # is leaving the default (and so goes into the guard audit log).
-box_default_feature() {
-  node "$SCRIPT_DIR/coding-features" enabled constraints >/dev/null 2>&1
+# The default itself is the `run` setting (features.yaml / Features tab):
+# `coding-features run` prints the effective mode — box, strict-box or host —
+# with `auto` already resolved (box iff `constraints` is on). An unreadable
+# config answers host; _resolve_features then stops the launch with the error.
+box_default_mode() {
+  node "$SCRIPT_DIR/coding-features" run 2>/dev/null || echo host
 }
 case "$AGENT" in
-  claude|copilot|opencode|pi) CODING_BOX_DEFAULT=true ;;
-  *) CODING_BOX_DEFAULT=false ;;
+  claude|copilot|opencode|pi) BOX_DEFAULT_MODE="$(box_default_mode)" ;;
+  *) BOX_DEFAULT_MODE=host ;;
 esac
-if [ "$CODING_BOX_DEFAULT" = true ] && ! box_default_feature; then
-  CODING_BOX_DEFAULT=false
-fi
+case "$BOX_DEFAULT_MODE" in
+  box)        CODING_BOX_DEFAULT=true;  BOX_DEFAULT_STRICT=false ;;
+  strict-box) CODING_BOX_DEFAULT=true;  BOX_DEFAULT_STRICT=true ;;
+  *)          CODING_BOX_DEFAULT=false; BOX_DEFAULT_STRICT=false ;;
+esac
 export CODING_BOX_DEFAULT
 if [ -z "${CODING_BOX_SOURCE:-}" ]; then
   if [ -n "${CODING_BOX:-}" ]; then
     CODING_BOX_SOURCE=env
   else
     export CODING_BOX="$CODING_BOX_DEFAULT"
+    export CODING_BOX_STRICT="$BOX_DEFAULT_STRICT"
     CODING_BOX_SOURCE=default
   fi
 fi
@@ -367,6 +378,17 @@ if [ ! -f "$AGENT_CONFIG" ]; then
   AVAILABLE=$(ls "$CODING_REPO_PATH/config/agents/"*.sh 2>/dev/null | xargs -I{} basename {} .sh | tr '\n' ', ' | sed 's/,$//')
   error "Unsupported agent: $AGENT. No config at config/agents/${AGENT}.sh. Available: ${AVAILABLE:-none}"
 fi
+
+# The `agents` setting: an agent left out of it is not offered. Exit 1 = not
+# enabled; anything else (a broken config) is left to _resolve_features, which
+# reports it properly instead of this check guessing.
+# Captured with `|| rc=$?`: this script runs under `set -e`, which would end it
+# right here, silently, on the very exit status the check exists to report.
+agent_rc=0
+node "$SCRIPT_DIR/coding-features" agent-enabled "$AGENT" >/dev/null 2>&1 || agent_rc=$?
+case $agent_rc in
+  1) error "Agent '$AGENT' is not enabled on this machine. Enabled: $(node "$SCRIPT_DIR/coding-features" agents 2>/dev/null | tr '\n' ' ')— add it on the dashboard's Features tab, or: coding-features agents set <list>" ;;
+esac
 
 # Capture the directory where coding was invoked from (before any cd operations)
 INVOKED_FROM_DIR="$(pwd)"

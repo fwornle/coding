@@ -50,6 +50,40 @@ export interface SnapshotCheck {
   remedy: string | null
 }
 
+export type RunMode = 'auto' | 'box' | 'strict-box' | 'host'
+
+/**
+ * Choices rather than on/off features (lib/features/resolve.cjs settings):
+ * where agents run and which agents `coding` offers. Both apply to agents
+ * launched after the change.
+ */
+export interface FeatureSettings {
+  run: {
+    /** What is configured; `auto` = box while Constraint Monitoring is on. */
+    value: RunMode
+    /** What a launch will actually do — never `auto`. */
+    effective: Exclude<RunMode, 'auto'>
+    source: string
+    reason: string
+    choices: RunMode[]
+    /** Agents the box can run; any other agent runs on the host. */
+    boxAgents: string[]
+  }
+  agents: {
+    enabled: string[]
+    available: string[]
+    source: string
+    reason: string
+    /** What plain `coding` launches. */
+    default: string | null
+  }
+}
+
+export interface SettingsPatch {
+  run?: RunMode
+  agents?: string[] | null
+}
+
 interface FeaturesSliceState {
   loading: boolean
   saving: boolean
@@ -67,6 +101,8 @@ interface FeaturesSliceState {
   snapshot: SnapshotCheck | null
   /** profile name -> the feature ids it switches on */
   profiles: Record<string, FeatureId[]>
+  /** Null when the coordinator predates settings — the page then hides them. */
+  settings: FeatureSettings | null
   /** Set after a save whose apply tier includes 'session'. */
   restartNotice: string | null
 }
@@ -85,6 +121,7 @@ const initialState: FeaturesSliceState = {
   warnings: [],
   snapshot: null,
   profiles: {},
+  settings: null,
   restartNotice: null,
 }
 
@@ -101,7 +138,7 @@ export const fetchFeatures = createAsyncThunk('features/fetch', async () => {
 
 export const saveFeatures = createAsyncThunk(
   'features/save',
-  async (payload: { features?: Record<string, boolean>; profile?: string }) => {
+  async (payload: { features?: Record<string, boolean>; profile?: string; settings?: SettingsPatch }) => {
     const saved = await readJson(await fetch('/api/features', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -133,6 +170,7 @@ const featuresSlice = createSlice({
       state.warnings = payload.warnings ?? []
       state.snapshot = payload.snapshot ?? null
       if (payload.profiles) state.profiles = payload.profiles
+      state.settings = payload.settings ?? null
       state.loaded = true
       state.error = null
     }
@@ -156,9 +194,10 @@ const featuresSlice = createSlice({
         const sessionScoped = Object.entries(state.features)
           .filter(([, f]) => f.applyTier === 'session')
           .map(([id]) => id)
-        state.restartNotice = sessionScoped.length
-          ? `${sessionScoped.join(', ')} affect agent hooks — start a new session to pick that up.`
-          : null
+        const notes = []
+        if (sessionScoped.length) notes.push(`${sessionScoped.join(', ')} affect agent hooks — start a new session to pick that up.`)
+        if (action.meta.arg.settings) notes.push('Where agents run and which agents are offered apply to agents launched from now on.')
+        state.restartNotice = notes.length ? notes.join(' ') : null
       })
       .addCase(saveFeatures.rejected, (state, action) => {
         state.saving = false

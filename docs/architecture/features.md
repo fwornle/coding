@@ -57,6 +57,41 @@ graph TD
 feature editor. The CLI says so rather than refusing the choice; `bin/coding-features`
 remains fully capable on its own.
 
+## Settings: where agents run, which agents are offered
+
+Two choices live in the same layered files as the features (and are edited from
+the same Features tab and `coding-features`), but they are not on/off switches:
+
+| key | values | default | read by |
+|-----|--------|---------|---------|
+| `run` | `auto` · `box` · `strict-box` · `host` | `auto` | `bin/coding` (`coding-features run`) |
+| `agents` | a list of `config/agents/<name>.sh` names | every agent | `bin/coding` (`default-agent`, `agent-enabled`) |
+
+```yaml
+# ~/.coding/features.yaml
+run: strict-box
+agents: [claude, copilot]
+```
+
+- **`auto`** is the rule `bin/coding` used to hard-code: the agent box while
+  `constraints` is on, the host otherwise.
+- **The box needs `constraints`.** It runs under the guard and reaches it through
+  its gate, so an explicit `box`/`strict-box` with `constraints` off resolves to
+  `host`, with a warning, and never switches `constraints` back on.
+- Only `claude`, `copilot`, `opencode` and `pi` can run in the box; any other
+  agent runs on the host whatever `run` says.
+- `--box`, `--strict-box`, `--no-box` and `CODING_BOX` still override `run` for
+  one launch, and leaving a box default is still written to the guard audit log.
+- An agent left out of `agents` is refused by the launcher. Plain `coding`
+  launches `claude` while it is offered, else the first agent offered. An empty
+  list or an unknown name is a config error.
+- A profile switch leaves both alone: a profile is a set of features.
+- Apply tier: **session** — both apply to agents launched after the change.
+
+Resolved under `settings` in `coding-features json` and the coordinator's
+`GET /features`; written through `setSettings()` in `lib/features/write.mjs`
+(`PUT /features {settings: {run, agents}}`).
+
 ## Host daemons
 
 Platform service manager: launchd (macOS), systemd `--user` (Linux), Scheduled Tasks

@@ -29,8 +29,9 @@ import {
   FEATURE_IDS,
   FEATURES,
   envVarFor,
+  RUN_MODES,
 } from '../lib/features/index.mjs';
-import { setFeatures, setProfile } from '../lib/features/write.mjs';
+import { setFeatures, setProfile, setSettings } from '../lib/features/write.mjs';
 import { writeSnapshot, checkSnapshot } from '../lib/features/snapshot.cjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -65,6 +66,12 @@ USAGE
   coding-features set <id> on|off     Turn one feature on or off
   coding-features profile [<name>]    Show, or switch to, a named preset
   coding-features profiles            List available presets
+  coding-features run [<mode>]        Show where agents run (box, strict-box or
+                                      host), or set it: ${RUN_MODES.join(' | ')}
+  coding-features agents              The agents \`coding\` offers, one per line
+  coding-features agents set <a,b>    Offer only these agents ('all' = every one)
+  coding-features agent-enabled <a>   Exit 0 if agent <a> is offered, 1 if not
+  coding-features default-agent       The agent plain \`coding\` launches
   coding-features repair              Run install steps for features enabled
                                       after install (idempotent)
   coding-features snapshot            Rewrite .coding/runtime/features.json
@@ -116,6 +123,12 @@ function printStatus(resolved, asJson) {
     const tier = f.enabled ? '' : ` ${C.dim}(${f.source})${C.reset}`;
     process.stdout.write(`  ${mark}  ${id.padEnd(width)}  ${f.label}${tier}\n`);
   }
+
+  const { run, agents } = resolved.settings;
+  process.stdout.write(`\n  run     ${C.bold}${run.effective}${C.reset}  ${C.dim}${run.reason}${C.reset}\n`);
+  process.stdout.write(
+    `  agents  ${C.bold}${agents.enabled.join(', ')}${C.reset}  ${C.dim}(plain \`coding\` → ${agents.default}; ${agents.reason})${C.reset}\n`,
+  );
 
   process.stdout.write(`\n${C.dim}docker required: ${resolved.needsDocker ? 'yes' : 'no'}${C.reset}\n`);
 
@@ -301,6 +314,68 @@ switch (cmd) {
     writeSnapshot({ repoPath: REPO });
     printStatus(resolved, asJson);
     if (!noApply) await applyDelta(resolved);
+    break;
+  }
+
+  case 'run': {
+    // Bare: the EFFECTIVE mode, one word — bin/coding reads it to pick the box
+    // default. Never `auto`: that is resolved here so the launcher has one rule.
+    const mode = args[1];
+    if (!mode) {
+      const run = resolveOrDie().settings.run;
+      if (asJson) process.stdout.write(`${JSON.stringify(run, null, 2)}\n`);
+      else process.stdout.write(`${run.effective}\n`);
+      break;
+    }
+    if (!RUN_MODES.includes(mode)) die(`unknown run mode '${mode}'. Known: ${RUN_MODES.join(', ')}`);
+    let resolved;
+    try {
+      resolved = setSettings({ run: mode === 'auto' ? null : mode });
+    } catch (err) {
+      die(err.message, 2);
+    }
+    const run = resolved.settings.run;
+    process.stdout.write(`run: ${C.bold}${run.effective}${C.reset}  ${C.dim}${run.reason}${C.reset}\n`);
+    if (mode !== 'auto' && run.effective !== mode) {
+      process.stdout.write(`${C.yellow}note:${C.reset} '${mode}' does not apply while Constraint Monitoring is off.\n`);
+    }
+    process.stdout.write(`${C.dim}applies to agents launched from now on.${C.reset}\n`);
+    break;
+  }
+
+  case 'agents': {
+    if (!args[1]) {
+      const agents = resolveOrDie().settings.agents;
+      if (asJson) process.stdout.write(`${JSON.stringify(agents, null, 2)}\n`);
+      else for (const a of agents.enabled) process.stdout.write(`${a}\n`);
+      break;
+    }
+    if (args[1] !== 'set' || !args[2]) die("usage: coding-features agents set <a,b,…> | all");
+    const list = args[2] === 'all' ? null : args[2].split(',').map((a) => a.trim()).filter(Boolean);
+    let resolved;
+    try {
+      resolved = setSettings({ agents: list });
+    } catch (err) {
+      die(err.message, 2);
+    }
+    const agents = resolved.settings.agents;
+    process.stdout.write(
+      `agents: ${C.bold}${agents.enabled.join(', ')}${C.reset}  ${C.dim}(plain \`coding\` → ${agents.default})${C.reset}\n`,
+    );
+    break;
+  }
+
+  case 'agent-enabled': {
+    // Silent bash gate, like `enabled`.
+    if (!args[1]) die('missing agent name');
+    process.exit(resolveOrDie().settings.agents.enabled.includes(args[1]) ? 0 : 1);
+    break;
+  }
+
+  case 'default-agent': {
+    const def = resolveOrDie().settings.agents.default;
+    if (!def) die('no agent is enabled', 2);
+    process.stdout.write(`${def}\n`);
     break;
   }
 

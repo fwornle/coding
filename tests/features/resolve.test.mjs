@@ -472,3 +472,57 @@ describe('the shipped team default', () => {
     }
   });
 });
+
+describe('settings: run mode and agents', () => {
+  test('defaults: run auto → box while constraints is on, every agent offered, claude first', () => {
+    const r = loadFeatures(opts());
+    assert.equal(r.settings.run.value, 'auto');
+    assert.equal(r.settings.run.effective, 'box');
+    assert.deepEqual(r.settings.agents.enabled, ['claude', 'copilot', 'opencode', 'pi']);
+    assert.equal(r.settings.agents.default, 'claude');
+  });
+
+  test('auto falls to host when constraints is off (the Docker-free harness tier)', () => {
+    writeHome('profile: harness\n');
+    const r = loadFeatures(opts());
+    assert.equal(r.settings.run.effective, 'host');
+    assert.match(r.settings.run.reason, /auto: Constraint Monitoring is off/);
+  });
+
+  test('an explicit mode wins over auto, and the layer that set it is named', () => {
+    writeRepo('run: host\n');
+    writeHome('run: strict-box\n');
+    const r = loadFeatures(opts());
+    assert.equal(r.settings.run.effective, 'strict-box');
+    assert.equal(r.settings.run.source, '~/.coding/features.yaml');
+  });
+
+  test('an explicit box with constraints off falls back to host, with a warning — never re-enables constraints', () => {
+    writeHome('profile: harness\nrun: box\n');
+    const r = loadFeatures(opts());
+    assert.equal(r.settings.run.effective, 'host');
+    assert.equal(r.features.constraints.enabled, false);
+    assert.ok(r.warnings.some((w) => /run mode 'box' falls back to host/.test(w)));
+  });
+
+  test('the agents list narrows what is offered; the default is the first one left when claude is out', () => {
+    writeHome('agents: [pi, copilot]\n');
+    const r = loadFeatures(opts());
+    assert.deepEqual(r.settings.agents.enabled, ['copilot', 'pi']);
+    assert.equal(r.settings.agents.default, 'copilot');
+  });
+
+  test('a layer with only settings counts as applied', () => {
+    writeHome('run: host\n');
+    assert.deepEqual(loadFeatures(opts()).layers, ['~/.coding/features.yaml']);
+  });
+
+  test('an unknown run mode, an unknown agent and an empty agents list are refused', () => {
+    writeHome('run: boxed\n');
+    assert.throws(() => loadFeatures(opts()), /'run' must be one of auto, box, strict-box, host/);
+    writeHome('agents: [claud]\n');
+    assert.throws(() => loadFeatures(opts()), /unknown agent 'claud'/);
+    writeHome('agents: []\n');
+    assert.throws(() => loadFeatures(opts()), /at least one must be enabled/);
+  });
+});

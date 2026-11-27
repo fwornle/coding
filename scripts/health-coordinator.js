@@ -58,7 +58,7 @@ import { loadFeatures, FeatureConfigError, loadProfiles, profileAliases, configP
 import { discover as discoverRepos } from '../lib/teams/discover.mjs';
 import { restart as restartDaemon } from '../lib/features/daemons.mjs';
 import { createRequire } from 'node:module';
-import { setFeatures, setProfile } from '../lib/features/write.mjs';
+import { setFeatures, setProfile, setSettings } from '../lib/features/write.mjs';
 import { checkSnapshot } from '../lib/features/snapshot.cjs';
 import {
   reclassifyTimeoutAsUnknown, debounceDbStatus,
@@ -4440,7 +4440,12 @@ app.get('/features', (_req, res) => {
 });
 
 app.put('/features', async (req, res) => {
-  const { features, profile } = req.body || {};
+  const { features, profile, settings } = req.body || {};
+  // `settings` = { run?: mode|null, agents?: string[]|null } — choices rather
+  // than on/off features (lib/features/write.mjs setSettings). Written LAST, so
+  // a profile switch in the same request cannot be confused for touching them.
+  const hasSettings = settings && typeof settings === 'object'
+    && ('run' in settings || 'agents' in settings);
   try {
     let resolved; let dropped = [];
     if (typeof profile === 'string' && profile) {
@@ -4450,8 +4455,14 @@ app.put('/features', async (req, res) => {
       }
     } else if (features && typeof features === 'object') {
       resolved = setFeatures(features, 'profile' in (req.body || {}) ? { profile } : {});
-    } else {
-      return res.status(400).json({ ok: false, error: "expected { features: {id: boolean} } and/or { profile: '<name>' }" });
+    } else if (!hasSettings) {
+      return res.status(400).json({ ok: false, error: "expected { features: {id: boolean} }, { profile: '<name>' } and/or { settings: {run, agents} }" });
+    }
+    if (hasSettings) {
+      const patch = {};
+      if ('run' in settings) patch.run = settings.run === 'auto' ? null : settings.run;
+      if ('agents' in settings) patch.agents = settings.agents;
+      resolved = setSettings(patch);
     }
     res.json({ ok: true, ...resolved, droppedOverrides: dropped });
   } catch (err) {
