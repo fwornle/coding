@@ -31,6 +31,26 @@ the historical single-stack behaviour. Upgrading changes nothing until the user 
 `core` is not a feature. `bin/coding`, agent detection and launch, `config/`,
 `.coding/runtime/` and the feature resolver itself are always present.
 
+## Core
+
+Always present, never switchable. Everything else belongs to a feature. The
+machine-readable form is `lib/features/surfaces.cjs` (`CORE`, `CLIS`, `ROUTES`);
+`tests/features/surface-registry.test.mjs` fails when a `bin/*` command or a
+dashboard route is not mapped, when a mapping disagrees with the code's own gate,
+or when an item below goes missing.
+
+- bin/coding (the launcher, agent selection, run mode) and coding.bat (the WSL pointer)
+- the feature resolver and writer (lib/features/), bin/coding-features, the Features tab
+- config/ and the data home (~/.coding/, bin/coding-data-home)
+- the repo → project mapping (lib/teams/config.cjs projectIdFor, attribution, the kb layout)
+- machine status and housekeeping: bin/status, bin/mcp-status, bin/cleanup-orphans
+- agent plumbing every agent needs: bin/claude-mcp, bin/gsd-browser (browser automation), bin/llm (Docker Model Runner, deliberately not the proxy)
+
+Commands that belong to a feature but do not refuse while it is off say why in the
+registry: `bin/init-history.sh` (lsl — run by install.sh only with lsl on),
+`bin/statusline-click` (statusline — only tmux calls it). `bin/ckb` is a broken
+tracked symlink (its target is the text of a script).
+
 ## Dependencies
 
 A feature whose dependency is off is **auto-disabled** with a recorded reason. A

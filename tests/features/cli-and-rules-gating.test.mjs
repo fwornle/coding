@@ -21,16 +21,12 @@ const REPO = (process.env.CODING_REPO || new URL('../..', import.meta.url).pathn
 const { FEATURE_IDS } = require(join(REPO, 'lib/features/catalogue.cjs'));
 
 /** CLI -> the feature it must refuse to run without. */
-const GUARDED = {
-  'bin/semantic': 'knowledge',
-  'bin/vkb': 'knowledge',
-  'bin/clean-knowledge-base': 'knowledge',
-  'bin/fix-knowledge-base': 'knowledge',
-  'bin/graphify': 'codegraph',
-  'bin/codegraph': 'codegraph',
-  'bin/constraints': 'constraints',
-  'bin/log-session': 'lsl',
-};
+// From the surface registry (lib/features/surfaces.cjs), so the guarded set is
+// written down once; tests/features/surface-registry.test.mjs keeps it complete.
+const GUARDED = Object.fromEntries(
+  Object.entries(createRequire(import.meta.url)(join(REPO, 'lib/features/surfaces.cjs')).CLIS)
+    .filter(([, e]) => e.guard).map(([cli, e]) => [cli, e.feature]),
+);
 
 function homeWith(yaml) {
   const dir = mkdtempSync(join(tmpdir(), 'coding-cli-'));
