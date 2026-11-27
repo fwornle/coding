@@ -212,15 +212,33 @@ developer — no PRs in coding).
   `initialize_knowledge_databases` and the `.data` carry are a stopgap until
   that data moves to the data home.
 
-### P5 — Release notification  `status: not started`
+### P5 — Release notification  `status: done`
 
-- [ ] The health coordinator (:3034) checks for a newer release every few hours
-  (like glass's `UPDATE_CHECK_MS`). Display only — fails open.
-- [ ] Status line `⬆ coding x.y.z`; click → `coding update` in a tmux popup.
-- [ ] Dashboard banner with the release notes and an **Update** button; the
-  update runs on the host, so it goes through the coordinator, like `/features`.
-- Accept: a fake newer release shows the badge and banner; clicking Update
-  completes P4's flow; no network → no badge, no error spam.
+- [x] The health coordinator (:3034) checks for a newer release a minute after
+  start, then every 6 h (`lib/install/release-check.mjs`, the same unmetered
+  redirect as `coding update`) → `~/.coding/release-check.json`. Display only,
+  fails open (error recorded, a known update kept). Dev: never checked.
+  `CODING_UPDATE_CHECK=off`.
+- [x] Status line `[⬆ x.y.z]` (reads the file only); click → `coding update`
+  in a tmux popup (tag `update`).
+- [x] Dashboard banner (`release-banner.tsx`): version, notes (new
+  `coding-<v>-notes.md` release asset; attached to v8.0.0 by hand), GitHub link,
+  **Update** → coordinator `POST /release/update` (detached, pid file +
+  `UPDATE_EXIT=` marker so the status survives the coordinator restart),
+  progress log, "reload". Dismissible per release.
+- Accept: met, with the release state faked (this machine is a dev checkout):
+  banner shown → notes → Update → "installed — reload" (gsd-browser with mocked
+  /api/release*, screenshots); status line rendered by the exact tmux command
+  shows the clickable badge, the click routes to the popup, and the badge goes
+  away with the real state; no network → `error`, no badge
+  (`tests/install/release-check.test.mjs`, 10). The real dev state shows no
+  banner and no badge.
+- Found on the way: `server.js` is a single-file bind mount — replacing it
+  orphaned the mount (ENOENT, dashboard API down) until `docker restart
+  coding-services`; the shared `Alert` sizes its icon column with `--spacing`,
+  undefined in this dashboard (801px column) — the banner keeps its icon in
+  the title; `notes.mjs` picked the milestone by `git describe` distance (v7.3
+  for 8.0.0) — now the highest `v*` merged into HEAD.
 
 ### P6 — Installer becomes a thin bootstrap  `status: not started`
 
@@ -235,6 +253,11 @@ developer — no PRs in coding).
 ---
 
 ## Session log
+
+- **2026-11-27 (P5 done)** — release check + coordinator routes + status line
+  badge + dashboard banner; verified with faked state in the browser and via
+  the tmux status command. v8.0.0 got its notes asset. Next: P6 (thin
+  bootstrap installer), and the first real 8.0.x → 8.0.y update on macOS.
 
 - **2026-11-27 (P3 published, P4 done)** — dry run green, merged, v8.0.0
   publish run started. P4: `coding update` + install.sh update phases + e2e

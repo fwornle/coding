@@ -11,6 +11,7 @@ import { TokenUsagePage } from './pages/token-usage'
 import { PerformancePage } from './pages/performance'
 import { TimelineFullscreen } from './components/performance/timeline-fullscreen'
 import { NavBar } from './components/nav-bar'
+import { ReleaseBanner } from './components/release-banner'
 import { useEffect } from 'react'
 import { healthRefreshManager } from './store/middleware/healthRefreshMiddleware'
 import { initializeWorkflowConfig } from './store/slices/workflowConfigSlice'
@@ -44,6 +45,7 @@ function AppContent() {
   return (
     <>
       <NavBar />
+      <ReleaseBanner />
       <Routes>
         <Route path="/" element={<SystemHealthDashboard />} />
         {/* Routes stay registered when their feature is off — the nav tab is

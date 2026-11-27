@@ -147,4 +147,13 @@ describe('release notes', () => {
     assert.match(md, /\*\*lib:\*\* add sub/);
     assert.doesNotMatch(md, /initial/);
   });
+
+  test('re-run on the own tagged commit of the release still counts from the milestone', () => {
+    git(repo, 'tag', 'v8.0.0');
+    try {
+      assert.match(buildNotes({ repo, version: '8.0.0' }), /since the v7\.6 milestone/);
+    } finally {
+      git(repo, 'tag', '-d', 'v8.0.0');
+    }
+  });
 });

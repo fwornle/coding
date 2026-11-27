@@ -142,3 +142,28 @@ leaves behind, data and the previous release survive), and
 `scripts/release/update-e2e.sh` run through `scripts/test-install-linux.sh
 --release A --update-to B update` on a clean Ubuntu. The release workflow runs
 the latter as a gate, updating to a next-patch tarball built from the same commit.
+
+## Release notification
+
+When a newer release is out, the status line and the dashboard say so. Both are
+display only and fail open.
+
+- **Check**: `lib/install/release-check.mjs`, run by the health coordinator (:3034)
+  a minute after it starts and then every 6 hours. It reads the `releases/latest`
+  redirect (see above) and writes `~/.coding/release-check.json`. Dev checkouts
+  are never checked, and `CODING_UPDATE_CHECK=off` switches the check off. A failed
+  check records `error`, but keeps a known update for the same installed version.
+- **Status line**: `[⬆ 8.0.1]`, read from that file only, so the status line never
+  touches the network. Clicking it runs `coding update` in a tmux popup
+  (`bin/statusline-click`, tag `update`).
+- **Dashboard**: a banner (`release-banner.tsx`) with the version, the release notes
+  (the `coding-<ver>-notes.md` asset the release workflow attaches), a link to the
+  release page and an **Update** button. It can be dismissed until the next release.
+- **Coordinator routes** (local only; the dashboard proxies them under `/api/release`):
+
+| route | what |
+|---|---|
+| `GET /release[?refresh=1]` | the last check (or a fresh one), plus `update` status |
+| `GET /release/notes` | the available release's notes as markdown, or 204 |
+| `POST /release/update` | starts `coding update` from `releases/current`, detached; 409 when nothing is newer, a dev checkout, or one is already running |
+| `GET /release/update` | `{running, exit, log}`: a pid file plus an `UPDATE_EXIT=` marker in `~/.coding/update.log`, so the status survives the coordinator restart the update itself causes |
