@@ -292,6 +292,8 @@ case "$TAG" in
                TMUX_SESSION_NAME='$pane_session' TRANSCRIPT_SOURCE_PROJECT='$pane_project' \
                node '$CODING_REPO/scripts/statusline-click-report.mjs' ctx" ;;
 
+  update)   popup "coding update" "'$CODING_REPO/bin/coding' update" ;;
+
   ''|window|pane|session) : ;;   # not one of ours — the binding handles these
   *) note "statusline: unmapped field '$TAG'" ;;
 esac

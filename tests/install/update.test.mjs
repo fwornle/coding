@@ -44,14 +44,12 @@ function publish(version, { corrupt = false } = {}) {
 /** Install `version` the way a first install would: adopt + activate, plus machine files. */
 function installed(version) {
   publish(version);
-  const r = latestRelease({ env });
   const dir = path.join(home, 'first');
   fs.mkdirSync(dir);
   execFileSync('tar', ['-xzf', path.join(server, 'download', `v${version}`, `coding-${version}.tar.gz`), '-C', dir]);
   layout.adopt(path.join(dir, `coding-${version}`), opts);
   layout.activate(version, opts);
   fs.writeFileSync(path.join(layout.releaseDir(version, opts), '.env'), 'CODING_HISTORY_REPO=git@x:me/h.git\n');
-  return r;
 }
 
 function stubs({ failInstall = false, failRestartOn = null } = {}) {
@@ -196,15 +194,15 @@ describe('latest release lookup', () => {
   test('github: the tag comes from the redirect target, not the HTML body', async () => {
     const { latestTag } = await import('../../lib/install/update.mjs');
     const html = '<html>…v9.9.9…</html>\nhttps://github.com/fwornle/coding/releases/tag/v8.0.0'; // body, then the redirect target
-    assert.equal(latestTag('https://github.com/fwornle/coding/releases', { exec: fake(html) }), '8.0.0');
+    assert.equal(await latestTag('https://github.com/fwornle/coding/releases', { exec: fake(html) }), '8.0.0');
   });
   test('no release yet (github answers the releases page itself): a clear error', async () => {
     const { latestTag } = await import('../../lib/install/update.mjs');
     const page = '<html></html>\n'; // a 200 with no redirect
-    assert.throws(() => latestTag('https://github.com/fwornle/coding/releases', { exec: fake(page) }), /no usable tag/);
+    await assert.rejects(latestTag('https://github.com/fwornle/coding/releases', { exec: fake(page) }), /no usable tag/);
   });
-  test('asset URLs are the download paths', () => {
-    const r = latestRelease({ exec: fake('v8.1.0\n'), env: { CODING_RELEASE_URL: 'https://github.com/fwornle/coding/releases/' } });
+  test('asset URLs are the download paths', async () => {
+    const r = await latestRelease({ exec: fake('v8.1.0\n'), env: { CODING_RELEASE_URL: 'https://github.com/fwornle/coding/releases/' } });
     assert.equal(r.tarballUrl, 'https://github.com/fwornle/coding/releases/download/v8.1.0/coding-8.1.0.tar.gz');
     assert.equal(r.shaUrl, 'https://github.com/fwornle/coding/releases/download/v8.1.0/coding-8.1.0.tar.gz.sha256');
   });

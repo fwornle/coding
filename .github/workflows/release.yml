@@ -237,6 +237,9 @@ jobs:
       - name: Create the GitHub release
         shell: bash
         run: |
-          gh release create "v$VERSION" "dist/coding-$VERSION.tar.gz" "dist/coding-$VERSION.tar.gz.sha256" \
+          # The notes also as an asset: the dashboard's release banner reads them
+          # from the download path (not the API, which is rate-limited).
+          cp dist/notes.md "dist/coding-$VERSION-notes.md"
+          gh release create "v$VERSION" "dist/coding-$VERSION.tar.gz" "dist/coding-$VERSION.tar.gz.sha256" "dist/coding-$VERSION-notes.md" \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
             --title "coding $VERSION" --notes-file dist/notes.md

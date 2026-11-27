@@ -60,6 +60,7 @@ import { restart as restartDaemon } from '../lib/features/daemons.mjs';
 import { createRequire } from 'node:module';
 import { setFeatures, setProfile, setSettings } from '../lib/features/write.mjs';
 import { checkSnapshot } from '../lib/features/snapshot.cjs';
+import { createReleaseWatch, notes as releaseNotes, startUpdate, updateStatus } from '../lib/install/release-check.mjs';
 import {
   reclassifyTimeoutAsUnknown, debounceDbStatus,
   classifyProxyHttpFailure, isProxyRestartActionable,
@@ -4484,6 +4485,45 @@ app.post('/features/apply', async (_req, res) => {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
+
+// ── /release ─────────────────────────────────────────────────────────────────
+//
+// Release notification (P5, lib/install/release-check.mjs). Here for the same
+// reason as /features: the install record and the update run on the HOST, and
+// an update restarts daemons through launchctl/systemctl. Display only — the
+// check fails open into an `error` field; nothing here can break the dashboard.
+//
+//   GET  /release            the last check; ?refresh=1 checks now
+//   GET  /release/notes      markdown notes of the available release (or 204)
+//   POST /release/update     start `coding update` (detached; one at a time)
+//   GET  /release/update     { running, exit, log } of the last started update
+
+const releaseWatch = createReleaseWatch({ log: (m) => log(m) });
+
+app.get('/release', async (req, res) => {
+  const state = req.query.refresh ? await releaseWatch.refresh({ force: true }) : (releaseWatch.state() ?? await releaseWatch.refresh());
+  res.json({ ok: true, ...state, update: updateStatus() });
+});
+
+app.get('/release/notes', async (_req, res) => {
+  const md = await releaseNotes(releaseWatch.state());
+  if (!md) return res.status(204).end();
+  res.type('text/markdown').send(md);
+});
+
+app.post('/release/update', async (_req, res) => {
+  try {
+    // `current`, not this process's own (symlink-resolved) folder: the update
+    // must run the code the next start will run, and outlive this one.
+    const codeRoot = createRequire(import.meta.url)('../lib/install/layout.cjs').codeRoot();
+    const r = await startUpdate({ codeRoot });
+    res.status(r.ok ? 202 : 409).json(r);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/release/update', (_req, res) => res.json({ ok: true, ...updateStatus() }));
 
 // ── /teams ───────────────────────────────────────────────────────────────────
 //

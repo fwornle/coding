@@ -28,6 +28,7 @@ import { isToolsRepo } from '../lib/scope/index.mjs';
 import { restartingServices } from '../lib/health/deliberate-restart.mjs';
 import { OK_SERVICE_STATUSES } from '../lib/health/violations.mjs';
 import { repoHistoryDir } from '../lib/history/paths.cjs';
+import { readState as readReleaseState } from '../lib/install/release-check.mjs';
 
 const { statusLeftReserveCells } = paneCacheKey;
 
@@ -2851,6 +2852,14 @@ class CombinedStatusLine {
       parts.push(`[→${target}]`);
     }
     
+    // A newer release (P5): written by the coordinator's release check, read
+    // here from ~/.coding/release-check.json only — the status line never
+    // touches the network. Click -> `coding update` in a popup.
+    const release = readReleaseState();
+    if (release?.available && release.enabled !== false) {
+      parts.push(`[⬆ ${release.available}]`);
+    }
+
     // Append current time (HH:MM) so tmux doesn't need a separate %H:%M token
     // which would misalign due to emoji width miscalculation
     const now = new Date();

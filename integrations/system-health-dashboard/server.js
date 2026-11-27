@@ -386,6 +386,11 @@ class SystemHealthAPIServer {
         this.app.get('/api/features', this.handleGetFeatures.bind(this));
         this.app.put('/api/features', this.handlePutFeatures.bind(this));
         this.app.post('/api/features/apply', this.handleApplyFeatures.bind(this));
+        // Release notification (P5): the check and the update live on the host coordinator.
+        this.app.get('/api/release', (req, res) => this._forwardCoordinatorWithBody(req, res, `/release${req.query.refresh ? '?refresh=1' : ''}`));
+        this.app.get('/api/release/notes', this.handleReleaseNotes.bind(this));
+        this.app.get('/api/release/update', (req, res) => this._forwardCoordinatorWithBody(req, res, '/release/update'));
+        this.app.post('/api/release/update', (req, res) => this._forwardCoordinatorWithBody(req, res, '/release/update'));
         // Teams (sets of repos) — served by the host coordinator, like features.
         // Not /api/teams: obs-api already serves the viewer's registry there.
         this.app.get('/api/teams-config', (req, res) => this._forwardCoordinatorWithBody(req, res, '/teams'));
@@ -726,6 +731,18 @@ class SystemHealthAPIServer {
                 error: 'health coordinator unreachable — feature configuration is unavailable',
                 detail: err.message,
             });
+        }
+    }
+
+    /** Release notes are markdown (or 204), which the JSON forwarders would mangle. */
+    async handleReleaseNotes(req, res) {
+        const base = process.env.HEALTH_COORDINATOR_URL || 'http://host.docker.internal:3034';
+        try {
+            const upstream = await fetch(`${base}/release/notes`);
+            if (upstream.status === 204) return res.status(204).end();
+            res.status(upstream.status).type('text/markdown').send(await upstream.text());
+        } catch {
+            res.status(204).end(); // display only: no coordinator = no notes
         }
     }
 

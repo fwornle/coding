@@ -92,6 +92,27 @@ export function renderNotes({ version, since, sinceIsMilestone, commits }) {
   return parts.join('\n');
 }
 
+/**
+ * The highest-numbered `v*` milestone tag merged into HEAD (other than this
+ * version's own tag). By version, not by `git describe`: describe measures
+ * distance through merge history and picked v7.3 over v7.6 for 8.0.0.
+ * Milestone tags are loose (`v7.6`), so they are compared as number lists.
+ */
+export function lastMilestone(repo, version) {
+  const nums = (t) => t.slice(1).split(/[.-]/).map((x) => (/^\d+$/.test(x) ? Number(x) : -1));
+  const cmp = (a, b) => {
+    const x = nums(a);
+    const y = nums(b);
+    for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) - (y[i] ?? 0);
+    return 0;
+  };
+  const tags = git(repo, ['tag', '--merged', 'HEAD', '--list', 'v*'])
+    .split('\n')
+    .filter((t) => /^v\d+(\.\d+)*$/.test(t) && t !== `v${version}`)
+    .sort(cmp);
+  return tags.at(-1) ?? null;
+}
+
 export function buildNotes({ repo, version, since } = {}) {
   repo = path.resolve(repo ?? path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..'));
   version ??= JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')).version;
@@ -99,12 +120,8 @@ export function buildNotes({ repo, version, since } = {}) {
   if (!since) {
     since = previousRelease(repo, version);
     if (!since) {
-      try {
-        since = git(repo, ['describe', '--tags', '--abbrev=0', '--match', 'v*', 'HEAD']);
-        sinceIsMilestone = true;
-      } catch {
-        since = null;
-      }
+      since = lastMilestone(repo, version);
+      sinceIsMilestone = !!since;
     }
   }
   return renderNotes({ version, since, sinceIsMilestone, commits: commitsSince(repo, since) });
