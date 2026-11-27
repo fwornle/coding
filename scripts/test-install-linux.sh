@@ -20,6 +20,8 @@
 #   scripts/test-install-linux.sh                  # all shapes, HOST arch
 #   scripts/test-install-linux.sh direct           # one shape
 #   scripts/test-install-linux.sh --arm64 arch     # arm64 tokenizer path
+#   scripts/test-install-linux.sh --release dist/coding-8.0.0.tar.gz direct
+#                                                  # install from a release tarball
 #   scripts/test-install-linux.sh --amd64 arch     # x64 tokenizer path (emulated
 #                                                  # on Apple Silicon, so slow)
 #
@@ -101,8 +103,16 @@ if [[ "${1:-}" == "--in-container" ]]; then
 fi
 
 # ── argument parsing ─────────────────────────────────────────────────────────
-for arg in "$@"; do
+RELEASE_TARBALL=""
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+    arg="${args[$i]}"
     case "$arg" in
+        # Install from a release tarball (scripts/release/build-tarball.mjs)
+        # instead of this checkout's tracked files: the gate the release
+        # workflow runs before it publishes.
+        --release) i=$((i + 1)); RELEASE_TARBALL="${args[$i]:-}"
+                   [[ -f "$RELEASE_TARBALL" ]] || { echo "--release: no such tarball: $RELEASE_TARBALL"; exit 2; } ;;
         --arm64)  PLATFORM_FLAG="--platform=linux/arm64" ;;
         --amd64)  PLATFORM_FLAG="--platform=linux/amd64" ;;
         direct|proxy-only|no-egress|arch) SHAPES+=("$arg") ;;
@@ -134,6 +144,14 @@ trap cleanup EXIT
 # ~10.5G of submodule node_modules.
 CTX="$(mktemp -d)"
 prepare_context() {
+    if [[ -n "$RELEASE_TARBALL" ]]; then
+        info "Preparing build context from release $(basename "$RELEASE_TARBALL")..."
+        tar -xzf "$RELEASE_TARBALL" -C "$CTX" --strip-components=1
+        [[ -f "$CTX/release.json" ]] || { echo "${RED}not a release tarball (no release.json)${NC}"; exit 2; }
+        cp "$CTX/docker/Dockerfile.install-test" "$CTX/Dockerfile.install-test"
+        info "  context: $(du -sh "$CTX" | cut -f1), $(find "$CTX" -type f | wc -l | tr -d ' ') files"
+        return
+    fi
     info "Preparing build context (tracked files, minus docs/.data/.planning/tests)..."
     ( cd "$CODING_REPO" && git ls-files -z -- . \
         ':!:docs/**' ':!:docs-content/**' ':!:.data/**' ':!:.planning/**' ':!:tests/**' \
@@ -265,6 +283,21 @@ shape_direct() {
         fail "direct: ENOTFOUND still present"
     else
         pass "direct: no ENOTFOUND"
+    fi
+    # From a release, every submodule is vendored: nothing may be cloned. The
+    # default (harness) tier skips the knowledge/codegraph submodules, so the
+    # one that must work from the vendored copy here is km-core (LSL needs it).
+    if [[ -n "$RELEASE_TARBALL" ]]; then
+        if grep -qE "Initializing [a-z-]+ submodule|git submodule update" <<<"$out"; then
+            fail "direct: a release install still tried to fetch a submodule"
+        else
+            pass "direct: release install fetched no submodule"
+        fi
+        if grep -q "@fwornle/km-core linked and resolvable" <<<"$out"; then
+            pass "direct: vendored km-core built and linked"
+        else
+            fail "direct: vendored km-core was not built and linked"
+        fi
     fi
     # And no host browser download.
     if grep -qi "Installing Playwright browsers" <<<"$out"; then

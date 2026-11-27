@@ -72,3 +72,35 @@ A flip changes what the **next** start runs; running daemons keep their code
 until restarted. `coding update` (P4) runs the flip, `apply-features` and the
 restarts as one step. Containers bind-mount the resolved path when they are
 created, so they need recreating, not just restarting.
+
+## Publishing a release
+
+Decided 2026-11-27: GitHub only (`github.com/fwornle/coding`), images on GHCR,
+release numbers start at 8.0.0 (the `v7.x` tags were milestones), and updates
+notify and install on one click.
+
+To release, bump `version` in `package.json` and merge to main.
+`.github/workflows/release.yml` sees a version that has no GitHub release yet and
+runs:
+
+| job | what it does |
+|---|---|
+| `tarball` | `scripts/release/build-tarball.mjs` builds `coding-<version>.tar.gz` plus `.sha256`, then a smoke test installs it as a release folder and runs `coding` from `current` |
+| `install-test` | `scripts/test-install-linux.sh --release <tarball> direct arch` runs a full `install.sh --ci` on a clean Ubuntu, with no submodule fetched |
+| `lite` | `cross-platform-lite` on ubuntu, macOS and Windows |
+| `images` | builds `coding-services` for linux/amd64 and linux/arm64 on native runners, pushed **untagged** |
+| `publish` | only after all of the above: tags the images `:<version>` and `:latest` and creates the GitHub release `v<version>` with the tarball, checksum and notes |
+
+A push to a `feat/release-*` branch runs every job except `publish`; that's how
+the pipeline itself is changed.
+
+**The tarball** holds every file tracked at HEAD, minus a developer-only
+exclusion list (`EXCLUDE` in the builder; each entry says why it's there). Every
+submodule is vendored at the SHA the superproject pins, so installing needs no git
+and no submodule clone. `install.sh` checks `submodule_vendored` and skips fetching.
+`node_modules` is not bundled: its native builds differ per OS and architecture.
+
+**The notes** (`scripts/release/notes.mjs`) list the conventional commits since the
+previous `v8+` release; the first release counts from the last milestone tag.
+Breaking changes come first, then features, fixes and performance, and long lists
+are capped.

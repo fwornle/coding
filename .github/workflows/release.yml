@@ -1,0 +1,218 @@
+# coding releases (.planning/coding-releases.md P3, docs/architecture/release-layout.md).
+#
+# A push to main whose package.json version has no GitHub release yet publishes
+# one: the source tarball (submodules vendored, scripts/release/build-tarball.mjs)
+# and the coding-services image for linux/amd64 + linux/arm64 on GHCR. To
+# release, bump "version" in package.json and merge.
+#
+# Nothing is published unless every gate passed:
+#   tarball       builds, unpacks, installs as a release folder and runs from it
+#   install-test  scripts/test-install-linux.sh --release on the tarball (Docker)
+#   lite          cross-platform-lite on ubuntu / macOS / Windows
+#   images        both architectures build
+# The images are pushed UNTAGGED (by digest) while building; only the publish job,
+# after the gates, gives them the version and `latest` tags. An image no tag
+# names is unreachable for an installer.
+#
+# A push to a feat/release-* branch runs everything except publishing: the dry
+# run used to change this pipeline.
+name: release
+
+on:
+  push:
+    branches: [main, 'feat/release-*']
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  IMAGE: ghcr.io/fwornle/coding-services
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      build: ${{ steps.v.outputs.build }}
+      publish: ${{ steps.v.outputs.publish }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          v="$(node -p 'require("./package.json").version')"
+          node -e 'const {VERSION_RE}=require("./lib/install/layout.cjs"); if(!VERSION_RE.test(process.argv[1])) {console.error("not a release version: "+process.argv[1]); process.exit(1)}' "$v"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if gh release view "v$v" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then exists=yes; else exists=no; fi
+          if [[ "$GITHUB_REF" == refs/heads/main ]]; then
+            # On main: work only when this version is not released yet.
+            build=$([[ $exists == no ]] && echo true || echo false); publish=$build
+          else
+            build=true; publish=false   # dry run
+          fi
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+          echo "coding $v — release exists: $exists, build: $build, publish: $publish" >> "$GITHUB_STEP_SUMMARY"
+
+  tarball:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive   # every submodule is public; they are vendored
+          fetch-depth: 0          # tags + history for the release notes
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build the tarball
+        run: node scripts/release/build-tarball.mjs --out dist
+      - name: Release notes
+        run: node scripts/release/notes.mjs > dist/notes.md && cat dist/notes.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Smoke — install as a release folder and run from it
+        shell: bash
+        run: |
+          set -euo pipefail
+          v='${{ needs.plan.outputs.version }}'
+          (cd dist && sha256sum -c "coding-$v.tar.gz.sha256")
+          home="$(mktemp -d)"; u="$(mktemp -d)"
+          tar -xzf "dist/coding-$v.tar.gz" -C "$u"
+          test -f "$u/coding-$v/release.json"
+          test -z "$(find "$u/coding-$v" -name .git -print -quit)" || { echo "a .git leaked into the tarball"; exit 1; }
+          export CODING_HOME="$home"
+          node scripts/releases.mjs adopt "$u/coding-$v"
+          node scripts/releases.mjs use "$v"
+          out="$("$home/.coding/releases/current/bin/coding" releases status)"
+          echo "$out"
+          grep -q "code root: $home/.coding/releases/current" <<<"$out"
+          grep -q "^  \* $v" <<<"$out"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-dist
+          path: dist/
+          if-no-files-found: error
+
+  install-test:
+    needs: [plan, tarball]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      ONNXRUNTIME_NODE_INSTALL_CUDA: skip
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-dist
+          path: dist
+      - name: Install from the tarball on a clean Ubuntu (direct + arch shapes)
+        run: bash scripts/test-install-linux.sh --release "dist/coding-${{ needs.plan.outputs.version }}.tar.gz" direct arch
+
+  lite:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    uses: ./.github/workflows/cross-platform-lite.yml
+
+  images:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm   # native: QEMU would take the better part of an hour
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: docker/setup-buildx-action@v3
+      - if: needs.plan.outputs.publish == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.coding-services
+          platforms: linux/${{ matrix.arch }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/fwornle/coding
+            org.opencontainers.image.version=${{ needs.plan.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          outputs: ${{ needs.plan.outputs.publish == 'true' && format('type=image,name={0},push-by-digest=true,name-canonical=true,push=true', env.IMAGE) || 'type=cacheonly' }}
+          cache-from: type=gha,scope=coding-services-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=coding-services-${{ matrix.arch }}
+      - if: needs.plan.outputs.publish == 'true'
+        shell: bash
+        run: |
+          mkdir -p digests
+          touch "digests/${DIGEST#sha256:}"
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+      - if: needs.plan.outputs.publish == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.arch }}
+          path: digests/*
+          if-no-files-found: error
+
+  publish:
+    needs: [plan, tarball, install-test, lite, images]
+    if: needs.plan.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.plan.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-dist
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digest-*
+          path: digests
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Tag the images (multi-arch manifest)
+        shell: bash
+        run: |
+          set -euo pipefail
+          refs=(); for d in digests/*; do refs+=("$IMAGE@sha256:$(basename "$d")"); done
+          test "${#refs[@]}" -eq 2 || { echo "expected 2 image digests, got ${#refs[@]}"; exit 1; }
+          docker buildx imagetools create -t "$IMAGE:$VERSION" -t "$IMAGE:latest" "${refs[@]}"
+          docker buildx imagetools inspect "$IMAGE:$VERSION"
+      - name: Create the GitHub release
+        shell: bash
+        run: |
+          gh release create "v$VERSION" "dist/coding-$VERSION.tar.gz" "dist/coding-$VERSION.tar.gz.sha256" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "coding $VERSION" --notes-file dist/notes.md
