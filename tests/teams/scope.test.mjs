@@ -9,7 +9,7 @@ import { mkdtempSync, mkdirSync, rmSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { parseTeams, projectOf, projectsOfTeams, teamPredicate, defaultTeamsFor } from '../../lib/teams/scope.mjs';
+import { parseTeams, projectOf, projectsOfTeams, teamPredicate, defaultTeamsFor, retrievalScope } from '../../lib/teams/scope.mjs';
 
 const root = realpathSync(mkdtempSync(join(tmpdir(), 'team-scope-')));
 const repo = (name) => {
@@ -75,4 +75,24 @@ test('defaultTeamsFor: the teams of the cwd\'s repo, else its own project — ne
   const selecting = { ...teamsDoc, active: ['ops'] };
   assert.deepEqual(defaultTeamsFor(join(root, 'coding'), { teamsDoc: selecting }), ['coding'], 'the viewer selection is not the session\'s repo');
   assert.deepEqual(defaultTeamsFor(join(root, 'loose'), { teamsDoc: selecting }), ['loose']);
+});
+
+test("defaultTeamsFor with the 'teams' feature off: the repo's own project, never its teams", () => {
+  mkdirSync(join(root, 'raas-api', 'src'), { recursive: true });
+  assert.deepEqual(defaultTeamsFor(join(root, 'raas-api', 'src'), { teamsDoc, teams: false }), ['raas-api']);
+  assert.deepEqual(defaultTeamsFor(tmpdir(), { teamsDoc, teams: false }), [], 'in no repo: unchanged');
+});
+
+test('retrievalScope: named teams, else the directory default; off narrows to the own project and never widens', () => {
+  const cwd = join(root, 'raas-api');
+  const on = (o) => retrievalScope({ teamsDoc, ...o });
+  const off = (o) => retrievalScope({ teamsDoc, teams: false, ...o });
+  assert.deepEqual(on({ explicit: 'ops', cwd }), { teams: ['ops'], projects: null }, 'on: the request names the teams');
+  assert.deepEqual(on({ cwd }), { teams: ['raas'], projects: null }, 'on: the repo\'s teams');
+  assert.deepEqual(off({ explicit: 'ops', cwd }), { teams: [], projects: ['raas-api'] }, 'off: own project, named teams not expanded');
+  assert.deepEqual(off({ cwd: join(root, 'coding') }), { teams: [], projects: ['coding'] },
+    'off: a project named like a team is a PROJECT, not that team\'s repos');
+  assert.deepEqual(off({ explicit: 'ops', cwd: tmpdir() }), { teams: ['ops'], projects: null },
+    'off with no repo: keeps the request\'s filter instead of [] (no filter)');
+  assert.deepEqual(off({ cwd: tmpdir() }), { teams: [], projects: null }, 'nothing to name: as before');
 });

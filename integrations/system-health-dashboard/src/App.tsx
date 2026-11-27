@@ -26,7 +26,7 @@ const GatedDigests = gated('observations', 'Digests are produced by the observat
 const GatedInsights = gated('observations', 'Insights are produced by the observation pipeline, which is not running.', InsightsPage)
 const GatedCoverage = gated('knowledge', 'Coverage is computed from the knowledge base, which is not running.', CoveragePage)
 const GatedTokenUsage = gated('llm-proxy', 'Token accounting comes from the LLM proxy, which is not running.', TokenUsagePage)
-const GatedTeams = gated('lsl', 'Teams group the repos whose sessions are learned from, and session logging is not running.', TeamsPage)
+const GatedTeams = gated('teams', 'Sharing learning with a team is switched off on this machine (it also needs session logging).', TeamsPage)
 const GatedPerformance = gated('performance', 'Measurement, experiments and benchmarks are not running.', PerformancePage)
 const GatedCluster = gated('cluster', 'The Cluster tab is switched off on this machine.', ClusterPage)
 

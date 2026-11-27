@@ -47,7 +47,8 @@ profiles:
   learning:
     description: >-
       harness + session logging (LSL), online learning (observations, digests,
-      insights), UKB batch learning and the knowledge viewer. Needs Docker.
+      insights), UKB batch learning, the knowledge viewer and team sharing.
+      Needs Docker.
     features:
       llm-proxy: on
       health: on
@@ -55,6 +56,7 @@ profiles:
       lsl: on
       observations: on
       knowledge: on
+      teams: on
 
   learning-perf:
     description: >-
@@ -67,6 +69,7 @@ profiles:
       lsl: on
       observations: on
       knowledge: on
+      teams: on
       performance: on
 
   everything:
@@ -80,6 +83,7 @@ profiles:
       lsl: on
       observations: on
       knowledge: on
+      teams: on
       performance: on
       constraints: on
       codegraph: on
@@ -96,6 +100,7 @@ profiles:
       lsl-redirect: on
       observations: on
       knowledge: on
+      teams: on
       codegraph: on
       constraints: on
       llm-proxy: on

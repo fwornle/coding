@@ -218,13 +218,13 @@ describe('dependency closure', () => {
     writeHome('features:\n  lsl: off\n');
     const r = loadFeatures(opts());
     const auto = r.warnings.filter((w) => w.includes('auto-disabled'));
-    // observations (direct), knowledge and cluster (transitive via
-    // observations), and lsl-redirect (direct). Asserted by name rather than by count: a bare count
+    // observations, lsl-redirect and teams (direct), knowledge and cluster
+    // (transitive via observations). Asserted by name rather than by count: a bare count
     // passes for the wrong set, and this is the assertion that proves the
     // fixpoint loop closes over an indirect dependency rather than one level.
     assert.deepEqual(
       auto.map((w) => w.split("'")[1]).sort(),
-      ['cluster', 'knowledge', 'lsl-redirect', 'observations'],
+      ['cluster', 'knowledge', 'lsl-redirect', 'observations', 'teams'],
     );
   });
 

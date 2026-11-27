@@ -21,7 +21,7 @@ import type { RootState } from '../index'
 
 export type FeatureId =
   | 'lsl' | 'lsl-redirect' | 'observations' | 'knowledge' | 'codegraph' | 'constraints'
-  | 'llm-proxy' | 'performance' | 'cluster' | 'health' | 'statusline'
+  | 'llm-proxy' | 'performance' | 'teams' | 'cluster' | 'health' | 'statusline'
 
 export interface FeatureState {
   enabled: boolean
