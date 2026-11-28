@@ -269,6 +269,19 @@ developer — no PRs in coding).
 
 ## Session log
 
+- **2026-11-28 (8.0.1 + glass 0.1.101 released)** — coding **v8.0.1** published
+  (run 46125848487: all gates green; assets tarball, .sha256, notes,
+  `coding-install.sh`); `releases/latest/download/coding-install.sh` live, and
+  the real one-liner verified into a throwaway home (download, checksum,
+  adopt, current → 8.0.1). glass extracted from coding f59f04c6 + proxy
+  81ce5225 → bmw AIMAAD/glass#142 and public fwornle/glass#110, CI green on
+  both, merged → glass **v0.1.101** released on both targets (glass's own
+  release workflow; install-check inside it). Only change of today's reaching
+  glass: the `[⬆` rule in `lib/statusline/clickable.cjs` (glass tags its own
+  badge `g:upd`, unaffected). Found: `coding releases status | head` dies with
+  an unhandled EPIPE — cosmetic, fix in the next patch. Next: the user's macOS
+  fresh-user + WSL runs.
+
 - **2026-11-28 (8.0.1)** — `scripts/release/verify-install.sh` (macOS/Linux/WSL,
   `VERIFY pass|fail` lines; the bootstrap and update container tests call it:
   51/51). Version 8.0.1 — the first release with `coding update`, the release
