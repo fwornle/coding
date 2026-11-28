@@ -269,6 +269,17 @@ developer — no PRs in coding).
 
 ## Session log
 
+- **2026-11-28 (8.1.0 released)** — minor bump for two user-facing features:
+  the clickable feature map on the Features tab and the knowledge viewer
+  served by the container (`:3032/viewer/`); plus Getting Started as Install →
+  Configure → Update. coding a8431599, merged c9309085. v8.1.0 published (run
+  46158678319, every gate green: tarball, images amd64 + arm64, lite matrix on
+  macOS/Windows/Ubuntu, install-test); assets tarball, .sha256, notes,
+  `coding-install.sh`; `releases/latest/download/coding-install.sh` resolves.
+  glass re-extracted from c930908 + proxy 259a0a1 (bmw #149, public #117;
+  provenance only), CI green, merged — no glass release needed. Next
+  unchanged: macOS fresh-user + WSL runs (P6 accept / T8).
+
 - **2026-11-28 (viewer served by the container)** — the coding-services image
   builds the knowledge viewer (`vite build`, build deps not shipped); the
   dashboard frontend serves it at `:3032/viewer/<system>` ahead of its own
