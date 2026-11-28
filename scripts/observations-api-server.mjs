@@ -29,7 +29,6 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { repoHistoryDir } from '../lib/history/paths.cjs';
-import { mountViewer } from '../lib/viewer/mount.mjs';
 import { ObservationWriter, subscribeObservationWritten } from '../src/live-logging/ObservationWriter.js';
 import { ObservationConsolidator } from '../src/live-logging/ObservationConsolidator.js';
 import { RetrievalService } from '../src/retrieval/retrieval-service.js';
@@ -972,9 +971,6 @@ const app = express();
 // Host + Origin allow-lists instead of wildcard CORS (lib/network/local-only.mjs).
 app.use(localOnly());
 app.use(express.json({ limit: '1mb' }));
-
-// The built knowledge viewer at /viewer/ (bin/vkb) — see lib/viewer/mount.mjs.
-mountViewer(app, express, { repoRoot: REPO_ROOT });
 
 app.get('/health', (_req, res) => {
   // Phase 44 Plan 14 — readiness switched from `_writer.db` (SQLite

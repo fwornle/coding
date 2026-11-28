@@ -139,7 +139,7 @@ theirs, `skip` keeps the data local and untracked. Never asked again for that re
 - **Dashboard** — Observations, Digests and Insights tabs at
   [localhost:3032](http://localhost:3032).
 - **Knowledge viewer** — the graph, filtered by your active teams: `vkb` (opens
-  [127.0.0.1:12436/viewer/coding](http://127.0.0.1:12436/viewer/coding)).
+  [127.0.0.1:3032/viewer/coding](http://127.0.0.1:3032/viewer/coding)).
 
 ### Update the knowledge base
 

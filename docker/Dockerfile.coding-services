@@ -178,6 +178,14 @@ RUN cd lib/llm && npm run build 2>/dev/null || true
 # correct point in the dependency chain.
 RUN cd integrations/semantic-analysis && npm run build 2>/dev/null || true
 RUN cd integrations/system-health-dashboard && npm run build 2>/dev/null || true
+# The knowledge viewer, served by the dashboard frontend under /viewer/
+# (lib/viewer/mount.mjs; bin/vkb opens it) — built here so the host needs no
+# npm and no dev server. vite only: a type error must not cost anyone the
+# viewer. Its dependencies are build-time only, so they do not ship.
+RUN cd integrations/unified-viewer && npm ci --no-audit --no-fund \
+    && npx --no-install vite build \
+    && test -f dist/index.html \
+    && rm -rf node_modules
 
 # Build Constraint Dashboard (Next.js on port 3030)
 RUN cd integrations/constraint-monitor/dashboard && \

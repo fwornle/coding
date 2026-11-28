@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
-# Open the knowledge viewer — no dev server.
+# Open the knowledge viewer — no dev server, no host build.
 #
-#   vkb               build if needed, then open the coding graph
+#   vkb               open the coding graph
 #   vkb okb           the operational knowledge base instead
 #   vkb --no-open     just print the URL
-#   vkb --build       rebuild even if the build looks current
 #
-# obs-api (:12436, the host service the viewer reads from anyway) serves the
-# built viewer under /viewer/ (lib/viewer/mount.mjs). This command makes sure
-# that build exists and is not older than the viewer's sources, then opens it.
+# The coding-services container serves the built viewer under /viewer/ from
+# the dashboard frontend (:3032, static-server.js + lib/viewer/mount.mjs); the
+# image builds it (docker/Dockerfile.coding-services). The page reads its data
+# from obs-api (:12436) on the host. The :5173 vite dev server is only for
+# working on the viewer itself.
 # Replaces the vkb command that went with vkb-server (2026-09-08).
 set -euo pipefail
 
@@ -20,49 +21,40 @@ fi
 . "$CODING_REPO/lib/features/require-feature.sh"
 require_feature knowledge
 
-VIEWER="$CODING_REPO/integrations/unified-viewer"
-DIST="$VIEWER/dist"
-PORT="${OBSERVATIONS_API_PORT:-12436}"
-LOG="$CODING_REPO/.logs/vkb-build.log"
+PORT="${HEALTH_DASHBOARD_PORT:-3032}"
+DATA_PORT="${OBSERVATIONS_API_PORT:-12436}"
 
-system=coding open_it=true force=false
+system=coding open_it=true
 for arg in "$@"; do
   case "$arg" in
     coding|okb)  system="$arg" ;;
     --no-open)   open_it=false ;;
-    --build)     force=true ;;
-    -h|--help)   sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help)   sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)           echo "vkb: unknown argument: $arg (try --help)" >&2; exit 2 ;;
   esac
 done
 
-# Stale = no build, or any source the build is made from is newer than it.
-needs_build() {
-  [ "$force" = true ] && return 0
-  [ -f "$DIST/index.html" ] || return 0
-  [ -n "$(find "$VIEWER/src" "$VIEWER/index.html" "$VIEWER/vite.config.ts" "$VIEWER/package.json" \
-            -newer "$DIST/index.html" -print -quit 2>/dev/null)" ]
-}
-
-if needs_build; then
-  mkdir -p "$(dirname "$LOG")"
-  if [ ! -d "$VIEWER/node_modules" ]; then
-    echo "vkb: installing the viewer's dependencies (once)…"
-    (cd "$VIEWER" && npm ci --no-audit --no-fund) >>"$LOG" 2>&1 \
-      || { echo "vkb: npm ci failed — see $LOG" >&2; exit 1; }
-  fi
-  echo "vkb: building the viewer…"
-  # vite only, not `npm run build`: that also type-checks, and a type error
-  # somewhere in the viewer should not stop anyone from opening it.
-  (cd "$VIEWER" && npx --no-install vite build) >>"$LOG" 2>&1 \
-    || { echo "vkb: build failed — see $LOG" >&2; exit 1; }
-fi
-
 url="http://127.0.0.1:${PORT}/viewer/${system}"
-if ! curl -sf -m 3 "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then
-  echo "vkb: obs-api is not answering on :${PORT} — the viewer is served by it." >&2
+# The mount marks its answers (X-Coding-Viewer); a plain 200 can be the
+# dashboard's own shell from a container that predates the viewer mount.
+mark="$(curl -s -o /dev/null -D - -m 5 "$url" 2>/dev/null | tr -d '\r' \
+        | awk -F': ' 'tolower($1)=="x-coding-viewer" {print $2}' || true)"
+case "$mark" in
+  built) ;;
+  not-built|"")
+    if [ -z "$mark" ] && ! curl -s -o /dev/null -m 5 "http://127.0.0.1:${PORT}/" 2>/dev/null; then
+      echo "vkb: nothing answers on :${PORT} — the viewer is served by the coding-services container." >&2
+      echo "     Check: docker ps (coding-services up?) and coding-features status (health on?)" >&2
+      exit 1
+    fi
+    echo "vkb: the container on :${PORT} has no viewer build — its image predates it." >&2
+    echo "     Rebuild: docker compose -f \"$CODING_REPO/docker/docker-compose.yml\" build coding-services" >&2
+    echo "              docker compose -f \"$CODING_REPO/docker/docker-compose.yml\" up -d coding-services" >&2
+    exit 1 ;;
+esac
+if ! curl -sf -m 3 "http://127.0.0.1:${DATA_PORT}/health" >/dev/null 2>&1; then
+  echo "vkb: warning — obs-api is not answering on :${DATA_PORT}; the viewer opens but shows no graph." >&2
   echo "     Check: coding-features status   (observations must be on)" >&2
-  exit 1
 fi
 
 if [ "$open_it" = false ]; then echo "$url"; exit 0; fi

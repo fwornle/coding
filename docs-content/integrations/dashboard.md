@@ -6,13 +6,13 @@ Web-based visualization and monitoring interfaces.
 
 | Dashboard | URL | Purpose |
 |-----------|-----|---------|
-| VKB | http://127.0.0.1:12436/viewer/coding (`vkb`) | Knowledge graph visualization |
+| VKB | http://127.0.0.1:3032/viewer/coding (`vkb`) | Knowledge graph visualization |
 | Constraint Monitor | http://localhost:3030 | Compliance monitoring |
 | System Health | http://localhost:3032 | Service health monitoring |
 
 ## VKB (Knowledge Visualization)
 
-**URL**: http://127.0.0.1:12436/viewer/coding — served by obs-api
+**URL**: http://127.0.0.1:3032/viewer/coding — served by the coding-services container (dashboard frontend); data from obs-api `:12436`
 
 **Start**:
 
@@ -152,11 +152,12 @@ cd lib/vkb-server && node index.js
 ### Data not updating
 
 ```bash
-# Check the backend (obs-api serves both the viewer and its data)
+# Check the backend (obs-api serves the viewer's data)
 curl http://127.0.0.1:12436/health
 
-# Rebuild the viewer if it looks out of date
-vkb --build
+# The container serves the viewer; rebuild its image if the viewer looks out of date
+docker compose -f docker/docker-compose.yml build coding-services
+docker compose -f docker/docker-compose.yml up -d coding-services
 ```
 
 ### Graph out of date or missing
