@@ -131,8 +131,17 @@ registration and image pulls all live in the release's `install.sh`, and
 Because the installer runs from `current`, everything it stores names `current`:
 the shell rc, `~/bin/coding`, agent settings and daemons.
 
+To check an install, run `bash ~/.coding/releases/current/scripts/release/verify-install.sh`
+(`--tier <name>`, `--offline`) on macOS, Linux or WSL as the user who installed. It
+checks the layout, the install record, `~/bin/coding`, the shell rc, that no stored
+path names a version folder (agent settings, MCP config, launchd plists, systemd
+units), the tier, the daemons, and `coding update --check`. It prints one
+`VERIFY pass|fail` line per check and exits 1 on any failure.
+
 Checked by `scripts/test-install-linux.sh --release <tgz> bootstrap`, which runs
 one clean Ubuntu container per tier through `scripts/release/bootstrap-e2e.sh`.
+That test calls the same `verify-install.sh`, and so does the update test after
+its update.
 The release workflow gates on the harness and learning tiers.
 
 ## `coding update`

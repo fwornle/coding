@@ -269,6 +269,13 @@ developer — no PRs in coding).
 
 ## Session log
 
+- **2026-11-28 (8.0.1)** — `scripts/release/verify-install.sh` (macOS/Linux/WSL,
+  `VERIFY pass|fail` lines; the bootstrap and update container tests call it:
+  51/51). Version 8.0.1 — the first release with `coding update`, the release
+  notification and `coding-install.sh`. glass checked against main: both
+  targets extract, glass suite 192/0 fail, install-check passes. Next: the
+  user's macOS fresh-user + WSL runs (P6 accept).
+
 - **2026-11-27 (P6 done on Linux)** — `coding-install.sh` bootstrap, published
   per release; fresh-machine e2e 41/41 over all four tiers (first run 37/41:
   under `--ci` the installer rightly declines the shell rc without consent —

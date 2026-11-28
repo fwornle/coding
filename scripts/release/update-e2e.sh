@@ -67,6 +67,14 @@ else
   ok "no version folder path stored"
 fi
 
+# 3b. the installed state after the update, as a user would check it
+while IFS= read -r line; do
+    case "$line" in
+        "VERIFY pass "*) ok "after update: ${line#VERIFY pass }" ;;
+        "VERIFY fail "*) bad "after update: ${line#VERIFY fail }" ;;
+    esac
+done < <(bash "$CUR/scripts/release/verify-install.sh" --allow-no-rc --offline 2>&1)
+
 # 4. rollback
 "$CUR/bin/coding" update --rollback > /tmp/rollback.log 2>&1; rc=$?
 [[ "$(readlink "$CUR")" == "$A" ]] && ok "rollback -> $A (exit $rc)" || bad "rollback: current -> $(readlink "$CUR"), exit $rc"
