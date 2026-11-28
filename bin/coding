@@ -134,7 +134,8 @@ OPTIONS:
   --project DIR      Set target project directory (default: current dir)
   --verbose          Enable verbose logging
   --dry-run          Run startup logic but stop before launching agent
-  --box              Run the agent in the agent box (the default for every agent).
+  --box              Run the agent in the agent box (the default while the constraints
+                     feature is on, under run: auto; see: coding-features run).
                      The agent can VIEW the host's web UIs (dashboard, viewer) read-only
   --strict-box       Agent box, and the host's web UIs stay hidden too (CODING_BOX_STRICT=true)
   --no-box           Run the agent directly on the host (recorded in the guard audit log)

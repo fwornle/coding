@@ -6,7 +6,9 @@ CLI commands and shell usage reference.
 
 ### coding
 
-Launch a coding agent with all integrations (Docker services, LSL, health monitoring, constraints).
+Launch a coding agent with the integrations your tier switches on — health monitoring, the
+LLM proxy and the status line in the default `harness` tier; Docker services, LSL and
+constraints when your tier includes them (see [Composing What Runs](../guides/features.md)).
 
 The agent is named by the first word after `coding`, or by the equivalent flag.
 Without one, `coding` starts Claude Code.
@@ -87,6 +89,153 @@ vkb --version
 
 # Debug mode
 vkb --debug
+```
+
+## Install and Update
+
+### One-line install
+
+```bash
+# Latest release; installer options pass through after `bash -s --`
+curl -fsSL https://github.com/fwornle/coding/releases/latest/download/coding-install.sh | bash
+curl -fsSL https://github.com/fwornle/coding/releases/latest/download/coding-install.sh | bash -s -- --features=learning
+```
+
+To develop `coding` itself, clone it instead and run `./install.sh` from the checkout.
+
+### coding update
+
+Install the latest release and switch to it.
+
+```bash
+coding update              # download, verify, install beside the current one, switch, restart
+coding update --check      # report whether a newer release exists; install nothing
+coding update --rollback   # switch back to the previous release and restart
+coding update --pull       # on a development checkout: git pull + submodule update
+```
+
+When a newer release is out, the status line shows `[⬆ x.y.z]` (click it to run
+`coding update`) and the dashboard shows a banner.
+
+### coding releases
+
+The releases installed on this machine.
+
+```bash
+coding releases [status] [--json]    # channel, current version, installed releases
+coding releases list [--json]        # installed release folders
+coding releases root                 # the code root daemons are registered against
+coding releases use <version>        # flip `current` to an installed release
+coding releases rollback             # flip back to the previous release
+coding releases adopt <dir>          # install an unpacked release tree (needs release.json)
+coding releases remove <version> [--force]
+```
+
+`use` and `rollback` change which code the next start runs; running daemons keep the old code
+until restarted. `coding update` does both steps for you.
+
+## Configuration Commands
+
+### coding-features
+
+Compose which parts of `coding` are active (see [Composing What Runs](../guides/features.md)).
+
+```bash
+coding-features [status]            # the resolved feature set
+coding-features list                # enabled ids, one per line (for scripts)
+coding-features enabled <id>        # exit 0 if on, 1 if off; prints nothing
+coding-features explain <id>        # why a feature is on or off
+coding-features set <id> on|off     # turn one feature on or off
+coding-features profile [<name>]    # show, or switch to, a tier or profile
+coding-features profiles            # list the available presets
+coding-features run [<mode>]        # where agents run, or set it: auto | box | strict-box | host
+coding-features agents              # the agents coding offers, one per line
+coding-features agents set <a,b>    # offer only these agents ('all' = every one)
+coding-features agent-enabled <a>   # exit 0 if agent <a> is offered, 1 if not
+coding-features default-agent       # the agent plain `coding` launches
+coding-features repair              # run install steps for features enabled after install
+coding-features snapshot            # rewrite .coding/runtime/features.json
+coding-features json                # machine-readable resolved state
+```
+
+Options: `--json` (for `status`, `explain`, `profile`) and `--no-apply` (after `set` or
+`profile`, record the change without starting or stopping services).
+
+### coding sync
+
+Sync the per-repo learning checkouts (`<repo>/.coding/`) and the shared clones of
+teammates' repos. The launcher pulls at session start, and local commits are made at session
+end and on the coordinator's periodic sweep. Nothing pushes except `coding sync push` (or
+`coding sync --push`), which asks first; `--yes` skips the question. Shared clones are
+pull-only.
+
+```bash
+coding sync [status]                  # every checkout: ahead / behind / dirty
+coding sync pull   [--repo <dir>]     # commit local changes, then pull (+ shared clones)
+coding sync commit [--repo <dir>]     # local commit only
+coding sync push   [--repo <dir>] [--yes]
+coding sync status --json             # machine-readable
+```
+
+### coding job-classes
+
+A team's shared job-class taxonomy (see [Job Classes](../job-classes.md)).
+
+```bash
+coding job-classes [status]                         # bindings on this machine
+coding job-classes init --team <id> [--repo <url>]  # create the team's package, bind the team
+coding job-classes join --team <id> --repo <url>    # use a teammate's package
+coding job-classes validate [<file or package dir>]
+coding job-classes index                            # rewrite the proxy's bindings index
+coding job-classes propose --team <id> [--dry-run]  # draft new classes from unplaced prompts
+coding job-classes fold --team <id> [--dry-run] [--no-push]   # maintainer: fold proposals into a new version
+coding job-classes publish [--team <id>] [--push]   # this member's gate counts (no prompts)
+coding job-classes replay candidates|run|report|evidence
+```
+
+`--json` gives machine-readable output. Labelling itself is switched on or off on the
+Features tab (LLM Proxy → Job-class labelling).
+
+## Agent Box and Guard
+
+### coding box
+
+The agent box image. Building is a deliberate user action: it bakes the committed guard and
+rules into the image.
+
+```bash
+coding box build     # build the image from the COMMITTED guard + rules
+coding box status    # image present? built from the current guard?
+coding box redteam   # run agents against bypass scenarios inside the box
+```
+
+Whether an agent runs in the box is the `run` setting (`auto` = the box while `constraints`
+is on); `--box`, `--strict-box` and `--no-box` override it for one launch.
+
+### coding guard
+
+Client of the host guard daemon: override requests, approvals and the audit log.
+
+```bash
+coding guard status                 # daemon up? key fingerprint, pending count
+coding guard pending [--all]        # override requests
+coding guard approve <id>           # open the approval page in your browser
+coding guard deny <id>
+coding guard enroll                 # enrol / manage factors (Touch ID, phone, key, password)
+coding guard factors                # what is enrolled
+coding guard audit [--limit N]      # tail + hash-chain check
+coding guard note <event> [k=v …]   # record a host event (the launcher uses it)
+```
+
+Approving needs one of your factors, proven in the host browser. `enroll`, `audit` and
+`note` need the approver token, which exists only on the host, so they fail inside the box.
+
+### coding svc
+
+The fixed Docker verbs the guard runs for an agent in the box.
+
+```bash
+coding svc status | logs | restart | graphify | up | rebuild
 ```
 
 ## Testing Commands

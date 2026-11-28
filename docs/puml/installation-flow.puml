@@ -1,30 +1,53 @@
 @startuml installation-flow
 !include _standard-style.puml
 
-title ./install.sh — what it asks, in order, and what each answer decides
+title Installing coding — release bootstrap (primary) or dev checkout, then install.sh
 
 start
 
-:Impact manifest;
-note right
-  Lists every file, hook and daemon this run would touch,
-  BEFORE the first change. ""--dry-run"" stops here.
-end note
+if (How do you install?) then (release — recommended)
+  partition "coding-install.sh  (scripts/release/bootstrap.sh)" {
+    #E8F5E8:""curl -fsSL …/releases/latest/download/coding-install.sh | bash"";
+    :Check prerequisites
+    bash, curl, tar, sha256sum / shasum, Node.js >= 22;
+    note right: missing → exit with a message,\nnothing written
+    if (CODING_VERSION set?) then (yes)
+      :use the pinned version;
+    else (no)
+      :resolve latest from the
+      ""releases/latest"" redirect;
+      note right: not the GitHub API —\n60 anonymous calls/h per IP
+    endif
+    :Download ""coding-<ver>.tar.gz"" + "".sha256""
+    verify the checksum;
+    :Unpack into &#126;/.coding/releases/<ver>/\n""releases.mjs adopt"";
+    :Point &#126;/.coding/releases/current at <ver>\n""releases.mjs use"";
+    :Run that release's install.sh through ""current""\noptions pass through, terminal handed over;
+  }
+else (dev checkout)
+  #FFF2E6:""git clone"" + ""./install.sh"";
+  note right: channel ""dev"": daemons and the\nshell rc name the checkout itself
+endif
 
-partition "Question 1 — agent scope" {
-  if (Observe bare agents too? [y/N]) then (n — default)
+partition "install.sh" {
+  :Impact manifest;
+  note right
+    Lists every file, hook and daemon this run would
+    touch, BEFORE the first change. ""--dry-run"" stops here.
+  end note
+
+  if (Q1 — observe bare agents too? [y/N]) then (n — default)
     #E8F5E8:wrapper-scoped;
     note right: only sessions started via ""coding""\nare logged and get knowledge injected
   else (y)
     #FFF2E6:global;
     note right: hooks + MCP written into &#126;/.claude,\n&#126;/.config/opencode (reversible)
   endif
-}
 
-partition "Question 2 — tier" {
-  switch (Choice [1-4] (default: harness))
+  switch (Q2 — tier [1-4] (default: harness))
   case (1)
-    #E8F4FD:harness;
+    #E8F4FD:harness
+    (no Docker);
   case (2)
     #E8F4FD:learning;
   case (3)
@@ -39,37 +62,48 @@ partition "Question 2 — tier" {
     read. Change it later: ""coding-features profile <tier>""
     or the dashboard's Features tab.
   end note
+
+  :Network first: proxy detection + preflight;
+  :System dependencies (each asks y / N / skip-all);
+  :Q3 — machine scope
+  (runtime home &#126;/.coding/data/<scope>/);
+
+  :Install steps, each gated by the tier
+  ----
+  every tier: npm dependencies, LLM proxy
+  learning+: session logging, observations,
+      knowledge base, viewer, UKB
+  learning-perf+: performance measurement
+  everything: constraints + code graph;
+
+  if (platform?) then (macOS)
+    :launchd LaunchAgents
+    (only the tier's daemons);
+  elseif (Linux / WSL with systemd) then
+    :systemd --user units + timers
+    (only the tier's daemons);
+  else (WSL without systemd)
+    #FFFACD:no daemons + the /etc/wsl.conf fix;
+  endif
+
+  if (constraints on (everything)?) then (yes)
+    :Override factors — open the enrolment page?
+    Touch ID / Windows Hello, phone passkey,
+    security key, password;
+    note right: unattended, or guard daemon down →\nenrol later: ""coding guard enroll""
+  else (no)
+  endif
+
+  :Verify, report warnings / failures;
+  :""source .activate"" → ""coding"" is on PATH;
 }
-
-:Network first: proxy detection + preflight;
-:System dependencies (each one asks y / N / skip-all);
-:Question 3 — machine scope\n(name of the runtime home &#126;/.coding/data/<scope>/);
-
-partition "Install steps — each gated by the tier" {
-  :npm dependencies, LLM proxy (rapid-llm-proxy) — every tier;
-  :session logging, observations, knowledge base,\nviewer, UKB — learning and up;
-  :performance measurement — learning-perf and up;
-  :constraints + code graph — everything;
-}
-
-if (platform?) then (macOS)
-  :launchd LaunchAgents\n(only the tier's daemons);
-elseif (Linux / WSL with systemd) then
-  :systemd --user units + timers\n(only the tier's daemons);
-else (WSL without systemd)
-  #FFFACD:no daemons + the /etc/wsl.conf fix;
-endif
-
-:Verify, report warnings / failures;
-:""source .activate"" → ""coding"" is on PATH;
 
 stop
 
 note right
   Learned data is set up per repo on the first
-  ""coding"" launch in it (see learning-repo-setup) —
-  only the coding checkout's own is asked here
-  (learning tiers: ""setup_history_repo"").
+  ""coding"" launch in it (see learning-repo-setup).
+  Later updates: ""coding update"" (release-update-flow).
 end note
 
 @enduml

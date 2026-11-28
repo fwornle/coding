@@ -134,18 +134,27 @@ All agents share the same infrastructure: tmux session wrapping, status line, he
 ## Quick Start
 
 ```bash
-# Clone and install
-git clone --recurse-submodules https://github.com/fwornle/coding ~/Agentic/coding
-cd ~/Agentic/coding && ./install.sh
+# Install the latest release (installer options pass through: | bash -s -- --features=learning)
+curl -fsSL https://github.com/fwornle/coding/releases/latest/download/coding-install.sh | bash
 
 # Reload shell
 source ~/.bashrc  # or ~/.zshrc
 
-# Start coding with all features
+# Start coding with the features of your tier
 coding
 
-# View your knowledge graph
+# Later: install the newest release (the status line shows [⬆ x.y.z] when one is out)
+coding update
+
+# View your knowledge graph (learning tier and up)
 vkb
+```
+
+Developing `coding` itself? Clone it and run the installer from the checkout:
+
+```bash
+git clone --recurse-submodules https://github.com/fwornle/coding ~/Agentic/coding
+cd ~/Agentic/coding && ./install.sh
 ```
 
 ![Coding Startup](images/coding-startup-dockerized.png)

@@ -70,26 +70,30 @@ the LLM proxy and obs-api run on the host. The `harness` tier runs no containers
 
 ![Docker Architecture](../images/docker-architecture.png)
 
-### Step 1: Clone Repository
+### Step 1: Get a release
 
 ```bash
-git clone --recurse-submodules https://github.com/fwornle/coding ~/Agentic/coding
-cd ~/Agentic/coding
+curl -fsSL https://github.com/fwornle/coding/releases/latest/download/coding-install.sh | bash
 ```
 
-!!! tip "Existing Clone?"
-    If you already cloned without submodules:
+`coding-install.sh` checks bash, curl, tar, a SHA-256 tool and Node.js 22+, finds the latest
+release through the `releases/latest` redirect (not the rate-limited GitHub API;
+`CODING_VERSION=x.y.z` pins one), downloads `coding-<version>.tar.gz` and its `.sha256`,
+verifies, unpacks into `~/.coding/releases/<version>/`, points `~/.coding/releases/current`
+at it, and runs `current/install.sh`. Everything registered afterwards names `current`, so
+[`coding update`](updating.md) can swap releases without registering anything again.
+
+!!! tip "Developing coding itself"
+    Install from a checkout instead (the `dev` channel, updated with `coding update --pull`):
     ```bash
-    git submodule update --init --recursive
+    git clone --recurse-submodules https://github.com/fwornle/coding ~/Agentic/coding
+    cd ~/Agentic/coding && ./install.sh
     ```
+    Cloned without submodules? `git submodule update --init --recursive`.
 
-### Step 2: Run Installer
+### Step 2: The installer
 
-```bash
-./install.sh
-```
-
-The installer will:
+Options pass through the one-liner after `bash -s --`. The installer will:
 
 1. Print the impact manifest — everything it may touch
 2. Ask the **agent scope** (default: only `coding` launches are observed)
@@ -107,11 +111,13 @@ The installer will:
 ### Step 2a: See what it will change first
 
 ```bash
-./install.sh --dry-run
+curl -fsSL https://github.com/fwornle/coding/releases/latest/download/coding-install.sh | bash -s -- --dry-run
 ```
 
 This prints every path the installer may touch, grouped by scope, then exits
-without changing anything at all. It is the authoritative list — this page
+without changing anything at all. Through the one-liner, the release itself is still
+downloaded and unpacked into `~/.coding/releases/` first; only the installer's own changes
+are skipped. From a checkout, `./install.sh --dry-run` touches nothing. It is the authoritative list — this page
 deliberately does not reproduce it, so it cannot go stale.
 
 !!! info "Bare agents are not affected by default"
@@ -252,8 +258,8 @@ pkill -f "coding"
 # Clean state (preserves knowledge base)
 rm -f .transition-in-progress
 
-# Reinstall
-./install.sh
+# Reinstall: re-run the installer of the current release (a checkout: ./install.sh)
+~/.coding/releases/current/install.sh
 ```
 
 ---

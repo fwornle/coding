@@ -73,9 +73,10 @@ How to group your repos into teams, choose what the knowledge viewer shows, and 
     The settings icon next to Teams opens **Features**: the installed tier as a profile, and a
     switch per feature. Dependencies are explained inline ("Turning this off also switches off
     …"), and the chip next to each says when a change takes effect — on save, or for new
-    sessions only.
+    sessions only. The map beside the list shows the same switches as a picture; click a box
+    or a family title to switch it.
 
-    ![Dashboard → Features](../images/dashboard-features-tab.png)
+    ![Dashboard → Features](../images/features-editor.png)
 
     The same from a shell: `coding-features status`, `coding-features profile learning`,
     `coding-features set performance off`.

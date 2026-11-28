@@ -115,6 +115,27 @@ Auto-healing now flows through the coordinator (re-introduced after the initial 
 
 The system includes a real-time web-based health dashboard accessible at `http://localhost:3032`:
 
+### Release banner
+
+`src/components/release-banner.tsx` is the dashboard half of the release notification. Its
+state comes from the health coordinator's release check (`/api/release`, proxied to
+`:3034/release`); **Update** posts to `/api/release/update`, and the update runs on the host
+through the coordinator, because it restarts host daemons. While it runs the banner follows
+its log, then offers **Reload**. Dismissing stores the dismissed version in the browser, so
+the banner returns for the next release. It fails open: no coordinator, no network or a
+development checkout render nothing rather than an error banner.
+
+### Features tab
+
+The tab edits `~/.coding/features.yaml` through the coordinator's `/features` API (see
+[Composing What Runs](features.md)). Beside the list, **How the parts fit** draws the same
+switches as a map in four families — Learning, LLM & measurement, Guardrails & code,
+Monitoring. Clicking a box toggles that feature in the page's draft, clicking a family title
+toggles every member, and the dependency rule is the resolver's: a feature whose dependency
+is off will not switch on, and is never switched on for you. The Job-class labelling box is
+read and written on the proxy (`/api/job-classes/enabled`). Nothing is saved until
+**Save & apply**.
+
 ### Monitoring Cards
 
 **1. Databases** (LevelDB, Qdrant, CGR Cache)

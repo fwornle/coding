@@ -1,4 +1,4 @@
-Nine features, one resolver, four surfaces that must agree about them. This tier is the
+Twelve features, two settings, one resolver, four surfaces that must agree about them. This tier is the
 mechanism: how a decision is reached, who is allowed to act on it, and which failures are
 deliberately asymmetric.
 
@@ -12,10 +12,14 @@ Four layers, evaluated in order, last one wins:
 
 | # | layer | scope |
 |---|-------|-------|
-| 1 | built-in defaults (all on) | the product |
+| 1 | built-in defaults (all on) | the product — reached only by a checkout that was never installed |
 | 2 | `<repo>/config/features.yaml` | the team — committed, shipped fully commented out |
 | 3 | `~/.coding/features.yaml` | this machine — what `coding-features` and the dashboard write |
 | 4 | `CODING_FEATURE_<ID>=on\|off` | this shell |
+
+The installer always writes layer 3: the tier the user picked, or `harness` in an unattended
+run (`install.sh`, `ask_feature_selection`). An absent `features.yaml` resolves to all-on,
+which is the developer profile with `lsl-redirect` included, so no install is left without one.
 
 Layer 2 exists so a project can pin what it needs without every developer configuring it by
 hand; it ships entirely commented out, so it doubles as schema documentation in the place
@@ -28,9 +32,16 @@ chip. That is what makes "why is this off" have exactly one answer.
 ## Dependencies
 
 ```
+lsl ──▶ lsl-redirect
+lsl ──▶ teams
 lsl ──▶ observations ──▶ knowledge
+            observations ──▶ cluster
 llm-proxy ──▶ performance
 ```
+
+`cluster` depends on `observations` because its routes (`/api/cluster`, `/api/routing`) are
+served by obs-api, the `observations` daemon, which runs on the host. `teams` is the sharing
+layer only: which repo a turn belongs to is core and stays on without it.
 
 The rule is one-directional: **a dependent whose dependency is off is auto-disabled; a
 dependency is never auto-enabled.** Off is an explicit instruction and is honoured exactly.
@@ -38,9 +49,48 @@ On-by-implication would start services nobody asked for, which is how a "minimal
 quietly becomes a full one.
 
 The resolver applies this transitively to a fixed point, and so does the dashboard's preview
-— switching `lsl` off greys out `observations` *and* `knowledge`. An editor that previewed
+— switching `lsl` off greys out `lsl-redirect`, `teams`, `observations`, `knowledge` and
+`cluster`. The Features tab's map (**How the parts fit**) uses the same rule: a box whose
+dependency is off will not switch on and says what is missing, and a family title switches
+its members together but leaves off any member whose dependency outside the family is off. An editor that previewed
 only one level was worse than one that previewed none, because the second surprise arrived
 after the click.
+
+## Settings beside the features
+
+Two keys in the same layered files are choices rather than on/off switches:
+
+| key | values | resolved by |
+|-----|--------|-------------|
+| `run` | `auto`, `box`, `strict-box`, `host` | `resolveRun()`: `auto` is the box while `constraints` is on, else the host; an explicit `box` or `strict-box` with `constraints` off falls back to the host, with the reason recorded |
+| `agents` | a list of `config/agents/*.sh` names | unknown names and an empty list are config errors; without the key every agent is offered, and plain `coding` launches `claude` while it is offered, else the first one |
+
+The box is how `constraints` is enforced (it runs under the guard), so the run mode follows
+the same rule as a dependency: it is never switched back on for you.
+
+**Job-class labelling** is a sub-switch of `llm-proxy` that does not live in these files. The
+proxy owns it: `GET`/`PUT /api/job-classes/enabled` on rapid-llm-proxy, which writes this
+machine's choice to its gitignored `llm-routing.machine.yaml` over the team's setting. The
+Features tab reads and writes it there, under LLM Proxy and as a box on the map.
+
+## Install tiers and profiles
+
+`config/feature-profiles.yaml` names what each profile switches ON; everything it omits is
+off, so a new feature never switches itself on in an existing profile.
+
+| profile | on | offered by the installer |
+|---------|----|--------------------------|
+| `harness` | `llm-proxy`, `health`, `statusline` | yes, the default |
+| `learning` | harness + `lsl`, `observations`, `knowledge`, `teams` | yes |
+| `learning-perf` | learning + `performance` | yes |
+| `everything` | learning-perf + `constraints`, `codegraph`, `cluster` | yes |
+| `full` | everything + `lsl-redirect` | no — the developer profile |
+| `minimal` | `statusline` | no — the baseline `--features=a,b` builds on |
+
+No tier names `lsl-redirect`: it files turns it judges to be about the toolchain into the
+tools repo, which for anyone not developing `coding` moves their own sessions out of their
+project. Older names (`km`, `km-perf`, `proxy-only`, `logging-only`) still resolve as
+aliases so an old `features.yaml` keeps working, but they are never listed.
 
 ## Fail-open and fail-closed are deliberately asymmetric
 
@@ -80,7 +130,7 @@ It is therefore gated in three places rather than one:
 | apply (`reconcileEtm`) | SIGTERMs every running ETM |
 
 The last two overlap on purpose: the coordinator can only reap while it is running, and
-`minimal` and `proxy-only` stop it in the same pass that switches `lsl` off.
+`minimal` and `harness` stop it in the same pass that switches `lsl` off.
 
 ## Why the API lives on the coordinator, not the dashboard
 
@@ -96,8 +146,8 @@ Only `knowledge`, `codegraph` and `constraints` need the container. With all thr
 `_start_services()` skips it entirely and the launcher never demands a daemon.
 
 `health` deliberately does **not** need Docker: the coordinator and both dashboard servers
-have host implementations, which is what lets `logging-only` run a dashboard on a machine
-with no Docker Desktop at all.
+have host implementations, which is what lets `harness` run a dashboard on a machine with no
+Docker Desktop at all.
 
 ## Reference
 

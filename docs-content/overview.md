@@ -62,10 +62,14 @@ Use the agent you already know: **Claude Code, Copilot CLI, OpenCode or pi**.
 ## One command in front of your agent {#overview-launch}
 
 ```bash
+curl -fsSL https://github.com/fwornle/coding/releases/latest/download/coding-install.sh | bash
+
 coding              # Claude Code
 coding copilot      # GitHub Copilot CLI   (or --copilot)
 coding opencode     # OpenCode             (or --opencode)
 coding pi           # pi                   (or --pi)
+
+coding update       # when the status line shows ⬆
 ```
 
 The launcher checks the network, starts what is missing and hands over to the
@@ -345,14 +349,16 @@ Move between networks. The agent keeps working.
 
 ## Run only what you need {#overview-compose}
 
-coding is nine features, and you choose which ones run: from **harness**
-(logging, routing and the status line, no Docker) up to **everything**
-(knowledge graph, code graph, constraints and performance tracking).
+coding is twelve features, and you choose which ones run: from **harness**
+(the launcher, status line, health monitoring and the LLM proxy, no Docker) up
+to **everything** (session logging, the knowledge graph, code graph,
+constraints and performance tracking).
 
 A feature that needs another one that is switched off is switched off too, and
 every surface says why.
 
-Change it with `coding-features` or the dashboard's **Features** tab.
+Change it with `coding-features` or the dashboard's **Features** tab, where a
+map shows how the parts fit and a click switches one.
 
 </div>
 <figure class="overview-figure" markdown="1">

@@ -15,10 +15,21 @@ builds knowledge from them, and stops known mistakes before they happen.
     ## Install and run
 
     ```bash
+    curl -fsSL https://github.com/fwornle/coding/releases/latest/download/coding-install.sh | bash
+    source ~/.zshrc          # or ~/.bashrc
+    coding                   # launches Claude Code with your tier wired up
+    coding update            # later: install the newest release (the status line shows ⬆)
+    ```
+
+    The installer asks for a tier — `harness` (the default, no Docker), `learning`,
+    `learning-perf` or `everything` — and options pass through, for example
+    `| bash -s -- --features=learning`. See [Composing What Runs](guides/features.md).
+
+    Developing `coding` itself? Clone it and run the installer from the checkout:
+
+    ```bash
     git clone --recurse-submodules https://github.com/fwornle/coding ~/Agentic/coding
     cd ~/Agentic/coding && ./install.sh
-    source ~/.zshrc          # or ~/.bashrc
-    coding                   # launches Claude Code with everything wired up
     ```
 
     ## What you get
@@ -32,10 +43,16 @@ builds knowledge from them, and stops known mistakes before they happen.
     | Status Line | Health, cost and logging state, live in your tmux bar |
     | Multi-agent support | The same environment for Claude, Copilot, OpenCode and Pi |
 
+    Which of these run depends on your tier: the default `harness` gives the launcher, status
+    line, health monitoring and the LLM proxy; session logging, knowledge and constraints come
+    with the larger tiers.
+
     ## Where to go next
 
-    `coding --health` should come back all green. If it does, read
-    [Getting Started](getting-started/index.md); if it does not, go straight to
+    Check that it is healthy: the `[🏥●]` badge on the status line should be green, the
+    dashboard at [localhost:3032](http://localhost:3032) shows each service, and
+    `coding-features status` lists what your tier switched on. If all is well, read
+    [Getting Started](getting-started/index.md); if not, go straight to
     [Verify & Repair](getting-started/verify-repair.md).
 
 === "📖 Standard (~15 min)"
@@ -96,8 +113,9 @@ builds knowledge from them, and stops known mistakes before they happen.
 
     | Command | Does |
     |---------|------|
-    | `coding` | Start a session with everything running |
-    | `coding --health` | Check every service |
+    | `coding` | Start a session with your tier's services running |
+    | `coding update` | Install the newest release |
+    | `coding-features status` | What is switched on, and why |
     | `vkb` | Open the knowledge graph viewer |
     | `semantic workflow run wave-analysis --team coding` | Refresh the knowledge base |
 

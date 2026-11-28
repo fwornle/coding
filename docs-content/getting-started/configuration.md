@@ -1,73 +1,147 @@
 # Configuration
 
-API keys, port assignments, and MCP server configuration.
+What runs (features, tiers, run mode, offered agents), optional provider keys, ports, and
+where things are kept.
 
-## API Keys
+## What runs: features
 
-Create `.env` file with your provider keys:
+`coding` is composed of twelve features. The tier you picked at install is a preset of them;
+after that you can switch any one on or off.
+
+| Feature | id | Needs | Docker |
+|---|---|---|---|
+| Live Session Logging | `lsl` | | |
+| LSL Redirect | `lsl-redirect` | `lsl` | |
+| Observations | `observations` | `lsl` | |
+| Knowledge Base | `knowledge` | `observations` | yes |
+| Teams | `teams` | `lsl` | |
+| Cluster | `cluster` | `observations` | |
+| LLM Proxy | `llm-proxy` | | |
+| Performance Measurement | `performance` | `llm-proxy` | |
+| Constraint Monitoring | `constraints` | | yes |
+| Code Graph | `codegraph` | | yes |
+| Health Monitoring | `health` | | |
+| Status Line | `statusline` | | |
+
+A feature whose dependency is off is switched off with it. A dependency is never switched
+on for you. LLM Proxy also has a sub-switch, **Job-class labelling**, which labels each turn
+with its job class. It is stored on the proxy, so it follows the team's setting until you set
+it on this machine.
+
+### In the dashboard
+
+**Dashboard → Features** ([localhost:3032/features](http://localhost:3032/features)) has the
+switches as a list, and beside it a map of how the parts fit together:
+
+![Features tab: list and map](../images/features-editor.png)
+
+- click a box to switch that feature, or a family title (*Learning*, *LLM & measurement*,
+  *Guardrails & code*, *Monitoring*) to switch the whole family
+- a box with an amber dashed border is blocked: its dependency is off. Clicking it says which
+  one.
+- nothing changes until **Save & apply**. **Discard** drops the pending changes.
+- each switch shows when it takes effect: *live* (immediately), *on save* (services are
+  started or stopped), *new sessions* (agents launched afterwards)
+
+Switching **Health Monitoring** off stops the dashboard itself, so it asks first. To get it
+back: `coding-features profile full`, or `coding-features set health on`.
+
+### From the shell
 
 ```bash
-cp .env.example .env
+coding-features status                 # the resolved set, and why anything is off
+coding-features explain knowledge      # why one feature is on or off
+coding-features profiles               # the presets
+coding-features profile learning-perf  # switch preset (clears single overrides)
+coding-features set codegraph on       # one feature
+coding-features repair                 # run the install steps a newly enabled feature needs
 ```
+
+The presets are the install tiers `harness`, `learning`, `learning-perf` and `everything`,
+plus `full` (everything and `lsl-redirect`, for developing `coding` itself) and `minimal`.
+
+### Where agents run, and which are offered
+
+```bash
+coding-features run                    # show it
+coding-features run host               # auto | box | strict-box | host
+coding-features agents set claude,pi   # offer only these ('all' = every one)
+```
+
+`auto` runs agents in the [agent box](../core-systems/agent-box.md) while Constraint
+Monitoring is on, and on this machine otherwise. `--box`, `--strict-box` and `--no-box` on
+the `coding` command line override it for one launch. Plain `coding` launches Claude Code if
+it is offered, otherwise the first offered agent.
+
+### Where the settings are stored
+
+Later layers win:
+
+1. built-in defaults (everything on)
+2. `config/features.yaml` in the release: the team default
+3. `~/.coding/features.yaml`: this machine. The installer, the dashboard and
+   `coding-features` write here.
+4. `CODING_FEATURE_<ID>=on|off` in the environment, for CI and tests
+   (`CODING_FEATURE_LLM_PROXY=off`)
+
+```yaml
+# ~/.coding/features.yaml
+profile: learning
+features:
+  codegraph: on
+run: auto
+agents: [claude, copilot]
+```
+
+The full feature → service matrix is in `docs/architecture/features.md` in the repository,
+and the user guide is [Composing What Runs](../guides/features.md).
+
+## Provider keys (optional)
+
+The LLM proxy routes through the subscriptions you already have (Claude Code, GitHub
+Copilot), so no key is required. Keys add providers:
 
 ```env
-# LLM Providers (configure at least ONE)
-GROQ_API_KEY=your-groq-key           # Recommended - fastest
-ANTHROPIC_API_KEY=sk-ant-...         # High quality
-OPENAI_API_KEY=sk-...                # GPT models
-GOOGLE_API_KEY=...                   # Gemini
-
-# Auto-configured by installer
-CODING_TOOLS_PATH=/Users/<username>/Agentic/coding
-CODING_REPO=/Users/<username>/Agentic/coding
+# ~/.coding/releases/current/.env  (a git checkout: <checkout>/.env)
+GROQ_API_KEY=...
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
 ```
 
-!!! note "Port Configuration"
-    All ports (including DMR, browser automation, etc.) are centralized in `.env.ports`.
-    See the Port Configuration section below for details.
+`coding update` copies `.env` into each new release, so it survives updates. See
+[LLM Providers](../guides/llm-providers.md).
 
-## Port Configuration
+## Ports
 
-All ports are centralized in `.env.ports`:
+All ports are set in `.env.ports`:
 
-| Port | Service | Location |
-|------|---------|----------|
-| 3030 | Constraint Dashboard UI | Docker |
-| 3031 | Constraint Monitor API | Docker |
-| 3032 | System Health Dashboard UI | Docker |
-| 3033 | System Health API | Docker |
-| 3848 | Semantic Analysis SSE | Docker |
-| 3849 | Constraint Monitor SSE | Docker |
-| 3851 | Graphify (HTTP MCP, in `coding-services`) | Docker |
-| 6333 | Qdrant HTTP | Docker |
-| 6379 | Redis | Docker |
-| 3034 | Health coordinator (features, teams, sync APIs) | Host |
-| 5173 | Knowledge viewer dev server (only while developing it; `vkb` uses obs-api) | Host |
-| 12435 | LLM CLI Proxy | Host |
-| 12436 | obs-api — the knowledge store, retrieval, KB export/reload, and the viewer at `/viewer/` | Host |
-| 12434 | Docker Model Runner | Host |
+| Port | Service | Runs |
+|------|---------|------|
+| 3032 | Dashboard UI | host under `harness`, in the container with Docker tiers |
+| 3033 | Dashboard API | as 3032 |
+| 3034 | Health coordinator (features, teams, release check) | host |
+| 12435 | LLM proxy | host |
+| 12436 | obs-api: knowledge store, retrieval, the viewer at `/viewer/` | host (`learning`+) |
+| 12434 | Docker Model Runner | host |
+| 3030 / 3031 | Constraint dashboard / API | container (`everything`) |
+| 3848 / 3849 | Semantic analysis / constraint monitor SSE | container |
+| 3851 | Graphify (HTTP MCP) | container (`everything`) |
+| 6333 / 6379 | Qdrant / Redis | container |
+| 5173 | Knowledge viewer dev server, only while developing it | host |
 
-The `harness` tier runs only the host rows (no Docker); the Docker rows come with
-`learning` and up.
+## MCP servers and hooks
 
-## MCP & Hook Configuration
+The installer sets these up. By default they apply only to sessions started through
+`coding`: it passes the MCP config and settings to each launch and leaves your own agent
+configuration alone. Install with `--global-agents` to also write `~/.claude.json` and
+`~/.claude/settings.json` for bare `claude` sessions.
 
-MCP servers and hooks are **configured automatically** by the installer. No manual configuration required.
+## Where things are kept
 
-!!! info "Troubleshooting"
-    If you need to inspect or repair configurations:
-
-    - **MCP config**: `~/.claude/claude_desktop_config.json` (macOS/Linux) or `%APPDATA%/Claude/` (Windows)
-    - **Hooks config**: `~/.claude/settings.json`
-    - **Re-run installer**: `./install.sh` will repair any missing configuration
-
-## Key Directories
-
-| Path | Purpose |
-|------|---------|
-| `~/Agentic/coding/` | Main repository |
-| `~/.coding-tools/` | Installed binaries |
-| `~/.claude/` | Claude Code configs |
-| `.data/knowledge-graph/` | GraphDB storage |
-| `.data/knowledge-export/` | Git-tracked JSON exports |
-| `.coding/history/` | LSL session logs |
+| Path | What |
+|---|---|
+| `~/.coding/releases/<version>/` | an installed release; `current` points at the active one |
+| `~/.coding/features.yaml`, `~/.coding/teams.yaml` | your settings |
+| `~/.coding/install.json` | channel, version, previous version |
+| `~/.coding/data/<scope>/` | this machine's runtime data and caches |
+| `<repo>/.coding/` | what each repo learned: history, observations, insights, kb, tokens |

@@ -10,14 +10,24 @@ Where to look when something is unhealthy, and the supervision design that decid
     [localhost:3032](http://localhost:3032). The same state is available raw:
 
     ```bash
-    coding --health
     curl -s localhost:3034/health/state | jq .
     ```
 
     ## What the dashboard shows
 
     Service health and container state, per-project session activity, the knowledge-workflow
-    monitor with its debug controls, database health, and performance metrics.
+    monitor with its debug controls, database health, and performance metrics. Tabs whose
+    feature is off are not shown.
+
+    When a newer release of `coding` is out, a banner across the top says so — "coding x.y.z
+    is available" — with an **Update** button, the release notes and a link to the release on
+    GitHub. Update runs `coding update` on the host through the health coordinator; dismissing
+    the banner hides it until the next release.
+
+    The **Features** tab chooses which parts of `coding` run. Beside the list of switches,
+    **How the parts fit** draws them as a map: click a box to switch a feature, or a family
+    title to switch the family. Dependencies are honoured and nothing is saved until
+    **Save & apply**. See [Composing What Runs](features.md).
 
     ## The one idea behind the design
 

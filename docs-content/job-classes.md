@@ -279,6 +279,7 @@ label and is never changed by it.
 - A **second teacher pass** checks consistency: every turn of a class while the team has under 20 checks for it (`sample_until_gate`), then 1 in 10 (status and explain: every turn, for replay).
 - The label sits beside the turn's tokens: tokens per class for free.
 - **Reporting phase** (`report_sample_every`, glass: 5): once every class has a verdict, 1 turn in N is labelled and counts N times. Off in coding, where routing needs every label.
+- **On or off:** in coding, the dashboard's Features tab → LLM Proxy → *Job-class labelling* (or its box on the map). The choice is this machine's, stored on the proxy over the team's setting.
 
 </div>
 <figure class="overview-figure" markdown="1">

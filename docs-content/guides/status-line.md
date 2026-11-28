@@ -22,6 +22,7 @@ something broken?" questions into a glance.
     | `[🧠●]` | Proxy semantic readiness |
     | `███░░░░░ 47%` | How full **this pane's** conversation context is |
     | `[📋8-9]` | Session logging time window |
+    | `[⬆ 8.0.2]` | A newer release of `coding` is out — shown only then |
 
     Each badge belongs to a feature, and a feature you have switched off contributes no badge
     at all — see [Composing What Runs](features.md).
@@ -55,9 +56,11 @@ something broken?" questions into a glance.
     | `[🧠●]` | Popup: why the semantic badge is the colour it is |
     | the gauge | Popup: context in tokens, not just a percentage |
     | `[📋8-9]` | The sessions tab |
+    | `[⬆ 8.0.2]` | Popup: runs `coding update` |
 
-    The clock is deliberately inert. Every action is read-only — a stray click cannot restart,
-    toggle or write anything.
+    The clock is deliberately inert. Every action but one is read-only — a stray click cannot
+    restart, toggle or write anything. The exception is `[⬆ x.y.z]`, which exists to install the
+    release it names; the popup shows `coding update` running.
 
     ## Two absences that are good news
 

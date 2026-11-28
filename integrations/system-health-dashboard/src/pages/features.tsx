@@ -7,6 +7,7 @@ import {
 } from '@/store/slices/featuresSlice'
 import { Badge } from '@/components/ui/badge'
 import { PROXY_BASE } from '@/lib/llm-proxy'
+import { FeatureMap, type LabellingNode } from '@/components/features/feature-map'
 
 /**
  * Features — choose which parts of `coding` are active.
@@ -52,6 +53,15 @@ async function readLabelling(): Promise<Labelling> {
   } catch {
     return { state: 'unreachable' }
   }
+}
+
+/**
+ * The draft a labelling switch to `v` leaves: back to what is saved = no
+ * change at all (undefined), so no "unsaved" badge. Shared by the list row and
+ * the map, which must agree on it.
+ */
+function labellingDraftFor(labelling: Extract<Labelling, { state: 'ok' }>, v: boolean): boolean | undefined {
+  return (labelling.override === null && v === labelling.team) || labelling.override === v ? undefined : v
 }
 
 type SavePayload = { features?: Record<string, boolean>; profile?: string; settings?: SettingsPatch }
@@ -105,10 +115,7 @@ function LabellingRow({ labelling, draft, error, disabled, onChange }: {
       <Toggle
         checked={value}
         disabled={disabled}
-        // Back to what is saved = no change at all, so no "unsaved" badge.
-        onChange={v => onChange(
-          (labelling.override === null && v === labelling.team) || labelling.override === v ? undefined : v,
-        )}
+        onChange={v => onChange(labellingDraftFor(labelling, v))}
         label="Job-class labelling"
       />
       <div className="min-w-0">
@@ -294,6 +301,18 @@ export function FeaturesPage() {
   })
   const onProfile = (name: string) => submit({ profile: name }, `the '${name}' profile`)
 
+  /** The labelling box on the map: same value and same draft rule as its list row. */
+  const labellingNode: LabellingNode = (() => {
+    if (labelling.state !== 'ok') return { value: null, dirty: false, onToggle: () => {} }
+    const override = labellingDraft === undefined ? labelling.override : labellingDraft
+    const value = override ?? labelling.team
+    return {
+      value,
+      dirty: labellingDraft !== undefined,
+      onToggle: () => setLabellingDraft(labellingDraftFor(labelling, !value)),
+    }
+  })()
+
   const confirmProceed = () => {
     if (!confirm) return
     if (confirm.payload.profile) setDraft({})
@@ -318,7 +337,11 @@ export function FeaturesPage() {
   }
 
   return (
-    <div className="p-6 max-w-4xl" data-testid="features-page">
+    <div
+      className="p-6 grid gap-8 items-start xl:grid-cols-[minmax(0,56rem)_minmax(26rem,1fr)]"
+      data-testid="features-page"
+    >
+      <div className="min-w-0">
       <div className="flex items-start justify-between gap-4 mb-1">
         <div>
           <h1 className="text-xl font-semibold">Features</h1>
@@ -660,6 +683,22 @@ export function FeaturesPage() {
           </div>
         ))}
       </div>
+      </div>
+
+      {/* The same switches as a picture of the system; edits land in the same draft. */}
+      <aside className="min-w-0 xl:sticky xl:top-4">
+        <FeatureMap
+          features={features}
+          effective={effective}
+          valueOf={valueOf}
+          draft={draft}
+          saving={saving}
+          onToggle={onToggle}
+          labelling={labellingNode}
+          runLabel={RUN_COPY[runEffective].label.toLowerCase()}
+          agents={agentsValue}
+        />
+      </aside>
     </div>
   )
 }
