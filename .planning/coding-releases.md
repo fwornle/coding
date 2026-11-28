@@ -269,6 +269,23 @@ developer — no PRs in coding).
 
 ## Session log
 
+- **2026-11-28 (feature map + install/configure/update docs)** — Features tab
+  gains a clickable map (`feature-map.tsx`): click a module to toggle it in the
+  draft, dependencies honoured (blocked click explains, switch-off lists the
+  cascade), family titles toggle a whole group; `tests/features/feature-map-
+  coverage.test.mjs` fails the build when a catalogue feature or dependency is
+  not drawn. Arrows reworked to meet their boxes (userSpaceOnUse markers,
+  right-angle paths); screenshots re-shot. Getting Started rewritten as
+  Install → Configure → Update (new `updating.md`; one-liner first; removed
+  flags that never existed: `--skip-all`, `--repair`, `--mcp-only`,
+  `--hooks-only`); README, guides, reference, slides, CLAUDE.md aligned;
+  `installation-flow.puml` updated, `release-update-flow.puml` new, ten PNGs
+  re-rendered. rapid-llm-proxy README/job-classes doc list the
+  `/api/job-classes` routes (adpnext-apps#104, merged → 259a0a1). glass
+  re-extracted four times (bmw #143–#146, public #111–#114), CI green, all
+  merged; last two provenance-only (coding 3e751a8, proxy 259a0a1). No glass
+  release cut (still v0.1.101). Next unchanged: macOS fresh-user + WSL runs.
+
 - **2026-11-28 (8.0.2)** — notes generator lists `wip(...)` work and names the
   one-liner in Install; the 8.0.1 page + notes asset regenerated with it. No
   EPIPE crash from `coding releases`/`coding update` into a closed pipe.
