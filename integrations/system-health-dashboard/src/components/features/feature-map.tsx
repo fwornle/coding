@@ -71,13 +71,16 @@ const FAMILIES: { id: FamilyId; title: string; box: [number, number, number, num
  * edge here still blocks the click; it only goes undrawn.
  */
 const REQUIRES_EDGES: { from: NodeId; to: NodeId; d: string }[] = [
-  { from: 'lsl', to: 'lsl-redirect', d: 'M176 163 L192 163' },
-  { from: 'lsl', to: 'observations', d: 'M101 186 L101 224' },
-  { from: 'lsl', to: 'teams', d: 'M150 186 C150 206 269 204 269 224' },
-  { from: 'observations', to: 'knowledge', d: 'M101 272 L101 310' },
-  { from: 'observations', to: 'cluster', d: 'M150 272 C150 292 269 290 269 310' },
-  { from: 'llm-proxy', to: 'labelling', d: 'M467 186 L467 224' },
-  { from: 'llm-proxy', to: 'performance', d: 'M542 163 C572 163 572 335 544 335' },
+  // Each path ends exactly on the target's border (the marker's tip sits on the
+  // end point); bends are right angles with a 6px radius, so no line meets a
+  // box at a slant.
+  { from: 'lsl', to: 'lsl-redirect', d: 'M176 163 H194' },
+  { from: 'lsl', to: 'observations', d: 'M101 186 V226' },
+  { from: 'lsl', to: 'teams', d: 'M150 186 V200 Q150 206 156 206 H263 Q269 206 269 212 V226' },
+  { from: 'observations', to: 'knowledge', d: 'M101 272 V312' },
+  { from: 'observations', to: 'cluster', d: 'M150 272 V286 Q150 292 156 292 H263 Q269 292 269 298 V312' },
+  { from: 'llm-proxy', to: 'labelling', d: 'M467 186 V226' },
+  { from: 'llm-proxy', to: 'performance', d: 'M542 163 H546 Q552 163 552 169 V329 Q552 335 546 335 H542' },
 ]
 
 export interface LabellingNode {
@@ -267,8 +270,10 @@ export function FeatureMap({
         <svg viewBox="0 0 760 498" className="w-full h-auto select-none" role="group" aria-label="Feature map">
           <defs>
             {(['on', 'off', 'flow'] as const).map(k => (
-              <marker key={k} id={`fm-arrow-${k}`} viewBox="0 0 10 10" refX="9" refY="5"
-                markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              // userSpaceOnUse: a fixed 7px head whatever the line width (a hovered
+              // edge is thicker), with its tip (x=10) on the path's end point.
+              <marker key={k} id={`fm-arrow-${k}`} viewBox="0 0 10 10" refX="10" refY="5"
+                markerWidth="7" markerHeight="7" markerUnits="userSpaceOnUse" orient="auto">
                 <path d="M0 0 L10 5 L0 10 z"
                   className={k === 'on' ? 'fill-primary' : 'fill-muted-foreground/50'} />
               </marker>
@@ -318,15 +323,15 @@ export function FeatureMap({
 
           {/* How the core talks to each family (interaction, not dependency) */}
           <g className="text-[10px]">
-            <path d="M300 68 L190 98" fill="none" strokeDasharray="4 3" markerEnd="url(#fm-arrow-flow)"
+            <path d="M300 68 V78 Q300 84 294 84 H191 Q185 84 185 90 V100" fill="none" strokeDasharray="4 3" markerEnd="url(#fm-arrow-flow)"
               className={learningIn ? 'stroke-muted-foreground' : 'stroke-muted-foreground/30'} />
-            <text x={238} y={80} textAnchor="end" className="fill-muted-foreground">transcripts</text>
-            <path d="M430 68 L462 98" fill="none" strokeDasharray="4 3" markerEnd="url(#fm-arrow-flow)"
+            <text x={242} y={79} textAnchor="middle" className="fill-muted-foreground">transcripts</text>
+            <path d="M467 68 V100" fill="none" strokeDasharray="4 3" markerEnd="url(#fm-arrow-flow)"
               className={llmIn ? 'stroke-muted-foreground' : 'stroke-muted-foreground/30'} />
-            <text x={460} y={78} className="fill-muted-foreground">LLM calls</text>
-            <path d="M662 100 C662 74 600 41 532 41" fill="none" strokeDasharray="4 3" markerEnd="url(#fm-arrow-flow)"
+            <text x={473} y={88} className="fill-muted-foreground">LLM calls</text>
+            <path d="M662 100 V47 Q662 41 656 41 H530" fill="none" strokeDasharray="4 3" markerEnd="url(#fm-arrow-flow)"
               className={guardIn ? 'stroke-muted-foreground' : 'stroke-muted-foreground/30'} />
-            <text x={566} y={32} className="fill-muted-foreground">guards · MCP</text>
+            <text x={596} y={35} textAnchor="middle" className="fill-muted-foreground">guards · MCP</text>
           </g>
 
           {/* Dependencies */}
