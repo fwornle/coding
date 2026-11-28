@@ -269,6 +269,21 @@ developer — no PRs in coding).
 
 ## Session log
 
+- **2026-11-28 (viewer served by the container)** — the coding-services image
+  builds the knowledge viewer (`vite build`, build deps not shipped); the
+  dashboard frontend serves it at `:3032/viewer/<system>` ahead of its own
+  catch-all (`lib/viewer/mount.mjs`, bind-mounted with `static-server.js`;
+  answers marked `X-Coding-Viewer`). obs-api no longer serves `/viewer/`
+  (404), the installer no longer builds it on the host, `vkb` opens the
+  container URL and names the rebuild when the image predates the viewer
+  (`--build` gone). Data still from obs-api `:12436`. coding 546a89f7, merged
+  388039b0; verified: image rebuilt + container up, gsd-browser shows the full
+  graph (3583 nodes, LIVE) on `:3032`, dashboard `/` and `/features` intact,
+  feature/viewer/network 485/485, install 37/37. Routing PATCH
+  re-serialisation: already fixed by proxy 6e2fa4e (2026-11-23) — verified
+  live (gate_scope toggle = one-line diff, clean after revert). glass
+  re-extracted (bmw #148, public #116; provenance only), CI green, merged.
+
 - **2026-11-28 (glass 0.1.102 released)** — overlay version 0.1.101 → 0.1.102
   (coding ecda12c5, merged e8134182). Ships what reached glass since v0.1.101:
   the `[⬆` update rule in `lib/statusline/clickable.cjs`, the README's
