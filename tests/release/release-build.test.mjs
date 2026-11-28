@@ -120,6 +120,17 @@ describe('release notes', () => {
     );
   });
 
+  test('wip commits are listed with the features; install names the one-liner', () => {
+    const md = renderNotes({
+      version: '8.0.2',
+      since: 'v8.0.1',
+      commits: [{ sha: 'b1', type: 'wip', scope: 'bootstrap', subject: 'coding-install.sh', breaking: false }],
+    });
+    assert.match(md, /### Features\n\n- \*\*bootstrap:\*\* coding-install\.sh \(b1\)/);
+    assert.match(md, /releases\/latest\/download\/coding-install\.sh \| bash/);
+    assert.match(md, /coding update --rollback/);
+  });
+
   test('render: sections, breaking first, long lists capped', () => {
     const commits = [
       { sha: 'a', type: 'feat', scope: 'x', subject: 'one', breaking: true },

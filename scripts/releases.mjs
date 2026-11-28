@@ -18,6 +18,12 @@
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
+
+// `… | head` closes the pipe early; that is the reader being done, not a failure.
+process.stdout.on('error', (err) => {
+  if (err.code === 'EPIPE') process.exit(0);
+  throw err;
+});
 const layout = require('../lib/install/layout.cjs');
 
 const out = (s) => process.stdout.write(`${s}\n`);

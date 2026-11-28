@@ -28,6 +28,10 @@ const SECTIONS = [
   ['fix', 'Fixes'],
   ['perf', 'Performance'],
 ];
+// A feature built up in `wip(...)` commits has no `feat` commit of its own —
+// 8.0.1's notes left out coding-install.sh that way. Such commits are listed
+// with the features.
+const SECTION_OF = { wip: 'feat' };
 // A first release spans months of work; listing every fix there buries the features.
 const MAX_LISTED = 60;
 
@@ -75,7 +79,7 @@ export function renderNotes({ version, since, sinceIsMilestone, commits }) {
   if (breaking.length) parts.push('### Breaking changes', '', ...breaking.map(line), '');
 
   for (const [type, title] of SECTIONS) {
-    const list = commits.filter((c) => c.type === type);
+    const list = commits.filter((c) => (SECTION_OF[c.type] ?? c.type) === type);
     if (!list.length) continue;
     parts.push(`### ${title}`, '');
     if (list.length > MAX_LISTED) {
@@ -85,7 +89,18 @@ export function renderNotes({ version, since, sinceIsMilestone, commits }) {
   parts.push(
     '### Install',
     '',
-    'Download `coding-' + version + '.tar.gz`, check it against the `.sha256` file, unpack it and run `./install.sh`.',
+    'New machine:',
+    '',
+    '```bash',
+    'curl -fsSL https://github.com/fwornle/coding/releases/latest/download/coding-install.sh | bash',
+    '```',
+    '',
+    'It downloads `coding-' + version + '.tar.gz`, checks it against the `.sha256` file, installs it into',
+    '`~/.coding/releases/' + version + '` and runs its installer (options such as `--features=learning` pass through).',
+    'Then check the install with `bash ~/.coding/releases/current/scripts/release/verify-install.sh`.',
+    '',
+    'Already installed: `coding update` (or the **Update** button / the `⬆` on the status line); `coding update --rollback` goes back.',
+    '',
     'Service images: `ghcr.io/fwornle/coding-services:' + version + '` (linux/amd64, linux/arm64).',
     '',
   );

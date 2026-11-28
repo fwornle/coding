@@ -213,6 +213,17 @@ describe('what gets persisted names current, not a version folder', () => {
 });
 
 describe('coding releases CLI', () => {
+  test('a reader that closes the pipe early (| head) is not a crash', () => {
+    for (let i = 0; i < 12; i++) makeTree(path.join(home, 'u', `p${i}`), `9.0.${i}`);
+    for (let i = 0; i < 12; i++) layout.adopt(path.join(home, 'u', `p${i}`), opts);
+    const r = execFileSync('bash', ['-c', `node "${REPO}/scripts/releases.mjs" status 2>"${home}/err" | head -1 >/dev/null; echo "\${PIPESTATUS[0]}"`], {
+      encoding: 'utf8',
+      env: { ...process.env, CODING_HOME: home },
+    });
+    assert.equal(r.trim(), '0');
+    assert.equal(fs.readFileSync(path.join(home, 'err'), 'utf8'), '', 'no EPIPE stack trace');
+  });
+
   const cli = (...a) =>
     execFileSync(process.execPath, [path.join(REPO, 'scripts', 'releases.mjs'), ...a], {
       encoding: 'utf8',
