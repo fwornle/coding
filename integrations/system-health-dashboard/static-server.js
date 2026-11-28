@@ -19,6 +19,7 @@ import express from 'express';
 import http from 'node:http';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { mountViewer } from '../../lib/viewer/mount.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distDir = path.join(__dirname, 'dist');
@@ -73,6 +74,11 @@ app.use('/api', (req, res) => {
   req.pipe(upstream);
 });
 
+// The knowledge viewer under /viewer/ (bin/vkb opens it) — before the
+// dashboard's own static files and catch-all, which would otherwise answer
+// /viewer/coding with the dashboard shell. See lib/viewer/mount.mjs.
+mountViewer(app, express, { repoRoot: path.resolve(__dirname, '..', '..') });
+
 // SPA static assets
 app.use(express.static(distDir));
 
@@ -84,4 +90,5 @@ app.listen(port, () => {
     `Health dashboard frontend serving from ${distDir} on port ${port}\n`
   );
   process.stdout.write(`  /api/* reverse-proxy -> ${apiHost}:${apiPort}\n`);
+  process.stdout.write(`  /viewer/* knowledge viewer (integrations/unified-viewer/dist)\n`);
 });

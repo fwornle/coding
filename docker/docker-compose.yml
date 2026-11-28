@@ -209,6 +209,9 @@ services:
       # added /api/* reverse-proxy and we need host edits to take effect without
       # a Docker image rebuild — same pattern as server.js above).
       - ${CODING_REPO:-.}/integrations/system-health-dashboard/static-server.js:/coding/integrations/system-health-dashboard/static-server.js:ro
+      # The viewer mount static-server.js imports — live-mounted with it, so the
+      # two cannot disagree. The viewer's build itself comes from the image.
+      - ${CODING_REPO:-.}/lib/viewer:/coding/lib/viewer:ro
       # Sessions tab: the LSL session model, and pi's vendored export shell.
       # Same live-mount rationale as server.js — these are plain .mjs/.html with
       # no build step, and the tab is iterated on frequently.

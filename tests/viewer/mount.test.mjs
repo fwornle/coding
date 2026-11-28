@@ -1,5 +1,6 @@
 /**
- * lib/viewer/mount.mjs — obs-api serves the built viewer under /viewer/.
+ * lib/viewer/mount.mjs — the dashboard frontend (:3032) serves the built
+ * viewer under /viewer/, ahead of its own SPA catch-all.
  */
 
 import { test, describe, before, after } from 'node:test';
@@ -18,6 +19,8 @@ async function serve(dist) {
   const app = express();
   mountViewer(app, express, { dist });
   app.get('/api/x', (_q, r) => r.json({ ok: true }));
+  // The dashboard's own catch-all, mounted after the viewer as in static-server.js.
+  app.get('*', (_q, r) => r.type('html').send('<html>dashboard</html>'));
   const server = await new Promise((ok) => { const s = app.listen(0, '127.0.0.1', () => ok(s)); });
   const url = `http://127.0.0.1:${server.address().port}`;
   return { url, close: () => new Promise((ok) => server.close(ok)) };
@@ -39,6 +42,7 @@ describe('a built viewer', () => {
     assert.equal(r.status, 200);
     assert.equal(await r.text(), '<html>shell</html>');
     assert.equal(r.headers.get('cache-control'), 'no-cache');
+    assert.equal(r.headers.get('x-coding-viewer'), 'built');
   });
   test('an asset is served and cached for good', async () => {
     const r = await fetch(`${s.url}/viewer/assets/index-abc.js`);
@@ -48,10 +52,12 @@ describe('a built viewer', () => {
   test('a missing asset is a 404, not the shell', async () => {
     assert.equal((await fetch(`${s.url}/viewer/assets/gone-123.js`)).status, 404);
   });
-  test('the API is untouched and / goes to the viewer', async () => {
+  test('the API and the dashboard keep their own paths', async () => {
     assert.deepEqual(await (await fetch(`${s.url}/api/x`)).json(), { ok: true });
     const r = await fetch(`${s.url}/`, { redirect: 'manual' });
-    assert.equal(r.headers.get('location'), '/viewer/coding');
+    assert.equal(r.status, 200);
+    assert.equal(await r.text(), '<html>dashboard</html>');
+    assert.equal(await (await fetch(`${s.url}/features`)).text(), '<html>dashboard</html>');
   });
 });
 
@@ -60,6 +66,7 @@ test('no build yet: a page that says how to make one', async () => {
   try {
     const r = await fetch(`${s.url}/viewer/coding`);
     assert.equal(r.status, 503);
-    assert.match(await r.text(), /vkb/);
+    assert.equal(r.headers.get('x-coding-viewer'), 'not-built');
+    assert.match(await r.text(), /not built/);
   } finally { await s.close(); }
 });
