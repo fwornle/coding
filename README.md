@@ -19,7 +19,7 @@ coding update
 # Developing coding itself instead: clone it and run the installer from the checkout
 #   git clone --recurse-submodules https://github.com/fwornle/coding && cd coding && ./install.sh
 
-# Start Claude Code with all features
+# Start Claude Code with the features of your tier
 coding
 
 # Or name the agent (bare word or flag: `coding pi` = `coding --pi`)
@@ -38,10 +38,13 @@ cat file.js | llm "Review this code"
 
 ### 🐳 Docker Deployment
 
-The coding stack runs in Docker — there is no native fallback.
+Whether Docker is needed depends on your tier. The default `harness` tier (launcher,
+status line, health monitoring, LLM proxy) runs entirely on the host and never asks for
+Docker. Only `knowledge`, `codegraph` and `constraints` need the `coding-services`
+container, so the `learning`, `learning-perf` and `everything` tiers do.
 
 ```bash
-# Start Claude or CoPilot — Docker services start automatically
+# Start Claude or CoPilot — when your tier needs it, Docker services start automatically
 coding claude
 coding copilot
 ```
@@ -63,7 +66,7 @@ coding copilot
 | **OpenCode** | `coding opencode` | SQLite store — the host's own, plus the agent box's exported copy |
 | **Pi** | `coding pi` | Session JSONL (`<project>/.observations/pi-sessions/`) |
 
-All four run in the agent box by default (`--no-box` runs on the host); see [Session logs from the box](docs-content/core-systems/agent-box.md#session-logs-from-the-box).
+Where they run is the `run:` setting (`coding-features run auto|box|strict-box|host`). The default, `auto`, runs them in the agent box while `constraints` is on and on the host otherwise; `--box` / `--no-box` override it for one launch. See [Session logs from the box](docs-content/core-systems/agent-box.md#session-logs-from-the-box).
 
 The agent is the first word after `coding`; the flag form (`coding --claude`, `--copilot`, `--opencode`, `--pi`) works the same. Plain `coding` always starts Claude Code.
 
@@ -79,7 +82,7 @@ See [Agent Integration Guide](docs/agent-integration-guide.md) for adding new ag
 
 **Health System**: The health verifier reads cached commit info from `cache-metadata.json` (no `.git` inside the container) and uses supervisorctl for service restarts.
 
-The Docker stack runs 3 containers (coding-services, Qdrant, Redis) with 10 internal services managed by supervisord, using ~1.75 GB memory total. Code-graph analysis is provided by graphify, which runs inside `coding-services` and serves a static, file-based `graph.json` (no separate database container). The only host-side service is the LLM CLI Proxy (port 12435), which bridges to host-local CLI tools like Claude Code and GitHub Copilot.
+The Docker stack runs 3 containers (coding-services, Qdrant, Redis) with 10 internal services managed by supervisord, using ~1.75 GB memory total. Code-graph analysis is provided by graphify, which runs inside `coding-services` and serves a static, file-based `graph.json` (no separate database container). Several services run on the host rather than in the container, each gated by its feature: the LLM CLI Proxy (port 12435, `llm-proxy`), which bridges to host-local CLI tools like Claude Code and GitHub Copilot; the health coordinator and the dashboard servers (`health`); and the Observations API (`obs-api`, `observations`). Under the `harness` tier these host services are all that runs — the proxy, the coordinator and the dashboard.
 
 ![Docker Container Architecture](docs/images/dockerized-system-architecture.png)
 
@@ -408,36 +411,49 @@ start_workflow {
 
 ### Choosing what runs
 
-`coding` is composable. Nine features can be switched on and off independently —
+`coding` is composable. Twelve features can be switched on and off independently —
 and the parts you switch off do not install, do not start, do not appear in the
 dashboard and do not appear in the status line.
 
 | feature | what it is |
 |---------|------------|
 | `lsl` | verbatim session logging (`.coding/history/`, `.jsonl`) |
+| `lsl-redirect` | file toolchain turns from other projects into the tools repo (developer only) |
 | `observations` | the observation → digest → insight pipeline |
 | `knowledge` | semantic analysis, UKB workflows, knowledge graph, VKB |
 | `codegraph` | the graphify code knowledge graph |
 | `constraints` | guardrail rules checked before every tool call |
 | `llm-proxy` | provider routing, fallback and token accounting |
 | `performance` | measurement, experiments, benchmarks |
+| `teams` | share learning with a team: Teams tab, teammates' repos, team-wide injection |
+| `cluster` | the on-prem GPU cluster tab (nodes, models, jobs, routing) |
 | `health` | health coordinator and the monitoring dashboard |
 | `statusline` | the tmux / agent status line |
+
+`llm-proxy` carries one sub-switch, **job-class labelling** (label each turn with its
+job class), which is stored on the proxy rather than in `features.yaml`. Two settings
+sit beside the features: `run:` — where agents run (`auto`, `box`, `strict-box`,
+`host`; `auto` = the agent box while `constraints` is on, else the host) — and
+`agents:`, which agents `coding` offers.
 
 ```bash
 coding-features status                 # what is on, and why
 coding-features profile harness        # launcher, health, LLM proxy — no Docker needed
 coding-features set constraints off    # turn one thing off
 coding-features explain knowledge      # why is this off?
+coding-features run                    # where agents run (auto | box | strict-box | host)
+coding-features agents set claude,pi   # offer only these agents
 ```
 
 Or use the dashboard: **http://localhost:3032 → Features**.
 
 The installer offers four tiers, each including the one before:
 `harness` (launcher, status line, health, LLM proxy — no Docker; the default),
-`learning` (+ session logging, online + UKB learning, viewer), `learning-perf`
-(+ performance measurement) and `everything` (+ constraints, code graph). Pick
-one at install time with `./install.sh --features=learning`, or change your
+`learning` (+ session logging, online + UKB learning, viewer, team sharing),
+`learning-perf` (+ performance measurement) and `everything` (+ constraints,
+code graph, cluster tab). Pick
+one at install time with `./install.sh --features=learning` (or, with the
+one-liner, `curl -fsSL https://github.com/fwornle/coding/releases/latest/download/coding-install.sh | bash -s -- --features=learning`), or change your
 mind later — a feature enabled after install is set up by
 `coding-features repair`. `full` (everything + `lsl-redirect`) is the
 developer profile and is never offered.

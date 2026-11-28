@@ -103,8 +103,9 @@ nav:
   - Getting Started:
     - Overview: getting-started/index.md
     - Installation: getting-started/installation.md
-    - Verify & Repair: getting-started/verify-repair.md
     - Configuration: getting-started/configuration.md
+    - Updating: getting-started/updating.md
+    - Verify & Repair: getting-started/verify-repair.md
   - Core Systems:
     - Overview: core-systems/index.md
     - Live Session Logging: core-systems/lsl.md

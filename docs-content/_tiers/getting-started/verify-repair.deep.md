@@ -185,8 +185,8 @@ docker compose -f docker/docker-compose.yml up -d
 # Verify MCP config
 cat ~/.claude/settings.json | jq '.mcpServers'
 
-# Reinstall hooks and config
-./install.sh --mcp-only
+# Re-run the installer: it is idempotent and re-registers MCP config and hooks
+~/.coding/releases/current/install.sh     # a checkout: ./install.sh
 ```
 
 ### LSL Not Recording
@@ -239,30 +239,34 @@ node ~/Agentic/coding/dist/embedding/backfill.js
 
 ## Repair Commands
 
-### Full Repair
+### After a bad update
 
 ```bash
-./install.sh --repair
+coding update --rollback        # back to the previous release, services restarted
+coding releases status          # which releases are installed, which is current
+coding releases use <version>   # switch to another installed one (takes effect on next start)
 ```
 
-This will:
-1. Check all prerequisites
-2. Reinstall missing components
-3. Rebuild Docker containers
-4. Reset configuration to defaults
-5. Restart all services
-
-### Selective Repair
+### Re-run the installer
 
 ```bash
-# Repair only MCP configuration
-./install.sh --mcp-only
+~/.coding/releases/current/install.sh     # a checkout: ./install.sh
+```
 
-# Repair only hooks
-./install.sh --hooks-only
+It is idempotent: it checks prerequisites, installs what is missing for your tier and
+re-registers MCP config, hooks and background services. It has no partial modes; an unknown
+option makes it exit with status 2.
 
-# Rebuild Docker containers
-cd docker && docker-compose build --no-cache && docker-compose up -d
+### A feature switched on after install
+
+```bash
+coding-features repair          # runs the install steps of every enabled feature
+```
+
+### Rebuild the services container
+
+```bash
+cd docker && docker compose build --no-cache && docker compose up -d
 ```
 
 ### Reset to Clean State
@@ -280,7 +284,7 @@ rm -rf .data .health .logs .cache
 rm -f .transition-in-progress
 
 # Reinstall
-./install.sh
+~/.coding/releases/current/install.sh     # a checkout: ./install.sh
 ```
 
 ---

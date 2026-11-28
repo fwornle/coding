@@ -33,6 +33,8 @@ Checking that the installation actually works, and fixing it when it does not.
     | `coding` not found | Shell not reloaded since install |
     | Missing tools in the agent | A container that never started |
     | A project absent from the status line | No session monitor for it |
+    | Broken right after `coding update` | Roll back: `coding update --rollback` |
+    | A feature switched on but not working | `coding-features repair` |
 
     ## Full reset
 
@@ -77,6 +79,16 @@ Checking that the installation actually works, and fixing it when it does not.
 
     **A project missing from the status line** — that project has no session monitor. This is
     different from having an unhealthy one, and the fix is different too.
+
+    **Broken right after an update** — `coding update --rollback` switches back to the previous
+    release and restarts the services. `coding releases status` shows what is installed. See
+    [Updating](updating.md).
+
+    **A feature you switched on later does not work** — `coding-features repair` runs the
+    install steps of every enabled feature. It is safe to run again.
+
+    **Configuration lost or damaged** — re-run the installer of the current release,
+    `~/.coding/releases/current/install.sh` (a checkout: `./install.sh`). It is idempotent.
 
     **Everything looks fine but nothing is happening** — look for a wedged process. One that has
     stalled does not die: it answers `ps`, holds its ports, and stops doing work. Sample it rather

@@ -1,0 +1,111 @@
+@startuml release-update-flow
+!include _standard-style.puml
+
+title Updating coding — release check, ""coding update"", going back
+
+start
+
+partition "Release check  (health coordinator :3034, lib/install/release-check.mjs)" {
+  :60 s after the coordinator starts,
+  then every 6 h;
+  if (dev checkout, or CODING_UPDATE_CHECK=off?) then (yes)
+    #FFFACD:no check;
+    detach
+  else (no)
+    :read the ""releases/latest"" redirect
+    (curl, proxy variables apply — not the GitHub API);
+    :write &#126;/.coding/release-check.json;
+    note right: a failed check records ""error""\nbut keeps a known update
+  endif
+}
+
+if (newer release available?) then (no)
+  stop
+else (yes)
+endif
+
+fork
+  :Status line shows ""[⬆ x.y.z]""
+  (reads the file only, never the network);
+  :click → ""coding update"" in a tmux popup;
+fork again
+  :Dashboard banner (release-banner.tsx)
+  version, release notes, release page;
+  :Update → POST /api/release/update
+  → coordinator starts ""coding update"" detached;
+  note right: progress: GET /api/release/update\n(pid file + UPDATE_EXIT= in &#126;/.coding/update.log)
+fork again
+  :user runs ""coding update"" in a terminal;
+end fork
+
+partition "coding update  (lib/install/update.mjs)" {
+  if (channel?) then (dev checkout)
+    if (--pull?) then (yes)
+      :""git pull --ff-only""
+      ""git submodule update ~--init ~--recursive"";
+      :restart your coding sessions;
+    else (no)
+      :print those git commands, change nothing;
+    endif
+    stop
+  else (release)
+  endif
+
+  :1. latest version from the redirect;
+  if (newer than installed?) then (no)
+    :""coding <ver> is the latest release"";
+    stop
+  else (yes)
+  endif
+  if (--check?) then (yes)
+    :report the available version, install nothing;
+    stop
+  else (no)
+  endif
+
+  :2. download tarball + .sha256, verify,
+  adopt as &#126;/.coding/releases/<ver>/  (beside current);
+  :3. carry machine files from current
+  (.env, .npmrc, .coding, .data);
+  :4. ""<ver>/install.sh --update=build""
+  (npm installs + builds in the new folder only);
+  :5. Docker feature on → ""docker pull""
+  ghcr.io/fwornle/coding-services:<ver>;
+  note right
+    Any failure in 1–5: exit 1,
+    nothing switched — the running
+    release is untouched.
+  end note
+
+  #E8F5E8:6. flip ""current"" → <ver>
+  (install.json records previous);
+  :7. ""current/install.sh --update=register""
+  (MCP config, agent settings, hooks, daemons, .activate);
+  :8. apply-features, restart installed daemons,
+  recreate the coding-services container;
+
+  if (7 and 8 succeeded?) then (yes)
+    #E8F5E8:installed and running;
+  else (no)
+    #FFF2E6:flip back to previous + restart again;
+    note right: the new release stays\nunpacked for a retry
+  endif
+}
+
+stop
+
+start
+partition "Going back" {
+  switch (command)
+  case (coding update --rollback)
+    :flip ""current"" to previous
+    (from install.json);
+    :restart daemons + container;
+  case (coding releases use <ver>)
+    :flip ""current"" to an installed <ver>;
+    note right: no restart — daemons pick it\nup at their next start
+  endswitch
+}
+stop
+
+@enduml

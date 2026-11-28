@@ -1,4 +1,82 @@
-Highlights since the v6.0 Knowledge Context Injection milestone (commit `0fdb7665`). Grouped by subsystem.
+Highlights since the v6.0 Knowledge Context Injection milestone (commit `0fdb7665`). Grouped by subsystem. Since 8.0.0 `coding` is also published as numbered releases; those
+entries come first, newest first.
+
+---
+
+## Unreleased — a map on the Features tab
+
+The dashboard's Features tab gains **How the parts fit**, a clickable map beside the feature
+list. Click a box to switch that feature, or a family title (Learning, LLM & measurement,
+Guardrails & code, Monitoring) to switch the whole family. Dependencies are honoured exactly
+as in the list — a box whose dependency is off will not switch on and says what is missing —
+and nothing is saved until **Save & apply**. See [Composing What Runs](guides/features.md).
+
+---
+
+## Release 8.0.2 (2026-11-28)
+
+A patch release.
+
+- The generated release notes list `wip(...)` work and name the one-line install in their
+  Install section (`73e01fcd`).
+- `coding releases` and `coding update` no longer crash with an unhandled `EPIPE` when their
+  output goes into a pipe that closes early (`coding releases status | head`).
+
+---
+
+## Release 8.0.1 (2026-11-28)
+
+The first release that installs and updates itself.
+
+- **One-line install.** Each release publishes `coding-install.sh`. On a new machine:
+
+    ```bash
+    curl -fsSL https://github.com/fwornle/coding/releases/latest/download/coding-install.sh | bash
+    ```
+
+    It downloads the release tarball, checks it against its `.sha256`, installs it into
+    `~/.coding/releases/<version>` and runs that release's installer. Installer options pass
+    through: `| bash -s -- --features=learning`. `scripts/release/verify-install.sh` checks
+    an install on macOS, Linux and WSL (`25521555`, `f2b61334`, `231cf994`).
+- **`coding update`** downloads, verifies, installs beside the current release, switches and
+  restarts; `--check` only reports, `--rollback` goes back, `--pull` updates a development
+  checkout from git (`f426e241`, `8eb17678`). The latest release is found by its download
+  redirect rather than the rate-limited GitHub API (`53fd17cb`).
+- **Update notice.** When a newer release is out the status line shows `[⬆ x.y.z]` (click it
+  to run `coding update`) and the dashboard shows a banner with an **Update** button and the
+  release notes (`3879a81c`). The status line reads the coordinator's cached check and never
+  touches the network itself.
+
+---
+
+## Release 8.0.0 (2026-11-27)
+
+The first numbered release; `v7.x` remain milestones. Changes since the v7.3 milestone.
+
+- **Release channel.** A release workflow with gates, a tarball per release and the
+  `coding-services` image on GHCR (`b7f580d9`, `50299469`). Installs keep versioned folders
+  under `~/.coding/releases/` with a `current` link and a stable code root, so daemons
+  registered once survive a switch (`96919002`). `coding releases status|list|use
+  <version>|rollback|adopt|remove` manages them.
+- **Teams and Cluster are features.** `teams` (the sharing layer: Teams tab, teammates'
+  shared repos, team-wide injection, gate publishing; needs `lsl`) and `cluster` (the on-prem
+  GPU cluster tab; needs `observations`) can be switched like any other, bringing the
+  catalogue to twelve (`f07ca6db`, `900f7026`).
+- **Job-class labelling switch.** Labelling, a sub-switch of `llm-proxy`, is switched on the
+  Features tab under LLM Proxy and stored on the proxy (`GET`/`PUT
+  /api/job-classes/enabled`) as this machine's choice over the team's (`f07ca6db`).
+- **Run mode and offered agents.** Two settings beside the features: `run:` (`auto`, `box`,
+  `strict-box`, `host`; `auto` = the agent box while `constraints` is on, else the host) and
+  `agents:` (which agents `coding` offers). Both are on the Features tab and in
+  `coding-features run` / `coding-features agents` (`5206a095`).
+- **Core written down.** Every command and dashboard route maps to a feature or to core, and
+  a test fails on one that does not (`0996cd71`).
+- **Agent box and guard.** Agents run in a container under a guard they cannot edit; overrides
+  are approved only through the host guard, with Touch ID, phone, security key or password
+  (`6ea4c045`, `916f0a3e`, `d027cf2c`, `551e3c1c`).
+
+See [Composing What Runs](guides/features.md) and the
+[command reference](reference/commands.md#install-and-update).
 
 ---
 

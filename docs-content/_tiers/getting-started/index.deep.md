@@ -57,13 +57,17 @@ With only `harness` features on, the launcher never starts Docker.
 ## Install
 
 ```bash
-git clone --recurse-submodules https://github.com/fwornle/coding ~/Agentic/coding
-cd ~/Agentic/coding
-./install.sh            # asks: agent scope, tier
+curl -fsSL https://github.com/fwornle/coding/releases/latest/download/coding-install.sh | bash
 source ~/.zshrc         # or ~/.bashrc
 ```
 
+The one-liner installs the latest release into `~/.coding/releases/<version>/` and runs its
+installer, which asks for agent scope and tier. Developing `coding` itself: clone it with
+`--recurse-submodules` and run `./install.sh` in the checkout instead.
+
 ![Which tier](../images/install-tier-menu.png)
+
+Installer flags go after `bash -s --` (e.g. `curl -fsSL https://github.com/fwornle/coding/releases/latest/download/coding-install.sh | bash -s -- --features=learning`):
 
 | Flag | Effect |
 |---|---|
@@ -72,8 +76,9 @@ source ~/.zshrc         # or ~/.bashrc
 | `--yes` | unattended; take the defaults |
 | `--global-agents` | also observe bare `claude` / `copilot` / `opencode` (writes their global configs) |
 
-Everything is reversible with `./uninstall.sh`. The full flow, with every prompt, is on
-[Installation](installation.md).
+Everything is reversible with `uninstall.sh` (in the release folder or the checkout). The full
+flow, with every prompt, is on [Installation](installation.md); keeping it current is on
+[Updating](updating.md): `coding update`, `coding update --rollback`.
 
 ---
 

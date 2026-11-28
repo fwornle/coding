@@ -4,9 +4,25 @@ Highlights since the v6.0 Knowledge Context Injection milestone, grouped by subs
 
 === "⚡ Quick (~3 min)"
 
+    ## Latest releases
+
+    | release | date | in short |
+    |---------|------|----------|
+    | 8.0.2 | 2026-11-28 | patch: release notes name the one-line install; no crash into a closed pipe |
+    | 8.0.1 | 2026-11-28 | one-line install (`coding-install.sh`), `coding update`, the `[⬆ x.y.z]` badge and dashboard banner |
+    | 8.0.0 | 2026-11-27 | first numbered release: release channel, `coding releases`, `teams` and `cluster` as features, job-class labelling switch, `run` and `agents` settings |
+
+    Unreleased: a clickable **How the parts fit** map on the dashboard's Features tab.
+
+    ```bash
+    curl -fsSL https://github.com/fwornle/coding/releases/latest/download/coding-install.sh | bash
+    coding update
+    ```
+
     ## How to read this
 
-    Entries are grouped by **subsystem**, newest first within each, and dated. They record what
+    Numbered releases (since 8.0.0) come first. Older entries are grouped by **subsystem**,
+    newest first within each, and dated. They record what
     changed and — more usefully — what the change was found to be hiding.
 
     ## The recurring theme

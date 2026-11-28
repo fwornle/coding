@@ -24,6 +24,7 @@ The current pane's project is rendered with an underline (`#[underscore]…#[nou
 | Local Execution | `[L:3]` | Completions served by hardware we own — absent at zero |
 | Context Window | `███░░░░░&nbsp;&nbsp;42%` | How full THIS pane's agent conversation is — see [Context Window Gauge](#context-window-gauge) |
 | LSL Time Window | `[📋18-19]` | Session time range (HHMM-HHMM) |
+| Release | `[⬆ 8.0.2]` | A newer release is out — read from `~/.coding/release-check.json`, written by the health coordinator's release check; the status line never touches the network. Click runs `coding update` in a popup. Absent when there is nothing newer |
 | Time | `18:34` | Local HH:MM, anchored to the right edge |
 
 The context gauge is the one segment with no `[…]` brackets and no leading emoji: it
@@ -512,8 +513,9 @@ client context of its own.
 
 ### Dispatcher
 
-`bin/statusline-click` maps a tag to an action. Every action is read-only, because a status
-line is glanced at far more often than it is deliberately clicked.
+`bin/statusline-click` maps a tag to an action. Every action but `update` is read-only,
+because a status line is glanced at far more often than it is deliberately clicked; `update`
+exists only while a newer release is out, and its whole purpose is to install it.
 
 | Tag | Action |
 |-----|--------|
@@ -524,6 +526,7 @@ line is glanced at far more often than it is deliberately clicked.
 | `constraints` | Constraint dashboard on `:3030` |
 | `p:<project>` | That project's `origin` remote, converted to a browsable URL |
 | `net`, `semantic`, `ctx` | A report in a `display-popup` |
+| `update` | `coding update` running in a `display-popup` |
 
 Two things do not reach the dispatcher and have to be recovered:
 
