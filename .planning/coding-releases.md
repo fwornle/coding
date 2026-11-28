@@ -269,12 +269,13 @@ developer — no PRs in coding).
 
 ## Session log
 
-- **2026-11-28 (glass 0.1.102 cut)** — overlay version 0.1.101 → 0.1.102
+- **2026-11-28 (glass 0.1.102 released)** — overlay version 0.1.101 → 0.1.102
   (coding ecda12c5, merged e8134182). Ships what reached glass since v0.1.101:
   the `[⬆` update rule in `lib/statusline/clickable.cjs`, the README's
   update-badge wording, the rebuilt UI. Extracted from coding e8134182 + proxy
-  259a0a1 → bmw AIMAAD/glass#147, public fwornle/glass#115; CI running — merge
-  on green, then glass's release workflow publishes v0.1.102 on both targets.
+  259a0a1 → bmw AIMAAD/glass#147, public fwornle/glass#115; CI green on both,
+  merged → glass **v0.1.102** released on both targets (`glass-0.1.102.tgz`
+  attached, install check inside the release workflow).
 
 - **2026-11-28 (feature map + install/configure/update docs)** — Features tab
   gains a clickable map (`feature-map.tsx`): click a module to toggle it in the
