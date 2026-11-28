@@ -269,6 +269,11 @@ developer — no PRs in coding).
 
 ## Session log
 
+- **2026-11-28 (8.0.2)** — notes generator lists `wip(...)` work and names the
+  one-liner in Install; the 8.0.1 page + notes asset regenerated with it. No
+  EPIPE crash from `coding releases`/`coding update` into a closed pipe.
+  v8.0.2 published (run 46131524282, all gates green; image amd64 + arm64).
+
 - **2026-11-28 (8.0.1 + glass 0.1.101 released)** — coding **v8.0.1** published
   (run 46125848487: all gates green; assets tarball, .sha256, notes,
   `coding-install.sh`); `releases/latest/download/coding-install.sh` live, and
