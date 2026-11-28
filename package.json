@@ -1,6 +1,6 @@
 {
   "name": "agent-agnostic-coding-tools",
-  "version": "8.0.2",
+  "version": "8.1.0",
   "description": "Unified coding tools that work with both Claude Code (MCP) and GitHub CoPilot (fallbacks)",
   "main": "lib/agent-registry.cjs",
   "type": "module",
